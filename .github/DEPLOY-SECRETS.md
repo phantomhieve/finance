@@ -25,11 +25,13 @@ App secrets (Django, DB, OAuth, API keys) stay on the server in `.env` only.
 | `DEPLOY_CRON_LOG` | `/var/log/vault/cron.log` |
 | `DEPLOY_HEALTHCHECK_URL` | *(skip)* |
 
-## Workflows
+## Workflow
 
-| File | Trigger |
-|------|---------|
-| `.github/workflows/ci.yml` | push/PR → `manage.py check` |
-| `.github/workflows/deploy.yml` | push to `main` / manual → check + `./scripts/deploy.sh` |
+Single pipeline: `.github/workflows/ci.yml`
+
+| Job | When |
+|-----|------|
+| `check` | Every push / PR → `manage.py check` |
+| `deploy` | After `check` succeeds, on push to `main` or manual dispatch only (not on PR) |
 
 Local deploy: copy `scripts/DEPLOY.env.example` → `scripts/DEPLOY.env` (gitignored).
