@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # One-time: least-privilege deploy user (same model as cashcenter).
 # Run as root on the app server:
-#   sudo APP_OWNER=atul APP_DIR=/path/to/app \
-#        DEPLOY_USER=vault-deploy DEPLOY_PUBKEY="$(cat deploy.pub)" \
+#   sudo APP_OWNER=your-app-user APP_DIR=/path/to/app \
+#        DEPLOY_USER=your-deploy-user DEPLOY_PUBKEY="$(cat deploy.pub)" \
 #        bash setup-deploy-user.sh
 #
 # Optional: STATIC_DIR, SERVICE_NAME, CRON_NAME, CRON_LOG (defaults below).
