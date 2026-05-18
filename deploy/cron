@@ -1,0 +1,12 @@
+# App scheduled tasks — installed to /etc/cron.d/__CRON_NAME__ (chmod 644, root:root)
+# Placeholders __APP_DIR__, __APP_OWNER__, __CRON_LOG__ are substituted at deploy time.
+
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+CRON_TZ=Asia/Kolkata
+
+# Daily 6:00 AM IST — Google Sheets sync, then commodity prices.
+0 6 * * *  __APP_OWNER__  cd __APP_DIR__ && set -a && . ./.env && set +a && venv/bin/python manage.py sync_sheets >> __CRON_LOG__ 2>&1 ; venv/bin/python manage.py refresh_prices >> __CRON_LOG__ 2>&1
+
+# Monthly portfolio snapshot — 6:00 AM IST on day 1
+0 6 1 * *  __APP_OWNER__  cd __APP_DIR__ && set -a && . ./.env && set +a && venv/bin/python manage.py take_snapshot >> __CRON_LOG__ 2>&1
