@@ -1,0 +1,41 @@
+<script>
+(function() {
+  var goldOpts = [
+    {v:'24k', t:'24k (999)'},
+    {v:'22k', t:'22k (916)'},
+    {v:'18k', t:'18k (750)'},
+    {v:'14k', t:'14k (585)'}
+  ];
+  var silverOpts = [
+    {v:'999', t:'999 (Fine Silver)'},
+    {v:'925', t:'925 (Sterling)'},
+    {v:'900', t:'900'},
+    {v:'800', t:'800'}
+  ];
+
+  function updatePurityOptions(typeSelect, puritySelect, keepValue) {
+    var opts = typeSelect.value === 'SILVER' ? silverOpts : goldOpts;
+    var prev = keepValue || puritySelect.value;
+    puritySelect.innerHTML = '';
+    opts.forEach(function(o) {
+      var opt = document.createElement('option');
+      opt.value = o.v;
+      opt.textContent = o.t;
+      puritySelect.appendChild(opt);
+    });
+    var found = opts.some(function(o) { return o.v === prev; });
+    puritySelect.value = found ? prev : opts[0].v;
+  }
+
+  var typeEl = document.querySelector('#commodityForm [name=commodity_type]');
+  var purityEl = document.querySelector('#commodityForm [name=purity]');
+  if (typeEl && purityEl) {
+    typeEl.addEventListener('change', function() {
+      updatePurityOptions(typeEl, purityEl);
+    });
+    updatePurityOptions(typeEl, purityEl);
+  }
+
+  window._updateCommodityPurity = updatePurityOptions;
+})();
+</script>

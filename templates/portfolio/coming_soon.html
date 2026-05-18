@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+
+{% block title %}Portfolio — Vault{% endblock %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+  <div>
+    <p class="text-xs font-bold tracking-widest uppercase text-primary">Portfolio</p>
+    <h1 class="text-xl lg:text-2xl font-extrabold">Investment Tracker</h1>
+    <p class="text-xs opacity-50">Track your wealth across all asset classes</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col items-center justify-center text-center py-20 animate-up">
+  <div class="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-6">
+    <span class="material-symbols-outlined text-5xl text-primary">query_stats</span>
+  </div>
+  <h2 class="text-2xl font-extrabold mb-3">Portfolio Coming Soon</h2>
+  <p class="text-sm opacity-50 max-w-md mb-8">
+    We're building an advanced analytics platform to track your investments
+    across stocks, mutual funds, gold, crypto, and more.
+  </p>
+  <div class="flex flex-wrap justify-center gap-2 mb-8">
+    <span class="badge badge-outline gap-1"><span class="material-symbols-outlined text-sm">candlestick_chart</span>Equities</span>
+    <span class="badge badge-outline gap-1"><span class="material-symbols-outlined text-sm">bar_chart</span>Mutual Funds</span>
+    <span class="badge badge-outline gap-1"><span class="material-symbols-outlined text-sm">diamond</span>Gold & Silver</span>
+    <span class="badge badge-outline gap-1"><span class="material-symbols-outlined text-sm">currency_bitcoin</span>Crypto</span>
+    <span class="badge badge-outline gap-1"><span class="material-symbols-outlined text-sm">real_estate_agent</span>Real Estate</span>
+    <span class="badge badge-outline gap-1"><span class="material-symbols-outlined text-sm">account_balance</span>Fixed Deposits</span>
+  </div>
+  <a href="{% url 'dashboard' %}" class="btn btn-ghost btn-sm gap-1">
+    <span class="material-symbols-outlined text-base">arrow_back</span>Back to Dashboard
+  </a>
+</div>
+{% endblock %}

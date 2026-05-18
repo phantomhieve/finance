@@ -1,0 +1,179 @@
+{% extends 'base.html' %}
+
+{% block title %}Unlock Portfolio — Vault{% endblock %}
+
+{% block page_header %}
+<div class="flex items-center gap-2">
+  <span class="material-symbols-outlined text-xl text-primary">lock</span>
+  <h1 class="text-lg font-bold">Portfolio Locked</h1>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-center min-h-[60vh]">
+  <div class="card bg-base-200 shadow-xl w-full max-w-sm">
+    <div class="card-body items-center text-center">
+      <div class="mb-2">
+        <span class="material-symbols-outlined text-5xl text-primary/60">shield_lock</span>
+      </div>
+
+      {% if has_password %}
+
+      {% if messages %}
+      {% for message in messages %}
+      <div role="alert" class="alert alert-error text-sm w-full mb-2">
+        <span class="material-symbols-outlined text-base">error</span>
+        <span>{{ message }}</span>
+      </div>
+      {% endfor %}
+      {% endif %}
+
+      {% if has_webauthn %}
+      <div id="biometricSection">
+        <h2 class="card-title text-base">Unlock Portfolio</h2>
+        <p class="text-xs opacity-50 mb-4">Authenticate to access your portfolio.</p>
+        <button type="button" id="biometricBtn" class="btn btn-primary btn-block gap-2" onclick="startBiometricAuth()">
+          <span class="material-symbols-outlined text-base">fingerprint</span>
+          Unlock with Biometrics
+        </button>
+        <div id="biometricError" class="alert alert-error text-sm w-full mt-3 hidden">
+          <span class="material-symbols-outlined text-base">error</span>
+          <span id="biometricErrorMsg"></span>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm mt-4 opacity-50" onclick="showPasswordForm()">
+          Use password instead
+        </button>
+      </div>
+      {% endif %}
+
+      <div id="passwordSection" {% if has_webauthn %}style="display:none"{% endif %}>
+        <h2 class="card-title text-base">Enter Portfolio Password</h2>
+        <p class="text-xs opacity-50 mb-4">Access expires after 5 minutes of inactivity.</p>
+        <form method="post" class="w-full">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ next }}">
+          <div class="form-control w-full">
+            <input type="password" name="password" placeholder="Password" required
+                   class="input input-bordered w-full text-center tracking-widest" />
+          </div>
+          <button type="submit" class="btn btn-primary btn-block mt-4 gap-2">
+            <span class="material-symbols-outlined text-base">lock_open</span>
+            Unlock
+          </button>
+        </form>
+        {% if has_webauthn %}
+        <button type="button" class="btn btn-ghost btn-sm mt-3 opacity-50" onclick="showBiometricSection()">
+          Use biometrics instead
+        </button>
+        {% endif %}
+      </div>
+
+      {% else %}
+      <h2 class="card-title text-base">Portfolio Unavailable</h2>
+      <p class="text-xs opacity-50">No portfolio password has been configured. Contact your administrator.</p>
+      {% endif %}
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{% if has_webauthn %}
+<script>
+function _b64urlToBytes(b64url) {
+  var s = b64url.replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  var raw = atob(s);
+  var arr = new Uint8Array(raw.length);
+  for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+
+function _bytesToB64url(buf) {
+  var bytes = new Uint8Array(buf);
+  var str = '';
+  for (var i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i]);
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function _getCsrf() {
+  var c = document.cookie.match(/csrftoken=([^;]+)/);
+  return c ? c[1] : document.querySelector('[name=csrfmiddlewaretoken]').value;
+}
+
+function showPasswordForm() {
+  document.getElementById('biometricSection').style.display = 'none';
+  document.getElementById('passwordSection').style.display = '';
+}
+
+function showBiometricSection() {
+  document.getElementById('passwordSection').style.display = 'none';
+  document.getElementById('biometricSection').style.display = '';
+}
+
+async function startBiometricAuth() {
+  var btn = document.getElementById('biometricBtn');
+  var errBox = document.getElementById('biometricError');
+  errBox.classList.add('hidden');
+  btn.classList.add('btn-disabled');
+  btn.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Verifying…';
+
+  try {
+    var beginResp = await fetch('{% url "webauthn_auth_begin" %}', {
+      method: 'POST',
+      headers: {'X-CSRFToken': _getCsrf(), 'Content-Type': 'application/json'},
+    });
+    if (!beginResp.ok) throw new Error((await beginResp.json()).error || 'Failed to start.');
+    var options = await beginResp.json();
+
+    options.challenge = _b64urlToBytes(options.challenge);
+    if (options.allowCredentials) {
+      options.allowCredentials = options.allowCredentials.map(function(c) {
+        return {id: _b64urlToBytes(c.id), type: c.type, transports: c.transports};
+      });
+    }
+
+    var assertion = await navigator.credentials.get({publicKey: options});
+
+    var body = {
+      id: assertion.id,
+      rawId: _bytesToB64url(assertion.rawId),
+      type: assertion.type,
+      response: {
+        authenticatorData: _bytesToB64url(assertion.response.authenticatorData),
+        clientDataJSON: _bytesToB64url(assertion.response.clientDataJSON),
+        signature: _bytesToB64url(assertion.response.signature),
+      },
+    };
+    if (assertion.response.userHandle) {
+      body.response.userHandle = _bytesToB64url(assertion.response.userHandle);
+    }
+
+    var completeResp = await fetch('{% url "webauthn_auth_complete" %}', {
+      method: 'POST',
+      headers: {'X-CSRFToken': _getCsrf(), 'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    if (!completeResp.ok) throw new Error((await completeResp.json()).error || 'Verification failed.');
+
+    window.location.href = '{{ next|escapejs }}';
+  } catch (e) {
+    btn.classList.remove('btn-disabled');
+    btn.innerHTML = '<span class="material-symbols-outlined text-base">fingerprint</span> Unlock with Biometrics';
+    if (e.name === 'NotAllowedError') return;
+    errBox.classList.remove('hidden');
+    document.getElementById('biometricErrorMsg').textContent = e.message || 'Biometric auth failed.';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  if (window.PublicKeyCredential) {
+    setTimeout(startBiometricAuth, 400);
+  } else {
+    showPasswordForm();
+  }
+});
+</script>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,186 @@
+{% extends 'base.html' %}
+{% load indian_format %}
+
+{% block title %}EPF — Portfolio — Vault{% endblock %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+  <div>
+    <p class="text-xs font-bold tracking-widest uppercase text-primary">Portfolio</p>
+    <h1 class="text-2xl font-bold mt-1">Employee Provident Fund</h1>
+    <p class="text-sm opacity-60 mt-0.5">All contributions &amp; interest entries</p>
+  </div>
+  <div class="flex flex-wrap items-center gap-2">
+    <button type="button" class="btn btn-ghost btn-sm gap-1" onclick="openAddModal()">
+      <span class="material-symbols-outlined text-base">add</span>Add Entry
+    </button>
+    <a href="{% url 'portfolio_tracker' %}" class="btn btn-ghost btn-sm gap-1">
+      <span class="material-symbols-outlined text-base">arrow_back</span>Portfolio
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card hero-gradient-portfolio shadow-sm card-hover animate-up">
+  <div class="card-body p-4">
+    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
+      <div>
+        <div class="text-[10px] font-bold uppercase tracking-widest opacity-40">EPF Balance</div>
+        <div class="text-3xl font-bold mt-1">₹{{ balance|floatformat:0|indian_number }}</div>
+      </div>
+      <div class="flex flex-wrap gap-3">
+        <div class="stat-card stat-card-primary">
+          <div class="text-[10px] uppercase tracking-wider opacity-50">Contributions</div>
+          <div class="text-lg font-bold mt-0.5">₹{{ total_contrib|floatformat:0|indian_number }}</div>
+        </div>
+        <div class="stat-card stat-card-success">
+          <div class="text-[10px] uppercase tracking-wider opacity-50">Interest</div>
+          <div class="text-lg font-bold mt-0.5">₹{{ total_interest|floatformat:0|indian_number }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card bg-base-200 shadow-sm card-hover animate-up mt-4" style="animation-delay:0.1s">
+  <div class="card-body p-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+      <h2 class="text-lg font-semibold">All Entries</h2>
+      <span class="badge badge-primary badge-sm">{{ entries|length }}</span>
+    </div>
+    {% if entries %}
+    {# Desktop table #}
+    <div class="hidden md:block overflow-x-auto">
+      <table class="table table-sm" id="epfTable">
+        <thead>
+          <tr>
+            <th class="sortable-th cursor-pointer select-none">Date <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none">Type <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none text-right">Amount <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+            <th>Remarks</th>
+            <th class="w-12"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in entries %}
+          <tr class="hover">
+            <td class="opacity-60 text-sm whitespace-nowrap" data-val="{{ e.date|date:'Ymd' }}">{{ e.date|date:"d M Y" }}</td>
+            <td>
+              {% if e.entry_type == 'CONTRIBUTION' %}
+              <span class="badge badge-primary badge-sm">{{ e.get_entry_type_display }}</span>
+              {% else %}
+              <span class="badge badge-ghost badge-sm">{{ e.get_entry_type_display }}</span>
+              {% endif %}
+            </td>
+            <td class="text-right whitespace-nowrap font-semibold text-success" data-val="{{ e.amount }}">+₹{{ e.amount|floatformat:0|indian_number }}</td>
+            <td class="opacity-60 text-sm">{{ e.remarks|default:"—" }}</td>
+            <td class="text-right">
+              <button type="button" class="btn btn-ghost btn-xs btn-square" data-edit-epf data-id="{{ e.id }}" data-date="{{ e.date|date:'Y-m-d' }}" data-type="{{ e.entry_type }}" data-amount="{{ e.amount }}" data-remarks="{{ e.remarks }}">
+                <span class="material-symbols-outlined text-base">edit</span>
+              </button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {# Mobile card view #}
+    <div class="md:hidden space-y-2">
+      {% for e in entries %}
+      <div class="table-card flex items-center justify-between gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2">
+            <span class="font-semibold text-sm text-success">+₹{{ e.amount|floatformat:0|indian_number }}</span>
+            {% if e.entry_type == 'CONTRIBUTION' %}<span class="badge badge-primary badge-xs">Contribution</span>{% else %}<span class="badge badge-ghost badge-xs">Interest</span>{% endif %}
+          </div>
+          <div class="text-xs opacity-50 mt-0.5 truncate">{{ e.date|date:"d M Y" }}{% if e.remarks %} · {{ e.remarks }}{% endif %}</div>
+        </div>
+        <button type="button" class="btn btn-ghost btn-xs btn-square shrink-0" data-edit-epf data-id="{{ e.id }}" data-date="{{ e.date|date:'Y-m-d' }}" data-type="{{ e.entry_type }}" data-amount="{{ e.amount }}" data-remarks="{{ e.remarks }}">
+          <span class="material-symbols-outlined text-base">edit</span>
+        </button>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm opacity-60 py-4">No EPF entries yet.</p>
+    {% endif %}
+  </div>
+</div>
+
+<dialog class="modal" id="addEpfModal">
+  <div class="modal-box max-w-lg">
+    <div class="flex items-start justify-between gap-2 mb-4">
+      <h3 id="epfModalTitle" class="font-bold text-lg flex items-center gap-2">
+        <span class="material-symbols-outlined text-primary">add_circle</span> Add EPF Entry
+      </h3>
+      <button type="button" class="btn btn-ghost btn-xs btn-square" onclick="closeModal('addEpfModal')" aria-label="Close">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <form id="epfForm" method="post" action="{% url 'add_epf_entry' %}">{% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <div class="space-y-3">
+        <div class="grid grid-cols-2 gap-4">
+          <div class="form-field">
+            <label class="label text-xs font-semibold">Date</label>
+            {{ form.date }}
+          </div>
+          <div class="form-field">
+            <label class="label text-xs font-semibold">Type</label>
+            {{ form.entry_type }}
+          </div>
+        </div>
+        <div class="form-field">
+          <label class="label text-xs font-semibold">Amount (₹)</label>
+          {{ form.amount }}
+        </div>
+        <div class="form-field">
+          <label class="label text-xs font-semibold">Remarks <span class="opacity-40 font-normal">optional</span></label>
+          {{ form.remarks }}
+        </div>
+      </div>
+      <div class="modal-action flex-wrap gap-2 mt-6">
+        <button type="button" id="epfDeleteBtn" class="btn btn-error btn-sm gap-1 mr-auto hidden" onclick="confirmDelete('deleteEpfForm')">
+          <span class="material-symbols-outlined text-base">delete</span>Delete
+        </button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addEpfModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm gap-1">
+          <span class="material-symbols-outlined text-base">save</span>Save
+        </button>
+      </div>
+    </form>
+    <form id="deleteEpfForm" method="post" action="" class="hidden">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+{% endblock %}
+
+{% block extra_js %}
+{% include 'portfolio/_sortable_js.html' %}
+<script>
+function openAddModal() {
+  var form = document.getElementById('epfForm');
+  form.action = "{% url 'add_epf_entry' %}";
+  form.reset();
+  document.getElementById('epfDeleteBtn').classList.add('hidden');
+  document.getElementById('epfModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span> Add EPF Entry';
+  openModal('addEpfModal');
+}
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-edit-epf]');
+  if (!btn) return;
+  var form = document.getElementById('epfForm');
+  form.action = "{% url 'edit_epf_entry' pk=0 %}".replace('/0/', '/' + btn.dataset.id + '/');
+  document.getElementById('deleteEpfForm').action = "{% url 'delete_epf_entry' pk=0 %}".replace('/0/', '/' + btn.dataset.id + '/');
+  document.getElementById('epfDeleteBtn').classList.remove('hidden');
+  document.getElementById('epfModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">edit</span> Edit EPF Entry';
+  form.querySelector('[name=date]').value = btn.dataset.date;
+  form.querySelector('[name=entry_type]').value = btn.dataset.type;
+  form.querySelector('[name=amount]').value = btn.dataset.amount;
+  form.querySelector('[name=remarks]').value = btn.dataset.remarks;
+  openModal('addEpfModal');
+});
+document.addEventListener('DOMContentLoaded', function() { initPagination('epfTable', 15); });
+</script>
+{% endblock %}

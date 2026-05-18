@@ -1,0 +1,150 @@
+{% extends 'base.html' %}
+{% load indian_format %}
+
+{% block title %}Bonds — Portfolio — Vault{% endblock %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+  <div>
+    <p class="text-xs font-bold tracking-widest uppercase text-primary">Portfolio</p>
+    <h1 class="text-xl lg:text-2xl font-extrabold">Bonds</h1>
+    <p class="text-xs opacity-50">All bond holdings</p>
+  </div>
+  <div class="flex flex-wrap items-center gap-2">
+    <button type="button" class="btn btn-primary btn-sm gap-1" onclick="openAddModal()"><span class="material-symbols-outlined text-base">add</span>Add</button>
+    <a href="{% url 'portfolio_tracker' %}" class="btn btn-ghost btn-sm gap-1"><span class="material-symbols-outlined text-base">arrow_back</span>Portfolio</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card hero-gradient-portfolio shadow-sm card-hover animate-up mb-4">
+  <div class="card-body p-4 lg:p-6">
+    <div class="flex flex-wrap items-center gap-6">
+      <div class="stat-card stat-card-primary">
+        <div class="text-[10px] uppercase tracking-wider opacity-50">Total Bonds</div>
+        <div class="text-base font-bold mt-0.5 font-semibold">₹{{ total|floatformat:0|indian_number }}</div>
+      </div>
+      <div class="stat-card">
+        <div class="text-[10px] uppercase tracking-wider opacity-50">Holdings</div>
+        <div class="text-base font-bold mt-0.5">{{ bonds|length }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card bg-base-200 shadow-sm card-hover animate-up mb-4" style="animation-delay:0.1s">
+  <div class="card-body p-4">
+    <h2 class="card-title text-base mb-3">All Bond Holdings</h2>
+    {% if bonds %}
+    {# Desktop table #}
+    <div class="hidden md:block overflow-x-auto">
+      <table class="table table-sm" id="bondsTable">
+        <thead>
+          <tr>
+            <th class="sortable-th">Account <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
+            <th class="sortable-th text-right">Amount <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
+            <th>Remarks</th>
+            <th class="w-10"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for b in bonds %}
+          <tr class="hover">
+            <td class="font-semibold">{{ b.account_name }}</td>
+            <td class="text-right font-semibold" data-val="{{ b.amount }}">₹{{ b.amount|floatformat:0|indian_number }}</td>
+            <td class="opacity-60 text-sm">{{ b.remarks|default:"—" }}</td>
+            <td class="text-right">
+              <button type="button" class="btn btn-ghost btn-xs btn-square" data-edit-bond data-id="{{ b.id }}" data-account="{{ b.account_name }}" data-amount="{{ b.amount }}" data-remarks="{{ b.remarks|default:'' }}"><span class="material-symbols-outlined text-base">edit</span></button>
+            </td>
+          </tr>
+          {% endfor %}
+          <tr class="total-row border-t-2 border-base-300">
+            <td class="font-bold text-primary">Total</td>
+            <td class="text-right font-bold text-primary" data-val="{{ total }}">₹{{ total|floatformat:0|indian_number }}</td>
+            <td colspan="2"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    {# Mobile card view #}
+    <div class="md:hidden space-y-2">
+      {% for b in bonds %}
+      <div class="table-card flex items-center justify-between gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="font-semibold text-sm">{{ b.account_name }}</div>
+          <div class="text-xs opacity-50 mt-0.5 truncate">{{ b.remarks|default:"—" }}</div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <span class="font-bold text-sm">₹{{ b.amount|floatformat:0|indian_number }}</span>
+          <button type="button" class="btn btn-ghost btn-xs btn-square" data-edit-bond data-id="{{ b.id }}" data-account="{{ b.account_name }}" data-amount="{{ b.amount }}" data-remarks="{{ b.remarks|default:'' }}"><span class="material-symbols-outlined text-base">edit</span></button>
+        </div>
+      </div>
+      {% endfor %}
+      <div class="flex items-center justify-between px-1 pt-2 border-t border-base-300 text-sm">
+        <span class="font-bold text-primary">Total</span>
+        <span class="font-bold text-primary">₹{{ total|floatformat:0|indian_number }}</span>
+      </div>
+    </div>
+    {% else %}
+    <p class="text-sm opacity-40">No bond holdings.</p>
+    {% endif %}
+  </div>
+</div>
+
+<dialog class="modal" id="addBondModal">
+  <div class="modal-box">
+    <h3 class="font-bold text-lg flex items-center gap-2" id="bondModalTitle"><span class="material-symbols-outlined text-primary">add_circle</span>Add Bond Holding</h3>
+    <form id="bondForm" method="post" action="{% url 'add_bond' %}">{% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <div class="form-field mt-4">
+        <label class="label text-xs font-semibold">Account Name</label>
+        {{ form.account_name }}
+      </div>
+      <div class="form-field mt-3">
+        <label class="label text-xs font-semibold">Amount (₹)</label>
+        {{ form.amount }}
+      </div>
+      <div class="form-field mt-3">
+        <label class="label text-xs font-semibold">Remarks <span class="opacity-40">optional</span></label>
+        {{ form.remarks }}
+      </div>
+      <div class="modal-action">
+        <button type="button" id="bondDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteBondForm')"><span class="material-symbols-outlined text-base">delete</span>Delete</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addBondModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm gap-1"><span class="material-symbols-outlined text-base">save</span>Save</button>
+      </div>
+    </form>
+    <form id="deleteBondForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+{% endblock %}
+
+{% block extra_js %}
+{% include 'portfolio/_sortable_js.html' %}
+<script>
+function openAddModal() {
+  var form = document.getElementById('bondForm');
+  form.action = "{% url 'add_bond' %}";
+  form.reset();
+  document.getElementById('bondDeleteBtn').style.display = 'none';
+  document.getElementById('bondModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span>Add Bond Holding';
+  openModal('addBondModal');
+}
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-edit-bond]');
+  if (!btn) return;
+  var form = document.getElementById('bondForm');
+  form.action = "{% url 'edit_bond' pk=0 %}".replace('/0/', '/' + btn.dataset.id + '/');
+  document.getElementById('deleteBondForm').action = "{% url 'delete_bond' pk=0 %}".replace('/0/', '/' + btn.dataset.id + '/');
+  document.getElementById('bondDeleteBtn').style.display = 'inline-flex';
+  document.getElementById('bondModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">edit</span>Edit Bond';
+  form.querySelector('[name=account_name]').value = btn.dataset.account;
+  form.querySelector('[name=amount]').value = btn.dataset.amount;
+  form.querySelector('[name=remarks]').value = btn.dataset.remarks;
+  openModal('addBondModal');
+});
+document.addEventListener('DOMContentLoaded', function() { initPagination('bondsTable', 15); });
+</script>
+{% endblock %}

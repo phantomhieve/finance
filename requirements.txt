@@ -1,0 +1,15 @@
+django>=6.0,<7.0
+django-crispy-forms>=2.0
+crispy-bootstrap5>=2024.10
+dj-database-url>=2.3
+gunicorn>=23.0
+psycopg[binary]>=3.2
+gspread>=6.2.0
+google-auth>=2.0.0
+requests>=2.31.0
+cloudscraper>=1.2.71
+google-cloud-storage>=2.18.0
+django-allauth[socialaccount]>=65.0
+google-genai>=1.0
+django-unfold>=0.87.0
+webauthn>=2.0

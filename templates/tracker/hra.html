@@ -1,0 +1,283 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}HRA & Rent — Vault{% endblock %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+  <div>
+    <p class="text-xs font-bold tracking-widest uppercase text-primary">House Rent Allowance</p>
+    <h1 class="text-xl lg:text-2xl font-extrabold">{{ fy_label }}</h1>
+    <p class="text-xs opacity-50">{{ fy_start_date|date:"d M Y" }} → {{ fy_end_date|date:"d M Y" }}</p>
+  </div>
+  <div class="flex flex-wrap items-center gap-2 sm:gap-2 justify-center sm:justify-start w-full sm:w-auto">
+    <div class="fy-tabs" id="fySwitcher">
+      {% for fy in fy_options %}
+      <a href="?fy={{ fy }}" class="fy-tab {% if fy == fy_start %}fy-tab-active{% endif %}">{{ fy }}-{{ fy|add:1 }}</a>
+      {% endfor %}
+    </div>
+    {% if user.can_edit_hra %}
+    <button class="btn btn-primary btn-sm gap-1" onclick="newHraEntry()">
+      <span class="material-symbols-outlined text-base">add_circle</span><span class="hidden sm:inline">Add Entry</span><span class="sm:hidden">Add</span>
+    </button>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{# ——— HERO STATS ——— #}
+<div class="card hero-gradient-success shadow-sm animate-up mb-4 card-hover">
+  <div class="card-body p-4 lg:p-6">
+    <div class="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8">
+      <div>
+        <p class="text-[10px] font-bold uppercase tracking-widest opacity-40">Remaining Balance</p>
+        <p class="text-3xl lg:text-4xl font-extrabold mt-1 {% if remaining_balance >= 0 %}text-success{% else %}text-error{% endif %}">₹{{ remaining_balance|floatformat:0|intcomma }}</p>
+        <p class="text-xs opacity-30 mt-1">Available in HRA Pool</p>
+      </div>
+      <div class="flex gap-3">
+        <div class="stat-card stat-card-success">
+          <div class="text-[10px] uppercase tracking-wider opacity-50">Total Added</div>
+          <div class="text-lg font-bold text-success mt-0.5">₹{{ total_additions|floatformat:0|intcomma }}</div>
+        </div>
+        <div class="stat-card stat-card-error">
+          <div class="text-[10px] uppercase tracking-wider opacity-50">Total Spent</div>
+          <div class="text-lg font-bold text-error mt-0.5">₹{{ total_expense|floatformat:0|intcomma }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ——— MONTH GRID ——— #}
+<div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.1s">
+  <div class="card-body p-4 lg:p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="card-title text-base">Monthly Breakdown</h2>
+      <div class="flex gap-2 text-xs">
+        <span class="badge badge-success badge-sm">Added</span>
+        <span class="badge badge-error badge-sm">Spent</span>
+        <span class="badge badge-ghost badge-sm">None</span>
+      </div>
+    </div>
+    <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-2">
+      {% for m in monthly_data %}
+      <div class="month-card rounded-xl p-2.5 text-center text-xs border {% if m.status == 'good' %}border-success/30 bg-success/5{% elif m.status == 'partial' %}border-warning/30 bg-warning/5{% elif m.status == 'missed' %}border-error/20 bg-error/5{% else %}border-base-300/50 bg-base-300/20{% endif %}">
+        <div class="font-semibold opacity-60 mb-1.5 text-[10px] uppercase tracking-wider">{{ m.name }}</div>
+        {% if m.started %}
+        <div class="font-bold text-success text-sm">₹{{ m.addition|floatformat:0|intcomma }}</div>
+        <div class="text-[10px] opacity-30">Added</div>
+        <div class="text-sm text-error mt-1">-₹{{ m.expense|floatformat:0|intcomma }}</div>
+        <div class="text-[10px] opacity-30">Spent</div>
+        {% else %}
+        <div class="text-sm opacity-20 mt-1">—</div>
+        <div class="text-[10px] opacity-20">Future</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{# ——— LOG + SPENDS ——— #}
+<div class="grid grid-cols-1 lg:grid-cols-5 gap-4 animate-up" style="animation-delay:0.2s">
+  <div class="card bg-base-200 shadow-sm lg:col-span-2 order-2 lg:order-1 card-hover">
+    <div class="card-body p-4">
+      <h2 class="card-title text-base mb-2">Spends by Mode</h2>
+      <div class="space-y-2">
+        {% for metric in mode_metrics %}
+        <div class="flex justify-between items-center p-3 bg-base-300/30 rounded-lg text-sm hover:bg-base-300/50 transition-colors">
+          <span class="opacity-60">{{ metric.mode_of_payment }}</span>
+          <span class="font-semibold">₹{{ metric.total|floatformat:0|intcomma }}</span>
+        </div>
+        {% empty %}
+        <p class="text-sm opacity-40 py-4 text-center">No spends yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="card bg-base-200 shadow-sm lg:col-span-3 order-1 lg:order-2">
+    <div class="card-body p-4">
+      <h2 class="card-title text-base mb-2">Expense Log</h2>
+
+      {# Desktop table #}
+      <div class="hidden md:block overflow-x-auto">
+        <table class="table table-sm" id="hraTable">
+          <thead><tr><th>Date</th><th>Description</th><th>Mode</th><th>Amount</th>{% if user.can_edit_hra %}<th class="w-10"></th>{% endif %}</tr></thead>
+          <tbody>
+            {% for expense in expenses %}
+            <tr class="hover">
+              <td class="opacity-60 text-sm whitespace-nowrap">{{ expense.date|date:"d M Y" }}</td>
+              <td class="font-semibold text-sm">
+                {{ expense.expense_type }}
+                {% if expense.remarks %}<div class="text-xs opacity-40 mt-0.5">{{ expense.remarks }}</div>{% endif %}
+              </td>
+              <td>
+                <div class="flex flex-col gap-1">
+                  {% if expense.hra_type == 'RENT_PAID' %}<span class="badge badge-success badge-sm">Added</span>
+                  {% elif expense.hra_type == 'EXPENSE' %}<span class="badge badge-error badge-sm">Spent</span>
+                  {% elif expense.hra_type == 'REVERT' %}<span class="badge badge-info badge-sm">Revert</span>
+                  {% else %}<span class="badge badge-ghost badge-sm">{{ expense.hra_type|default:"—" }}</span>{% endif %}
+                  {% if expense.mode_of_payment %}<span class="badge badge-outline badge-sm">{{ expense.mode_of_payment }}</span>{% endif %}
+                </div>
+              </td>
+              <td class="font-semibold whitespace-nowrap">
+                {% if expense.is_revert %}<span class="text-success">+₹{{ expense.amount|floatformat:0|intcomma }}</span>
+                {% else %}<span class="text-error">−₹{{ expense.amount|floatformat:0|intcomma }}</span>{% endif %}
+              </td>
+              {% if user.can_edit_hra %}
+              <td>
+                <button class="btn btn-ghost btn-xs btn-square" onclick="editHraEntry({{ expense.id }}, '{{ expense.date|date:'Y-m-d' }}', '{{ expense.hra_type }}', '{{ expense.amount }}', '{{ expense.mode_of_payment|escapejs }}', '{{ expense.expense_type|escapejs }}', '{{ expense.remarks|escapejs }}')">
+                  <span class="material-symbols-outlined text-base">edit</span>
+                </button>
+              </td>
+              {% endif %}
+            </tr>
+            {% empty %}
+            <tr><td colspan="{% if user.can_edit_hra %}5{% else %}4{% endif %}" class="text-center opacity-50 py-8">No records found.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {# Mobile card view #}
+      <div class="md:hidden space-y-2" id="hraCards">
+        {% for expense in expenses %}
+        <div class="table-card flex items-center justify-between gap-3">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="font-semibold text-sm whitespace-nowrap">
+                {% if expense.is_revert %}<span class="text-success">+₹{{ expense.amount|floatformat:0|intcomma }}</span>
+                {% else %}<span class="text-error">−₹{{ expense.amount|floatformat:0|intcomma }}</span>{% endif %}
+              </span>
+              {% if expense.hra_type == 'RENT_PAID' %}<span class="badge badge-success badge-xs">Added</span>
+              {% elif expense.hra_type == 'EXPENSE' %}<span class="badge badge-error badge-xs">Spent</span>
+              {% elif expense.hra_type == 'REVERT' %}<span class="badge badge-info badge-xs">Revert</span>{% endif %}
+            </div>
+            <div class="text-xs opacity-50 mt-0.5 truncate">{{ expense.date|date:"d M Y" }} · {{ expense.expense_type }}</div>
+            {% if expense.mode_of_payment %}<div class="text-[10px] opacity-30 mt-0.5">{{ expense.mode_of_payment }}</div>{% endif %}
+          </div>
+          {% if user.can_edit_hra %}
+          <button class="btn btn-ghost btn-xs btn-square shrink-0" onclick="editHraEntry({{ expense.id }}, '{{ expense.date|date:'Y-m-d' }}', '{{ expense.hra_type }}', '{{ expense.amount }}', '{{ expense.mode_of_payment|escapejs }}', '{{ expense.expense_type|escapejs }}', '{{ expense.remarks|escapejs }}')">
+            <span class="material-symbols-outlined text-base">edit</span>
+          </button>
+          {% endif %}
+        </div>
+        {% empty %}
+        <p class="text-center opacity-50 py-8 text-sm">No records found.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if user.can_edit_hra %}
+{# ——— ADD/EDIT MODAL ——— #}
+<dialog class="modal" id="addTxnModal">
+  <div class="modal-box">
+    <h3 class="font-bold text-lg flex items-center gap-2" id="hraModalTitle">
+      <span class="material-symbols-outlined text-primary">add_circle</span>Add HRA Entry
+    </h3>
+    <form id="addHraForm" method="post" action="{% url 'add_hra_entry' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <div class="grid grid-cols-2 gap-4 mt-4">
+        <div class="form-field"><label class="label text-xs font-semibold">Date</label>{{ txn_form.date }}</div>
+        <div class="form-field"><label class="label text-xs font-semibold">Entry Type</label>{{ txn_form.type }}</div>
+      </div>
+      <div class="grid grid-cols-2 gap-4 mt-3">
+        <div class="form-field"><label class="label text-xs font-semibold">Amount (₹)</label>{{ txn_form.amount }}</div>
+        <div class="form-field">
+          <label class="label text-xs font-semibold">Mode of Payment</label>
+          <select id="mode_select" class="select select-bordered select-sm w-full" onchange="handleModeChange()">
+            <option value="UPI">UPI</option>
+            <option value="Credit Card">Credit Card</option>
+            <option value="Net Banking">Net Banking</option>
+            <option value="Debit Card">Debit Card</option>
+            <option value="Cash">Cash</option>
+            <option value="Transfer">Transfer</option>
+            {% for metric in mode_metrics %}
+              {% if metric.mode_of_payment != "UPI" and metric.mode_of_payment != "Credit Card" and metric.mode_of_payment != "Net Banking" and metric.mode_of_payment != "Debit Card" and metric.mode_of_payment != "Cash" and metric.mode_of_payment != "Transfer" %}
+                <option value="{{ metric.mode_of_payment }}">{{ metric.mode_of_payment }}</option>
+              {% endif %}
+            {% endfor %}
+            <option value="_NEW_">+ Add New...</option>
+          </select>
+          <input type="text" id="id_mode_of_payment" name="mode_of_payment" class="input input-bordered input-sm w-full mt-2 hidden" placeholder="Custom mode">
+        </div>
+      </div>
+      <div class="form-field mt-3"><label class="label text-xs font-semibold">Description / Title</label>{{ txn_form.expense_type }}</div>
+      <div class="form-field mt-3"><label class="label text-xs font-semibold">Remarks (Optional)</label>{{ txn_form.remarks }}</div>
+      <div class="modal-action">
+        <button type="button" id="hraDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteHraForm')">
+          <span class="material-symbols-outlined text-base">delete</span>Delete
+        </button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addTxnModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm">Save Entry</button>
+      </div>
+    </form>
+    <form id="deleteHraForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+{% if user.can_edit_hra %}
+function newHraEntry() {
+  var form = document.getElementById('addHraForm');
+  form.action = "{% url 'add_hra_entry' %}";
+  form.reset();
+  var sel = document.getElementById('mode_select');
+  sel.selectedIndex = 0;
+  handleModeChange();
+  document.getElementById('hraDeleteBtn').style.display = 'none';
+  document.getElementById('hraModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span> Add HRA Entry';
+  openModal('addTxnModal');
+}
+
+function handleModeChange() {
+  var sel = document.getElementById('mode_select');
+  var inp = document.getElementById('id_mode_of_payment');
+  if (sel.value === '_NEW_') {
+    inp.classList.remove('hidden');
+    inp.value = '';
+    inp.focus();
+  } else {
+    inp.classList.add('hidden');
+    inp.value = sel.value;
+  }
+}
+
+function editHraEntry(id, date, type, amount, mode, desc, remarks) {
+  var form = document.getElementById('addHraForm');
+  form.action = "{% url 'edit_hra_entry' pk=0 %}".replace('/0/', '/' + id + '/');
+  var delForm = document.getElementById('deleteHraForm');
+  delForm.action = "{% url 'delete_hra_entry' pk=0 %}".replace('/0/', '/' + id + '/');
+  document.getElementById('hraDeleteBtn').style.display = 'inline-flex';
+  document.getElementById('hraModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">edit</span> Edit Entry';
+  document.getElementById('id_date').value = date;
+  document.getElementById('id_type').value = type;
+  document.getElementById('id_amount').value = parseFloat(amount);
+  document.getElementById('id_expense_type').value = desc;
+  document.getElementById('id_remarks').value = remarks;
+  var sel = document.getElementById('mode_select');
+  var inp = document.getElementById('id_mode_of_payment');
+  var exists = false;
+  for (var i = 0; i < sel.options.length; i++) {
+    if (sel.options[i].value === mode) { exists = true; break; }
+  }
+  if (exists) { sel.value = mode; inp.classList.add('hidden'); inp.value = mode; }
+  else { sel.value = '_NEW_'; inp.classList.remove('hidden'); inp.value = mode; }
+  openModal('addTxnModal');
+}
+{% endif %}
+
+document.addEventListener('DOMContentLoaded', function() {
+  initPagination('hraTable', window.innerWidth <= 640 ? 7 : 15);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,301 @@
+{% extends 'base.html' %}
+{% load indian_format %}
+
+{% block title %}Commodities — Portfolio — Vault{% endblock %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+  <div>
+    <p class="text-xs font-bold tracking-widest uppercase text-primary">Portfolio</p>
+    <h1 class="text-xl lg:text-2xl font-extrabold">Commodities</h1>
+    <div class="flex flex-wrap items-center gap-3 mt-1 text-xs opacity-60">
+      <span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm text-warning">diamond</span>Gold ₹{{ gold_rate|floatformat:0|indian_number }}/g</span>
+      <span>&middot;</span>
+      <span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm opacity-60">toll</span>Silver ₹{{ silver_rate|floatformat:0|indian_number }}/g</span>
+    </div>
+  </div>
+  <div class="flex flex-wrap items-center gap-2">
+    <button type="button" class="btn btn-primary btn-sm gap-1" onclick="openAddModal()"><span class="material-symbols-outlined text-base">add</span>Add</button>
+    <a href="{% url 'portfolio_tracker' %}" class="btn btn-ghost btn-sm gap-1"><span class="material-symbols-outlined text-base">arrow_back</span>Portfolio</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card hero-gradient-portfolio shadow-sm card-hover animate-up mb-4">
+  <div class="card-body p-4 lg:p-6">
+    <div class="flex flex-wrap items-center gap-8">
+      <div>
+        <p class="text-[10px] font-bold uppercase tracking-widest opacity-40">Total Commodities Value</p>
+        <p class="text-3xl lg:text-4xl font-extrabold mt-1">₹{{ total|floatformat:0|indian_number }}</p>
+        <div class="mt-2">
+          <span class="badge {% if total_returns >= 0 %}badge-success{% else %}badge-error{% endif %} badge-sm gap-1">
+            {% if total_returns >= 0 %}+{% endif %}₹{{ total_returns|floatformat:0|indian_number }} returns
+          </span>
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-4">
+        <div class="stat-card">
+          <div class="text-[10px] uppercase tracking-wider opacity-50">Total Invested</div>
+          <div class="text-base font-bold mt-0.5">₹{{ total_invested|floatformat:0|indian_number }}</div>
+        </div>
+        <div class="stat-card stat-card-success">
+          <div class="text-[10px] uppercase tracking-wider opacity-50">Returns</div>
+          <div class="text-base font-bold mt-0.5 {% if total_returns >= 0 %}text-success{% else %}text-error{% endif %}">{% if total_returns >= 0 %}+{% endif %}₹{{ total_returns|floatformat:0|indian_number }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="text-[10px] uppercase tracking-wider opacity-50">Gold total</div>
+          <div class="text-base font-bold mt-0.5">₹{{ gold_value|floatformat:0|indian_number }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="text-[10px] uppercase tracking-wider opacity-50">Silver total</div>
+          <div class="text-base font-bold mt-0.5">₹{{ silver_value|floatformat:0|indian_number }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ——— Gold ——— #}
+<div class="card bg-base-200 shadow-sm card-hover animate-up mb-4" style="animation-delay:0.1s">
+  <div class="card-body p-4">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+      <h2 class="card-title text-base gap-2"><span class="material-symbols-outlined text-warning text-lg">diamond</span>Gold Holdings</h2>
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="badge badge-ghost badge-sm">{{ gold_weight|floatformat:0 }}g &middot; ₹{{ gold_rate|floatformat:0|indian_number }}/g</span>
+        <span class="badge badge-primary badge-sm">₹{{ gold_value|floatformat:0|indian_number }}</span>
+      </div>
+    </div>
+    {% if gold_holdings %}
+    {# Desktop table #}
+    <div class="hidden md:block overflow-x-auto">
+      <table class="table table-sm" id="goldTable">
+        <thead>
+          <tr>
+            <th class="sortable-th">Description <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
+            <th>Purity</th>
+            <th class="sortable-th text-right">Weight <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
+            <th class="text-right">Purchase Price</th>
+            <th class="sortable-th text-right">Current Value <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
+            <th class="sortable-th text-right">P&amp;L <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
+            <th class="w-10"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for h in gold_holdings %}
+          <tr class="hover">
+            <td class="font-semibold">{{ h.description }}</td>
+            <td class="opacity-60 text-sm">{{ h.purity }}</td>
+            <td class="text-right" data-val="{{ h.weight_grams }}">{{ h.weight_grams|floatformat:2 }}g</td>
+            <td class="text-right opacity-60 text-sm whitespace-nowrap" data-val="{{ h.purchase_price_per_gram }}">₹{{ h.purchase_price_per_gram|floatformat:0|indian_number }}/g</td>
+            <td class="text-right font-semibold" data-val="{{ h.current_value }}">₹{{ h.current_value|floatformat:0|indian_number }}</td>
+            <td class="text-right font-semibold" data-val="{{ h.pnl }}"><span class="{% if h.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if h.pnl >= 0 %}+{% endif %}₹{{ h.pnl|floatformat:0|indian_number }}</span></td>
+            <td class="text-right">
+              <button type="button" class="btn btn-ghost btn-xs btn-square" data-edit-commodity data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}" data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}"><span class="material-symbols-outlined text-base">edit</span></button>
+            </td>
+          </tr>
+          {% endfor %}
+          <tr class="total-row border-t-2 border-base-300">
+            <td colspan="2" class="font-bold text-primary">Total</td>
+            <td class="text-right font-bold" data-val="{{ gold_weight }}">{{ gold_weight|floatformat:2 }}g</td>
+            <td></td>
+            <td class="text-right font-bold text-primary" data-val="{{ gold_value }}">₹{{ gold_value|floatformat:0|indian_number }}</td>
+            <td colspan="2"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    {# Mobile card view #}
+    <div class="md:hidden space-y-2">
+      {% for h in gold_holdings %}
+      <div class="table-card">
+        <div class="flex items-start justify-between gap-2">
+          <div class="flex-1 min-w-0">
+            <div class="font-semibold text-sm">{{ h.description }}</div>
+            <span class="badge badge-ghost badge-xs mt-1">{{ h.purity }} · {{ h.weight_grams|floatformat:2 }}g</span>
+          </div>
+          <button type="button" class="btn btn-ghost btn-xs btn-square shrink-0" data-edit-commodity data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}" data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}"><span class="material-symbols-outlined text-base">edit</span></button>
+        </div>
+        <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
+          <div><span class="opacity-50">Buy</span><div class="font-semibold mt-0.5">₹{{ h.purchase_price_per_gram|floatformat:0|indian_number }}/g</div></div>
+          <div><span class="opacity-50">Value</span><div class="font-semibold mt-0.5">₹{{ h.current_value|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">P&L</span><div class="font-semibold mt-0.5 {% if h.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if h.pnl >= 0 %}+{% endif %}₹{{ h.pnl|floatformat:0|indian_number }}</div></div>
+        </div>
+      </div>
+      {% endfor %}
+      <div class="flex items-center justify-between px-1 pt-2 border-t border-base-300 text-sm">
+        <span class="font-bold text-primary">Total</span>
+        <span class="font-bold">{{ gold_weight|floatformat:2 }}g · <span class="text-primary">₹{{ gold_value|floatformat:0|indian_number }}</span></span>
+      </div>
+    </div>
+    {% if gold_price_obj %}<p class="text-xs opacity-40 mt-2">Rate updated {{ gold_price_obj.fetched_at|timesince }} ago</p>{% endif %}
+    {% else %}
+    <p class="text-sm opacity-40">No gold holdings.</p>
+    {% endif %}
+  </div>
+</div>
+
+{# ——— Silver ——— #}
+<div class="card bg-base-200 shadow-sm card-hover animate-up mb-4" style="animation-delay:0.15s">
+  <div class="card-body p-4">
+    <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+      <h2 class="card-title text-base gap-2"><span class="material-symbols-outlined text-lg opacity-60">toll</span>Silver Holdings</h2>
+      <div class="flex flex-wrap items-center gap-2">
+        <span class="badge badge-ghost badge-sm">{{ silver_weight|floatformat:0|indian_number }}g &middot; ₹{{ silver_rate|floatformat:0|indian_number }}/g</span>
+        <span class="badge badge-primary badge-sm">₹{{ silver_value|floatformat:0|indian_number }}</span>
+      </div>
+    </div>
+    {% if silver_holdings %}
+    {# Desktop table #}
+    <div class="hidden md:block overflow-x-auto">
+      <table class="table table-sm" id="silverTable">
+        <thead>
+          <tr>
+            <th class="sortable-th">Description <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
+            <th>Purity</th>
+            <th class="sortable-th text-right">Weight <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
+            <th class="text-right">Purchase Price</th>
+            <th class="sortable-th text-right">Current Value <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
+            <th class="sortable-th text-right">P&amp;L <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
+            <th class="w-10"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for h in silver_holdings %}
+          <tr class="hover">
+            <td class="font-semibold">{{ h.description }}</td>
+            <td class="opacity-60 text-sm">{{ h.purity }}</td>
+            <td class="text-right" data-val="{{ h.weight_grams }}">{{ h.weight_grams|floatformat:2 }}g</td>
+            <td class="text-right opacity-60 text-sm whitespace-nowrap" data-val="{{ h.purchase_price_per_gram }}">₹{{ h.purchase_price_per_gram|floatformat:0|indian_number }}/g</td>
+            <td class="text-right font-semibold" data-val="{{ h.current_value }}">₹{{ h.current_value|floatformat:0|indian_number }}</td>
+            <td class="text-right font-semibold" data-val="{{ h.pnl }}"><span class="{% if h.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if h.pnl >= 0 %}+{% endif %}₹{{ h.pnl|floatformat:0|indian_number }}</span></td>
+            <td class="text-right">
+              <button type="button" class="btn btn-ghost btn-xs btn-square" data-edit-commodity data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}" data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}"><span class="material-symbols-outlined text-base">edit</span></button>
+            </td>
+          </tr>
+          {% endfor %}
+          <tr class="total-row border-t-2 border-base-300">
+            <td colspan="2" class="font-bold text-primary">Total</td>
+            <td class="text-right font-bold" data-val="{{ silver_weight }}">{{ silver_weight|floatformat:2 }}g</td>
+            <td></td>
+            <td class="text-right font-bold text-primary" data-val="{{ silver_value }}">₹{{ silver_value|floatformat:0|indian_number }}</td>
+            <td colspan="2"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    {# Mobile card view #}
+    <div class="md:hidden space-y-2">
+      {% for h in silver_holdings %}
+      <div class="table-card">
+        <div class="flex items-start justify-between gap-2">
+          <div class="flex-1 min-w-0">
+            <div class="font-semibold text-sm">{{ h.description }}</div>
+            <span class="badge badge-ghost badge-xs mt-1">{{ h.purity }} · {{ h.weight_grams|floatformat:2 }}g</span>
+          </div>
+          <button type="button" class="btn btn-ghost btn-xs btn-square shrink-0" data-edit-commodity data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}" data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}"><span class="material-symbols-outlined text-base">edit</span></button>
+        </div>
+        <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
+          <div><span class="opacity-50">Buy</span><div class="font-semibold mt-0.5">₹{{ h.purchase_price_per_gram|floatformat:0|indian_number }}/g</div></div>
+          <div><span class="opacity-50">Value</span><div class="font-semibold mt-0.5">₹{{ h.current_value|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">P&L</span><div class="font-semibold mt-0.5 {% if h.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if h.pnl >= 0 %}+{% endif %}₹{{ h.pnl|floatformat:0|indian_number }}</div></div>
+        </div>
+      </div>
+      {% endfor %}
+      <div class="flex items-center justify-between px-1 pt-2 border-t border-base-300 text-sm">
+        <span class="font-bold text-primary">Total</span>
+        <span class="font-bold">{{ silver_weight|floatformat:2 }}g · <span class="text-primary">₹{{ silver_value|floatformat:0|indian_number }}</span></span>
+      </div>
+    </div>
+    {% if silver_price_obj %}<p class="text-xs opacity-40 mt-2">Rate updated {{ silver_price_obj.fetched_at|timesince }} ago</p>{% endif %}
+    {% else %}
+    <p class="text-sm opacity-40">No silver holdings.</p>
+    {% endif %}
+  </div>
+</div>
+
+<dialog class="modal" id="addCommodityModal">
+  <div class="modal-box">
+    <h3 class="font-bold text-lg flex items-center gap-2" id="commodityModalTitle"><span class="material-symbols-outlined text-primary">add_circle</span>Add Commodity</h3>
+    <form id="commodityForm" method="post" action="{% url 'add_commodity' %}">{% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <div class="grid grid-cols-2 gap-4 mt-4">
+        <div class="form-field">
+          <label class="label text-xs font-semibold">Type</label>
+          {{ form.commodity_type }}
+        </div>
+        <div class="form-field">
+          <label class="label text-xs font-semibold">Purity</label>
+          {{ form.purity }}
+        </div>
+      </div>
+      <div class="form-field mt-3">
+        <label class="label text-xs font-semibold">Description</label>
+        {{ form.description }}
+      </div>
+      <div class="grid grid-cols-2 gap-4 mt-3">
+        <div class="form-field">
+          <label class="label text-xs font-semibold">Weight (grams)</label>
+          {{ form.weight_grams }}
+        </div>
+        <div class="form-field">
+          <label class="label text-xs font-semibold">Purchase Price / gram (₹)</label>
+          {{ form.purchase_price_per_gram }}
+        </div>
+      </div>
+      <div class="modal-action">
+        <button type="button" id="commodityDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteCommodityForm')"><span class="material-symbols-outlined text-base">delete</span>Delete</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addCommodityModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm gap-1"><span class="material-symbols-outlined text-base">save</span>Save</button>
+      </div>
+    </form>
+    <form id="deleteCommodityForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+{% endblock %}
+
+{% block extra_js %}
+{% include 'portfolio/_sortable_js.html' %}
+{% include 'portfolio/_commodity_purity_js.html' %}
+<script>
+function _editSetup(formId, delFormId, delBtnId, titleId, editUrlBase, delUrlBase, editTitle, modalId, d, fieldMap) {
+  var form = document.getElementById(formId);
+  form.action = editUrlBase.replace('/0/', '/' + d.id + '/');
+  document.getElementById(delFormId).action = delUrlBase.replace('/0/', '/' + d.id + '/');
+  document.getElementById(delBtnId).style.display = 'inline-flex';
+  document.getElementById(titleId).innerHTML = '<span class="material-symbols-outlined text-primary">edit</span> ' + editTitle;
+  for (var name in fieldMap) {
+    var el = form.querySelector('[name=' + name + ']');
+    if (!el) continue;
+    if (el.type === 'checkbox') el.checked = fieldMap[name] === 'true';
+    else el.value = fieldMap[name];
+  }
+  openModal(modalId);
+}
+function openAddModal() {
+  var form = document.getElementById('commodityForm');
+  form.action = "{% url 'add_commodity' %}";
+  form.reset();
+  document.getElementById('commodityDeleteBtn').style.display = 'none';
+  document.getElementById('commodityModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span>Add Commodity';
+  var typeEl = form.querySelector('[name=commodity_type]');
+  var purityEl = form.querySelector('[name=purity]');
+  window._updateCommodityPurity(typeEl, purityEl);
+  openModal('addCommodityModal');
+}
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-edit-commodity]');
+  if (!btn) return;
+  var form = document.getElementById('commodityForm');
+  var typeEl = form.querySelector('[name=commodity_type]');
+  var purityEl = form.querySelector('[name=purity]');
+  typeEl.value = btn.dataset.type;
+  window._updateCommodityPurity(typeEl, purityEl, btn.dataset.purity);
+  _editSetup('commodityForm','deleteCommodityForm','commodityDeleteBtn','commodityModalTitle',
+    "{% url 'edit_commodity' pk=0 %}","{% url 'delete_commodity' pk=0 %}",'Edit Commodity','addCommodityModal',btn.dataset,
+    {commodity_type:btn.dataset.type,description:btn.dataset.desc,weight_grams:btn.dataset.weight,purchase_price_per_gram:btn.dataset.purchase});
+});
+document.addEventListener('DOMContentLoaded', function() { initPagination('goldTable', 15); initPagination('silverTable', 15); });
+</script>
+{% endblock %}
