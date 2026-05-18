@@ -6,6 +6,7 @@ portfolio/investor_profile.md
 **/google-service-account.json
 **/backup-sa.json
 *.pem
+.deploy-keys/
 
 # Python
 __pycache__/
