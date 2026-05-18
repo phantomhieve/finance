@@ -2,6 +2,10 @@
 credentials/
 .env
 .credentials
+portfolio/investor_profile.md
+**/google-service-account.json
+**/backup-sa.json
+*.pem
 
 # Python
 __pycache__/

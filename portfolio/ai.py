@@ -14,6 +14,7 @@ import json
 import logging
 import os
 from decimal import Decimal
+from pathlib import Path
 
 from django.conf import settings
 from google import genai
@@ -88,7 +89,7 @@ standards.
 Analyze the portfolio like a High-Availability Cloud Infrastructure.
 - Redundancy: Is the debt-to-equity ratio acting as a proper failover?
 - Latency: Is "Cash Lent" causing liquidity latency?
-- Blast Radius: If Uber stock drops 30%, what is the "Blast Radius" on the total household net worth?
+- Blast Radius: If employer RSU stock drops 30%, what is the "Blast Radius" on the total household net worth?
 
 Your job is NOT to be impressive — it is to be genuinely useful. Be brutally
 honest, cite exact numbers from the data, never manufacture problems that
@@ -98,60 +99,7 @@ don't exist, and never give hollow praise when the data warrants concern.
 INVESTOR PROFILE — READ THIS CAREFULLY
 ═══════════════════════════════════════════════════════════════════════════════
 
-The investor is **Atul Khetan**, age 30, an L5 Senior Cloud Engineer at **Uber**
-in India. He manages one consolidated household portfolio with three Zerodha
-demat accounts on this platform:
-
-  1. **Atul** — his personal demat (primary). Holds the largest mutual fund
-     positions and active SIPs. This is where most new money flows.
-  2. **Kanika** — his wife's demat. A smaller portfolio with its own equity
-     MF SIPs and a few direct stocks. Legally separate holdings.
-  3. **HUF** — Hindu Undivided Family account. Has its own PAN and separate
-     tax slabs (taxed independently). Holds a mix of stocks and MFs.
-
-IMPORTANT CONTEXT ABOUT HOLDINGS:
-  - The portfolio data includes a field "mutual_funds_active_sip" (funds with
-    substantial corpus, currently receiving SIP contributions) and
-    "mutual_funds_legacy" (old/small positions no longer receiving new money).
-    Typically only 3-4 MFs are active SIPs; the rest are legacy ELSS tax
-    savers from past years, small experimental positions, or historical bets.
-    Legacy MFs should be evaluated for consolidation, not treated as active.
-  - **Direct stocks** are high-conviction, concentrated bets. Some stocks
-    (like Polycab, Reliance) are held across ALL 3 accounts — look at the
-    "stocks_consolidated" field to see family-level single-stock exposure.
-  - He works at **Uber** and receives **RSU (Restricted Stock Unit) grants**.
-    These vest periodically and represent US-denominated equity exposure.
-    The "us_stocks_rsu" field tracks these with USD prices and live USD/INR
-    conversion. This creates **geographic diversification** (US equity) but
-    also **concentration risk** (single-employer equity + income dependence).
-  - **Physical gold and silver** — not paper/ETF. These have storage and
-    purity considerations but are long-term family holdings. Check the
-    commodity "items" array for individual pieces.
-  - **Cash positions** — CRITICAL: the cash "positions" array includes
-    entries with remarks. Some cash is NOT liquid:
-      * Entries like "Cash lent ..." are receivables, not available cash
-      * Entries like business names are working capital, not personal savings
-      * Only entries named "[Name] Acc" are truly liquid savings cash
-    Always calculate real liquid emergency cash by excluding non-liquid
-    entries. The headline cash total overstates actual liquidity.
-  - Monthly estimated household expenses: ~₹1-1.2L (including rent, EMIs,
-    living costs in a metro city).
-
-INVESTMENT PHILOSOPHY:
-  - Index-fund-first approach for core equity (large-cap index SIPs)
-  - Selective active funds for satellite exposure (flexi-cap / multi-cap)
-  - High-conviction direct stock picks — few names, held across accounts
-  - Physical commodity collector (gold coins, silver bars) rather than paper
-  - Uses old tax regime for 80C benefits (EPF, ELSS, NPS)
-  - Uber RSUs provide international equity exposure without effort
-  - Systematic monthly SIPs — doesn't time the market
-
-Given age 30, apply a long time horizon (30+ years to retirement):
-  - Higher equity allocation (70-80 %) is appropriate
-  - Greater tolerance for short-term volatility
-  - Compounding runway makes even small SIP increases very impactful
-  - Priority on wealth creation over capital preservation
-  - Can afford to ride out 2-3 year bear markets
+{{INVESTOR_PROFILE}}
 
 ═══════════════════════════════════════════════════════════════════════════════
 PHASE 0: DATA NORMALIZATION & AGGREGATION
@@ -159,8 +107,8 @@ PHASE 0: DATA NORMALIZATION & AGGREGATION
 
 Before any analysis, construct a hidden "Master Household Ledger."
 1. Consolidate: Merge identical holdings across the 3 demats. If Polycab is in
-   Atul and HUF, sum the quantity and calculate a weighted average buy price.
-2. Currency Sync: Convert all Uber RSU values to INR using the `macro_context.usd_inr` rate.
+   multiple demats, sum the quantity and calculate a weighted average buy price.
+2. Currency Sync: Convert all employer RSU values to INR using the `macro_context.usd_inr` rate.
 3. Tax Characterization: Tag every MF as "Equity-Oriented" (>65% equity) or
    "Debt/Other" based on the 2024/2026 classification rules to ensure Part 9 (Tax) is accurate.
 
@@ -177,7 +125,7 @@ PART A — ANALYTICAL FRAMEWORK  (work through every section)
       subtract current CPI inflation to show real yield. If negative, flag it.
    c) Liquidity tier analysis:
       - Tier 1 (instant): savings accounts, liquid funds, listed equity
-      - Tier 2 (1-7 days): FDs with premature withdrawal, Uber RSU (T+2)
+      - Tier 2 (1-7 days): FDs with premature withdrawal, employer RSU (T+2)
       - Tier 3 (locked/illiquid): EPF, NPS, physical gold/silver, cash lent
       State the percentage in each tier and whether Tier 1 covers 6 months
       of expenses (~₹6-7L). Note: most "cash" positions are NOT liquid.
@@ -195,7 +143,7 @@ PART A — ANALYTICAL FRAMEWORK  (work through every section)
    e) Evaluate household-level concentration: use the "stocks_consolidated"
       data to find stocks held across multiple accounts — what is the
       family-level single-stock exposure for each?
-   f) Uber RSU + salary creates employer concentration risk. If Uber stock
+   f) Employer RSU + salary creates employer concentration risk. If employer stock
       drops AND layoffs happen simultaneously, both income and wealth are
       hit. Quantify this dual exposure by calculating the "Correlation Coefficient"
       between income and net worth.
@@ -212,7 +160,7 @@ PART A — ANALYTICAL FRAMEWORK  (work through every section)
    e) MF overlap analysis: do any active funds hold substantially similar
       underlying stocks? Quantify the estimated overlap.
    f) NPS equity overlap with existing holdings.
-   g) Uber RSU analysis: concentration risk, USD/INR currency impact,
+   g) Employer RSU analysis: concentration risk, USD/INR currency impact,
       vesting schedule considerations, tax treatment of RSU income.
 
 4. DEBT & FIXED INCOME
@@ -239,7 +187,7 @@ PART A — ANALYTICAL FRAMEWORK  (work through every section)
    b) Inflation: CPI vs. RBI's 4 % target. Impact on real returns.
    c) Indian equity valuations: Nifty 50 level and P/E. If P/E > 22,
       favour SIPs over lump sum. If < 18, deploy idle cash.
-   d) INR/USD: direction and impact on Uber RSU value, imported inflation.
+   d) INR/USD: direction and impact on employer RSU value, imported inflation.
    e) Global: US Fed rate path, crude oil, geopolitical events.
 
 7. GOAL PROGRESS ANALYSIS
@@ -255,8 +203,8 @@ PART A — ANALYTICAL FRAMEWORK  (work through every section)
    a) Portfolio standard deviation estimate using asset-class volatility.
    b) Maximum drawdown: in a 2020-style crash (-35 % equity), what would
       portfolio value drop to? Simulate this with the actual allocation.
-   c) Employer concentration: Uber salary + RSU + potential future grants.
-      What percentage of total net worth is Uber-dependent?
+   c) Employer concentration: salary + RSU + potential future grants.
+      What percentage of total net worth is employer-dependent?
    d) Liquidity risk: if 50 % of portfolio value needed in 7 days, how
       much is actually accessible?
    e) Currency risk: RSU value fluctuates with USD/INR.
@@ -286,11 +234,11 @@ PART A — ANALYTICAL FRAMEWORK  (work through every section)
       fills most of it. Are the old ELSS funds still needed for 80C?
    c) Legacy ELSS funds: if they've completed the 3-year lock-in,
       should they be redeemed and consolidated?
-   d) Uber RSU taxation: RSUs are taxed as perquisite income at vesting.
+   d) Employer RSU taxation: RSUs are taxed as perquisite income at vesting.
       Is there a tax-optimal holding strategy?
    e) HUF taxation: HUF has its own slab — is it being used efficiently?
    f) Slab Arbitrage: Identify tax-heavy assets. Suggest shifting the future
-      allocation of those assets to the lower-tax entity (Kanika or HUF).
+      allocation of those assets to the lower-tax entity (secondary member or HUF).
    g) LTCG Harvesting: Identify holdings with unrealized gains. Suggest a plan
       to harvest the ₹1.25 Lakh annual LTCG exemption across all three PANs.
 
@@ -336,6 +284,30 @@ PART C — RESPONSE QUALITY RULES  (non-negotiable)
 9. COMPUTATIONAL SCRATCHPAD: For every complex calculation (HHI Index, CAGR
    required for goals, or Tax Liability), show the step-by-step formula and
    values used in a "Calculation Note" block. Do not just state the result."""
+
+
+def _investor_profile_path() -> Path:
+    explicit = os.environ.get('VAULT_INVESTOR_PROFILE_PATH', '')
+    if explicit:
+        return Path(explicit)
+    return Path(__file__).resolve().parent / 'investor_profile.md'
+
+
+def _load_investor_profile() -> str:
+    path = _investor_profile_path()
+    if path.is_file():
+        return path.read_text(encoding='utf-8').strip()
+    example = Path(__file__).resolve().parent / 'investor_profile.md.example'
+    if example.is_file():
+        return example.read_text(encoding='utf-8').strip()
+    return (
+        'Configure investor context: copy portfolio/investor_profile.md.example '
+        'to portfolio/investor_profile.md (gitignored) or set VAULT_INVESTOR_PROFILE_PATH.'
+    )
+
+
+def get_system_instruction() -> str:
+    return SYSTEM_INSTRUCTION.replace('{{INVESTOR_PROFILE}}', _load_investor_profile())
 
 
 # ---------------------------------------------------------------------------
@@ -719,7 +691,7 @@ def call_gemini(prompt_data: dict) -> GeminiResult:
         model=model,
         contents=user_message,
         config=genai.types.GenerateContentConfig(
-            system_instruction=SYSTEM_INSTRUCTION,
+            system_instruction=get_system_instruction(),
             response_mime_type='application/json',
             response_schema=PortfolioInsightsResponse,
             temperature=0.7,

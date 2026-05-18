@@ -77,7 +77,7 @@ class FixedDepositForm(forms.ModelForm):
         ]
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'e.g. SBI FD'}),
-            'account_name': forms.TextInput(attrs={'placeholder': 'e.g. Atul Acc'}),
+            'account_name': forms.TextInput(attrs={'placeholder': 'e.g. Primary Acc'}),
             'principal': forms.NumberInput(attrs={'step': '0.01'}),
             'interest_rate': forms.NumberInput(attrs={'step': '0.01', 'placeholder': '7.00'}),
             'compounding': forms.Select(),
@@ -92,7 +92,7 @@ class CashPositionForm(forms.ModelForm):
         model = CashPosition
         fields = ['name', 'amount', 'remarks']
         widgets = {
-            'name': forms.TextInput(attrs={'placeholder': 'e.g. Kanika Acc'}),
+            'name': forms.TextInput(attrs={'placeholder': 'e.g. Secondary Acc'}),
             'amount': forms.NumberInput(attrs={'step': '0.01'}),
             'remarks': forms.TextInput(attrs={'placeholder': 'Optional'}),
         }
@@ -103,7 +103,7 @@ class BondHoldingForm(forms.ModelForm):
         model = BondHolding
         fields = ['account_name', 'amount', 'remarks']
         widgets = {
-            'account_name': forms.TextInput(attrs={'placeholder': 'e.g. Kanika Acc'}),
+            'account_name': forms.TextInput(attrs={'placeholder': 'e.g. Secondary Acc'}),
             'amount': forms.NumberInput(attrs={'step': '0.01'}),
             'remarks': forms.TextInput(attrs={'placeholder': 'Optional'}),
         }
@@ -142,7 +142,7 @@ class USStockHoldingForm(forms.ModelForm):
         ]
         widgets = {
             'symbol': forms.TextInput(attrs={'placeholder': 'UBER', 'value': 'UBER'}),
-            'company_name': forms.TextInput(attrs={'placeholder': 'Uber Technologies', 'value': 'Uber Technologies'}),
+            'company_name': forms.TextInput(attrs={'placeholder': 'e.g. Employer Corp'}),
             'quantity': forms.NumberInput(attrs={'placeholder': 'Number of shares', 'min': '1'}),
             'vest_date': forms.DateInput(attrs={'type': 'date', 'value': datetime.date.today().isoformat()}),
             'purchase_price_usd': forms.NumberInput(attrs={
