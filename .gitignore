@@ -1,6 +1,7 @@
 # Secrets & credentials
 credentials/
 .env
+scripts/DEPLOY.env
 .credentials
 portfolio/investor_profile.md
 **/google-service-account.json
