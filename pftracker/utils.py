@@ -2,6 +2,7 @@
 Shared utilities used by both tracker and portfolio apps.
 """
 import datetime
+import os
 from decimal import Decimal
 
 from django.conf import settings
@@ -43,8 +44,15 @@ def pnl_pct(pnl, invested):
 
 
 def get_google_credentials_path():
-    """Resolve Google service account credentials path from settings or default."""
-    path = getattr(settings, 'GOOGLE_SHEETS_CREDENTIALS', None)
+    """Resolve Google service account JSON path from env (GOOGLE_SHEETS_CREDENTIALS)."""
+    path = (
+        getattr(settings, 'GOOGLE_SHEETS_CREDENTIALS', '')
+        or os.environ.get('GOOGLE_SHEETS_CREDENTIALS', '')
+        or os.environ.get('GOOGLE_APPLICATION_CREDENTIALS', '')
+    )
     if not path:
-        path = str(settings.BASE_DIR / 'credentials' / 'google-service-account.json')
+        raise ValueError(
+            'Set GOOGLE_SHEETS_CREDENTIALS (or GOOGLE_APPLICATION_CREDENTIALS) '
+            'to the path of your service account JSON file.'
+        )
     return str(path)

@@ -6,6 +6,7 @@ from django.utils.csp import CSP
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Dev-only fallback; production must set DJANGO_SECRET_KEY in .env
 _default_key = 'django-insecure-dev-only-change-me'
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', _default_key)
 
@@ -258,11 +259,21 @@ SECURE_CSP = {
 
 # WebAuthn (FaceID / biometric unlock)
 WEBAUTHN_RP_ID = os.environ.get('WEBAUTHN_RP_ID', 'localhost')
-WEBAUTHN_RP_NAME = 'Vault'
+WEBAUTHN_RP_NAME = os.environ.get('WEBAUTHN_RP_NAME', 'Vault')
 WEBAUTHN_ORIGIN = os.environ.get(
     'WEBAUTHN_ORIGIN',
-    'http://localhost:8000' if DEBUG else 'https://localhost:8000',
+    os.environ.get('VAULT_PUBLIC_URL', 'http://localhost:8000'),
 )
+
+# Google Sheets / GCS service account JSON (never commit the file)
+GOOGLE_SHEETS_CREDENTIALS = os.environ.get(
+    'GOOGLE_SHEETS_CREDENTIALS',
+    os.environ.get('GOOGLE_APPLICATION_CREDENTIALS', ''),
+)
+
+# Admin monitor: optional local health probe behind reverse proxy
+VAULT_HEALTH_CHECK_URL = os.environ.get('VAULT_HEALTH_CHECK_URL', '')
+VAULT_HEALTH_CHECK_HOST = os.environ.get('VAULT_HEALTH_CHECK_HOST', '')
 
 # Security hardening
 SESSION_COOKIE_HTTPONLY = True

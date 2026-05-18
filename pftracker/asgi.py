@@ -11,6 +11,9 @@ import os
 
 from django.core.asgi import get_asgi_application
 
+from pftracker.dotenv import load_dotenv
+
+load_dotenv()
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pftracker.settings')
 
 application = get_asgi_application()
