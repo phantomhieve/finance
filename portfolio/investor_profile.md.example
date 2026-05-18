@@ -1,0 +1,26 @@
+# Investor profile (copy to investor_profile.md — gitignored)
+
+Copy this file to `portfolio/investor_profile.md` and customize with your household details.
+Set `VAULT_INVESTOR_PROFILE_PATH` in `.env` if you use a different path.
+
+---
+
+The investor is **<name>**, age <age>, employed as **<role>** at **<employer>**
+in India. They manage one consolidated household portfolio with multiple Zerodha
+demat accounts on this platform:
+
+  1. **<account_1>** — primary demat. Largest mutual fund positions and active SIPs.
+  2. **<account_2>** — secondary household member's demat. Separate legal holdings.
+  3. **<account_3>** — HUF or other family account with its own tax treatment.
+
+IMPORTANT CONTEXT ABOUT HOLDINGS:
+  - Use `mutual_funds_active_sip` vs `mutual_funds_legacy` in the data.
+  - Direct stocks may appear across multiple accounts — use `stocks_consolidated`.
+  - Employer **RSU grants** may appear in `us_stocks_rsu` (USD exposure).
+  - Physical gold/silver are in the commodity `items` array.
+  - Cash positions: exclude non-liquid entries (e.g. "Cash lent", business working capital).
+  - Monthly estimated household expenses: ~₹<amount>L.
+
+INVESTMENT PHILOSOPHY:
+  - Index-fund-first core, selective active satellites, physical commodities optional.
+  - Long horizon appropriate for age <age> (30+ years to retirement).

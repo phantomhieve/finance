@@ -66,7 +66,7 @@ python manage.py runserver
 
 ## Scheduled Tasks (Cron)
 
-See `deploy-your-ssh-host-or-ip/vault-cron` (uses `CRON_TZ=Asia/Kolkata`).
+Example schedule (set `CRON_TZ=Asia/Kolkata` if needed):
 
 | Schedule | Command |
 |----------|---------|
@@ -76,20 +76,15 @@ See `deploy-your-ssh-host-or-ip/vault-cron` (uses `CRON_TZ=Asia/Kolkata`).
 
 ## Production Deployment
 
-Deployed on Ubuntu 24.04 via Cloudflare Tunnel.
-
-```
-Browser → Cloudflare Tunnel (HTTPS) → Nginx (:80) → Gunicorn (:8000) → Django → PostgreSQL
-```
-
-See `deploy-your-ssh-host-or-ip/` for Nginx, systemd, and cron (YouStable).
+Typical stack: HTTPS reverse proxy or tunnel → Gunicorn → Django → PostgreSQL.
 
 ```bash
-cd /path/to/app && source venv/bin/activate
+cp .env.example .env   # set production values
+source venv/bin/activate
+pip install -r requirements.txt
 python manage.py migrate
 python manage.py collectstatic --noinput
-sudo systemctl restart vault
-sudo cp deploy-your-ssh-host-or-ip/vault-cron /etc/cron.d/vault && sudo chmod 644 /etc/cron.d/vault && sudo chown root:root /etc/cron.d/vault
+gunicorn pftracker.wsgi:application -c gunicorn.conf.py
 ```
 
 ## Environment Variables
@@ -117,6 +112,8 @@ Copy `.env.example` to `.env` and fill in values. Never commit `.env` or files u
 ## Credentials
 
 Set `GOOGLE_SHEETS_CREDENTIALS` to the path of your service account JSON (e.g. `credentials/google-service-account.json`). Used for Google Sheets sync and GCS uploads. The `credentials/` directory is gitignored.
+
+For AI insights, copy `portfolio/investor_profile.md.example` → `portfolio/investor_profile.md` (gitignored) with your household details — never commit real names or employer info.
 
 ## Project Structure
 
