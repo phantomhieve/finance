@@ -48,7 +48,6 @@ RSYNC_EXCLUDES=(
 )
 
 echo "==> Deploy ${USER}@${HOST}:${REMOTE_APP}"
-ssh "${SSH_OPTS[@]}" "${USER}@${HOST}" "mkdir -p '${REMOTE_APP}'"
 
 rsync "${RSYNC_FLAGS[@]}" \
   "${RSYNC_EXCLUDES[@]}" \
