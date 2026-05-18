@@ -1,13 +1,24 @@
 #!/bin/bash
+# Dump PostgreSQL databases, zip, upload to GCS. Configure via .env (see .env.example).
 set -euo pipefail
 
-BACKUP_SA="/path/to/app/credentials/backup-sa.json"
-BUCKET="postgres_backup_cash_center"
-DATABASES="vault_db cashcenter familytree"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+if [[ -f "${ROOT}/.env" ]]; then
+  set -a
+  # shellcheck disable=SC1091
+  source "${ROOT}/.env"
+  set +a
+fi
+
+BACKUP_SA="${BACKUP_SA_JSON_PATH:?Set BACKUP_SA_JSON_PATH in .env}"
+BUCKET="${BACKUP_GCS_BUCKET:?Set BACKUP_GCS_BUCKET in .env}"
+DATABASES="${BACKUP_DATABASES:-vault_db}"
+LOGFILE="${BACKUP_LOG_FILE:-/var/log/vault/backup.log}"
+PYTHON="${BACKUP_PYTHON:-python3}"
+
 STAMP=$(date +%Y-%m-%d_%H-%M-%S)
 TMPDIR=$(mktemp -d /tmp/pg_backup.XXXXXX)
-LOGFILE="/var/log/vault/backup.log"
-VENV="/path/to/app/venv/bin/python3"
 ZIP_NAME="${STAMP}.zip"
 ZIP_PATH="${TMPDIR}/${ZIP_NAME}"
 
@@ -45,7 +56,7 @@ SIZE=$(du -h "$ZIP_PATH" | cut -f1)
 log "  zip: ${SIZE}"
 
 log "Uploading to gs://${BUCKET}/${ZIP_NAME}..."
-if ! $VENV - "$BACKUP_SA" "$BUCKET" "$ZIP_PATH" "$ZIP_NAME" <<'PYEOF'
+if ! "$PYTHON" - "$BACKUP_SA" "$BUCKET" "$ZIP_PATH" "$ZIP_NAME" <<'PYEOF'
 import sys
 from google.cloud import storage
 sa_path, bucket_name, local_path, gcs_path = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]

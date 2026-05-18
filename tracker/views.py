@@ -674,15 +674,19 @@ def server_metrics(request):
     # --- Website check ---
     web_up = False
     web_ms = None
-    try:
-        t0 = _time.time()
-        wr = http_requests.get('http://127.0.0.1:80/login/',
-                               headers={'Host': 'finance.phantomhive.in'},
-                               timeout=5, allow_redirects=False)
-        web_ms = round((_time.time() - t0) * 1000, 1)
-        web_up = wr.status_code in (200, 302)
-    except Exception:
-        pass
+    health_url = getattr(settings, 'VAULT_HEALTH_CHECK_URL', '')
+    if health_url:
+        try:
+            t0 = _time.time()
+            req_kwargs = {'timeout': 5, 'allow_redirects': False}
+            health_host = getattr(settings, 'VAULT_HEALTH_CHECK_HOST', '')
+            if health_host:
+                req_kwargs['headers'] = {'Host': health_host}
+            wr = http_requests.get(health_url, **req_kwargs)
+            web_ms = round((_time.time() - t0) * 1000, 1)
+            web_up = wr.status_code in (200, 302)
+        except Exception:
+            pass
 
     return JsonResponse({
         'ts': now,

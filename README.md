@@ -94,17 +94,29 @@ sudo cp deploy-your-ssh-host-or-ip/vault-cron /etc/cron.d/vault && sudo chmod 64
 
 ## Environment Variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DJANGO_SECRET_KEY` | Django secret key | insecure dev key |
-| `DJANGO_DEBUG` | Enable debug mode | `True` |
-| `DJANGO_ALLOWED_HOSTS` | Comma-separated hosts | `localhost,127.0.0.1` |
-| `DATABASE_URL` | PostgreSQL connection string | SQLite fallback |
-| `BACKUP_GCS_BUCKET` | GCS bucket for database backups | — |
+Copy `.env.example` to `.env` and fill in values. Never commit `.env` or files under `credentials/`.
+
+| Variable | Description |
+|----------|-------------|
+| `DJANGO_SECRET_KEY` | Django secret key (required in production) |
+| `DJANGO_DEBUG` | `True` / `False` |
+| `DJANGO_ALLOWED_HOSTS` | Comma-separated hostnames |
+| `DJANGO_CSRF_TRUSTED_ORIGINS` | Comma-separated origins (include `https://` in prod) |
+| `DATABASE_URL` | PostgreSQL URL; omit for SQLite dev |
+| `VAULT_PUBLIC_URL` | Public site URL (e.g. `https://finance.example.com`) |
+| `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` | Google login (allauth) |
+| `GOOGLE_SHEETS_CREDENTIALS` | Path to service account JSON (Sheets + GCS backup) |
+| `BACKUP_GCS_BUCKET` | GCS bucket for `backup_db` |
+| `BACKUP_SA_JSON_PATH` | Service account JSON for `scripts/backup-all-dbs.sh` |
+| `BACKUP_DATABASES` | Space-separated DB names for multi-DB backup script |
+| `GEMINI_API_KEY` | AI portfolio insights |
+| `WEBAUTHN_RP_ID` / `WEBAUTHN_ORIGIN` | Biometric unlock (must match browser URL) |
+| `VAULT_HEALTH_CHECK_URL` / `VAULT_HEALTH_CHECK_HOST` | Optional admin monitor probe |
+| `GUNICORN_*` | Bind address, workers, log paths (see `.env.example`) |
 
 ## Credentials
 
-Place the Google service account JSON at `credentials/google-service-account.json`. This is used for both Google Sheets sync and GCS backup uploads. The `credentials/` directory is gitignored.
+Set `GOOGLE_SHEETS_CREDENTIALS` to the path of your service account JSON (e.g. `credentials/google-service-account.json`). Used for Google Sheets sync and GCS uploads. The `credentials/` directory is gitignored.
 
 ## Project Structure
 
@@ -119,7 +131,6 @@ personal-finance/
 │   └── views.py        # Portfolio views
 ├── templates/          # Shared templates
 ├── static/             # CSS, JS assets
-├── credentials/        # Google service account (gitignored)
-├── deploy/             # Nginx, systemd, cron configs
-└── seed_data.py        # Database seeder
+├── credentials/        # Google service account (gitignored; paths via .env)
+└── scripts/            # Operational scripts (configure via .env)
 ```
