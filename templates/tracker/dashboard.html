@@ -1,0 +1,425 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Monthly Savings — Vault{% endblock %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+  <div>
+    <p class="text-xs font-bold tracking-widest uppercase text-primary">Monthly Savings</p>
+    <h1 class="text-xl lg:text-2xl font-extrabold">{{ fy_label }}</h1>
+    <p class="text-xs opacity-50">{{ fy_start_date|date:"d M Y" }} → {{ fy_end_date|date:"d M Y" }}</p>
+  </div>
+  <div class="flex flex-wrap items-center gap-2 sm:gap-2 justify-center sm:justify-start w-full sm:w-auto">
+    <div class="fy-tabs" id="fySwitcher">
+      {% for fy in fy_options %}
+      <a href="?fy={{ fy }}" class="fy-tab {% if fy == fy_start %}fy-tab-active{% endif %}">{{ fy }}-{{ fy|add:1 }}</a>
+      {% endfor %}
+    </div>
+    <button class="btn btn-primary btn-sm gap-1" onclick="newTransaction()">
+      <span class="material-symbols-outlined text-base">add_circle</span><span class="hidden sm:inline">Add Entry</span><span class="sm:hidden">Add</span>
+    </button>
+    <button class="btn btn-ghost btn-sm gap-1" onclick="openModal('goalModal')">
+      <span class="material-symbols-outlined text-base">flag</span><span class="hidden sm:inline">Manage Goals</span><span class="sm:hidden">Goals</span>
+    </button>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{# ——— GOAL HERO ——— #}
+<div class="card hero-gradient shadow-sm animate-up mb-4 card-hover">
+  <div class="card-body p-4 lg:p-6">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div>
+        <p class="text-xs font-bold uppercase tracking-wider opacity-40">Annual Goal</p>
+        <p class="text-3xl lg:text-4xl font-extrabold mt-1 text-primary">₹{{ total_goal|floatformat:0|intcomma }}</p>
+        <div class="flex flex-wrap gap-2 mt-2 text-xs opacity-60">
+          <span>Base ₹{{ monthly_goal|floatformat:0|intcomma }}/mo</span>
+          {% if increments %}<span class="badge badge-success badge-sm">{{ increments|length }} increment{{ increments|length|pluralize }}</span>{% endif %}
+          {% if adjustments %}<span class="badge badge-secondary badge-sm">{{ adjustments|length }} adjustment{{ adjustments|length|pluralize }}</span>{% endif %}
+        </div>
+      </div>
+      <div>
+        <div class="flex justify-between text-xs mb-1.5">
+          <span class="opacity-40">Goal progress</span>
+          <span class="font-bold text-primary">{{ goal_pct }}%</span>
+        </div>
+        <progress class="progress progress-primary w-full h-2.5" value="{{ goal_pct }}" max="100"></progress>
+        <div class="flex justify-between mt-3">
+          <div>
+            <p class="text-[10px] uppercase tracking-wider opacity-40">Achieved</p>
+            <p class="text-sm font-bold {% if goal_achieved >= 0 %}text-success{% else %}text-error{% endif %}">₹{{ goal_achieved|floatformat:0|intcomma }}</p>
+          </div>
+          <div class="text-right">
+            <p class="text-[10px] uppercase tracking-wider opacity-40">Remaining</p>
+            <p class="text-sm font-bold {% if goal_remaining > 0 %}text-error{% else %}text-success{% endif %}">₹{{ goal_remaining|floatformat:0|intcomma }}</p>
+          </div>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-2.5">
+        <div class="stat-card stat-card-primary">
+          <div class="text-[10px] uppercase tracking-wider opacity-50">Savings</div>
+          <div class="text-base font-bold mt-0.5 text-primary">₹{{ total_savings|floatformat:0|intcomma }}</div>
+        </div>
+        <div class="stat-card stat-card-accent">
+          <div class="text-[10px] uppercase tracking-wider opacity-50">Transfers</div>
+          <div class="text-base font-bold mt-0.5">₹{{ total_transfers|floatformat:0|intcomma }}</div>
+        </div>
+        <div class="stat-card stat-card-success">
+          <div class="text-[10px] uppercase tracking-wider opacity-50">Extra Income</div>
+          <div class="text-base font-bold mt-0.5 text-success">₹{{ total_income|floatformat:0|intcomma }}</div>
+        </div>
+        <div class="stat-card {% if hra_balance >= 0 %}stat-card-success{% else %}stat-card-error{% endif %}">
+          <div class="text-[10px] uppercase tracking-wider opacity-50">HRA Balance</div>
+          <div class="text-base font-bold mt-0.5 {% if hra_balance >= 0 %}text-success{% else %}text-error{% endif %}">{% if hra_balance >= 0 %}+{% endif %}₹{{ hra_balance|floatformat:0|intcomma }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ——— MONTH GRID ——— #}
+<div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.1s">
+  <div class="card-body p-4 lg:p-6">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+      <h2 class="card-title text-base">Monthly Performance</h2>
+      <div class="hidden sm:flex gap-2 text-xs">
+        <span class="badge badge-success badge-sm gap-1">Beat goal</span>
+        <span class="badge badge-warning badge-sm gap-1">Below goal</span>
+        <span class="badge badge-error badge-sm gap-1 opacity-60">Missed</span>
+      </div>
+    </div>
+    <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-2">
+      {% for m in monthly_data %}
+      <div class="month-card rounded-xl p-2.5 text-center text-xs border {% if m.status == 'good' %}border-success/30 bg-success/5{% elif m.status == 'partial' %}border-warning/30 bg-warning/5{% elif m.status == 'missed' %}border-error/20 bg-error/5{% else %}border-base-300/50 bg-base-300/20{% endif %}">
+        <div class="font-semibold opacity-60 mb-1.5 text-[10px] uppercase tracking-wider">{{ m.name }}</div>
+        {% if m.started %}
+        <div class="font-bold text-sm">₹{{ m.total|floatformat:0|intcomma }}</div>
+        <div class="text-[10px] {% if m.surplus >= 0 %}text-success{% else %}text-error{% endif %} font-semibold mt-0.5">{% if m.surplus >= 0 %}+{% endif %}₹{{ m.surplus|floatformat:0|intcomma }}</div>
+        <progress class="progress progress-xs w-full mt-1.5 {% if m.status == 'good' %}progress-success{% elif m.status == 'partial' %}progress-warning{% else %}progress-error{% endif %}" value="{{ m.pct }}" max="100"></progress>
+        <div class="text-[10px] opacity-40 mt-0.5">{{ m.pct }}%</div>
+        {% else %}
+        <div class="text-sm opacity-30 mt-1">₹{{ m.goal|floatformat:0|intcomma }}</div>
+        <div class="text-[10px] opacity-20">Target</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{# ——— CHARTS ——— #}
+<div class="grid grid-cols-1 lg:grid-cols-5 gap-4 animate-up mb-4" style="animation-delay:0.2s">
+  <div class="card bg-base-200 shadow-sm lg:col-span-3 card-hover">
+    <div class="card-body p-4"><h2 class="card-title text-base mb-2">Savings vs Monthly Goal</h2><div class="chart-wrap"><canvas id="barChart"></canvas></div></div>
+  </div>
+  <div class="card bg-base-200 shadow-sm lg:col-span-2 card-hover">
+    <div class="card-body p-4"><h2 class="card-title text-base mb-2">Cumulative</h2><div class="chart-wrap"><canvas id="lineChart"></canvas></div></div>
+  </div>
+</div>
+
+{# ——— TRANSACTIONS ——— #}
+<div class="card bg-base-200 shadow-sm animate-up" style="animation-delay:0.3s">
+  <div class="card-body p-4">
+    <h2 class="card-title text-base mb-2">Transactions</h2>
+
+    {# Desktop table #}
+    <div class="hidden md:block overflow-x-auto">
+      <table class="table table-sm" id="txnTable">
+        <thead><tr><th>Date</th><th>Amount</th><th>Type</th><th>Remarks</th><th class="w-10"></th></tr></thead>
+        <tbody>
+          {% for t in recent_transactions %}
+          <tr class="hover">
+            <td class="opacity-60 text-sm whitespace-nowrap">{{ t.date|date:"d M Y" }}</td>
+            <td class="font-semibold whitespace-nowrap">
+              {% if t.type == 'EXTRA_INCOME' or t.type == 'SAVINGS' %}<span class="text-success">+₹{{ t.amount|intcomma }}</span>
+              {% else %}₹{{ t.amount|intcomma }}{% endif %}
+            </td>
+            <td>
+              {% if t.type == 'SAVINGS' %}<span class="badge badge-primary badge-sm">Savings</span>
+              {% elif t.type == 'TRANSFER' %}<span class="badge badge-info badge-sm">Transfer</span>
+              {% elif t.type == 'EXTRA_INCOME' %}<span class="badge badge-success badge-sm">Income</span>
+              {% else %}<span class="badge badge-ghost badge-sm">Other</span>{% endif %}
+            </td>
+            <td class="opacity-50 text-sm">{{ t.remarks|default:"—" }}</td>
+            <td>
+              <button class="btn btn-ghost btn-xs btn-square" onclick="editTransaction({{ t.id }}, '{{ t.date|date:'Y-m-d' }}', '{{ t.type }}', '{{ t.amount }}', '{{ t.remarks|escapejs }}')">
+                <span class="material-symbols-outlined text-base">edit</span>
+              </button>
+            </td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="5" class="text-center opacity-50 py-8">No transactions yet — click <strong>Add Entry</strong> above.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {# Mobile card view #}
+    <div class="md:hidden space-y-2" id="txnCards">
+      {% for t in recent_transactions %}
+      <div class="table-card flex items-center justify-between gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2">
+            <span class="font-semibold text-sm whitespace-nowrap">
+              {% if t.type == 'EXTRA_INCOME' or t.type == 'SAVINGS' %}<span class="text-success">+₹{{ t.amount|intcomma }}</span>
+              {% else %}₹{{ t.amount|intcomma }}{% endif %}
+            </span>
+            {% if t.type == 'SAVINGS' %}<span class="badge badge-primary badge-xs">Savings</span>
+            {% elif t.type == 'TRANSFER' %}<span class="badge badge-info badge-xs">Transfer</span>
+            {% elif t.type == 'EXTRA_INCOME' %}<span class="badge badge-success badge-xs">Income</span>
+            {% else %}<span class="badge badge-ghost badge-xs">Other</span>{% endif %}
+          </div>
+          <div class="text-xs opacity-50 mt-0.5 truncate">{{ t.date|date:"d M Y" }}{% if t.remarks %} · {{ t.remarks }}{% endif %}</div>
+        </div>
+        <button class="btn btn-ghost btn-xs btn-square shrink-0" onclick="editTransaction({{ t.id }}, '{{ t.date|date:'Y-m-d' }}', '{{ t.type }}', '{{ t.amount }}', '{{ t.remarks|escapejs }}')">
+          <span class="material-symbols-outlined text-base">edit</span>
+        </button>
+      </div>
+      {% empty %}
+      <p class="text-center opacity-50 py-8 text-sm">No transactions yet — tap <strong>Add</strong> above.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{# ——— ADD/EDIT TRANSACTION MODAL ——— #}
+<dialog class="modal" id="addTxnModal">
+  <div class="modal-box">
+    <h3 class="font-bold text-lg flex items-center gap-2" id="txnModalTitle">
+      <span class="material-symbols-outlined text-primary">add_circle</span>Add Savings Entry
+    </h3>
+    <form id="addTxnForm" method="post" action="{% url 'add_transaction' %}">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <div class="grid grid-cols-2 gap-4 mt-4">
+        <div class="form-field"><label class="label text-xs font-semibold">Date</label>{{ txn_form.date }}</div>
+        <div class="form-field"><label class="label text-xs font-semibold">Type</label>{{ txn_form.type }}</div>
+      </div>
+      <div class="form-field mt-3"><label class="label text-xs font-semibold">Amount (₹)</label>{{ txn_form.amount }}</div>
+      <div class="form-field mt-3"><label class="label text-xs font-semibold">Remarks</label>{{ txn_form.remarks }}</div>
+      <div class="modal-action">
+        <button type="button" id="txnDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteTxnForm')">
+          <span class="material-symbols-outlined text-base">delete</span>Delete
+        </button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addTxnModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm"><span class="material-symbols-outlined text-base">save</span>Save</button>
+      </div>
+    </form>
+    <form id="deleteTxnForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+{# ——— GOAL MODAL ——— #}
+<dialog class="modal" id="goalModal">
+  <div class="modal-box max-w-lg">
+    <h3 class="font-bold text-lg flex items-center gap-2">
+      <span class="material-symbols-outlined text-primary">flag</span>Manage Goals
+    </h3>
+    <div role="tablist" class="tabs tabs-bordered mt-4" id="goalTabs">
+      <a role="tab" class="tab tab-active" data-tab="tab-fy" onclick="switchTab('goalTabs','tab-fy',this)">Set FY Goal</a>
+      <a role="tab" class="tab" data-tab="tab-inc" onclick="switchTab('goalTabs','tab-inc',this)">Increment</a>
+      <a role="tab" class="tab" data-tab="tab-adj" onclick="switchTab('goalTabs','tab-adj',this)">Adjust</a>
+    </div>
+
+    {# Tab 1: Set FY Goal #}
+    <div id="tab-fy" class="tab-pane mt-4">
+      <form method="post" action="{% url 'set_annual_goal' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <div class="alert alert-info text-xs mb-4"><span class="material-symbols-outlined text-sm">info</span>Set the annual savings goal and base monthly target for any financial year.</div>
+        <div class="form-field"><label class="label text-xs font-semibold">Financial Year <span class="opacity-40">(April start year)</span></label>{{ fy_goal_form.fy_year }}<p class="text-xs opacity-40 mt-1">e.g. enter <strong>2025</strong> for FY 2025-26. Currently viewing: <strong>{{ fy_start }}</strong></p></div>
+        <div class="form-field mt-3"><label class="label text-xs font-semibold">Base Monthly Goal (₹)</label>{{ fy_goal_form.monthly_goal }}</div>
+        <div class="modal-action">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('goalModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">Save FY Goal</button>
+        </div>
+      </form>
+    </div>
+
+    {# Tab 2: Increment #}
+    <div id="tab-inc" class="tab-pane hidden mt-4">
+      <form method="post" action="{% url 'add_goal_increment' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><input type="hidden" name="increment_id" id="inc_id_field" value="">
+        <div class="alert alert-info text-xs mb-4"><span class="material-symbols-outlined text-sm">info</span>Add a step-up or step-down to the monthly goal from a specific month.</div>
+        {% if increments %}
+        <div class="bg-base-300/50 rounded-lg p-3 mb-4 text-xs space-y-2">
+          <p class="font-semibold opacity-50">Existing increments in {{ fy_label }}</p>
+          {% for inc in increments %}
+          <div class="flex justify-between items-center">
+            <span>
+              <span class="material-symbols-outlined text-sm text-warning align-middle">{% if inc.increment_amount < 0 %}arrow_downward{% else %}arrow_upward{% endif %}</span>
+              {% if inc.increment_amount > 0 %}+{% endif %}₹{{ inc.increment_amount|floatformat:0|intcomma }}/mo from {{ inc.effective_month|date:"M Y" }}
+              {% if inc.reason %}<span class="opacity-40">— {{ inc.reason }}</span>{% endif %}
+            </span>
+            <span class="flex gap-1">
+              <button type="button" class="btn btn-ghost btn-xs" onclick="editIncrement('{{ inc.id }}', '{{ inc.effective_month|date:'Y-m-d' }}', '{{ inc.increment_amount }}', '{{ inc.reason|escapejs|default:'' }}')">Edit</button>
+              <button type="button" class="btn btn-ghost btn-xs text-error" onclick="confirmDelete('deleteInc{{ inc.id }}', 'Remove this goal increment?')">Del</button>
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <div class="grid grid-cols-2 gap-4">
+          <div class="form-field"><label class="label text-xs font-semibold">Effective From</label>{{ goal_form.effective_month }}</div>
+          <div class="form-field"><label class="label text-xs font-semibold">Increment Amount (+/- ₹)</label>{{ goal_form.increment_amount }}</div>
+        </div>
+        <div class="form-field mt-3"><label class="label text-xs font-semibold">Reason <span class="opacity-40">optional</span></label>{{ goal_form.reason }}</div>
+        <div class="modal-action">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('goalModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">Save Increment</button>
+        </div>
+      </form>
+      {% for inc in increments %}
+      <form id="deleteInc{{ inc.id }}" method="post" action="{% url 'delete_goal_increment' inc.id %}" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form>
+      {% endfor %}
+    </div>
+
+    {# Tab 3: Adjust #}
+    <div id="tab-adj" class="tab-pane hidden mt-4">
+      <form method="post" action="{% url 'add_goal_adjustment' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><input type="hidden" name="adjustment_id" id="adj_id_field" value="">
+        <div class="alert alert-info text-xs mb-4"><span class="material-symbols-outlined text-sm">info</span>Tweak the goal for <strong>one specific month only</strong>.</div>
+        {% if adjustments %}
+        <div class="bg-base-300/50 rounded-lg p-3 mb-4 text-xs space-y-2">
+          <p class="font-semibold opacity-50">Monthly adjustments in {{ fy_label }}</p>
+          {% for adj in adjustments %}
+          <div class="flex justify-between items-center">
+            <span>
+              <span class="material-symbols-outlined text-sm text-warning align-middle">{% if adj.adjustment_amount < 0 %}remove{% else %}add{% endif %}</span>
+              {% if adj.adjustment_amount > 0 %}+{% endif %}₹{{ adj.adjustment_amount|floatformat:0|intcomma }} only for {{ adj.month|date:"M Y" }}
+              {% if adj.reason %}<span class="opacity-40">— {{ adj.reason }}</span>{% endif %}
+            </span>
+            <span class="flex gap-1">
+              <button type="button" class="btn btn-ghost btn-xs" onclick="editAdjustment('{{ adj.id }}', '{{ adj.month|date:'Y-m-d' }}', '{{ adj.adjustment_amount }}', '{{ adj.reason|escapejs|default:'' }}')">Edit</button>
+              <button type="button" class="btn btn-ghost btn-xs text-error" onclick="confirmDelete('deleteAdj{{ adj.id }}', 'Remove this monthly adjustment?')">Del</button>
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        <div class="grid grid-cols-2 gap-4">
+          <div class="form-field"><label class="label text-xs font-semibold">Month</label>{{ adjust_form.month }}</div>
+          <div class="form-field"><label class="label text-xs font-semibold">Adjustment (+/- ₹)</label>{{ adjust_form.adjustment_amount }}</div>
+        </div>
+        <div class="form-field mt-3"><label class="label text-xs font-semibold">Reason <span class="opacity-40">optional</span></label>{{ adjust_form.reason }}</div>
+        <div class="modal-action">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('goalModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">Save Adjustment</button>
+        </div>
+      </form>
+      {% for adj in adjustments %}
+      <form id="deleteAdj{{ adj.id }}" method="post" action="{% url 'delete_goal_adjustment' adj.id %}" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form>
+      {% endfor %}
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+{{ dashboard_chart_data|json_script:"chart-data" }}
+{% endblock %}
+
+{% block chart_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var cd = JSON.parse(document.getElementById('chart-data').textContent);
+  var months = cd.months, totals = cd.totals, goals = cd.goals, cumulative = cd.cumulative, cumulative_goals = cd.cumulative_goals;
+
+  var gridClr = 'rgba(128,128,128,0.08)';
+  var tickClr = 'rgba(128,128,128,0.45)';
+
+  var tip = {
+    backgroundColor: 'oklch(0.2 0 0 / 0.95)',
+    borderColor: 'rgba(128,128,128,0.15)',
+    borderWidth: 1,
+    titleColor: '#ddd',
+    bodyColor: '#aaa',
+    padding: 12,
+    cornerRadius: 8,
+    callbacks: { label: function (c) { return ' \u20b9' + c.raw.toLocaleString('en-IN'); } }
+  };
+
+  var scaleOpts = {
+    x: { grid: { display: false }, ticks: { color: tickClr, font: { size: 11 } }, border: { display: false } },
+    y: { grid: { color: gridClr }, ticks: { color: tickClr, font: { size: 11 }, callback: function (v) { return v >= 1e5 ? '\u20b9' + (v / 1e5).toFixed(0) + 'L' : '\u20b9' + v.toLocaleString('en-IN'); } }, border: { display: false } }
+  };
+
+  new Chart(document.getElementById('barChart'), {
+    data: {
+      labels: months,
+      datasets: [
+        { type: 'bar', label: '  Saved', data: totals, backgroundColor: totals.map(function (v, i) { return v >= goals[i] ? 'rgba(0,200,120,0.45)' : v > 0 ? 'rgba(250,200,50,0.4)' : 'rgba(240,80,80,0.25)'; }), borderColor: totals.map(function (v, i) { return v >= goals[i] ? '#00c878' : v > 0 ? '#fab032' : '#f05050'; }), borderWidth: 1.5, borderRadius: 8, borderSkipped: false },
+        { type: 'line', label: '  Goal', data: goals, borderColor: 'rgba(100,140,250,0.5)', borderWidth: 2, borderDash: [5, 4], pointRadius: 0, fill: false, tension: 0.1 }
+      ]
+    },
+    options: { animation: { duration: 900 }, responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: tickClr, usePointStyle: true, boxWidth: 6, padding: 16 } }, tooltip: tip }, scales: scaleOpts }
+  });
+
+  new Chart(document.getElementById('lineChart'), {
+    type: 'line',
+    data: {
+      labels: months,
+      datasets: [
+        { label: '  Saved', data: cumulative, borderColor: '#648cfa', backgroundColor: 'rgba(100,140,250,0.06)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#648cfa', pointBorderColor: 'transparent', pointBorderWidth: 0, tension: 0.35, fill: true },
+        { label: '  Goal', data: cumulative_goals, borderColor: 'rgba(100,140,250,0.5)', borderWidth: 2, borderDash: [5, 4], pointRadius: 0, fill: false, tension: 0.1 }
+      ]
+    },
+    options: { animation: { duration: 1100 }, responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: tickClr, usePointStyle: true, boxWidth: 6, padding: 16 } }, tooltip: tip }, scales: scaleOpts }
+  });
+
+  initPagination('txnTable', window.innerWidth <= 640 ? 7 : 15);
+});
+
+function switchTab(groupPrefix, targetId, btnEl) {
+  var container = btnEl.closest('.modal-box');
+  container.querySelectorAll('[role=tab]').forEach(function(b) { b.classList.remove('tab-active'); });
+  container.querySelectorAll('.tab-pane').forEach(function(p) { p.classList.add('hidden'); });
+  btnEl.classList.add('tab-active');
+  document.getElementById(targetId).classList.remove('hidden');
+}
+
+function editIncrement(id, date, amount, reason) {
+  var pane = document.getElementById('tab-inc');
+  pane.querySelector('#inc_id_field').value = id;
+  pane.querySelector('#id_effective_month').value = date;
+  pane.querySelector('#id_increment_amount').value = amount;
+  var r = pane.querySelector('input[name="reason"]');
+  if (r) r.value = reason;
+}
+
+function editAdjustment(id, date, amount, reason) {
+  var pane = document.getElementById('tab-adj');
+  pane.querySelector('#adj_id_field').value = id;
+  pane.querySelector('#id_month').value = date;
+  pane.querySelector('#id_adjustment_amount').value = amount;
+  var r = pane.querySelector('input[name="reason"]');
+  if (r) r.value = reason;
+}
+
+function newTransaction() {
+  var form = document.getElementById('addTxnForm');
+  form.action = "{% url 'add_transaction' %}";
+  form.reset();
+  document.getElementById('txnDeleteBtn').style.display = 'none';
+  document.getElementById('txnModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span> Add Savings Entry';
+  openModal('addTxnModal');
+}
+
+function editTransaction(id, date, type, amount, remarks) {
+  var form = document.getElementById('addTxnForm');
+  form.action = "{% url 'edit_transaction' pk=0 %}".replace('/0/', '/' + id + '/');
+  var delForm = document.getElementById('deleteTxnForm');
+  delForm.action = "{% url 'delete_transaction' pk=0 %}".replace('/0/', '/' + id + '/');
+  document.getElementById('txnDeleteBtn').style.display = 'inline-flex';
+  document.getElementById('txnModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">edit</span> Edit Entry';
+  document.getElementById('id_date').value = date;
+  document.getElementById('id_type').value = type;
+  document.getElementById('id_amount').value = parseFloat(amount);
+  document.getElementById('id_remarks').value = remarks;
+  openModal('addTxnModal');
+}
+</script>
+{% endblock %}

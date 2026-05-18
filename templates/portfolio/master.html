@@ -1,0 +1,884 @@
+{% extends 'base.html' %}
+{% load indian_format %}
+
+{% block title %}Portfolio — Vault{% endblock %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+  <div>
+    <p class="text-xs font-bold tracking-widest uppercase text-primary">Portfolio Tracker</p>
+    <h1 class="text-xl lg:text-2xl font-extrabold">Master Portfolio</h1>
+    <p class="text-xs opacity-50">All asset classes &amp; investments</p>
+  </div>
+  <div class="hidden sm:flex flex-wrap items-center gap-2">
+    <form method="post" action="{% url 'sync_from_sheets' %}" class="inline">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <button type="submit" class="btn btn-ghost btn-sm gap-1"><span class="material-symbols-outlined text-base">sync</span>Sync Sheets</button>
+    </form>
+    <form method="post" action="{% url 'refresh_prices' %}" class="inline">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <button type="submit" class="btn btn-ghost btn-sm gap-1"><span class="material-symbols-outlined text-base">currency_exchange</span>Refresh Prices</button>
+    </form>
+    <form method="post" action="{% url 'generate_insights' %}" class="inline">{% csrf_token %}
+      <button type="submit" class="btn btn-ghost btn-sm gap-1{% if not can_generate_insight %} btn-disabled opacity-50{% endif %}"{% if not can_generate_insight %}{% if insight_cooldown_days_hint %} title="Wait: minimum {{ insight_cooldown_days_hint }} day(s) between runs"{% else %} title="Dev: no cooldown"{% endif %}{% endif %}><span class="material-symbols-outlined text-base">auto_awesome</span>AI Insights</button>
+    </form>
+    <button type="button" class="btn btn-ghost btn-sm gap-1" id="biometricSetupBtn" onclick="openModal('biometricModal')" style="display:none"><span class="material-symbols-outlined text-base">fingerprint</span>Biometrics</button>
+    <a href="{% url 'portfolio_growth' %}" class="btn btn-primary btn-sm gap-1"><span class="material-symbols-outlined text-base">trending_up</span>Growth</a>
+  </div>
+  {# Mobile actions dropdown #}
+  <div class="sm:hidden flex items-center gap-2">
+    <a href="{% url 'portfolio_growth' %}" class="btn btn-primary btn-sm gap-1"><span class="material-symbols-outlined text-base">trending_up</span>Growth</a>
+    <div class="dropdown">
+      <div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square">
+        <span class="material-symbols-outlined">more_vert</span>
+      </div>
+      <ul tabindex="0" class="dropdown-content menu bg-base-200 rounded-xl z-50 w-44 p-2 shadow-2xl mt-2">
+        <li><form method="post" action="{% url 'sync_from_sheets' %}" class="m-0">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button type="submit" class="flex items-center gap-2 w-full text-left text-sm"><span class="material-symbols-outlined text-sm">sync</span>Sync</button></form></li>
+        <li><form method="post" action="{% url 'refresh_prices' %}" class="m-0">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button type="submit" class="flex items-center gap-2 w-full text-left text-sm"><span class="material-symbols-outlined text-sm">currency_exchange</span>Refresh</button></form></li>
+        <li><form method="post" action="{% url 'generate_insights' %}" class="m-0">{% csrf_token %}<button type="submit" class="flex items-center gap-2 w-full text-left text-sm{% if not can_generate_insight %} opacity-50{% endif %}"{% if not can_generate_insight %} disabled{% endif %}{% if not can_generate_insight %}{% if insight_cooldown_days_hint %} title="Minimum {{ insight_cooldown_days_hint }} day(s) between runs"{% else %} title="Dev: no cooldown"{% endif %}{% endif %}><span class="material-symbols-outlined text-sm">auto_awesome</span>AI Insights</button></form></li>
+        <li><button type="button" class="flex items-center gap-2 w-full text-left text-sm biometric-setup-btn" style="display:none" onclick="openModal('biometricModal')"><span class="material-symbols-outlined text-sm">fingerprint</span>Biometrics</button></li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{# ——— PORTFOLIO HERO ——— #}
+<div class="card hero-gradient-portfolio shadow-sm animate-up mb-4 card-hover">
+  <div class="card-body p-4 lg:p-6">
+    <div class="flex flex-wrap items-center gap-8">
+      <div>
+        <p class="text-[10px] font-bold uppercase tracking-widest opacity-40">Total Portfolio Value</p>
+        <p class="text-3xl lg:text-4xl font-extrabold mt-1 text-primary">₹{{ total_value|floatformat:0|indian_number }}</p>
+        <div class="mt-2">
+          <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold {% if total_returns >= 0 %}bg-success/15 text-success border border-success/25{% else %}bg-error/15 text-error border border-error/25{% endif %}">
+            <span class="material-symbols-outlined text-sm">{% if total_returns >= 0 %}trending_up{% else %}trending_down{% endif %}</span>
+            {% if total_returns >= 0 %}+{% endif %}₹{{ total_returns|floatformat:0|indian_number }} ({{ return_pct }}%)
+          </span>
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-3">
+        <div class="stat-card stat-card-primary">
+          <div class="text-[10px] uppercase tracking-wider opacity-50">Invested</div>
+          <div class="text-base font-bold mt-0.5">₹{{ total_invested|floatformat:0|indian_number }}</div>
+        </div>
+        <div class="stat-card {% if total_returns >= 0 %}stat-card-success{% else %}stat-card-error{% endif %}">
+          <div class="text-[10px] uppercase tracking-wider opacity-50">Returns</div>
+          <div class="text-base font-bold mt-0.5 {% if total_returns >= 0 %}text-success{% else %}text-error{% endif %}">₹{{ total_returns|floatformat:0|indian_number }}</div>
+        </div>
+        <div class="flex items-center gap-3 text-xs opacity-50 self-center">
+          <span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm text-warning">diamond</span>₹{{ gold_rate|floatformat:0|indian_number }}/g</span>
+          <span>&middot;</span>
+          <span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm opacity-60">toll</span>₹{{ silver_rate|floatformat:0|indian_number }}/g</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ——— AI INSIGHTS ——— #}
+{% if latest_insight %}
+{% with ins=latest_insight.insights %}
+<div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.05s">
+  <div class="card-body p-4 lg:p-6">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+      <h2 class="card-title text-base gap-2"><span class="material-symbols-outlined text-warning text-lg">auto_awesome</span>AI Analysis</h2>
+      <div class="flex gap-2"><span class="badge badge-ghost badge-sm">{{ latest_insight.model_used }}</span><span class="badge badge-ghost badge-sm">{{ latest_insight.generated_at|timesince }} ago</span></div>
+    </div>
+
+    {# Desktop: score ring + summary side by side #}
+    <div class="hidden md:flex gap-4 items-start">
+      <div class="ai-score-ring {% if ins.score >= 75 %}ai-score-high{% elif ins.score >= 50 %}ai-score-mid{% else %}ai-score-low{% endif %}">
+        <svg viewBox="0 0 64 64"><circle class="ai-score-ring-bg" cx="32" cy="32" r="28"/><circle class="ai-score-ring-fg" cx="32" cy="32" r="28" stroke-dasharray="175.93" stroke-dashoffset="175.93" data-score="{{ ins.score }}"/></svg>
+        <span class="ai-score-ring-text">{{ ins.score }}</span>
+      </div>
+      <p class="text-sm opacity-70 flex-1">{{ ins.summary }}</p>
+    </div>
+
+    <div class="hidden md:block">
+      <div class="collapse collapse-arrow bg-base-300/30 mt-4">
+        <input type="checkbox" />
+        <div class="collapse-title text-sm font-semibold flex items-center gap-2"><span class="material-symbols-outlined text-base">insights</span>Key Insights <span class="badge badge-ghost badge-sm">{{ ins.insights|length }}</span></div>
+        <div class="collapse-content space-y-3">
+          {% for item in ins.insights %}
+          <div class="pl-3 py-2 text-sm ai-sev-{{ item.severity }}">
+            <div class="font-semibold flex items-center gap-2">
+              <span class="material-symbols-outlined text-base">{% if item.category == 'risk' %}shield{% elif item.category == 'opportunity' %}trending_up{% elif item.category == 'rebalancing' %}balance{% elif item.category == 'goal' %}flag{% elif item.category == 'tax' %}receipt_long{% elif item.category == 'macro' %}public{% else %}lightbulb{% endif %}</span>
+              {{ item.title }}
+              {% if item.severity == 'critical' %}<span class="badge badge-error badge-xs">Critical</span>
+              {% elif item.severity == 'warning' %}<span class="badge badge-warning badge-xs">Warning</span>
+              {% elif item.severity == 'positive' %}<span class="badge badge-success badge-xs">Positive</span>
+              {% elif item.severity == 'info' %}<span class="badge badge-info badge-xs">Info</span>{% endif %}
+            </div>
+            <p class="opacity-60 mt-1">{{ item.detail }}</p>
+            {% if item.action %}<p class="text-primary text-xs mt-1 flex items-center gap-1"><span class="material-symbols-outlined text-xs">arrow_forward</span>{{ item.action }}</p>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      {% if ins.market_context %}
+      <div class="collapse collapse-arrow bg-base-300/30 mt-2">
+        <input type="checkbox" />
+        <div class="collapse-title text-sm font-semibold flex items-center gap-2"><span class="material-symbols-outlined text-base">public</span>Market Context</div>
+        <div class="collapse-content"><p class="text-sm opacity-60">{{ ins.market_context }}</p></div>
+      </div>
+      {% endif %}
+
+      {% if ins.outlook %}
+      <div class="collapse collapse-arrow bg-base-300/30 mt-2">
+        <input type="checkbox" />
+        <div class="collapse-title text-sm font-semibold flex items-center gap-2"><span class="material-symbols-outlined text-base">visibility</span>Outlook</div>
+        <div class="collapse-content"><p class="text-sm opacity-60">{{ ins.outlook }}</p></div>
+      </div>
+      {% endif %}
+    </div>
+
+    {# Mobile: compact — score number + collapsible details #}
+    <div class="md:hidden">
+      <div class="flex items-center gap-4 mb-3">
+        <div class="ai-score-ring {% if ins.score >= 75 %}ai-score-high{% elif ins.score >= 50 %}ai-score-mid{% else %}ai-score-low{% endif %}">
+          <svg viewBox="0 0 64 64"><circle class="ai-score-ring-bg" cx="32" cy="32" r="28"/><circle class="ai-score-ring-fg" cx="32" cy="32" r="28" stroke-dasharray="175.93" stroke-dashoffset="175.93" data-score="{{ ins.score }}"/></svg>
+          <span class="ai-score-ring-text">{{ ins.score }}</span>
+        </div>
+        <div>
+          <div class="text-2xl font-extrabold">{{ ins.score }}<span class="text-sm font-normal opacity-40"> / 100</span></div>
+          <div class="text-xs opacity-50">Portfolio Score</div>
+        </div>
+      </div>
+      <div class="collapse collapse-arrow bg-base-300/30">
+        <input type="checkbox" />
+        <div class="collapse-title text-sm font-semibold flex items-center gap-2"><span class="material-symbols-outlined text-base">description</span>Summary &amp; Insights</div>
+        <div class="collapse-content space-y-4">
+          <p class="text-sm opacity-70">{{ ins.summary }}</p>
+          {% for item in ins.insights %}
+          <div class="pl-3 py-2 text-sm ai-sev-{{ item.severity }}">
+            <div class="font-semibold flex items-center gap-2">
+              <span class="material-symbols-outlined text-base">{% if item.category == 'risk' %}shield{% elif item.category == 'opportunity' %}trending_up{% elif item.category == 'rebalancing' %}balance{% elif item.category == 'goal' %}flag{% elif item.category == 'tax' %}receipt_long{% elif item.category == 'macro' %}public{% else %}lightbulb{% endif %}</span>
+              {{ item.title }}
+              {% if item.severity == 'critical' %}<span class="badge badge-error badge-xs">Critical</span>
+              {% elif item.severity == 'warning' %}<span class="badge badge-warning badge-xs">Warning</span>
+              {% elif item.severity == 'positive' %}<span class="badge badge-success badge-xs">Positive</span>
+              {% elif item.severity == 'info' %}<span class="badge badge-info badge-xs">Info</span>{% endif %}
+            </div>
+            <p class="opacity-60 mt-1">{{ item.detail }}</p>
+          </div>
+          {% endfor %}
+          {% if ins.market_context %}<div class="pt-2 border-t border-base-300"><p class="text-xs font-semibold opacity-50 mb-1">Market Context</p><p class="text-sm opacity-60">{{ ins.market_context }}</p></div>{% endif %}
+          {% if ins.outlook %}<div class="pt-2 border-t border-base-300"><p class="text-xs font-semibold opacity-50 mb-1">Outlook</p><p class="text-sm opacity-60">{{ ins.outlook }}</p></div>{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endwith %}
+{% endif %}
+
+{# ——— FINANCIAL GOALS ——— #}
+<div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.08s">
+  <div class="card-body p-4">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="card-title text-base">Financial Goals</h2>
+      <button class="btn btn-ghost btn-sm gap-1" onclick="openGoalModal()"><span class="material-symbols-outlined text-base">add</span>Add</button>
+    </div>
+    {% if goals %}
+    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+      {% for g in goals %}
+      <div class="p-3 rounded-lg border cursor-pointer hover:bg-base-300/80 transition-colors {% if g.achieved %}border-success/30 bg-success/5{% else %}border-base-content/8 bg-base-300/30{% endif %}" data-edit-goal data-id="{{ g.id }}" data-label="{{ g.label }}" data-target="{{ g.target|floatformat:0 }}" data-sort="{{ g.sort_order }}">
+        <div class="text-sm font-semibold truncate">{{ g.label }}</div>
+        <progress class="progress w-full my-1.5 {% if g.achieved %}progress-success{% else %}progress-primary{% endif %}" value="{{ g.pct }}" max="100"></progress>
+        <div class="text-xs font-bold {% if g.achieved %}text-success{% endif %}">{{ g.pct }}%</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm opacity-40">No goals set. Add your first target!</p>
+    {% endif %}
+  </div>
+</div>
+
+{# ——— ASSET BREAKDOWN + ALLOCATION ——— #}
+<div class="grid grid-cols-1 lg:grid-cols-5 gap-4 animate-up mb-4" style="animation-delay:0.1s">
+  <div class="card bg-base-200 shadow-sm lg:col-span-3 card-hover">
+    <div class="card-body p-4">
+      <h2 class="card-title text-base mb-2">Portfolio Breakdown</h2>
+      <div class="hidden md:block overflow-x-auto"><table class="table table-sm">
+        <thead><tr><th></th><th>Asset Class</th><th class="text-right">Value</th><th class="text-right">Allocation</th></tr></thead>
+        <tbody>
+        {% for a in assets %}
+        <tr class="hover"><td><span class="material-symbols-outlined text-base opacity-50">{{ a.icon }}</span></td><td class="font-semibold">{{ a.name }}</td><td class="text-right font-semibold">₹{{ a.value|floatformat:0|indian_number }}</td><td class="text-right"><span class="badge badge-ghost badge-sm">{{ a.pct }}%</span></td></tr>
+        {% endfor %}
+        <tr class="border-t-2 border-base-300"><td></td><td class="font-bold text-primary">Total</td><td class="text-right font-bold text-primary">₹{{ total_value|floatformat:0|indian_number }}</td><td class="text-right"><span class="badge badge-primary badge-sm">100%</span></td></tr>
+        </tbody>
+      </table></div>
+      <div class="md:hidden">
+        {% for a in assets %}
+        <div class="flex items-center gap-3 py-2.5">
+          <span class="material-symbols-outlined text-lg opacity-30">{{ a.icon }}</span>
+          <span class="flex-1 font-medium text-sm">{{ a.name }}</span>
+          <span class="text-sm tabular-nums opacity-80">₹{{ a.value|floatformat:0|indian_number }}</span>
+          <span class="text-xs tabular-nums opacity-40 w-11 text-right">{{ a.pct }}%</span>
+        </div>
+        {% if not forloop.last %}<div class="divider-fade"></div>{% endif %}
+        {% endfor %}
+        <div class="divider-fade"></div>
+        <div class="flex items-center gap-3 pt-2.5">
+          <span class="material-symbols-outlined text-lg opacity-0">add</span>
+          <span class="flex-1 font-bold text-sm text-primary">Total</span>
+          <span class="text-sm font-bold text-primary tabular-nums">₹{{ total_value|floatformat:0|indian_number }}</span>
+          <span class="text-xs font-bold text-primary tabular-nums w-11 text-right">100%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="card bg-base-200 shadow-sm lg:col-span-2 card-hover">
+    <div class="card-body p-4"><h2 class="card-title text-base mb-2">Allocation</h2><div class="chart-wrap" style="height:280px"><canvas id="allocationChart"></canvas></div></div>
+  </div>
+</div>
+
+{# ——— CONSOLIDATED PORTFOLIO ——— #}
+<div class="grid grid-cols-1 lg:grid-cols-5 gap-4 animate-up mb-4" style="animation-delay:0.15s">
+  <div class="card bg-base-200 shadow-sm lg:col-span-3 card-hover">
+    <div class="card-body p-4">
+      <h2 class="card-title text-base mb-2">Consolidated Portfolio</h2>
+      <div class="hidden md:block overflow-x-auto"><table class="table table-sm">
+        <thead><tr><th>Category</th><th class="text-right">Value</th><th class="text-right">%</th></tr></thead>
+        <tbody>{% for c in consolidated %}<tr class="hover"><td class="font-semibold">{{ c.name }}</td><td class="text-right">₹{{ c.value|floatformat:0|indian_number }}</td><td class="text-right"><span class="badge badge-ghost badge-sm">{{ c.pct }}%</span></td></tr>{% endfor %}</tbody>
+      </table></div>
+      <div class="md:hidden">
+        {% for c in consolidated %}
+        <div class="flex items-center justify-between py-2.5">
+          <span class="font-medium text-sm">{{ c.name }}</span>
+          <div class="flex items-center gap-3">
+            <span class="text-sm tabular-nums opacity-80">₹{{ c.value|floatformat:0|indian_number }}</span>
+            <span class="text-xs tabular-nums opacity-40 w-11 text-right">{{ c.pct }}%</span>
+          </div>
+        </div>
+        {% if not forloop.last %}<div class="divider-fade"></div>{% endif %}
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  <div class="card bg-base-200 shadow-sm lg:col-span-2 card-hover">
+    <div class="card-body p-4"><h2 class="card-title text-base mb-2">Allocation</h2><div class="chart-wrap" style="height:280px"><canvas id="consolidatedChart"></canvas></div></div>
+  </div>
+</div>
+
+{# ——— EQUITY ——— #}
+<div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.2s">
+  <div class="card-body p-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-1"><h2 class="card-title text-base">Equity Breakdown</h2><span class="badge badge-primary badge-sm">₹{{ equity_total|floatformat:0|indian_number }}</span></div>
+    <div class="flex gap-4 text-xs opacity-60 mb-3">
+      <span>Invested: <strong class="text-success">₹{{ equity_invested|floatformat:0|indian_number }}</strong></span>
+      <span>Returns: <strong class="{% if equity_returns >= 0 %}text-success{% else %}text-error{% endif %}">{% if equity_returns >= 0 %}+{% endif %}₹{{ equity_returns|floatformat:0|indian_number }}</strong></span>
+    </div>
+    <div class="hidden md:block overflow-x-auto"><table class="table table-sm">
+      <thead><tr><th>Category</th><th class="text-right">Value</th><th class="text-right">% of Equity</th></tr></thead>
+      <tbody>{% for e in equity_items %}<tr class="hover"><td class="font-semibold">{{ e.name }}</td><td class="text-right">₹{{ e.value|floatformat:0|indian_number }}</td><td class="text-right"><span class="badge badge-ghost badge-sm">{{ e.pct }}%</span></td></tr>{% endfor %}</tbody>
+    </table></div>
+    <div class="md:hidden">
+      {% for e in equity_items %}
+      <div class="flex items-center justify-between py-2.5">
+        <span class="font-medium text-sm">{{ e.name }}</span>
+        <div class="flex items-center gap-3">
+          <span class="text-sm tabular-nums opacity-80">₹{{ e.value|floatformat:0|indian_number }}</span>
+          <span class="text-xs tabular-nums opacity-40 w-11 text-right">{{ e.pct }}%</span>
+        </div>
+      </div>
+      {% if not forloop.last %}<div class="divider-fade"></div>{% endif %}
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+{# ——— ZERODHA ACCOUNTS ——— #}
+{% if accounts %}
+<div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.25s">
+  <div class="card-body p-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3"><h2 class="card-title text-base">Zerodha Accounts</h2><a href="{% url 'zerodha_consolidated' %}" class="btn btn-outline btn-primary btn-xs gap-1">View All<span class="material-symbols-outlined text-sm">arrow_forward</span></a></div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      {% for a in accounts %}
+      <a href="{% url 'zerodha_detail' a.account.slug %}" class="group block p-4 rounded-xl bg-base-300/40 border border-base-content/5 hover:border-primary/30 hover:bg-base-300/70 transition-all duration-200 no-underline text-inherit">
+        <div class="flex items-center justify-between">
+          <div class="font-semibold text-sm">{{ a.account.name }}</div>
+          <span class="material-symbols-outlined text-base opacity-30 group-hover:opacity-70 group-hover:translate-x-0.5 transition-all">arrow_forward_ios</span>
+        </div>
+        <div class="text-xl font-extrabold mt-1 text-primary">₹{{ a.total|floatformat:0|indian_number }}</div>
+        <div class="flex gap-4 text-xs mt-2 opacity-60">
+          <span>Invested: <strong>₹{{ a.invested|floatformat:0|indian_number }}</strong></span>
+          <span>Returns: <strong class="{% if a.returns >= 0 %}text-success{% else %}text-error{% endif %}">{% if a.returns >= 0 %}+{% endif %}₹{{ a.returns|floatformat:0|indian_number }}</strong></span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 mt-2.5 text-xs">
+          <div><span class="opacity-50">Stocks</span><br><span class="font-semibold">₹{{ a.stocks|floatformat:0|indian_number }}</span></div>
+          <div><span class="opacity-50">Index MF</span><br><span class="font-semibold">₹{{ a.index_mf|floatformat:0|indian_number }}</span></div>
+          <div><span class="opacity-50">Other MF</span><br><span class="font-semibold">₹{{ a.other_mf|floatformat:0|indian_number }}</span></div>
+        </div>
+        {% if a.account.last_synced %}<div class="text-xs opacity-30 mt-2">Synced {{ a.account.last_synced|timesince }} ago</div>{% endif %}
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ——— US STOCKS (RSU) ——— #}
+<div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.27s">
+  <div class="card-body p-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+      <h2 class="card-title text-base">US Stocks (RSU)</h2>
+      <div class="flex flex-wrap items-center gap-1.5"><span class="badge badge-primary badge-sm">₹{{ us_stocks_current|floatformat:0|indian_number }}</span><button class="btn btn-ghost btn-sm gap-1" onclick="openModal('addUSStockModal')"><span class="material-symbols-outlined text-base">add</span>Add</button></div>
+    </div>
+    <div class="flex gap-4 text-xs opacity-60 mb-3">
+      <span>Invested: <strong class="text-success">₹{{ us_stocks_invested|floatformat:0|indian_number }}</strong></span>
+      <span>Returns: <strong class="{% if us_stocks_returns >= 0 %}text-success{% else %}text-error{% endif %}">{% if us_stocks_returns >= 0 %}+{% endif %}₹{{ us_stocks_returns|floatformat:0|indian_number }}</strong></span>
+    </div>
+    {% if us_stocks %}
+    <div class="hidden md:block overflow-x-auto"><table class="table table-sm">
+      <thead><tr><th>Symbol</th><th>Qty</th><th>Vest Date</th><th class="text-right">Buy (USD)</th><th class="text-right">Now (USD)</th><th class="text-right">Invested (₹)</th><th class="text-right">Current (₹)</th><th class="text-right">P&amp;L</th><th class="w-10"></th></tr></thead>
+      <tbody>
+      {% for h in us_stocks %}
+      <tr class="hover">
+        <td class="font-semibold">{{ h.symbol }}<div class="text-xs opacity-40">{{ h.company_name }}</div></td>
+        <td>{{ h.quantity }}</td>
+        <td class="opacity-60 text-sm whitespace-nowrap">{{ h.vest_date|date:"d M Y" }}</td>
+        <td class="text-right opacity-60">${{ h.purchase_price_usd|floatformat:2 }}</td>
+        <td class="text-right font-semibold">${{ h.current_price_usd|floatformat:2 }}</td>
+        <td class="text-right">₹{{ h.purchase_value|floatformat:0|indian_number }}</td>
+        <td class="text-right font-semibold">₹{{ h.current_value|floatformat:0|indian_number }}</td>
+        <td class="text-right"><span class="{% if h.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if h.pnl >= 0 %}+{% endif %}₹{{ h.pnl|floatformat:0|indian_number }}<div class="text-xs opacity-60">{{ h.pnl_pct }}%</div></span></td>
+        <td><button class="btn btn-ghost btn-xs btn-square" data-edit-usstock data-id="{{ h.id }}" data-symbol="{{ h.symbol }}" data-company="{{ h.company_name }}" data-qty="{{ h.quantity }}" data-vest="{{ h.vest_date|date:'Y-m-d' }}" data-buyprice="{{ h.purchase_price_usd }}" data-buyrate="{{ h.purchase_usd_inr }}" data-remarks="{{ h.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    <div class="md:hidden space-y-2">
+      {% for h in us_stocks %}
+      <div class="table-card">
+        <div class="flex items-center justify-between gap-2">
+          <div class="min-w-0">
+            <div class="font-semibold text-sm">{{ h.symbol }} <span class="opacity-40 font-normal">× {{ h.quantity }}</span></div>
+            <span class="text-xs opacity-40">{{ h.vest_date|date:"d M Y" }} · ${{ h.current_price_usd|floatformat:2 }}</span>
+          </div>
+          <button class="btn btn-ghost btn-xs btn-square shrink-0" data-edit-usstock data-id="{{ h.id }}" data-symbol="{{ h.symbol }}" data-company="{{ h.company_name }}" data-qty="{{ h.quantity }}" data-vest="{{ h.vest_date|date:'Y-m-d' }}" data-buyprice="{{ h.purchase_price_usd }}" data-buyrate="{{ h.purchase_usd_inr }}" data-remarks="{{ h.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button>
+        </div>
+        <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
+          <div><span class="opacity-50">Invested</span><div class="font-semibold mt-0.5 tabular-nums">₹{{ h.purchase_value|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5 tabular-nums">₹{{ h.current_value|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">P&L</span><div class="font-semibold mt-0.5 tabular-nums {% if h.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if h.pnl >= 0 %}+{% endif %}₹{{ h.pnl|floatformat:0|indian_number }}</div></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% if us_stocks.0.last_refreshed %}<div class="text-xs opacity-30 mt-2">Prices updated {{ us_stocks.0.last_refreshed|timesince }} ago</div>{% endif %}
+    {% else %}
+    <p class="text-sm opacity-40">No US stock holdings yet. Add your RSU vests!</p>
+    {% endif %}
+  </div>
+</div>
+
+{# ——— COMMODITIES ——— #}
+<div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.3s">
+  <div class="card-body p-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+      <h2 class="card-title text-base">Commodities</h2>
+      <div class="flex flex-wrap items-center gap-1.5"><span class="badge badge-ghost badge-sm">₹{{ commodity_total|floatformat:0|indian_number }}</span><a href="{% url 'commodities_detail' %}" class="btn btn-outline btn-primary btn-xs gap-1">View All<span class="material-symbols-outlined text-sm">arrow_forward</span></a><button class="btn btn-ghost btn-sm gap-1" onclick="openModal('addCommodityModal')"><span class="material-symbols-outlined text-base">add</span>Add</button></div>
+    </div>
+    <div class="flex gap-4 text-xs opacity-60 mb-3">
+      <span>Invested: <strong class="text-success">₹{{ commodity_invested|floatformat:0|indian_number }}</strong></span>
+      <span>Returns: <strong class="{% if commodity_returns >= 0 %}text-success{% else %}text-error{% endif %}">{% if commodity_returns >= 0 %}+{% endif %}₹{{ commodity_returns|floatformat:0|indian_number }}</strong></span>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div class="p-4 rounded-lg bg-base-300/50">
+        <div class="flex items-center gap-3 mb-3">
+          <span class="material-symbols-outlined text-2xl text-warning">diamond</span>
+          <div class="flex-1"><div class="font-semibold">Gold</div><div class="text-xs opacity-50">₹{{ gold_rate|floatformat:0|indian_number }}/g &middot; {{ gold_weight|floatformat:0 }}g</div></div>
+          <div class="font-bold">₹{{ gold_value|floatformat:0|indian_number }}</div>
+        </div>
+        {% if gold_holdings %}
+        <div class="space-y-1 max-h-44 overflow-y-auto text-sm">
+          {% for h in gold_holdings %}
+          <div class="flex justify-between items-center">
+            <span>{{ h.description }}</span>
+            <span class="flex items-center gap-2"><span class="opacity-50">{{ h.weight_grams|floatformat:0 }}g</span>
+            <button class="btn btn-ghost btn-xs btn-square" data-edit-commodity data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}" data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}"><span class="material-symbols-outlined text-base">edit</span></button></span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if gold_price_obj %}<div class="text-xs opacity-30 mt-2">Updated {{ gold_price_obj.fetched_at|timesince }} ago</div>{% endif %}
+      </div>
+      <div class="p-4 rounded-lg bg-base-300/50">
+        <div class="flex items-center gap-3 mb-3">
+          <span class="material-symbols-outlined text-2xl opacity-50">toll</span>
+          <div class="flex-1"><div class="font-semibold">Silver</div><div class="text-xs opacity-50">₹{{ silver_rate|floatformat:0|indian_number }}/g &middot; {{ silver_weight|floatformat:0|indian_number }}g</div></div>
+          <div class="font-bold">₹{{ silver_value|floatformat:0|indian_number }}</div>
+        </div>
+        {% if silver_holdings %}
+        <div class="space-y-1 max-h-44 overflow-y-auto text-sm">
+          {% for h in silver_holdings %}
+          <div class="flex justify-between items-center">
+            <span>{{ h.description }}</span>
+            <span class="flex items-center gap-2"><span class="opacity-50">{{ h.weight_grams|floatformat:0 }}g</span>
+            <button class="btn btn-ghost btn-xs btn-square" data-edit-commodity data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}" data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}"><span class="material-symbols-outlined text-base">edit</span></button></span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if silver_price_obj %}<div class="text-xs opacity-30 mt-2">Updated {{ silver_price_obj.fetched_at|timesince }} ago</div>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ——— EPF ——— #}
+<div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.35s">
+  <div class="card-body p-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-1"><h2 class="card-title text-base">EPF</h2>
+      <div class="flex flex-wrap items-center gap-1.5"><span class="badge badge-primary badge-sm">₹{{ epf_balance|floatformat:0|indian_number }}</span><a href="{% url 'epf_detail' %}" class="btn btn-outline btn-primary btn-xs gap-1">View All<span class="material-symbols-outlined text-sm">arrow_forward</span></a><button class="btn btn-ghost btn-sm gap-1" onclick="openModal('addEpfModal')"><span class="material-symbols-outlined text-base">add</span>Add</button></div>
+    </div>
+    <div class="flex flex-wrap gap-4 text-xs opacity-60 mb-3"><span>Contributions: <strong class="text-success">₹{{ epf_total_contrib|floatformat:0|indian_number }}</strong></span><span>Interest: <strong class="text-success">₹{{ epf_total_interest|floatformat:0|indian_number }}</strong></span></div>
+    {% if epf_entries %}
+    <div class="hidden md:block overflow-x-auto max-h-72"><table class="table table-sm"><thead><tr><th>Date</th><th>Type</th><th class="text-right">Amount</th><th>Remarks</th><th class="w-10"></th></tr></thead><tbody>
+    {% for e in epf_entries %}<tr class="hover"><td class="opacity-60 text-sm whitespace-nowrap">{{ e.date|date:"d M Y" }}</td><td><span class="badge {% if e.entry_type == 'CONTRIBUTION' %}badge-primary{% else %}badge-ghost{% endif %} badge-sm">{{ e.get_entry_type_display }}</span></td><td class="text-right whitespace-nowrap"><span class="text-success">+₹{{ e.amount|floatformat:0|indian_number }}</span></td><td class="opacity-50 text-sm">{{ e.remarks|default:"—" }}</td><td><button class="btn btn-ghost btn-xs btn-square" data-edit-epf data-id="{{ e.id }}" data-date="{{ e.date|date:'Y-m-d' }}" data-type="{{ e.entry_type }}" data-amount="{{ e.amount }}" data-remarks="{{ e.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button></td></tr>
+    {% endfor %}</tbody></table></div>
+    <div class="md:hidden space-y-2 max-h-72 overflow-y-auto">
+      {% for e in epf_entries %}
+      <div class="table-card">
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="badge {% if e.entry_type == 'CONTRIBUTION' %}badge-primary{% else %}badge-ghost{% endif %} badge-xs">{{ e.get_entry_type_display }}</span>
+            <span class="text-xs opacity-50">{{ e.date|date:"d M Y" }}</span>
+          </div>
+          <button class="btn btn-ghost btn-xs btn-square shrink-0" data-edit-epf data-id="{{ e.id }}" data-date="{{ e.date|date:'Y-m-d' }}" data-type="{{ e.entry_type }}" data-amount="{{ e.amount }}" data-remarks="{{ e.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button>
+        </div>
+        <div class="flex items-center justify-between mt-1.5">
+          <span class="text-sm font-semibold text-success">+₹{{ e.amount|floatformat:0|indian_number }}</span>
+          <span class="text-xs opacity-40 truncate max-w-[50%]">{{ e.remarks|default:"" }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}<p class="text-sm opacity-40">No EPF entries yet.</p>{% endif %}
+  </div>
+</div>
+
+{# ——— FIXED DEPOSITS ——— #}
+<div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.4s">
+  <div class="card-body p-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3"><h2 class="card-title text-base">Fixed Deposits</h2>
+      <div class="flex flex-wrap items-center gap-1.5"><span class="badge badge-primary badge-sm">₹{{ fd_current|floatformat:0|indian_number }}</span><a href="{% url 'fd_detail' %}" class="btn btn-outline btn-primary btn-xs gap-1">View All<span class="material-symbols-outlined text-sm">arrow_forward</span></a><button class="btn btn-ghost btn-sm gap-1" onclick="openModal('addFdModal')"><span class="material-symbols-outlined text-base">add</span>Add FD</button></div>
+    </div>
+    {% if active_fds %}
+    <div class="hidden md:block overflow-x-auto max-h-72"><table class="table table-sm"><thead><tr><th>Name</th><th>Account</th><th class="text-right">Principal</th><th class="text-right">Rate</th><th>Compounding</th><th class="text-right">Current Value</th><th>Maturity</th><th class="w-10"></th></tr></thead><tbody>
+    {% for fd in active_fds %}<tr class="hover"><td class="font-semibold">{{ fd.name }}</td><td class="opacity-60 text-sm">{{ fd.account_name }}</td><td class="text-right">₹{{ fd.principal|floatformat:0|indian_number }}</td><td class="text-right">{{ fd.interest_rate }}%</td><td><span class="badge badge-ghost badge-sm">{{ fd.get_compounding_display }}</span></td><td class="text-right font-semibold text-success">₹{{ fd.current_value|floatformat:0|indian_number }}</td><td class="opacity-60 text-sm">{{ fd.maturity_date|date:"d M Y" }}{% if fd.days_remaining > 0 %} <span class="text-xs">({{ fd.days_remaining }}d)</span>{% endif %}</td><td><button class="btn btn-ghost btn-xs btn-square" data-edit-fd data-id="{{ fd.id }}" data-name="{{ fd.name }}" data-account="{{ fd.account_name }}" data-principal="{{ fd.principal }}" data-rate="{{ fd.interest_rate }}" data-compounding="{{ fd.compounding }}" data-start="{{ fd.start_date|date:'Y-m-d' }}" data-maturity="{{ fd.maturity_date|date:'Y-m-d' }}" data-active="{{ fd.is_active|yesno:'true,false' }}" data-remarks="{{ fd.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button></td></tr>
+    {% endfor %}</tbody></table></div>
+    <div class="md:hidden space-y-2">
+      {% for fd in active_fds %}
+      <div class="table-card">
+        <div class="flex items-center justify-between gap-2">
+          <div class="min-w-0">
+            <div class="font-semibold text-sm truncate">{{ fd.name }}</div>
+            <span class="text-xs opacity-40">{{ fd.account_name }}</span>
+          </div>
+          <button class="btn btn-ghost btn-xs btn-square shrink-0" data-edit-fd data-id="{{ fd.id }}" data-name="{{ fd.name }}" data-account="{{ fd.account_name }}" data-principal="{{ fd.principal }}" data-rate="{{ fd.interest_rate }}" data-compounding="{{ fd.compounding }}" data-start="{{ fd.start_date|date:'Y-m-d' }}" data-maturity="{{ fd.maturity_date|date:'Y-m-d' }}" data-active="{{ fd.is_active|yesno:'true,false' }}" data-remarks="{{ fd.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button>
+        </div>
+        <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
+          <div><span class="opacity-50">Principal</span><div class="font-semibold mt-0.5">₹{{ fd.principal|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">Rate</span><div class="font-semibold mt-0.5">{{ fd.interest_rate }}%</div></div>
+          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5 text-success">₹{{ fd.current_value|floatformat:0|indian_number }}</div></div>
+        </div>
+        <div class="flex items-center justify-between mt-1.5 text-xs">
+          <span class="badge badge-ghost badge-xs">{{ fd.get_compounding_display }}</span>
+          <span class="opacity-40">{{ fd.maturity_date|date:"d M Y" }}{% if fd.days_remaining > 0 %} ({{ fd.days_remaining }}d){% endif %}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}<p class="text-sm opacity-40">No fixed deposits.</p>{% endif %}
+  </div>
+</div>
+
+{# ——— CASH + BONDS ——— #}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-up mb-4" style="animation-delay:0.45s">
+  <div class="card bg-base-200 shadow-sm card-hover">
+    <div class="card-body p-4">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3"><h2 class="card-title text-base">Cash Positions</h2>
+        <div class="flex flex-wrap items-center gap-1.5"><span class="badge badge-primary badge-sm">₹{{ cash_total|floatformat:0|indian_number }}</span><a href="{% url 'cash_detail' %}" class="btn btn-outline btn-primary btn-xs gap-1">View All<span class="material-symbols-outlined text-sm">arrow_forward</span></a><button class="btn btn-ghost btn-sm gap-1" onclick="openModal('addCashModal')"><span class="material-symbols-outlined text-base">add</span>Add</button></div>
+      </div>
+      {% if cash_positions %}
+      <div class="hidden md:block overflow-x-auto max-h-60"><table class="table table-sm"><thead><tr><th>Name</th><th class="text-right">Amount</th><th>Remarks</th><th class="w-10"></th></tr></thead><tbody>
+      {% for c in cash_positions %}<tr class="hover"><td class="font-semibold">{{ c.name }}</td><td class="text-right font-semibold">₹{{ c.amount|floatformat:0|indian_number }}</td><td class="opacity-50 text-sm">{{ c.remarks|default:"—" }}</td><td><button class="btn btn-ghost btn-xs btn-square" data-edit-cash data-id="{{ c.id }}" data-name="{{ c.name }}" data-amount="{{ c.amount }}" data-remarks="{{ c.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button></td></tr>
+      {% endfor %}</tbody></table></div>
+      <div class="md:hidden space-y-2 max-h-60 overflow-y-auto">
+        {% for c in cash_positions %}
+        <div class="table-card flex items-center justify-between gap-3">
+          <div class="min-w-0">
+            <div class="font-semibold text-sm truncate">{{ c.name }}</div>
+            {% if c.remarks %}<span class="text-xs opacity-40">{{ c.remarks }}</span>{% endif %}
+          </div>
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="font-semibold text-sm tabular-nums">₹{{ c.amount|floatformat:0|indian_number }}</span>
+            <button class="btn btn-ghost btn-xs btn-square" data-edit-cash data-id="{{ c.id }}" data-name="{{ c.name }}" data-amount="{{ c.amount }}" data-remarks="{{ c.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}<p class="text-sm opacity-40">No cash positions.</p>{% endif %}
+    </div>
+  </div>
+  <div class="card bg-base-200 shadow-sm card-hover">
+    <div class="card-body p-4">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3"><h2 class="card-title text-base">Bonds</h2>
+        <div class="flex flex-wrap items-center gap-1.5"><span class="badge badge-primary badge-sm">₹{{ bonds_total|floatformat:0|indian_number }}</span><a href="{% url 'bonds_detail' %}" class="btn btn-outline btn-primary btn-xs gap-1">View All<span class="material-symbols-outlined text-sm">arrow_forward</span></a><button class="btn btn-ghost btn-sm gap-1" onclick="openModal('addBondModal')"><span class="material-symbols-outlined text-base">add</span>Add</button></div>
+      </div>
+      {% if bonds %}
+      <div class="hidden md:block overflow-x-auto max-h-60"><table class="table table-sm"><thead><tr><th>Account</th><th class="text-right">Amount</th><th class="w-10"></th></tr></thead><tbody>
+      {% for b in bonds %}<tr class="hover"><td class="font-semibold">{{ b.account_name }}</td><td class="text-right">₹{{ b.amount|floatformat:0|indian_number }}</td><td><button class="btn btn-ghost btn-xs btn-square" data-edit-bond data-id="{{ b.id }}" data-account="{{ b.account_name }}" data-amount="{{ b.amount }}" data-remarks="{{ b.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button></td></tr>
+      {% endfor %}</tbody></table></div>
+      <div class="md:hidden space-y-2 max-h-60 overflow-y-auto">
+        {% for b in bonds %}
+        <div class="table-card flex items-center justify-between gap-3">
+          <span class="font-semibold text-sm">{{ b.account_name }}</span>
+          <div class="flex items-center gap-2 shrink-0">
+            <span class="font-semibold text-sm tabular-nums">₹{{ b.amount|floatformat:0|indian_number }}</span>
+            <button class="btn btn-ghost btn-xs btn-square" data-edit-bond data-id="{{ b.id }}" data-account="{{ b.account_name }}" data-amount="{{ b.amount }}" data-remarks="{{ b.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}<p class="text-sm opacity-40">No bonds.</p>{% endif %}
+    </div>
+  </div>
+</div>
+
+{# ——— NPS + CRYPTO ——— #}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-up mb-4" style="animation-delay:0.5s">
+  <div class="card bg-base-200 shadow-sm card-hover">
+    <div class="card-body p-4">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3"><h2 class="card-title text-base">NPS</h2>
+        <div class="flex flex-wrap items-center gap-1.5">{% if nps_latest %}<span class="badge badge-primary badge-sm">₹{{ nps_latest.total_balance|floatformat:0|indian_number }}</span>{% endif %}<a href="{% url 'nps_detail' %}" class="btn btn-outline btn-primary btn-xs gap-1">View All<span class="material-symbols-outlined text-sm">arrow_forward</span></a><button class="btn btn-ghost btn-sm gap-1" onclick="openNpsAddModal()"><span class="material-symbols-outlined text-base">add</span>Add</button></div>
+      </div>
+      {% if nps_entries %}
+      <div class="hidden md:block overflow-x-auto max-h-60"><table class="table table-sm"><thead><tr><th>Date</th><th class="text-right">Total (Entry)</th><th class="text-right">Returns</th><th class="w-10"></th></tr></thead><tbody>
+      {% for e in nps_entries %}<tr class="hover"><td class="opacity-60 text-sm">{{ e.date|date:"d M Y" }}</td><td class="text-right whitespace-nowrap font-semibold">₹{{ e.contribution|add:e.interest_earned|floatformat:0|indian_number }}</td><td class="text-right whitespace-nowrap"><span class="text-success">+₹{{ e.interest_earned|floatformat:0|indian_number }}</span></td><td><button class="btn btn-ghost btn-xs btn-square" data-edit-nps data-id="{{ e.id }}" data-date="{{ e.date|date:'Y-m-d' }}" data-contrib="{{ e.contribution }}" data-interest="{{ e.interest_earned }}" data-balance="{{ e.total_balance }}" data-remarks="{{ e.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button></td></tr>
+      {% endfor %}</tbody></table></div>
+      <div class="md:hidden space-y-2 max-h-60 overflow-y-auto">
+        {% for e in nps_entries %}
+        <div class="table-card">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-xs opacity-50">{{ e.date|date:"d M Y" }}</span>
+            <button class="btn btn-ghost btn-xs btn-square shrink-0" data-edit-nps data-id="{{ e.id }}" data-date="{{ e.date|date:'Y-m-d' }}" data-contrib="{{ e.contribution }}" data-interest="{{ e.interest_earned }}" data-balance="{{ e.total_balance }}" data-remarks="{{ e.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button>
+          </div>
+          <div class="grid grid-cols-2 gap-2 mt-1.5 text-xs">
+            <div><span class="opacity-50">Total</span><div class="font-semibold mt-0.5 tabular-nums">₹{{ e.contribution|add:e.interest_earned|floatformat:0|indian_number }}</div></div>
+            <div><span class="opacity-50">Returns</span><div class="font-semibold mt-0.5 text-success tabular-nums">+₹{{ e.interest_earned|floatformat:0|indian_number }}</div></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}<p class="text-sm opacity-40">No NPS entries yet.</p>{% endif %}
+    </div>
+  </div>
+  <div class="card bg-base-200 shadow-sm card-hover">
+    <div class="card-body p-4">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3"><h2 class="card-title text-base">Crypto</h2>
+        <div class="flex flex-wrap items-center gap-1.5"><span class="badge badge-primary badge-sm">₹{{ crypto_current|floatformat:0|indian_number }}</span><a href="{% url 'crypto_detail' %}" class="btn btn-outline btn-primary btn-xs gap-1">View All<span class="material-symbols-outlined text-sm">arrow_forward</span></a><button class="btn btn-ghost btn-sm gap-1" onclick="openModal('addCryptoModal')"><span class="material-symbols-outlined text-base">add</span>Add</button></div>
+      </div>
+      {% if crypto_holdings %}
+      <div class="hidden md:block overflow-x-auto max-h-60"><table class="table table-sm"><thead><tr><th>Name</th><th class="text-right">Invested</th><th class="text-right">Current</th><th class="text-right">P&amp;L</th><th class="w-10"></th></tr></thead><tbody>
+      {% for c in crypto_holdings %}<tr class="hover"><td class="font-semibold">{{ c.name }}</td><td class="text-right">₹{{ c.amount_invested|floatformat:0|indian_number }}</td><td class="text-right font-semibold">₹{{ c.current_value|floatformat:0|indian_number }}</td><td class="text-right"><span class="{% if c.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if c.pnl >= 0 %}+{% endif %}₹{{ c.pnl|floatformat:0|indian_number }}</span></td><td><button class="btn btn-ghost btn-xs btn-square" data-edit-crypto data-id="{{ c.id }}" data-name="{{ c.name }}" data-invested="{{ c.amount_invested }}" data-current="{{ c.current_value }}" data-remarks="{{ c.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button></td></tr>
+      {% endfor %}</tbody></table></div>
+      <div class="md:hidden space-y-2 max-h-60 overflow-y-auto">
+        {% for c in crypto_holdings %}
+        <div class="table-card">
+          <div class="flex items-center justify-between gap-2">
+            <span class="font-semibold text-sm">{{ c.name }}</span>
+            <button class="btn btn-ghost btn-xs btn-square shrink-0" data-edit-crypto data-id="{{ c.id }}" data-name="{{ c.name }}" data-invested="{{ c.amount_invested }}" data-current="{{ c.current_value }}" data-remarks="{{ c.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button>
+          </div>
+          <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
+            <div><span class="opacity-50">Invested</span><div class="font-semibold mt-0.5 tabular-nums">₹{{ c.amount_invested|floatformat:0|indian_number }}</div></div>
+            <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5 tabular-nums">₹{{ c.current_value|floatformat:0|indian_number }}</div></div>
+            <div><span class="opacity-50">P&L</span><div class="font-semibold mt-0.5 tabular-nums {% if c.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if c.pnl >= 0 %}+{% endif %}₹{{ c.pnl|floatformat:0|indian_number }}</div></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}<p class="text-sm opacity-40">No crypto holdings.</p>{% endif %}
+    </div>
+  </div>
+</div>
+
+{# ——— ALL MODALS ——— #}
+{# EPF Modal #}
+<dialog class="modal" id="addEpfModal"><div class="modal-box"><h3 class="font-bold text-lg flex items-center gap-2" id="epfModalTitle"><span class="material-symbols-outlined text-primary">add_circle</span>Add EPF Entry</h3><form id="epfForm" method="post" action="{% url 'add_epf_entry' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><div class="grid grid-cols-2 gap-4 mt-4"><div class="form-field"><label class="label text-xs font-semibold">Date</label>{{ epf_form.date }}</div><div class="form-field"><label class="label text-xs font-semibold">Type</label>{{ epf_form.entry_type }}</div></div><div class="form-field mt-3"><label class="label text-xs font-semibold">Amount (₹)</label>{{ epf_form.amount }}</div><div class="form-field mt-3"><label class="label text-xs font-semibold">Remarks <span class="opacity-40">optional</span></label>{{ epf_form.remarks }}</div><div class="modal-action"><button type="button" id="epfDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteEpfForm')"><span class="material-symbols-outlined text-base">delete</span>Delete</button><button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addEpfModal')">Cancel</button><button type="submit" class="btn btn-primary btn-sm">Save</button></div></form><form id="deleteEpfForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form></div><form method="dialog" class="modal-backdrop"><button>close</button></form></dialog>
+
+{# Goal Modal #}
+<dialog class="modal" id="addGoalModal"><div class="modal-box"><h3 class="font-bold text-lg flex items-center gap-2" id="goalModalTitle"><span class="material-symbols-outlined text-primary">add_circle</span>Add Goal</h3><form id="goalForm" method="post" action="{% url 'add_goal' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><div class="grid grid-cols-2 gap-4 mt-4"><div class="form-field"><label class="label text-xs font-semibold">Label</label>{{ goal_form.label }}</div><div class="form-field"><label class="label text-xs font-semibold">Target Amount (₹)</label>{{ goal_form.target_amount }}</div></div><div class="form-field mt-3"><label class="label text-xs font-semibold">Sort Order</label>{{ goal_form.sort_order }}</div><div class="modal-action"><button type="button" id="goalDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteGoalForm')"><span class="material-symbols-outlined text-base">delete</span>Delete</button><button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addGoalModal')">Cancel</button><button type="submit" class="btn btn-primary btn-sm">Save</button></div></form><form id="deleteGoalForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form></div><form method="dialog" class="modal-backdrop"><button>close</button></form></dialog>
+
+{# NPS Modal #}
+<dialog class="modal" id="addNpsModal"><div class="modal-box"><h3 class="font-bold text-lg flex items-center gap-2" id="npsModalTitle"><span class="material-symbols-outlined text-primary">add_circle</span>Add NPS Entry</h3><form id="npsForm" method="post" action="{% url 'add_nps_entry' %}" data-add-url="{% url 'add_nps_entry' %}" data-edit-url="{% url 'edit_nps_entry' pk=0 %}" data-delete-url="{% url 'delete_nps_entry' pk=0 %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><input type="hidden" id="npsPrevBalance" value="{{ nps_latest.total_balance|default_if_none:0|default:0 }}" data-current-balance="{{ nps_latest.total_balance|default_if_none:0|default:0 }}"><div class="form-field mt-4"><label class="label text-xs font-semibold">Date</label>{{ nps_form.date }}</div><div class="grid grid-cols-2 gap-4 mt-3"><div class="form-field"><label class="label text-xs font-semibold">Contribution (₹)</label>{{ nps_form.contribution }}</div><div class="form-field"><label class="label text-xs font-semibold">Returns (₹)</label>{{ nps_form.interest_earned }}</div></div><div class="form-field mt-3"><label class="label text-xs font-semibold">Total Balance (₹)</label>{{ nps_form.total_balance }}</div><div class="form-field mt-3"><label class="label text-xs font-semibold">Remarks <span class="opacity-40">optional</span></label>{{ nps_form.remarks }}</div><div class="modal-action"><button type="button" id="npsDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteNpsForm')"><span class="material-symbols-outlined text-base">delete</span>Delete</button><button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addNpsModal')">Cancel</button><button type="submit" class="btn btn-primary btn-sm">Save</button></div></form><form id="deleteNpsForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form></div><form method="dialog" class="modal-backdrop"><button>close</button></form></dialog>
+
+{# FD Modal #}
+<dialog class="modal" id="addFdModal"><div class="modal-box"><h3 class="font-bold text-lg flex items-center gap-2" id="fdModalTitle"><span class="material-symbols-outlined text-primary">add_circle</span>Add Fixed Deposit</h3><form id="fdForm" method="post" action="{% url 'add_fd' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><div class="grid grid-cols-2 gap-4 mt-4"><div class="form-field"><label class="label text-xs font-semibold">Name</label>{{ fd_form.name }}</div><div class="form-field"><label class="label text-xs font-semibold">Account</label>{{ fd_form.account_name }}</div></div><div class="grid grid-cols-2 gap-4 mt-3"><div class="form-field"><label class="label text-xs font-semibold">Principal (₹)</label>{{ fd_form.principal }}</div><div class="form-field"><label class="label text-xs font-semibold">Interest Rate (%)</label>{{ fd_form.interest_rate }}</div></div><div class="form-field mt-3"><label class="label text-xs font-semibold">Compounding</label>{{ fd_form.compounding }}</div><div class="grid grid-cols-2 gap-4 mt-3"><div class="form-field"><label class="label text-xs font-semibold">Start Date</label>{{ fd_form.start_date }}</div><div class="form-field"><label class="label text-xs font-semibold">Maturity Date</label>{{ fd_form.maturity_date }}</div></div><div class="form-field mt-3 flex items-center gap-2">{{ fd_form.is_active }}<label class="text-sm">Active</label></div><div class="form-field mt-3"><label class="label text-xs font-semibold">Remarks <span class="opacity-40">optional</span></label>{{ fd_form.remarks }}</div><div class="modal-action"><button type="button" id="fdDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteFdForm')"><span class="material-symbols-outlined text-base">delete</span>Delete</button><button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addFdModal')">Cancel</button><button type="submit" class="btn btn-primary btn-sm">Save</button></div></form><form id="deleteFdForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form></div><form method="dialog" class="modal-backdrop"><button>close</button></form></dialog>
+
+{# Cash Modal #}
+<dialog class="modal" id="addCashModal"><div class="modal-box"><h3 class="font-bold text-lg flex items-center gap-2" id="cashModalTitle"><span class="material-symbols-outlined text-primary">add_circle</span>Add Cash Position</h3><form id="cashForm" method="post" action="{% url 'add_cash' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><div class="form-field mt-4"><label class="label text-xs font-semibold">Name</label>{{ cash_form.name }}</div><div class="form-field mt-3"><label class="label text-xs font-semibold">Amount (₹)</label>{{ cash_form.amount }}</div><div class="form-field mt-3"><label class="label text-xs font-semibold">Remarks <span class="opacity-40">optional</span></label>{{ cash_form.remarks }}</div><div class="modal-action"><button type="button" id="cashDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteCashForm')"><span class="material-symbols-outlined text-base">delete</span>Delete</button><button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addCashModal')">Cancel</button><button type="submit" class="btn btn-primary btn-sm">Save</button></div></form><form id="deleteCashForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form></div><form method="dialog" class="modal-backdrop"><button>close</button></form></dialog>
+
+{# Bond Modal #}
+<dialog class="modal" id="addBondModal"><div class="modal-box"><h3 class="font-bold text-lg flex items-center gap-2" id="bondModalTitle"><span class="material-symbols-outlined text-primary">add_circle</span>Add Bond Holding</h3><form id="bondForm" method="post" action="{% url 'add_bond' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><div class="form-field mt-4"><label class="label text-xs font-semibold">Account Name</label>{{ bond_form.account_name }}</div><div class="form-field mt-3"><label class="label text-xs font-semibold">Amount (₹)</label>{{ bond_form.amount }}</div><div class="form-field mt-3"><label class="label text-xs font-semibold">Remarks <span class="opacity-40">optional</span></label>{{ bond_form.remarks }}</div><div class="modal-action"><button type="button" id="bondDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteBondForm')"><span class="material-symbols-outlined text-base">delete</span>Delete</button><button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addBondModal')">Cancel</button><button type="submit" class="btn btn-primary btn-sm">Save</button></div></form><form id="deleteBondForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form></div><form method="dialog" class="modal-backdrop"><button>close</button></form></dialog>
+
+{# Crypto Modal #}
+<dialog class="modal" id="addCryptoModal"><div class="modal-box"><h3 class="font-bold text-lg flex items-center gap-2" id="cryptoModalTitle"><span class="material-symbols-outlined text-primary">add_circle</span>Add Crypto Holding</h3><form id="cryptoForm" method="post" action="{% url 'add_crypto' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><div class="form-field mt-4"><label class="label text-xs font-semibold">Name</label>{{ crypto_form.name }}</div><div class="grid grid-cols-2 gap-4 mt-3"><div class="form-field"><label class="label text-xs font-semibold">Invested (₹)</label>{{ crypto_form.amount_invested }}</div><div class="form-field"><label class="label text-xs font-semibold">Current Value (₹)</label>{{ crypto_form.current_value }}</div></div><div class="form-field mt-3"><label class="label text-xs font-semibold">Remarks <span class="opacity-40">optional</span></label>{{ crypto_form.remarks }}</div><div class="modal-action"><button type="button" id="cryptoDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteCryptoForm')"><span class="material-symbols-outlined text-base">delete</span>Delete</button><button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addCryptoModal')">Cancel</button><button type="submit" class="btn btn-primary btn-sm">Save</button></div></form><form id="deleteCryptoForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form></div><form method="dialog" class="modal-backdrop"><button>close</button></form></dialog>
+
+{# Commodity Modal #}
+<dialog class="modal" id="addCommodityModal"><div class="modal-box"><h3 class="font-bold text-lg flex items-center gap-2" id="commodityModalTitle"><span class="material-symbols-outlined text-primary">add_circle</span>Add Commodity</h3><form id="commodityForm" method="post" action="{% url 'add_commodity' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><div class="grid grid-cols-2 gap-4 mt-4"><div class="form-field"><label class="label text-xs font-semibold">Type</label>{{ commodity_form.commodity_type }}</div><div class="form-field"><label class="label text-xs font-semibold">Purity</label>{{ commodity_form.purity }}</div></div><div class="form-field mt-3"><label class="label text-xs font-semibold">Description</label>{{ commodity_form.description }}</div><div class="grid grid-cols-2 gap-4 mt-3"><div class="form-field"><label class="label text-xs font-semibold">Weight (grams)</label>{{ commodity_form.weight_grams }}</div><div class="form-field"><label class="label text-xs font-semibold">Purchase Price / gram (₹)</label>{{ commodity_form.purchase_price_per_gram }}</div></div><div class="modal-action"><button type="button" id="commodityDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteCommodityForm')"><span class="material-symbols-outlined text-base">delete</span>Delete</button><button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addCommodityModal')">Cancel</button><button type="submit" class="btn btn-primary btn-sm">Save</button></div></form><form id="deleteCommodityForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form></div><form method="dialog" class="modal-backdrop"><button>close</button></form></dialog>
+
+{# US Stock Modal #}
+<dialog class="modal" id="addUSStockModal"><div class="modal-box"><h3 class="font-bold text-lg flex items-center gap-2" id="usStockModalTitle"><span class="material-symbols-outlined text-primary">add_circle</span>Add RSU Holding</h3><form id="usStockForm" method="post" action="{% url 'add_us_stock' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><div class="grid grid-cols-2 gap-4 mt-4"><div class="form-field"><label class="label text-xs font-semibold">Symbol</label>{{ us_stock_form.symbol }}</div><div class="form-field"><label class="label text-xs font-semibold">Company</label>{{ us_stock_form.company_name }}</div></div><div class="grid grid-cols-2 gap-4 mt-3"><div class="form-field"><label class="label text-xs font-semibold">Quantity (shares)</label>{{ us_stock_form.quantity }}</div><div class="form-field"><label class="label text-xs font-semibold">Vest Date</label>{{ us_stock_form.vest_date }}</div></div><div class="grid grid-cols-2 gap-4 mt-3"><div class="form-field"><label class="label text-xs font-semibold">Buy Price (USD) <span class="opacity-40">auto if blank</span></label>{{ us_stock_form.purchase_price_usd }}</div><div class="form-field"><label class="label text-xs font-semibold">USD/INR Rate <span class="opacity-40">auto if blank</span></label>{{ us_stock_form.purchase_usd_inr }}</div></div><div class="form-field mt-3"><label class="label text-xs font-semibold">Remarks <span class="opacity-40">optional</span></label>{{ us_stock_form.remarks }}</div><div class="modal-action"><button type="button" id="usStockDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteUSStockForm')"><span class="material-symbols-outlined text-base">delete</span>Delete</button><button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addUSStockModal')">Cancel</button><button type="submit" class="btn btn-primary btn-sm">Save</button></div></form><form id="deleteUSStockForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form></div><form method="dialog" class="modal-backdrop"><button>close</button></form></dialog>
+
+{# ——— BIOMETRIC MODAL ——— #}
+<dialog class="modal" id="biometricModal">
+  <div class="modal-box max-w-sm">
+    <h3 class="font-bold text-lg flex items-center gap-2">
+      <span class="material-symbols-outlined text-primary">fingerprint</span>Biometric Unlock
+    </h3>
+    <p class="text-xs opacity-50 mt-2">Use FaceID, TouchID, or fingerprint to unlock your portfolio without a password.</p>
+
+    {% if webauthn_credentials %}
+    <div class="mt-4 space-y-2">
+      <p class="text-xs font-semibold opacity-50 uppercase tracking-wider">Registered Devices</p>
+      {% for cred in webauthn_credentials %}
+      <div class="flex items-center justify-between p-3 bg-base-300/30 rounded-lg text-sm">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-base text-success">check_circle</span>
+          <span>{{ cred.device_name }}</span>
+          <span class="text-xs opacity-40">{{ cred.created_at|timesince }} ago</span>
+        </div>
+        <button type="button" class="btn btn-ghost btn-xs text-error" onclick="removeBiometric({{ cred.pk }})">
+          <span class="material-symbols-outlined text-base">delete</span>
+        </button>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="mt-4">
+      <button type="button" id="bioRegBtn" class="btn btn-primary btn-block gap-2" onclick="registerBiometric()">
+        <span class="material-symbols-outlined text-base">add</span>
+        Register This Device
+      </button>
+      <p id="bioRegStatus" class="text-xs mt-2 opacity-50"></p>
+    </div>
+
+    <div class="modal-action">
+      <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('biometricModal')">Close</button>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+{{ pf_chart_data|json_script:"pf-chart-data" }}
+{% endblock %}
+
+{% block chart_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block extra_js %}
+{% include 'portfolio/_commodity_purity_js.html' %}
+{% include 'portfolio/_nps_modal_js.html' %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var ring = document.querySelector('.ai-score-ring-fg');
+  if (ring) {
+    var score = parseInt(ring.getAttribute('data-score') || '0', 10);
+    var circ = 175.93;
+    setTimeout(function() { ring.style.strokeDashoffset = circ * (1 - score / 100); }, 100);
+  }
+
+  var cd = JSON.parse(document.getElementById('pf-chart-data').textContent);
+  var colors = ['#648cfa','#a78bfa','#34d399','#fbbf24','#f87171','#fb923c','#94a3b8','#60a5fa','#f97316','#2dd4bf','#c084fc'];
+  var tip = {
+    backgroundColor:'oklch(0.2 0 0 / 0.95)',borderColor:'rgba(128,128,128,0.2)',borderWidth:1,
+    titleColor:'#ddd',bodyColor:'#aaa',padding:10,
+    callbacks:{label:function(c){return ' \u20b9'+c.raw.toLocaleString('en-IN');}}
+  };
+  var _isMobile = window.innerWidth <= 640;
+  var legendOpts = {position: _isMobile ? 'bottom' : 'right',labels:{color:'rgba(128,128,128,0.7)',usePointStyle:true,pointStyle:'circle',boxWidth:8,boxHeight:8,padding:10,font:{size:12}}};
+  new Chart(document.getElementById('allocationChart'),{
+    type:'doughnut',
+    data:{labels:cd.labels,datasets:[{data:cd.values,backgroundColor:colors,borderWidth:0,hoverOffset:6}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:legendOpts,tooltip:tip}}
+  });
+  var consColors = ['#648cfa','#a78bfa','#34d399','#fbbf24','#f97316'];
+  new Chart(document.getElementById('consolidatedChart'),{
+    type:'doughnut',
+    data:{labels:cd.consolidated_labels,datasets:[{data:cd.consolidated_values,backgroundColor:consColors,borderWidth:0,hoverOffset:6}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:legendOpts,tooltip:tip}}
+  });
+});
+
+function openGoalModal() {
+  var form = document.getElementById('goalForm');
+  form.action = "{% url 'add_goal' %}";
+  form.reset();
+  document.getElementById('goalDeleteBtn').style.display = 'none';
+  document.getElementById('goalModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span> Add Goal';
+  openModal('addGoalModal');
+}
+
+function _editSetup(formId, delFormId, delBtnId, titleId, editUrlBase, delUrlBase, editTitle, modalId, d, fieldMap) {
+  var form = document.getElementById(formId);
+  form.action = editUrlBase.replace('/0/', '/' + d.id + '/');
+  document.getElementById(delFormId).action = delUrlBase.replace('/0/', '/' + d.id + '/');
+  document.getElementById(delBtnId).style.display = 'inline-flex';
+  document.getElementById(titleId).innerHTML = '<span class="material-symbols-outlined text-primary">edit</span> ' + editTitle;
+  for (var name in fieldMap) {
+    var el = form.querySelector('[name=' + name + ']');
+    if (!el) continue;
+    if (el.type === 'checkbox') el.checked = fieldMap[name] === 'true';
+    else el.value = fieldMap[name];
+  }
+  openModal(modalId);
+}
+
+/* ── WebAuthn biometric registration ── */
+(function() {
+  if (!window.PublicKeyCredential) return;
+  document.getElementById('biometricSetupBtn').style.display = '';
+  document.querySelectorAll('.biometric-setup-btn').forEach(function(b) { b.style.display = ''; });
+})();
+
+function _b64urlToBytes(b64url) {
+  var s = b64url.replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  var raw = atob(s);
+  var arr = new Uint8Array(raw.length);
+  for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+
+function _bytesToB64url(buf) {
+  var bytes = new Uint8Array(buf);
+  var str = '';
+  for (var i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i]);
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function _getCsrf() {
+  var c = document.cookie.match(/csrftoken=([^;]+)/);
+  return c ? c[1] : document.querySelector('[name=csrfmiddlewaretoken]').value;
+}
+
+async function registerBiometric() {
+  var statusEl = document.getElementById('bioRegStatus');
+  var regBtn = document.getElementById('bioRegBtn');
+  statusEl.className = 'text-xs mt-2 text-info';
+  statusEl.textContent = 'Starting registration…';
+  regBtn.classList.add('btn-disabled');
+
+  try {
+    var beginResp = await fetch('{% url "webauthn_register_begin" %}', {
+      method: 'POST',
+      headers: {'X-CSRFToken': _getCsrf(), 'Content-Type': 'application/json'},
+    });
+    if (!beginResp.ok) throw new Error((await beginResp.json()).error || 'Failed to start.');
+    var options = await beginResp.json();
+
+    options.challenge = _b64urlToBytes(options.challenge);
+    options.user.id = _b64urlToBytes(options.user.id);
+    if (options.excludeCredentials) {
+      options.excludeCredentials = options.excludeCredentials.map(function(c) {
+        return {id: _b64urlToBytes(c.id), type: c.type};
+      });
+    }
+
+    statusEl.textContent = 'Complete biometric prompt…';
+    var cred = await navigator.credentials.create({publicKey: options});
+
+    var body = {
+      id: cred.id,
+      rawId: _bytesToB64url(cred.rawId),
+      type: cred.type,
+      response: {
+        attestationObject: _bytesToB64url(cred.response.attestationObject),
+        clientDataJSON: _bytesToB64url(cred.response.clientDataJSON),
+      },
+      device_name: navigator.userAgent.match(/iPhone|iPad/) ? 'iPhone' :
+                   navigator.userAgent.match(/Android/) ? 'Android' :
+                   navigator.userAgent.match(/Mac/) ? 'Mac' : 'Device',
+    };
+
+    var completeResp = await fetch('{% url "webauthn_register_complete" %}', {
+      method: 'POST',
+      headers: {'X-CSRFToken': _getCsrf(), 'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    if (!completeResp.ok) throw new Error((await completeResp.json()).error || 'Registration failed.');
+
+    statusEl.className = 'text-xs mt-2 text-success';
+    statusEl.textContent = 'Biometric registered! You can now use it to unlock.';
+    setTimeout(function() { window.location.reload(); }, 1200);
+  } catch (e) {
+    regBtn.classList.remove('btn-disabled');
+    if (e.name === 'NotAllowedError') {
+      statusEl.className = 'text-xs mt-2 opacity-50';
+      statusEl.textContent = 'Cancelled.';
+      return;
+    }
+    statusEl.className = 'text-xs mt-2 text-error';
+    statusEl.textContent = e.message || 'Registration failed.';
+  }
+}
+
+async function removeBiometric(id) {
+  if (!confirm('Remove this biometric credential?')) return;
+  await fetch('{% url "webauthn_remove" %}', {
+    method: 'POST',
+    headers: {'X-CSRFToken': _getCsrf(), 'Content-Type': 'application/json'},
+    body: JSON.stringify({id: id}),
+  });
+  window.location.reload();
+}
+
+document.addEventListener('click', function(e) {
+  var btn;
+  if ((btn = e.target.closest('[data-edit-goal]'))) {
+    _editSetup('goalForm','deleteGoalForm','goalDeleteBtn','goalModalTitle',
+      "{% url 'edit_goal' pk=0 %}","{% url 'delete_goal' pk=0 %}",'Edit Goal','addGoalModal',btn.dataset,
+      {label:btn.dataset.label,target_amount:btn.dataset.target,sort_order:btn.dataset.sort});
+  } else if ((btn = e.target.closest('[data-edit-epf]'))) {
+    _editSetup('epfForm','deleteEpfForm','epfDeleteBtn','epfModalTitle',
+      "{% url 'edit_epf_entry' pk=0 %}","{% url 'delete_epf_entry' pk=0 %}",'Edit EPF Entry','addEpfModal',btn.dataset,
+      {date:btn.dataset.date,entry_type:btn.dataset.type,amount:btn.dataset.amount,remarks:btn.dataset.remarks});
+  } else if ((btn = e.target.closest('[data-edit-fd]'))) {
+    _editSetup('fdForm','deleteFdForm','fdDeleteBtn','fdModalTitle',
+      "{% url 'edit_fd' pk=0 %}","{% url 'delete_fd' pk=0 %}",'Edit Fixed Deposit','addFdModal',btn.dataset,
+      {name:btn.dataset.name,account_name:btn.dataset.account,principal:btn.dataset.principal,interest_rate:btn.dataset.rate,compounding:btn.dataset.compounding,start_date:btn.dataset.start,maturity_date:btn.dataset.maturity,is_active:btn.dataset.active,remarks:btn.dataset.remarks});
+  } else if ((btn = e.target.closest('[data-edit-cash]'))) {
+    _editSetup('cashForm','deleteCashForm','cashDeleteBtn','cashModalTitle',
+      "{% url 'edit_cash' pk=0 %}","{% url 'delete_cash' pk=0 %}",'Edit Cash Position','addCashModal',btn.dataset,
+      {name:btn.dataset.name,amount:btn.dataset.amount,remarks:btn.dataset.remarks});
+  } else if ((btn = e.target.closest('[data-edit-bond]'))) {
+    _editSetup('bondForm','deleteBondForm','bondDeleteBtn','bondModalTitle',
+      "{% url 'edit_bond' pk=0 %}","{% url 'delete_bond' pk=0 %}",'Edit Bond','addBondModal',btn.dataset,
+      {account_name:btn.dataset.account,amount:btn.dataset.amount,remarks:btn.dataset.remarks});
+  } else if ((btn = e.target.closest('[data-edit-crypto]'))) {
+    _editSetup('cryptoForm','deleteCryptoForm','cryptoDeleteBtn','cryptoModalTitle',
+      "{% url 'edit_crypto' pk=0 %}","{% url 'delete_crypto' pk=0 %}",'Edit Crypto','addCryptoModal',btn.dataset,
+      {name:btn.dataset.name,amount_invested:btn.dataset.invested,current_value:btn.dataset.current,remarks:btn.dataset.remarks});
+  } else if ((btn = e.target.closest('[data-edit-usstock]'))) {
+    _editSetup('usStockForm','deleteUSStockForm','usStockDeleteBtn','usStockModalTitle',
+      "{% url 'edit_us_stock' pk=0 %}","{% url 'delete_us_stock' pk=0 %}",'Edit RSU Holding','addUSStockModal',btn.dataset,
+      {symbol:btn.dataset.symbol,company_name:btn.dataset.company,quantity:btn.dataset.qty,vest_date:btn.dataset.vest,purchase_price_usd:btn.dataset.buyprice,purchase_usd_inr:btn.dataset.buyrate,remarks:btn.dataset.remarks});
+  } else if ((btn = e.target.closest('[data-edit-commodity]'))) {
+    var cf = document.getElementById('commodityForm');
+    cf.querySelector('[name=commodity_type]').value = btn.dataset.type;
+    window._updateCommodityPurity(cf.querySelector('[name=commodity_type]'), cf.querySelector('[name=purity]'), btn.dataset.purity);
+    _editSetup('commodityForm','deleteCommodityForm','commodityDeleteBtn','commodityModalTitle',
+      "{% url 'edit_commodity' pk=0 %}","{% url 'delete_commodity' pk=0 %}",'Edit Commodity','addCommodityModal',btn.dataset,
+      {commodity_type:btn.dataset.type,description:btn.dataset.desc,weight_grams:btn.dataset.weight,purchase_price_per_gram:btn.dataset.purchase});
+  }
+});
+</script>
+{% endblock %}

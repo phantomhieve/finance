@@ -1,0 +1,497 @@
+{% extends 'base.html' %}
+{% block title %}Server Monitor — Vault{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* JS toggles `active` on range buttons; keep DaisyUI primary look on the selected join item */
+  .join .mon-range-btn.active.btn-ghost {
+    background-color: oklch(var(--p) / 1);
+    color: oklch(var(--pc) / 1);
+    border-color: oklch(var(--p) / 1);
+  }
+  .mon-status-dot {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: 9999px;
+    display: inline-block;
+    vertical-align: middle;
+  }
+  .mon-status-text {
+    font-size: 0.875rem;
+    opacity: 0.85;
+  }
+  .mon-chart-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    font-size: 0.75rem;
+    opacity: 0.85;
+  }
+  .mon-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+  .mon-legend-dot {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 9999px;
+    flex-shrink: 0;
+  }
+  .mon-stat-ok .mon-stat-val {
+    color: oklch(var(--su) / 1);
+  }
+  .mon-stat-err .mon-stat-val {
+    color: oklch(var(--er) / 1);
+  }
+</style>
+{% endblock %}
+
+{% block page_header %}
+<h1 class="text-xl lg:text-2xl font-extrabold tracking-tight">Server Monitor</h1>
+{% endblock %}
+
+{% block content %}
+<div class="flex flex-col gap-6 animate-up max-w-[1600px] mx-auto">
+  <!-- Toolbar -->
+  <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-base-300 bg-base-200/80 px-4 py-3 shadow-sm">
+    <div class="flex items-center gap-2 min-w-0">
+      <span class="mon-status-dot w-2.5 h-2.5 rounded-full shrink-0" id="statusDot"></span>
+      <span class="mon-status-text text-base-content/80" id="statusText">Connecting…</span>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <div class="join">
+        <button type="button" class="join-item btn btn-sm btn-ghost mon-range-btn active" data-range="300">5m</button>
+        <button type="button" class="join-item btn btn-sm btn-ghost mon-range-btn" data-range="900">15m</button>
+        <button type="button" class="join-item btn btn-sm btn-ghost mon-range-btn" data-range="1800">30m</button>
+        <button type="button" class="join-item btn btn-sm btn-ghost mon-range-btn" data-range="3600">1h</button>
+      </div>
+      <button type="button" class="btn btn-ghost btn-sm btn-square shrink-0" id="btnRefresh" title="Refresh now">
+        <span class="material-symbols-outlined text-lg">refresh</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Stat cards -->
+  <div class="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
+    <div class="stat stat-horizontal p-3 bg-base-300/50 rounded-lg shadow-sm">
+      <div class="stat-figure text-primary shrink-0">
+        <span class="material-symbols-outlined text-2xl">schedule</span>
+      </div>
+      <div id="statUptime" class="mon-stat min-w-0">
+        <div class="stat-value text-lg mon-stat-val">—</div>
+        <div class="stat-title text-xs opacity-70 mon-stat-label">Uptime</div>
+      </div>
+    </div>
+    <div class="stat stat-horizontal p-3 bg-base-300/50 rounded-lg shadow-sm">
+      <div class="stat-figure text-primary shrink-0">
+        <span class="material-symbols-outlined text-2xl">language</span>
+      </div>
+      <div id="statWebsite" class="mon-stat min-w-0">
+        <div class="stat-value text-lg mon-stat-val">—</div>
+        <div class="stat-title text-xs opacity-70 mon-stat-label">Website</div>
+      </div>
+    </div>
+    <div class="stat stat-horizontal p-3 bg-base-300/50 rounded-lg shadow-sm">
+      <div class="stat-figure text-primary shrink-0">
+        <span class="material-symbols-outlined text-2xl">speed</span>
+      </div>
+      <div id="statResponse" class="mon-stat min-w-0">
+        <div class="stat-value text-lg mon-stat-val">—</div>
+        <div class="stat-title text-xs opacity-70 mon-stat-label">Response</div>
+      </div>
+    </div>
+    <div class="stat stat-horizontal p-3 bg-base-300/50 rounded-lg shadow-sm">
+      <div class="stat-figure text-primary shrink-0">
+        <span class="material-symbols-outlined text-2xl">database</span>
+      </div>
+      <div id="statPostgres" class="mon-stat min-w-0">
+        <div class="stat-value text-lg mon-stat-val">—</div>
+        <div class="stat-title text-xs opacity-70 mon-stat-label">PostgreSQL</div>
+      </div>
+    </div>
+    <div class="stat stat-horizontal p-3 bg-base-300/50 rounded-lg shadow-sm">
+      <div class="stat-figure text-primary shrink-0">
+        <span class="material-symbols-outlined text-2xl">memory</span>
+      </div>
+      <div id="statLoad" class="mon-stat min-w-0">
+        <div class="stat-value text-lg mon-stat-val">—</div>
+        <div class="stat-title text-xs opacity-70 mon-stat-label">Load Avg</div>
+      </div>
+    </div>
+    <div class="stat stat-horizontal p-3 bg-base-300/50 rounded-lg shadow-sm">
+      <div class="stat-figure text-primary shrink-0">
+        <span class="material-symbols-outlined text-2xl">storage</span>
+      </div>
+      <div id="statDbSize" class="mon-stat min-w-0">
+        <div class="stat-value text-lg mon-stat-val">—</div>
+        <div class="stat-title text-xs opacity-70 mon-stat-label">DB Size</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Gauges row -->
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="card bg-base-200 shadow-sm card-hover">
+      <div class="card-body p-4">
+        <div class="text-sm font-semibold opacity-90 mb-2">CPU Usage</div>
+        <div class="flex justify-center py-1">
+          <svg viewBox="0 0 120 120" class="mon-gauge-svg">
+            <circle cx="60" cy="60" r="52" class="mon-gauge-track"/>
+            <circle cx="60" cy="60" r="52" class="mon-gauge-fill" id="gaugeCpuFill" stroke-dasharray="0 327"/>
+            <text x="60" y="58" class="mon-gauge-text" id="gaugeCpuText">—</text>
+            <text x="60" y="73" class="mon-gauge-subtext" id="gaugeCpuSub"></text>
+          </svg>
+        </div>
+      </div>
+    </div>
+    <div class="card bg-base-200 shadow-sm card-hover">
+      <div class="card-body p-4">
+        <div class="text-sm font-semibold opacity-90 mb-2">Memory</div>
+        <div class="flex justify-center py-1">
+          <svg viewBox="0 0 120 120" class="mon-gauge-svg">
+            <circle cx="60" cy="60" r="52" class="mon-gauge-track"/>
+            <circle cx="60" cy="60" r="52" class="mon-gauge-fill" id="gaugeMemFill" stroke-dasharray="0 327"/>
+            <text x="60" y="58" class="mon-gauge-text" id="gaugeMemText">—</text>
+            <text x="60" y="73" class="mon-gauge-subtext" id="gaugeMemSub"></text>
+          </svg>
+        </div>
+      </div>
+    </div>
+    <div class="card bg-base-200 shadow-sm card-hover">
+      <div class="card-body p-4">
+        <div class="text-sm font-semibold opacity-90 mb-2">Disk</div>
+        <div class="flex justify-center py-1">
+          <svg viewBox="0 0 120 120" class="mon-gauge-svg">
+            <circle cx="60" cy="60" r="52" class="mon-gauge-track"/>
+            <circle cx="60" cy="60" r="52" class="mon-gauge-fill" id="gaugeDiskFill" stroke-dasharray="0 327"/>
+            <text x="60" y="58" class="mon-gauge-text" id="gaugeDiskText">—</text>
+            <text x="60" y="73" class="mon-gauge-subtext" id="gaugeDiskSub"></text>
+          </svg>
+        </div>
+      </div>
+    </div>
+    <div class="card bg-base-200 shadow-sm card-hover">
+      <div class="card-body p-4">
+        <div class="text-sm font-semibold opacity-90 mb-2">PG Cache Hit</div>
+        <div class="flex justify-center py-1">
+          <svg viewBox="0 0 120 120" class="mon-gauge-svg">
+            <circle cx="60" cy="60" r="52" class="mon-gauge-track"/>
+            <circle cx="60" cy="60" r="52" class="mon-gauge-fill" id="gaugeCacheFill" stroke-dasharray="0 327"/>
+            <text x="60" y="58" class="mon-gauge-text" id="gaugeCacheText">—</text>
+            <text x="60" y="73" class="mon-gauge-subtext" id="gaugeCacheSub"></text>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Time-series charts -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="card bg-base-200 shadow-sm card-hover">
+      <div class="card-body p-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <div class="text-sm font-semibold opacity-90">CPU Usage</div>
+          <div class="mon-chart-legend" id="legendCpu"></div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="chartCpu"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="card bg-base-200 shadow-sm card-hover">
+      <div class="card-body p-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <div class="text-sm font-semibold opacity-90">Memory Usage</div>
+          <div class="mon-chart-legend" id="legendMem"></div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="chartMemory"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="card bg-base-200 shadow-sm card-hover">
+      <div class="card-body p-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <div class="text-sm font-semibold opacity-90">Network I/O</div>
+          <div class="mon-chart-legend" id="legendNet"></div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="chartNetwork"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="card bg-base-200 shadow-sm card-hover">
+      <div class="card-body p-4">
+        <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <div class="text-sm font-semibold opacity-90">Response Time</div>
+          <div class="mon-chart-legend" id="legendResp"></div>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="chartResponse"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block chart_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  var API = '{% url "server_metrics" %}';
+  var INTERVAL = 15000;
+  var CIRC = 2 * Math.PI * 52; // ~326.7
+  var C = {
+    primary:'#7c9ef8', green:'#69f0ae', red:'#ff5c8a',
+    yellow:'#ffd54f', purple:'#b39ddb', cyan:'#4dd0e1',
+    grid:'rgba(255,255,255,0.06)', text:'rgba(255,255,255,0.5)'
+  };
+
+  // --- State ---
+  var history = [];
+  var rangeSeconds = 300;
+  var charts = {};
+  var timer = null;
+
+  // --- Helpers ---
+  function fmtDuration(s){
+    if(s==null) return '—';
+    var d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);
+    if(d>0) return d+'d '+h+'h';
+    if(h>0) return h+'h '+m+'m';
+    return m+'m';
+  }
+  function fmtBytes(b){
+    if(b==null) return '—';
+    if(b>=1e9) return (b/1e9).toFixed(1)+' GB';
+    if(b>=1e6) return (b/1e6).toFixed(1)+' MB';
+    if(b>=1e3) return (b/1e3).toFixed(1)+' KB';
+    return Math.round(b)+' B';
+  }
+  function fmtBps(b){
+    if(b==null||isNaN(b)) return '0 B/s';
+    if(b>=1e6) return (b/1e6).toFixed(1)+' MB/s';
+    if(b>=1e3) return (b/1e3).toFixed(1)+' kB/s';
+    return Math.round(b)+' B/s';
+  }
+  function fmtTime(ts){
+    var d=new Date(ts*1000);
+    return d.getHours()+':'+String(d.getMinutes()).padStart(2,'0')+':'+String(d.getSeconds()).padStart(2,'0');
+  }
+  function gaugeColor(v){return v<0.7?C.green:v<0.85?C.yellow:C.red;}
+
+  // --- Gauge update ---
+  function setGauge(fillId,textId,subId,pct,label,sub){
+    var fill=document.getElementById(fillId);
+    var txt=document.getElementById(textId);
+    var stxt=document.getElementById(subId);
+    if(!fill)return;
+    var val=Math.min(1,Math.max(0,pct||0));
+    var dash=val*CIRC;
+    fill.setAttribute('stroke-dasharray',dash+' '+CIRC);
+    fill.setAttribute('stroke',gaugeColor(val));
+    txt.textContent=label||'—';
+    if(stxt)stxt.textContent=sub||'';
+  }
+
+  // --- Stat card update ---
+  function setStat(id,val,sub,cls){
+    var el=document.getElementById(id);
+    if(!el)return;
+    el.querySelector('.mon-stat-val').textContent=val;
+    el.className='mon-stat'+(cls?' mon-stat-'+cls:'');
+  }
+
+  // --- Chart factory ---
+  var chartOpts={
+    responsive:true, maintainAspectRatio:false,
+    animation:{duration:200},
+    interaction:{mode:'index',intersect:false},
+    scales:{
+      x:{type:'category',display:true,ticks:{color:C.text,font:{size:9},maxRotation:0,autoSkip:true,maxTicksLimit:8},grid:{color:C.grid}},
+      y:{display:true,beginAtZero:true,ticks:{color:C.text,font:{size:9}},grid:{color:C.grid}}
+    },
+    plugins:{legend:{display:false},tooltip:{backgroundColor:'rgba(15,15,25,0.9)',titleFont:{size:11},bodyFont:{size:11},padding:8,cornerRadius:6}}
+  };
+
+  function makeChart(canvasId,datasets,yFmt){
+    var ctx=document.getElementById(canvasId);
+    if(!ctx)return null;
+    var opts=JSON.parse(JSON.stringify(chartOpts));
+    if(yFmt)opts.scales.y.ticks.callback=yFmt;
+    if(charts[canvasId])charts[canvasId].destroy();
+    charts[canvasId]=new Chart(ctx,{type:'line',data:{labels:[],datasets:datasets},options:opts});
+    return charts[canvasId];
+  }
+
+  function setLegend(id,items){
+    var el=document.getElementById(id);
+    if(!el)return;
+    el.innerHTML=items.map(function(i){return '<span class="mon-legend-item"><span class="mon-legend-dot" style="background:'+i.color+'"></span>'+i.label+'</span>';}).join('');
+  }
+
+  // Initialize charts
+  var cpuChart=makeChart('chartCpu',[
+    {label:'CPU %',data:[],borderColor:C.primary,backgroundColor:C.primary+'22',borderWidth:1.5,pointRadius:0,fill:true,tension:0.3}
+  ],function(v){return v.toFixed(0)+'%';});
+  setLegend('legendCpu',[{color:C.primary,label:'CPU %'}]);
+
+  var memChart=makeChart('chartMemory',[
+    {label:'Used',data:[],borderColor:C.purple,backgroundColor:C.purple+'22',borderWidth:1.5,pointRadius:0,fill:true,tension:0.3},
+    {label:'Available',data:[],borderColor:C.cyan,backgroundColor:C.cyan+'22',borderWidth:1.5,pointRadius:0,fill:true,tension:0.3}
+  ],function(v){return fmtBytes(v*1e9);});
+  setLegend('legendMem',[{color:C.purple,label:'Used'},{color:C.cyan,label:'Available'}]);
+
+  var netChart=makeChart('chartNetwork',[
+    {label:'▼ In',data:[],borderColor:C.green,backgroundColor:C.green+'22',borderWidth:1.5,pointRadius:0,fill:true,tension:0.3},
+    {label:'▲ Out',data:[],borderColor:C.primary,backgroundColor:C.primary+'22',borderWidth:1.5,pointRadius:0,fill:true,tension:0.3}
+  ],function(v){return fmtBps(v);});
+  setLegend('legendNet',[{color:C.green,label:'▼ In'},{color:C.primary,label:'▲ Out'}]);
+
+  var respChart=makeChart('chartResponse',[
+    {label:'Response',data:[],borderColor:C.yellow,backgroundColor:C.yellow+'22',borderWidth:1.5,pointRadius:0,fill:true,tension:0.3}
+  ],function(v){return v.toFixed(0)+' ms';});
+  setLegend('legendResp',[{color:C.yellow,label:'ms'}]);
+
+  // --- Status indicator ---
+  function setStatus(ok){
+    var dot=document.getElementById('statusDot');
+    var txt=document.getElementById('statusText');
+    dot.className='mon-status-dot'+(ok?' mon-status-ok':' mon-status-err');
+    txt.textContent=ok?'Connected — refreshing every '+Math.round(INTERVAL/1000)+'s':'Connection error';
+  }
+
+  // --- Fetch & update ---
+  function fetchMetrics(){
+    document.getElementById('btnRefresh').classList.add('spinning');
+    fetch(API).then(function(r){return r.json();}).then(function(d){
+      setStatus(true);
+      history.push(d);
+      var cutoff=d.ts-rangeSeconds;
+      while(history.length>1&&history[0].ts<cutoff)history.shift();
+      updateDashboard();
+    }).catch(function(){
+      setStatus(false);
+    }).finally(function(){
+      document.getElementById('btnRefresh').classList.remove('spinning');
+    });
+  }
+
+  function updateDashboard(){
+    var cur=history[history.length-1];
+    if(!cur)return;
+    var n=cur.node, pg=cur.pg, w=cur.web;
+
+    // Stats
+    setStat('statUptime',fmtDuration(n.uptime));
+    setStat('statWebsite',w.up?'UP':'DOWN','',w.up?'ok':'err');
+    setStat('statResponse',w.response_ms!=null?Math.round(w.response_ms)+' ms':'—');
+    setStat('statPostgres',pg.up?'UP':'DOWN','',pg.up?'ok':'err');
+    setStat('statLoad',n.load1!=null?n.load1.toFixed(2):'—');
+    setStat('statDbSize',fmtBytes(pg.db_size));
+
+    // Gauges
+    var memUsed=n.mem_total&&n.mem_available?(n.mem_total-n.mem_available)/n.mem_total:0;
+    setGauge('gaugeMemFill','gaugeMemText','gaugeMemSub',memUsed,(memUsed*100).toFixed(1)+'%',fmtBytes(n.mem_total-n.mem_available)+' / '+fmtBytes(n.mem_total));
+
+    var diskUsed=n.disk_total&&n.disk_available?(n.disk_total-n.disk_available)/n.disk_total:0;
+    setGauge('gaugeDiskFill','gaugeDiskText','gaugeDiskSub',diskUsed,(diskUsed*100).toFixed(1)+'%',fmtBytes(n.disk_total-n.disk_available)+' / '+fmtBytes(n.disk_total));
+
+    var cacheRatio=pg.cache_ratio!=null?pg.cache_ratio:0;
+    setGauge('gaugeCacheFill','gaugeCacheText','gaugeCacheSub',cacheRatio,(cacheRatio*100).toFixed(2)+'%','Hit ratio');
+
+    // CPU gauge — compute from last two samples
+    var cpuPct=computeCpu();
+    setGauge('gaugeCpuFill','gaugeCpuText','gaugeCpuSub',cpuPct!=null?cpuPct/100:0,cpuPct!=null?cpuPct.toFixed(1)+'%':'—',n.cpu_count+' cores');
+
+    // Time-series charts
+    updateCharts();
+  }
+
+  function computeCpu(){
+    if(history.length<2)return null;
+    var a=history[history.length-2].node.cpu_modes;
+    var b=history[history.length-1].node.cpu_modes;
+    if(!a||!b)return null;
+    var totalA=0,totalB=0,idleA=a.idle||0,idleB=b.idle||0;
+    for(var m in a)totalA+=a[m];
+    for(var m in b)totalB+=b[m];
+    var dTotal=totalB-totalA,dIdle=idleB-idleA;
+    if(dTotal<=0)return null;
+    return ((1-dIdle/dTotal)*100);
+  }
+
+  function updateCharts(){
+    var labels=[],cpuData=[],memUsedData=[],memAvailData=[],rxData=[],txData=[],respData=[];
+    var cutoff=history[history.length-1].ts-rangeSeconds;
+
+    for(var i=0;i<history.length;i++){
+      var h=history[i];
+      if(h.ts<cutoff)continue;
+      labels.push(fmtTime(h.ts));
+
+      // CPU: need previous sample
+      if(i>0){
+        var a=history[i-1].node.cpu_modes,b=h.node.cpu_modes;
+        if(a&&b){
+          var tA=0,tB=0;for(var m in a)tA+=a[m];for(var m in b)tB+=b[m];
+          var dt=tB-tA,di=(b.idle||0)-(a.idle||0);
+          cpuData.push(dt>0?((1-di/dt)*100):0);
+        } else cpuData.push(0);
+      } else cpuData.push(0);
+
+      // Memory (in GB)
+      var mu=h.node.mem_total&&h.node.mem_available?(h.node.mem_total-h.node.mem_available)/1e9:0;
+      var ma=h.node.mem_available?h.node.mem_available/1e9:0;
+      memUsedData.push(mu);
+      memAvailData.push(ma);
+
+      // Network (rate: bytes/s between samples)
+      if(i>0){
+        var dt2=h.ts-history[i-1].ts;
+        if(dt2>0){
+          var drx=(h.node.net_rx||0)-(history[i-1].node.net_rx||0);
+          var dtx=(h.node.net_tx||0)-(history[i-1].node.net_tx||0);
+          rxData.push(Math.max(0,drx/dt2));
+          txData.push(Math.max(0,dtx/dt2));
+        } else {rxData.push(0);txData.push(0);}
+      } else {rxData.push(0);txData.push(0);}
+
+      respData.push(h.web.response_ms||0);
+    }
+
+    if(cpuChart){cpuChart.data.labels=labels;cpuChart.data.datasets[0].data=cpuData;cpuChart.update('none');}
+    if(memChart){memChart.data.labels=labels;memChart.data.datasets[0].data=memUsedData;memChart.data.datasets[1].data=memAvailData;memChart.update('none');}
+    if(netChart){netChart.data.labels=labels;netChart.data.datasets[0].data=rxData;netChart.data.datasets[1].data=txData;netChart.update('none');}
+    if(respChart){respChart.data.labels=labels;respChart.data.datasets[0].data=respData;respChart.update('none');}
+  }
+
+  // --- Range selector ---
+  document.querySelectorAll('.mon-range-btn').forEach(function(btn){
+    btn.addEventListener('click',function(){
+      document.querySelectorAll('.mon-range-btn').forEach(function(b){b.classList.remove('active');});
+      btn.classList.add('active');
+      rangeSeconds=parseInt(btn.dataset.range,10);
+      updateDashboard();
+    });
+  });
+
+  // --- Manual refresh ---
+  document.getElementById('btnRefresh').addEventListener('click',function(){
+    fetchMetrics();
+  });
+
+  // --- Start ---
+  fetchMetrics();
+  timer=setInterval(fetchMetrics,INTERVAL);
+})();
+</script>
+{% endblock %}

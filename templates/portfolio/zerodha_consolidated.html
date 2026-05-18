@@ -1,0 +1,559 @@
+{% extends 'base.html' %}
+{% load indian_format %}
+
+{% block extra_head %}
+<style>
+/* Row markup from showBreakdown() uses these class names (script unchanged) */
+.zerodha-breakdown-modal .td-pos { color: oklch(var(--su) / 1); }
+.zerodha-breakdown-modal .amount-danger { color: oklch(var(--er) / 1); }
+.zerodha-breakdown-modal .td-bold { font-weight: 600; }
+</style>
+{% endblock %}
+
+{% block title %}All Zerodha — Portfolio — Vault{% endblock %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+  <div>
+    <p class="text-xs font-bold tracking-widest uppercase text-primary">Zerodha</p>
+    <h1 class="text-2xl font-bold mt-1">Consolidated Holdings</h1>
+    <p class="text-sm opacity-60 mt-0.5">All accounts — {{ accounts|length }} portfolios combined</p>
+  </div>
+  <div>
+    <a href="{% url 'portfolio_tracker' %}" class="btn btn-ghost btn-sm gap-1"><span class="material-symbols-outlined text-base">arrow_back</span>Portfolio</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{# ——— SUMMARY ——— #}
+<div class="card hero-gradient-portfolio shadow-sm card-hover animate-up">
+  <div class="card-body p-4">
+    <div class="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6 items-start">
+      <div>
+        <div class="text-xs opacity-60 font-medium">Total Equity Portfolio</div>
+        <div class="text-3xl font-bold mt-1">₹{{ total_portfolio|floatformat:0|indian_number }}</div>
+        {% with total_pnl=total_stocks_pnl|add:total_index_pnl|add:total_other_pnl %}
+        <div class="mt-2">
+          <span class="badge {% if total_pnl >= 0 %}badge-success{% else %}badge-error{% endif %} badge-sm">
+            {% if total_pnl >= 0 %}+{% endif %}₹{{ total_pnl|floatformat:0|indian_number }} P&amp;L
+          </span>
+        </div>
+        {% endwith %}
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full lg:min-w-[min(100%,28rem)]">
+        <div class="stat-card flex flex-row items-center gap-2">
+          <span class="material-symbols-outlined text-primary shrink-0">candlestick_chart</span>
+          <div class="min-w-0">
+            <div class="text-[10px] uppercase tracking-wider opacity-50">Stocks</div>
+            <div class="text-base font-bold mt-0.5">₹{{ total_stocks|floatformat:0|indian_number }}</div>
+          </div>
+        </div>
+        <div class="stat-card flex flex-row items-center gap-2">
+          <span class="material-symbols-outlined text-secondary shrink-0">trending_up</span>
+          <div class="min-w-0">
+            <div class="text-[10px] uppercase tracking-wider opacity-50">Index Funds</div>
+            <div class="text-base font-bold mt-0.5">₹{{ total_index|floatformat:0|indian_number }}</div>
+          </div>
+        </div>
+        <div class="stat-card flex flex-row items-center gap-2">
+          <span class="material-symbols-outlined text-accent shrink-0">pie_chart</span>
+          <div class="min-w-0">
+            <div class="text-[10px] uppercase tracking-wider opacity-50">Other MF</div>
+            <div class="text-base font-bold mt-0.5">₹{{ total_other|floatformat:0|indian_number }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ——— DASHBOARD ROW ——— #}
+<div class="grid grid-cols-1 lg:grid-cols-5 gap-4 animate-up" style="animation-delay:0.05s">
+  <div class="card bg-base-200 shadow-sm card-hover lg:col-span-3">
+    <div class="card-body p-4">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <h2 class="card-title text-base">P&amp;L Summary</h2>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div class="stat-card flex flex-row items-center gap-2">
+          <span class="material-symbols-outlined text-primary shrink-0">account_balance</span>
+          <div class="min-w-0">
+            <div class="text-[10px] uppercase tracking-wider opacity-50">Invested</div>
+            <div class="text-base font-bold mt-0.5">₹{{ total_purchased|floatformat:0|indian_number }}</div>
+          </div>
+        </div>
+        <div class="stat-card flex flex-row items-center gap-2">
+          <span class="material-symbols-outlined text-accent shrink-0">monitoring</span>
+          <div class="min-w-0">
+            <div class="text-[10px] uppercase tracking-wider opacity-50">Current</div>
+            <div class="text-base font-bold mt-0.5">₹{{ total_portfolio|floatformat:0|indian_number }}</div>
+          </div>
+        </div>
+        <div class="stat-card flex flex-row items-center gap-2">
+          <span class="material-symbols-outlined {% if total_pnl >= 0 %}text-success{% else %}text-error{% endif %} shrink-0">{% if total_pnl >= 0 %}trending_up{% else %}trending_down{% endif %}</span>
+          <div class="min-w-0">
+            <div class="text-[10px] uppercase tracking-wider opacity-50">Total P&amp;L</div>
+            <div class="text-base font-bold mt-0.5 {% if total_pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if total_pnl >= 0 %}+{% endif %}₹{{ total_pnl|floatformat:0|indian_number }}</div>
+          </div>
+        </div>
+        <div class="stat-card flex flex-row items-center gap-2">
+          <span class="material-symbols-outlined {% if total_pnl_pct >= 0 %}text-success{% else %}text-error{% endif %} shrink-0">percent</span>
+          <div class="min-w-0">
+            <div class="text-[10px] uppercase tracking-wider opacity-50">Return %</div>
+            <div class="text-base font-bold mt-0.5 {% if total_pnl_pct >= 0 %}text-success{% else %}text-error{% endif %}">{% if total_pnl_pct >= 0 %}+{% endif %}{{ total_pnl_pct }}%</div>
+          </div>
+        </div>
+        <div class="stat-card flex flex-row items-center gap-2">
+          <span class="material-symbols-outlined text-secondary shrink-0">format_list_numbered</span>
+          <div class="min-w-0">
+            <div class="text-[10px] uppercase tracking-wider opacity-50">Holdings</div>
+            <div class="text-base font-bold mt-0.5">{{ holding_count }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="card bg-base-200 shadow-sm card-hover lg:col-span-2">
+    <div class="card-body p-4">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <h2 class="card-title text-base">Allocation</h2>
+      </div>
+      <div class="chart-wrap"><canvas id="equityAllocationChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+{# ——— TOP GAINERS + LOSERS ——— #}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-up" style="animation-delay:0.08s">
+  <div class="card bg-base-200 shadow-sm card-hover">
+    <div class="card-body p-4">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <h2 class="card-title text-base">Top Gainers</h2>
+      </div>
+      {% if top_gainers %}
+      <div class="hidden md:block overflow-x-auto -mx-2 px-2">
+        <table class="table table-sm">
+          <thead><tr>
+            <th class="sortable-th cursor-pointer select-none">Name <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none text-end">P&amp;L <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none text-end">% <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+          </tr></thead>
+          <tbody>
+          {% for h in top_gainers %}
+          <tr class="hover">
+            <td class="font-semibold" data-val="{{ h.name }}">{{ h.name }}</td>
+            <td class="text-end whitespace-nowrap" data-val="{{ h.pnl }}"><span class="text-success">+₹{{ h.pnl|floatformat:0|indian_number }}</span></td>
+            <td class="text-end" data-val="{{ h.pnl_pct }}"><span class="text-success">+{{ h.pnl_pct }}%</span></td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {# Mobile cards #}
+      <div class="md:hidden space-y-2">
+        {% for h in top_gainers %}
+        <div class="table-card flex items-center justify-between gap-2">
+          <span class="font-semibold text-sm">{{ h.name }}</span>
+          <div class="text-right text-xs shrink-0">
+            <span class="text-success font-semibold">+₹{{ h.pnl|floatformat:0|indian_number }}</span>
+            <span class="text-success opacity-70 ml-1">+{{ h.pnl_pct }}%</span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-sm opacity-60 py-3">No gainers yet.</p>
+      {% endif %}
+    </div>
+  </div>
+  <div class="card bg-base-200 shadow-sm card-hover">
+    <div class="card-body p-4">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <h2 class="card-title text-base">Top Losers</h2>
+      </div>
+      {% if top_losers %}
+      <div class="hidden md:block overflow-x-auto -mx-2 px-2">
+        <table class="table table-sm">
+          <thead><tr>
+            <th class="sortable-th cursor-pointer select-none">Name <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none text-end">P&amp;L <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none text-end">% <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+          </tr></thead>
+          <tbody>
+          {% for h in top_losers %}
+          <tr class="hover">
+            <td class="font-semibold" data-val="{{ h.name }}">{{ h.name }}</td>
+            <td class="text-end whitespace-nowrap" data-val="{{ h.pnl }}"><span class="text-error">₹{{ h.pnl|floatformat:0|indian_number }}</span></td>
+            <td class="text-end" data-val="{{ h.pnl_pct }}"><span class="text-error">{{ h.pnl_pct }}%</span></td>
+          </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {# Mobile cards #}
+      <div class="md:hidden space-y-2">
+        {% for h in top_losers %}
+        <div class="table-card flex items-center justify-between gap-2">
+          <span class="font-semibold text-sm">{{ h.name }}</span>
+          <div class="text-right text-xs shrink-0">
+            <span class="text-error font-semibold">₹{{ h.pnl|floatformat:0|indian_number }}</span>
+            <span class="text-error opacity-70 ml-1">{{ h.pnl_pct }}%</span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="text-sm opacity-60 py-3">No losers yet.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{# ——— ACCOUNT DASHBOARDS ——— #}
+<div class="flex flex-wrap items-center justify-between gap-3 animate-up mt-2" style="animation-delay:0.1s">
+  <h2 class="text-lg font-semibold">Account Breakdown</h2>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 animate-up" style="animation-delay:0.12s">
+  {% for a in acct_stats %}
+  <a href="{% url 'zerodha_detail' a.slug %}" class="card bg-base-200 shadow-sm card-hover transition-colors hover:bg-base-300/30 no-underline text-base-content">
+    <div class="card-body p-4">
+      <div class="flex justify-between items-start gap-2 mb-2">
+        <div class="font-semibold leading-tight">{{ a.name }}</div>
+        <span class="badge {% if a.pnl >= 0 %}badge-success{% else %}badge-error{% endif %} badge-sm shrink-0">
+          {% if a.pnl >= 0 %}+{% endif %}{{ a.pnl_pct }}%
+        </span>
+      </div>
+      <div class="text-xl font-bold">₹{{ a.current|floatformat:0|indian_number }}</div>
+      <div class="grid grid-cols-2 gap-2 mt-3 text-sm">
+        <div class="flex flex-col gap-0.5">
+          <span class="text-xs opacity-60">Invested</span>
+          <span class="font-semibold">₹{{ a.invested|floatformat:0|indian_number }}</span>
+        </div>
+        <div class="flex flex-col gap-0.5">
+          <span class="text-xs opacity-60">P&amp;L</span>
+          <span class="font-semibold {% if a.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if a.pnl >= 0 %}+{% endif %}₹{{ a.pnl|floatformat:0|indian_number }}</span>
+        </div>
+      </div>
+      <div class="mt-2 text-end">
+        <span class="text-xs opacity-60">{{ a.holdings }} holdings</span>
+      </div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+
+{# ——— STOCK HOLDINGS (MERGED) ——— #}
+<div class="card bg-base-200 shadow-sm card-hover animate-up mt-4" style="animation-delay:0.1s">
+  <div class="card-body p-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <h2 class="card-title text-base">Stock Holdings</h2>
+      <span class="badge badge-primary badge-sm">₹{{ total_stocks|floatformat:0|indian_number }}</span>
+    </div>
+    {% if stocks %}
+    <div class="hidden md:block overflow-x-auto -mx-2 px-2">
+      <table class="table table-sm" id="stocksTable">
+        <thead><tr>
+          <th class="sortable-th cursor-pointer select-none">Symbol <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+          <th class="sortable-th cursor-pointer select-none text-end">Qty <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+          <th class="sortable-th cursor-pointer select-none text-end">Purchased <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+          <th class="sortable-th cursor-pointer select-none text-end">Current <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+          <th class="sortable-th cursor-pointer select-none text-end">P&amp;L <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+          <th class="sortable-th cursor-pointer select-none text-end">P&amp;L % <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+        </tr></thead>
+        <tbody>
+        {% for s in stocks %}
+        <tr class="hover {% if s.multi %}clickable-row{% endif %}" {% if s.multi %}onclick="showBreakdown('{{ s.name|escapejs }}', 'stock', {{ forloop.counter0 }})"{% endif %}>
+          <td class="font-semibold" data-val="{{ s.name }}">
+            {{ s.name }}
+            {% if s.multi %}<span class="material-symbols-outlined text-sm align-middle opacity-60 ml-1">unfold_more</span>{% endif %}
+          </td>
+          <td class="text-end" data-val="{{ s.quantity }}">{{ s.quantity }}</td>
+          <td class="text-end" data-val="{{ s.purchase_value }}">₹{{ s.purchase_value|floatformat:0|indian_number }}</td>
+          <td class="text-end font-semibold" data-val="{{ s.current_value }}">₹{{ s.current_value|floatformat:0|indian_number }}</td>
+          <td class="text-end" data-val="{{ s.pnl }}"><span class="{% if s.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if s.pnl >= 0 %}+{% endif %}₹{{ s.pnl|floatformat:0|indian_number }}</span></td>
+          <td class="text-end" data-val="{{ s.pnl_pct }}"><span class="{% if s.pnl_pct >= 0 %}text-success{% else %}text-error{% endif %}">{{ s.pnl_pct }}%</span></td>
+        </tr>
+        {% endfor %}
+        <tr class="total-row border-t-2 border-base-300">
+          <td class="font-bold text-primary">Total</td>
+          <td></td>
+          <td class="text-end font-semibold">₹{{ total_stocks_purchased|floatformat:0|indian_number }}</td>
+          <td class="text-end font-semibold">₹{{ total_stocks|floatformat:0|indian_number }}</td>
+          <td class="text-end"><span class="font-bold {% if total_stocks_pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if total_stocks_pnl >= 0 %}+{% endif %}₹{{ total_stocks_pnl|floatformat:0|indian_number }}</span></td>
+          <td></td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+    {# Mobile card view #}
+    <div class="md:hidden space-y-2">
+      {% for s in stocks %}
+      <div class="table-card {% if s.multi %}cursor-pointer active:bg-base-300/50{% endif %}" {% if s.multi %}onclick="showBreakdown('{{ s.name|escapejs }}', 'stock', {{ forloop.counter0 }})"{% endif %}>
+        <div class="flex items-center justify-between gap-2">
+          <span class="font-semibold text-sm">{{ s.name }}{% if s.multi %} <span class="material-symbols-outlined text-xs align-middle opacity-50">unfold_more</span>{% endif %}</span>
+          <span class="text-xs opacity-50">{{ s.quantity }} qty</span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
+          <div><span class="opacity-50">Bought</span><div class="font-semibold mt-0.5">₹{{ s.purchase_value|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5">₹{{ s.current_value|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">P&L</span><div class="font-semibold mt-0.5 {% if s.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if s.pnl >= 0 %}+{% endif %}₹{{ s.pnl|floatformat:0|indian_number }}</div></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm opacity-60 py-2">No stock holdings.</p>
+    {% endif %}
+  </div>
+</div>
+
+{# ——— INDEX MUTUAL FUNDS (MERGED) ——— #}
+<div class="card bg-base-200 shadow-sm card-hover animate-up mt-4" style="animation-delay:0.15s">
+  <div class="card-body p-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <h2 class="card-title text-base">Index Mutual Funds</h2>
+      <span class="badge badge-secondary badge-sm">₹{{ total_index|floatformat:0|indian_number }}</span>
+    </div>
+    {% if index_mf %}
+    <div class="hidden md:block overflow-x-auto -mx-2 px-2">
+      <table class="table table-sm" id="indexTable">
+        <thead><tr>
+          <th class="sortable-th cursor-pointer select-none">Fund <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+          <th class="sortable-th cursor-pointer select-none text-end">Units <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+          <th class="sortable-th cursor-pointer select-none text-end">Purchased <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+          <th class="sortable-th cursor-pointer select-none text-end">Current <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+          <th class="sortable-th cursor-pointer select-none text-end">P&amp;L <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+          <th class="sortable-th cursor-pointer select-none text-end">P&amp;L % <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+        </tr></thead>
+        <tbody>
+        {% for m in index_mf %}
+        <tr class="hover {% if m.multi %}clickable-row{% endif %}" {% if m.multi %}onclick="showBreakdown('{{ m.name|escapejs }}', 'index', {{ forloop.counter0 }})"{% endif %}>
+          <td class="font-semibold max-w-[280px] overflow-hidden text-ellipsis whitespace-nowrap" title="{{ m.name }}" data-val="{{ m.name }}">
+            {{ m.name }}
+            {% if m.multi %}<span class="material-symbols-outlined text-sm align-middle opacity-60 ml-1">unfold_more</span>{% endif %}
+          </td>
+          <td class="text-end" data-val="{{ m.units }}">{{ m.units|floatformat:3 }}</td>
+          <td class="text-end" data-val="{{ m.purchase_value }}">₹{{ m.purchase_value|floatformat:0|indian_number }}</td>
+          <td class="text-end font-semibold" data-val="{{ m.current_value }}">₹{{ m.current_value|floatformat:0|indian_number }}</td>
+          <td class="text-end" data-val="{{ m.pnl }}"><span class="{% if m.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if m.pnl >= 0 %}+{% endif %}₹{{ m.pnl|floatformat:0|indian_number }}</span></td>
+          <td class="text-end" data-val="{{ m.pnl_pct }}"><span class="{% if m.pnl_pct >= 0 %}text-success{% else %}text-error{% endif %}">{{ m.pnl_pct }}%</span></td>
+        </tr>
+        {% endfor %}
+        <tr class="total-row border-t-2 border-base-300">
+          <td class="font-bold text-primary">Total</td>
+          <td></td>
+          <td class="text-end font-semibold">₹{{ total_index_purchased|floatformat:0|indian_number }}</td>
+          <td class="text-end font-semibold">₹{{ total_index|floatformat:0|indian_number }}</td>
+          <td class="text-end"><span class="font-bold {% if total_index_pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if total_index_pnl >= 0 %}+{% endif %}₹{{ total_index_pnl|floatformat:0|indian_number }}</span></td>
+          <td></td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+    {# Mobile card view #}
+    <div class="md:hidden space-y-2">
+      {% for m in index_mf %}
+      <div class="table-card {% if m.multi %}cursor-pointer active:bg-base-300/50{% endif %}" {% if m.multi %}onclick="showBreakdown('{{ m.name|escapejs }}', 'index', {{ forloop.counter0 }})"{% endif %}>
+        <div class="flex items-center justify-between gap-2">
+          <span class="font-semibold text-sm">{{ m.name }}{% if m.multi %} <span class="material-symbols-outlined text-xs align-middle opacity-50">unfold_more</span>{% endif %}</span>
+          <span class="text-xs opacity-50">{{ m.units|floatformat:3 }} units</span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
+          <div><span class="opacity-50">Bought</span><div class="font-semibold mt-0.5">₹{{ m.purchase_value|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5">₹{{ m.current_value|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">P&L</span><div class="font-semibold mt-0.5 {% if m.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if m.pnl >= 0 %}+{% endif %}₹{{ m.pnl|floatformat:0|indian_number }}</div></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm opacity-60 py-2">No index funds.</p>
+    {% endif %}
+  </div>
+</div>
+
+{# ——— OTHER MUTUAL FUNDS (MERGED) ——— #}
+<div class="card bg-base-200 shadow-sm card-hover animate-up mt-4" style="animation-delay:0.2s">
+  <div class="card-body p-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <h2 class="card-title text-base">Other Mutual Funds</h2>
+      <span class="badge badge-secondary badge-sm">₹{{ total_other|floatformat:0|indian_number }}</span>
+    </div>
+    {% if other_mf %}
+    <div class="hidden md:block overflow-x-auto -mx-2 px-2">
+      <table class="table table-sm" id="otherTable">
+        <thead><tr>
+          <th class="sortable-th cursor-pointer select-none">Fund <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+          <th class="sortable-th cursor-pointer select-none text-end">Units <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+          <th class="sortable-th cursor-pointer select-none text-end">Purchased <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+          <th class="sortable-th cursor-pointer select-none text-end">Current <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+          <th class="sortable-th cursor-pointer select-none text-end">P&amp;L <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+          <th class="sortable-th cursor-pointer select-none text-end">P&amp;L % <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+        </tr></thead>
+        <tbody>
+        {% for m in other_mf %}
+        <tr class="hover {% if m.multi %}clickable-row{% endif %}" {% if m.multi %}onclick="showBreakdown('{{ m.name|escapejs }}', 'other', {{ forloop.counter0 }})"{% endif %}>
+          <td class="font-semibold max-w-[280px] overflow-hidden text-ellipsis whitespace-nowrap" title="{{ m.name }}" data-val="{{ m.name }}">
+            {{ m.name }}
+            {% if m.multi %}<span class="material-symbols-outlined text-sm align-middle opacity-60 ml-1">unfold_more</span>{% endif %}
+          </td>
+          <td class="text-end" data-val="{{ m.units }}">{{ m.units|floatformat:3 }}</td>
+          <td class="text-end" data-val="{{ m.purchase_value }}">₹{{ m.purchase_value|floatformat:0|indian_number }}</td>
+          <td class="text-end font-semibold" data-val="{{ m.current_value }}">₹{{ m.current_value|floatformat:0|indian_number }}</td>
+          <td class="text-end" data-val="{{ m.pnl }}"><span class="{% if m.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if m.pnl >= 0 %}+{% endif %}₹{{ m.pnl|floatformat:0|indian_number }}</span></td>
+          <td class="text-end" data-val="{{ m.pnl_pct }}"><span class="{% if m.pnl_pct >= 0 %}text-success{% else %}text-error{% endif %}">{{ m.pnl_pct }}%</span></td>
+        </tr>
+        {% endfor %}
+        <tr class="total-row border-t-2 border-base-300">
+          <td class="font-bold text-primary">Total</td>
+          <td></td>
+          <td class="text-end font-semibold">₹{{ total_other_purchased|floatformat:0|indian_number }}</td>
+          <td class="text-end font-semibold">₹{{ total_other|floatformat:0|indian_number }}</td>
+          <td class="text-end"><span class="font-bold {% if total_other_pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if total_other_pnl >= 0 %}+{% endif %}₹{{ total_other_pnl|floatformat:0|indian_number }}</span></td>
+          <td></td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+    {# Mobile card view #}
+    <div class="md:hidden space-y-2">
+      {% for m in other_mf %}
+      <div class="table-card {% if m.multi %}cursor-pointer active:bg-base-300/50{% endif %}" {% if m.multi %}onclick="showBreakdown('{{ m.name|escapejs }}', 'other', {{ forloop.counter0 }})"{% endif %}>
+        <div class="flex items-center justify-between gap-2">
+          <span class="font-semibold text-sm">{{ m.name }}{% if m.multi %} <span class="material-symbols-outlined text-xs align-middle opacity-50">unfold_more</span>{% endif %}</span>
+          <span class="text-xs opacity-50">{{ m.units|floatformat:3 }} units</span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
+          <div><span class="opacity-50">Bought</span><div class="font-semibold mt-0.5">₹{{ m.purchase_value|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5">₹{{ m.current_value|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">P&L</span><div class="font-semibold mt-0.5 {% if m.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if m.pnl >= 0 %}+{% endif %}₹{{ m.pnl|floatformat:0|indian_number }}</div></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm opacity-60 py-2">No other mutual funds.</p>
+    {% endif %}
+  </div>
+</div>
+
+{# ——— BREAKDOWN MODAL ——— #}
+<dialog id="breakdownModal" class="modal zerodha-breakdown-modal">
+  <div class="modal-box max-w-[640px] w-full">
+    <form method="dialog">
+      <button class="btn btn-ghost btn-xs btn-square absolute end-2 top-2" aria-label="Close"><span class="material-symbols-outlined text-lg">close</span></button>
+    </form>
+    <h3 class="font-bold text-lg flex items-center gap-2 pe-10" id="breakdownTitle"><span class="material-symbols-outlined text-primary">analytics</span> Breakdown</h3>
+    <div class="overflow-x-auto mt-4 -mx-2 px-2">
+      <table class="table table-sm" id="breakdownTable">
+        <thead id="breakdownHead"></thead>
+        <tbody id="breakdownBody"></tbody>
+      </table>
+    </div>
+    <div class="modal-action">
+      <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('breakdownModal')">Close</button>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+{{ equity_chart_data|json_script:"equity-chart-data" }}
+{{ consolidated_data|json_script:"consolidated-data" }}
+{% endblock %}
+
+{% block chart_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block extra_js %}
+{% include 'portfolio/_sortable_js.html' %}
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  initPagination('stocksTable', 20);
+  initPagination('indexTable', 20);
+  initPagination('otherTable', 20);
+});
+
+var _eqData = JSON.parse(document.getElementById('equity-chart-data').textContent);
+var _isMobile = window.innerWidth <= 640;
+new Chart(document.getElementById('equityAllocationChart'), {
+  type: 'doughnut',
+  data: {
+    labels: _eqData.labels,
+    datasets: [{data: _eqData.values, backgroundColor: ['#7c9ef8','#b39ddb','#69f0ae'], borderWidth: 0, hoverOffset: 6}]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false, cutout: '65%',
+    plugins: {
+      legend: {position: _isMobile ? 'bottom' : 'right', labels:{color:'#9999bb', usePointStyle:true, pointStyle:'circle', boxWidth:8, boxHeight:8, padding:10, font:{size:12}}},
+      tooltip: {
+        backgroundColor:'rgba(10,10,20,0.95)', borderColor:'rgba(255,255,255,0.08)', borderWidth:1,
+        titleColor:'#e2e2f0', bodyColor:'#8888aa', padding:10,
+        callbacks:{label:function(c){return ' \u20b9'+c.raw.toLocaleString('en-IN');}}
+      }
+    }
+  }
+});
+
+var _cdata = JSON.parse(document.getElementById('consolidated-data').textContent);
+
+function _fmt(v) {
+  var n = parseFloat(v);
+  return '\u20b9' + Math.abs(Math.round(n)).toLocaleString('en-IN');
+}
+
+function _td(text, opts) {
+  var td = document.createElement('td');
+  if (opts && opts.align) td.style.textAlign = opts.align;
+  if (opts && opts.cls) td.className = opts.cls;
+  td.textContent = text;
+  return td;
+}
+
+function showBreakdown(name, type, idx) {
+  var item = _cdata[type][idx];
+  if (!item) return;
+
+  var title = document.getElementById('breakdownTitle');
+  while (title.childNodes.length > 1) title.removeChild(title.lastChild);
+  title.appendChild(document.createTextNode(' ' + name));
+
+  var isStock = (type === 'stock');
+  var head = document.getElementById('breakdownHead');
+  head.textContent = '';
+  var hr = document.createElement('tr');
+  ['Account', isStock ? 'Qty' : 'Units', 'Purchased', 'Current', 'P&L'].forEach(function(label, i) {
+    var th = document.createElement('th');
+    th.textContent = label;
+    if (i > 0) th.style.textAlign = 'right';
+    hr.appendChild(th);
+  });
+  head.appendChild(hr);
+
+  var body = document.getElementById('breakdownBody');
+  body.textContent = '';
+  item.entries.forEach(function(e) {
+    var pnl = parseFloat(e.pnl);
+    var cls = pnl >= 0 ? 'td-pos' : 'amount-danger';
+    var sign = pnl >= 0 ? '+' : '-';
+    var tr = document.createElement('tr');
+    tr.appendChild(_td(e.account, {cls: 'td-bold'}));
+    tr.appendChild(_td(isStock ? e.quantity : parseFloat(e.units).toFixed(3), {align: 'right'}));
+    tr.appendChild(_td(_fmt(e.purchase_value), {align: 'right'}));
+    tr.appendChild(_td(_fmt(e.current_value), {align: 'right', cls: 'td-bold'}));
+    var pnlTd = document.createElement('td');
+    pnlTd.style.textAlign = 'right';
+    var pnlSpan = document.createElement('span');
+    pnlSpan.className = cls;
+    pnlSpan.textContent = sign + _fmt(e.pnl);
+    pnlTd.appendChild(pnlSpan);
+    tr.appendChild(pnlTd);
+    body.appendChild(tr);
+  });
+
+  openModal('breakdownModal');
+}
+</script>
+{% endblock %}

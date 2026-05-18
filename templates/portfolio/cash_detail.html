@@ -1,0 +1,166 @@
+{% extends 'base.html' %}
+{% load indian_format %}
+
+{% block title %}Cash — Portfolio — Vault{% endblock %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+  <div>
+    <p class="text-xs font-bold tracking-widest uppercase text-primary">Portfolio</p>
+    <h1 class="text-2xl font-bold mt-1">Cash Positions</h1>
+    <p class="text-sm opacity-60 mt-0.5">All cash &amp; savings accounts</p>
+  </div>
+  <div class="flex flex-wrap items-center gap-2">
+    <button type="button" class="btn btn-ghost btn-sm gap-1" onclick="openAddModal()">
+      <span class="material-symbols-outlined text-base">add</span>Add
+    </button>
+    <a href="{% url 'portfolio_tracker' %}" class="btn btn-ghost btn-sm gap-1">
+      <span class="material-symbols-outlined text-base">arrow_back</span>Portfolio
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card hero-gradient-portfolio shadow-sm card-hover animate-up">
+  <div class="card-body p-4">
+    <div class="text-[10px] font-bold uppercase tracking-widest opacity-40">Total Cash</div>
+    <div class="text-3xl font-bold mt-1">₹{{ total|floatformat:0|indian_number }}</div>
+  </div>
+</div>
+
+<div class="card bg-base-200 shadow-sm card-hover animate-up mt-4" style="animation-delay:0.1s">
+  <div class="card-body p-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+      <h2 class="text-lg font-semibold">All Cash Positions</h2>
+      <span class="badge badge-primary badge-sm">{{ positions|length }}</span>
+    </div>
+    {% if positions %}
+    {# Desktop table #}
+    <div class="hidden md:block overflow-x-auto">
+      <table class="table table-sm" id="cashTable">
+        <thead>
+          <tr>
+            <th class="sortable-th cursor-pointer select-none">Name <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none text-right">Amount <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+            <th>Remarks</th>
+            <th class="w-12"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in positions %}
+          <tr class="hover">
+            <td class="font-semibold">{{ c.name }}</td>
+            <td class="text-right whitespace-nowrap font-semibold" data-val="{{ c.amount }}">₹{{ c.amount|floatformat:0|indian_number }}</td>
+            <td class="opacity-60 text-sm">{{ c.remarks|default:"—" }}</td>
+            <td class="text-right">
+              <button type="button" class="btn btn-ghost btn-xs btn-square" data-edit-cash data-id="{{ c.id }}" data-name="{{ c.name }}" data-amount="{{ c.amount }}" data-remarks="{{ c.remarks }}">
+                <span class="material-symbols-outlined text-base">edit</span>
+              </button>
+            </td>
+          </tr>
+          {% endfor %}
+          <tr class="hover border-t border-base-300 font-semibold total-row">
+            <td class="text-primary">Total</td>
+            <td class="text-right text-primary" data-val="{{ total }}">₹{{ total|floatformat:0|indian_number }}</td>
+            <td colspan="2"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    {# Mobile card view #}
+    <div class="md:hidden space-y-2">
+      {% for c in positions %}
+      <div class="table-card flex items-center justify-between gap-3">
+        <div class="flex-1 min-w-0">
+          <div class="font-semibold text-sm">{{ c.name }}</div>
+          <div class="text-xs opacity-50 mt-0.5 truncate">{{ c.remarks|default:"—" }}</div>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <span class="font-bold text-sm">₹{{ c.amount|floatformat:0|indian_number }}</span>
+          <button type="button" class="btn btn-ghost btn-xs btn-square" data-edit-cash data-id="{{ c.id }}" data-name="{{ c.name }}" data-amount="{{ c.amount }}" data-remarks="{{ c.remarks }}">
+            <span class="material-symbols-outlined text-base">edit</span>
+          </button>
+        </div>
+      </div>
+      {% endfor %}
+      <div class="flex items-center justify-between px-1 pt-2 border-t border-base-300 text-sm">
+        <span class="font-bold text-primary">Total</span>
+        <span class="font-bold text-primary">₹{{ total|floatformat:0|indian_number }}</span>
+      </div>
+    </div>
+    {% else %}
+    <p class="text-sm opacity-60 py-4">No cash positions.</p>
+    {% endif %}
+  </div>
+</div>
+
+<dialog class="modal" id="addCashModal">
+  <div class="modal-box max-w-lg">
+    <div class="flex items-start justify-between gap-2 mb-4">
+      <h3 id="cashModalTitle" class="font-bold text-lg flex items-center gap-2">
+        <span class="material-symbols-outlined text-primary">add_circle</span> Add Cash Position
+      </h3>
+      <button type="button" class="btn btn-ghost btn-xs btn-square" onclick="closeModal('addCashModal')" aria-label="Close">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <form id="cashForm" method="post" action="{% url 'add_cash' %}">{% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <div class="space-y-3">
+        <div class="form-field">
+          <label class="label text-xs font-semibold">Name</label>
+          {{ form.name }}
+        </div>
+        <div class="form-field">
+          <label class="label text-xs font-semibold">Amount (₹)</label>
+          {{ form.amount }}
+        </div>
+        <div class="form-field">
+          <label class="label text-xs font-semibold">Remarks <span class="opacity-40 font-normal">optional</span></label>
+          {{ form.remarks }}
+        </div>
+      </div>
+      <div class="modal-action flex-wrap gap-2 mt-6">
+        <button type="button" id="cashDeleteBtn" class="btn btn-error btn-sm gap-1 mr-auto hidden" onclick="confirmDelete('deleteCashForm')">
+          <span class="material-symbols-outlined text-base">delete</span>Delete
+        </button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addCashModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm gap-1">
+          <span class="material-symbols-outlined text-base">save</span>Save
+        </button>
+      </div>
+    </form>
+    <form id="deleteCashForm" method="post" action="" class="hidden">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+{% endblock %}
+
+{% block extra_js %}
+{% include 'portfolio/_sortable_js.html' %}
+<script>
+function openAddModal() {
+  var form = document.getElementById('cashForm');
+  form.action = "{% url 'add_cash' %}";
+  form.reset();
+  document.getElementById('cashDeleteBtn').classList.add('hidden');
+  document.getElementById('cashModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span> Add Cash Position';
+  openModal('addCashModal');
+}
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-edit-cash]');
+  if (!btn) return;
+  var form = document.getElementById('cashForm');
+  form.action = "{% url 'edit_cash' pk=0 %}".replace('/0/', '/' + btn.dataset.id + '/');
+  document.getElementById('deleteCashForm').action = "{% url 'delete_cash' pk=0 %}".replace('/0/', '/' + btn.dataset.id + '/');
+  document.getElementById('cashDeleteBtn').classList.remove('hidden');
+  document.getElementById('cashModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">edit</span> Edit Cash Position';
+  form.querySelector('[name=name]').value = btn.dataset.name;
+  form.querySelector('[name=amount]').value = btn.dataset.amount;
+  form.querySelector('[name=remarks]').value = btn.dataset.remarks;
+  openModal('addCashModal');
+});
+document.addEventListener('DOMContentLoaded', function() { initPagination('cashTable', 15); });
+</script>
+{% endblock %}

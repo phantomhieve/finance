@@ -1,0 +1,243 @@
+{% extends 'base.html' %}
+{% load indian_format %}
+
+{% block title %}{{ account.name }} — Portfolio — Vault{% endblock %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+  <div>
+    <p class="text-xs font-bold tracking-widest uppercase text-primary">Zerodha Account</p>
+    <h1 class="text-2xl font-bold mt-1">{{ account.name }}</h1>
+    <p class="text-sm opacity-60 mt-0.5">
+      {% if account.last_synced %}Last synced {{ account.last_synced|timesince }} ago{% else %}Not synced yet{% endif %}
+    </p>
+  </div>
+  <div>
+    <a href="{% url 'portfolio_tracker' %}" class="btn btn-ghost btn-sm gap-1"><span class="material-symbols-outlined text-base">arrow_back</span>Back to Portfolio</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{# ——— SUMMARY KPIs ——— #}
+<div class="card hero-gradient-portfolio shadow-sm card-hover animate-up">
+  <div class="card-body p-4">
+    <div class="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6 items-start">
+      <div>
+        <div class="text-xs opacity-60 font-medium">Total Portfolio</div>
+        <div class="text-3xl font-bold mt-1 text-primary">₹{{ total_portfolio|floatformat:0|indian_number }}</div>
+        <div class="flex gap-4 text-xs mt-2 opacity-60">
+          <span>Invested: <strong>₹{{ total_invested|floatformat:0|indian_number }}</strong></span>
+          <span>Returns: <strong class="{% if total_returns >= 0 %}text-success{% else %}text-error{% endif %}">{% if total_returns >= 0 %}+{% endif %}₹{{ total_returns|floatformat:0|indian_number }}</strong></span>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full lg:min-w-[min(100%,28rem)]">
+        <div class="stat-card flex flex-row items-center gap-2">
+          <span class="material-symbols-outlined text-primary shrink-0">candlestick_chart</span>
+          <div class="min-w-0">
+            <div class="text-[10px] uppercase tracking-wider opacity-50">Stocks</div>
+            <div class="text-base font-bold mt-0.5">₹{{ total_stocks|floatformat:0|indian_number }}</div>
+          </div>
+        </div>
+        <div class="stat-card flex flex-row items-center gap-2">
+          <span class="material-symbols-outlined text-secondary shrink-0">trending_up</span>
+          <div class="min-w-0">
+            <div class="text-[10px] uppercase tracking-wider opacity-50">Index Funds</div>
+            <div class="text-base font-bold mt-0.5">₹{{ total_index|floatformat:0|indian_number }}</div>
+          </div>
+        </div>
+        <div class="stat-card flex flex-row items-center gap-2">
+          <span class="material-symbols-outlined text-accent shrink-0">pie_chart</span>
+          <div class="min-w-0">
+            <div class="text-[10px] uppercase tracking-wider opacity-50">Other MF</div>
+            <div class="text-base font-bold mt-0.5">₹{{ total_other|floatformat:0|indian_number }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ——— STOCK HOLDINGS ——— #}
+<div class="card bg-base-200 shadow-sm card-hover animate-up mt-4" style="animation-delay:0.1s">
+  <div class="card-body p-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <h2 class="card-title text-base">Stock Holdings</h2>
+      <span class="badge badge-primary badge-sm">₹{{ total_stocks|floatformat:0|indian_number }}</span>
+    </div>
+    {% if stocks %}
+    <div class="hidden md:block overflow-x-auto -mx-2 px-2">
+      <table class="table table-sm" id="stocksTable">
+        <thead><tr>
+          <th>Symbol</th>
+          <th class="text-end">Qty</th>
+          <th class="text-end">Purchased</th>
+          <th class="text-end">Current</th>
+          <th class="text-end">P&amp;L</th>
+        </tr></thead>
+        <tbody>
+        {% for s in stocks %}
+        <tr class="hover">
+          <td class="font-semibold">{{ s.symbol }}</td>
+          <td class="text-end">{{ s.quantity }}</td>
+          <td class="text-end">₹{{ s.purchase_value|floatformat:2|indian_number }}</td>
+          <td class="text-end font-semibold">₹{{ s.current_value|floatformat:2|indian_number }}</td>
+          <td class="text-end"><span class="{% if s.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if s.pnl >= 0 %}+{% endif %}₹{{ s.pnl|floatformat:2|indian_number }}</span></td>
+        </tr>
+        {% endfor %}
+        <tr class="border-t-2 border-base-300">
+          <td class="font-bold text-primary">Total</td>
+          <td></td>
+          <td class="text-end font-semibold">₹{{ total_stocks_purchased|floatformat:2|indian_number }}</td>
+          <td class="text-end font-semibold">₹{{ total_stocks|floatformat:2|indian_number }}</td>
+          <td class="text-end"><span class="font-bold {% if total_stocks_pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if total_stocks_pnl >= 0 %}+{% endif %}₹{{ total_stocks_pnl|floatformat:2|indian_number }}</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+    {# Mobile card view #}
+    <div class="md:hidden space-y-2">
+      {% for s in stocks %}
+      <div class="table-card">
+        <div class="flex items-center justify-between gap-2">
+          <span class="font-semibold text-sm">{{ s.symbol }}</span>
+          <span class="text-xs opacity-50">{{ s.quantity }} qty</span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
+          <div><span class="opacity-50">Bought</span><div class="font-semibold mt-0.5">₹{{ s.purchase_value|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5">₹{{ s.current_value|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">P&amp;L</span><div class="font-semibold mt-0.5 {% if s.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if s.pnl >= 0 %}+{% endif %}₹{{ s.pnl|floatformat:0|indian_number }}</div></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm opacity-60 py-2">No stock holdings synced.</p>
+    {% endif %}
+  </div>
+</div>
+
+{# ——— INDEX MUTUAL FUNDS ——— #}
+<div class="card bg-base-200 shadow-sm card-hover animate-up mt-4" style="animation-delay:0.15s">
+  <div class="card-body p-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <h2 class="card-title text-base">Index Mutual Funds</h2>
+      <span class="badge badge-secondary badge-sm">₹{{ total_index|floatformat:0|indian_number }}</span>
+    </div>
+    {% if index_mf %}
+    <div class="hidden md:block overflow-x-auto -mx-2 px-2">
+      <table class="table table-sm" id="indexTable">
+        <thead><tr>
+          <th>Fund</th>
+          <th class="text-end">Units</th>
+          <th class="text-end">Purchased</th>
+          <th class="text-end">Current</th>
+          <th class="text-end">P&amp;L</th>
+        </tr></thead>
+        <tbody>
+        {% for m in index_mf %}
+        <tr class="hover">
+          <td class="font-semibold max-w-[280px] overflow-hidden text-ellipsis whitespace-nowrap" title="{{ m.fund_name }}">{{ m.fund_name }}</td>
+          <td class="text-end">{{ m.units|floatformat:3 }}</td>
+          <td class="text-end">₹{{ m.purchase_value|floatformat:2|indian_number }}</td>
+          <td class="text-end font-semibold">₹{{ m.current_value|floatformat:2|indian_number }}</td>
+          <td class="text-end"><span class="{% if m.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if m.pnl >= 0 %}+{% endif %}₹{{ m.pnl|floatformat:2|indian_number }}</span></td>
+        </tr>
+        {% endfor %}
+        <tr class="border-t-2 border-base-300">
+          <td class="font-bold text-primary">Total</td>
+          <td></td>
+          <td class="text-end font-semibold">₹{{ total_index_purchased|floatformat:2|indian_number }}</td>
+          <td class="text-end font-semibold">₹{{ total_index|floatformat:2|indian_number }}</td>
+          <td class="text-end"><span class="font-bold {% if total_index_pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if total_index_pnl >= 0 %}+{% endif %}₹{{ total_index_pnl|floatformat:2|indian_number }}</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+    {# Mobile card view #}
+    <div class="md:hidden space-y-2">
+      {% for m in index_mf %}
+      <div class="table-card">
+        <div class="font-semibold text-sm truncate" title="{{ m.fund_name }}">{{ m.fund_name }}</div>
+        <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
+          <div><span class="opacity-50">Bought</span><div class="font-semibold mt-0.5">₹{{ m.purchase_value|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5">₹{{ m.current_value|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">P&amp;L</span><div class="font-semibold mt-0.5 {% if m.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if m.pnl >= 0 %}+{% endif %}₹{{ m.pnl|floatformat:0|indian_number }}</div></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm opacity-60 py-2">No index funds synced.</p>
+    {% endif %}
+  </div>
+</div>
+
+{# ——— OTHER MUTUAL FUNDS ——— #}
+<div class="card bg-base-200 shadow-sm card-hover animate-up mt-4" style="animation-delay:0.2s">
+  <div class="card-body p-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <h2 class="card-title text-base">Other Mutual Funds</h2>
+      <span class="badge badge-accent badge-sm">₹{{ total_other|floatformat:0|indian_number }}</span>
+    </div>
+    {% if other_mf %}
+    <div class="hidden md:block overflow-x-auto -mx-2 px-2">
+      <table class="table table-sm" id="otherTable">
+        <thead><tr>
+          <th>Fund</th>
+          <th class="text-end">Units</th>
+          <th class="text-end">Purchased</th>
+          <th class="text-end">Current</th>
+          <th class="text-end">P&amp;L</th>
+        </tr></thead>
+        <tbody>
+        {% for m in other_mf %}
+        <tr class="hover">
+          <td class="font-semibold max-w-[280px] overflow-hidden text-ellipsis whitespace-nowrap" title="{{ m.fund_name }}">{{ m.fund_name }}</td>
+          <td class="text-end">{{ m.units|floatformat:3 }}</td>
+          <td class="text-end">₹{{ m.purchase_value|floatformat:2|indian_number }}</td>
+          <td class="text-end font-semibold">₹{{ m.current_value|floatformat:2|indian_number }}</td>
+          <td class="text-end"><span class="{% if m.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if m.pnl >= 0 %}+{% endif %}₹{{ m.pnl|floatformat:2|indian_number }}</span></td>
+        </tr>
+        {% endfor %}
+        <tr class="border-t-2 border-base-300">
+          <td class="font-bold text-primary">Total</td>
+          <td></td>
+          <td class="text-end font-semibold">₹{{ total_other_purchased|floatformat:2|indian_number }}</td>
+          <td class="text-end font-semibold">₹{{ total_other|floatformat:2|indian_number }}</td>
+          <td class="text-end"><span class="font-bold {% if total_other_pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if total_other_pnl >= 0 %}+{% endif %}₹{{ total_other_pnl|floatformat:2|indian_number }}</span></td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+    {# Mobile card view #}
+    <div class="md:hidden space-y-2">
+      {% for m in other_mf %}
+      <div class="table-card">
+        <div class="font-semibold text-sm truncate" title="{{ m.fund_name }}">{{ m.fund_name }}</div>
+        <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
+          <div><span class="opacity-50">Bought</span><div class="font-semibold mt-0.5">₹{{ m.purchase_value|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5">₹{{ m.current_value|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">P&amp;L</span><div class="font-semibold mt-0.5 {% if m.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if m.pnl >= 0 %}+{% endif %}₹{{ m.pnl|floatformat:0|indian_number }}</div></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm opacity-60 py-2">No other mutual funds synced.</p>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  initPagination('stocksTable', 20);
+  initPagination('indexTable', 20);
+  initPagination('otherTable', 20);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,674 @@
+/* ====================================================================
+   VAULT — Django Admin Dark Theme
+   Complete override to match the Vault dashboard aesthetic.
+   Forces dark mode regardless of system preference.
+   ==================================================================== */
+
+/* ── Force dark variables (both default + light override) ────────── */
+:root,
+html[data-theme="light"],
+html[data-theme="auto"] {
+  --primary: #7c9ef8;
+  --secondary: #b39ddb;
+  --accent: #7c9ef8;
+  --primary-fg: #fff;
+
+  --body-fg: #e0e0f0;
+  --body-bg: #0a0a12;
+  --body-quiet-color: #8888a8;
+  --body-loud-color: #eaeaf5;
+
+  --header-color: #eaeaf5;
+  --header-branding-color: #7c9ef8;
+  --header-bg: #111119;
+  --header-link-color: #9090b0;
+
+  --breadcrumbs-fg: #8888a8;
+  --breadcrumbs-link-fg: #7c9ef8;
+  --breadcrumbs-bg: #111119;
+
+  --link-fg: #7c9ef8;
+  --link-hover-color: #a5b4fc;
+  --link-selected-fg: #b39ddb;
+
+  --hairline-color: rgba(255,255,255,0.06);
+  --border-color: rgba(255,255,255,0.08);
+
+  --darkened-bg: #15151d;
+  --selected-bg: #1c1c28;
+  --selected-row: #1a1a2a;
+
+  --button-fg: #fff;
+  --button-bg: #7c9ef8;
+  --button-hover-bg: #6b8de8;
+  --default-button-bg: #7c9ef8;
+  --default-button-hover-bg: #6b8de8;
+  --close-button-bg: #ff5c8a;
+  --close-button-hover-bg: #e8507a;
+
+  --object-tools-fg: #eaeaf5;
+  --object-tools-bg: #22222e;
+  --object-tools-hover-bg: #2e2e3c;
+
+  --error-fg: #ff5c8a;
+  --message-success-bg: rgba(105,240,174,0.1);
+  --message-warning-bg: rgba(255,213,79,0.1);
+  --message-error-bg: rgba(255,92,138,0.1);
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --primary: #7c9ef8; --secondary: #b39ddb; --accent: #7c9ef8;
+    --primary-fg: #fff; --body-fg: #e0e0f0; --body-bg: #0a0a12;
+    --body-quiet-color: #8888a8; --body-loud-color: #eaeaf5;
+    --header-color: #eaeaf5; --header-branding-color: #7c9ef8;
+    --header-bg: #111119; --header-link-color: #9090b0;
+    --breadcrumbs-fg: #8888a8; --breadcrumbs-link-fg: #7c9ef8;
+    --breadcrumbs-bg: #111119; --link-fg: #7c9ef8;
+    --link-hover-color: #a5b4fc; --link-selected-fg: #b39ddb;
+    --hairline-color: rgba(255,255,255,0.06);
+    --border-color: rgba(255,255,255,0.08);
+    --darkened-bg: #15151d; --selected-bg: #1c1c28;
+    --selected-row: #1a1a2a; --button-fg: #fff;
+    --button-bg: #7c9ef8; --button-hover-bg: #6b8de8;
+    --default-button-bg: #7c9ef8; --default-button-hover-bg: #6b8de8;
+    --close-button-bg: #ff5c8a; --close-button-hover-bg: #e8507a;
+    --object-tools-fg: #eaeaf5; --object-tools-bg: #22222e;
+    --object-tools-hover-bg: #2e2e3c; --error-fg: #ff5c8a;
+    --message-success-bg: rgba(105,240,174,0.1);
+    --message-warning-bg: rgba(255,213,79,0.1);
+    --message-error-bg: rgba(255,92,138,0.1);
+  }
+}
+
+/* Hide theme toggle since we force dark */
+.theme-toggle, #toggle-theme-link, label[for="theme-toggle"] { display: none !important; }
+
+/* ── Global typography & base ────────────────────────────────────── */
+body {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-size: 14px;
+}
+a { transition: color 0.15s; }
+
+/* ── Header ──────────────────────────────────────────────────────── */
+#header {
+  background: #111119;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding: 12px 24px;
+  line-height: 1.4;
+}
+#branding h1 { margin: 0; padding: 0; font-size: 1.15rem; }
+#branding h1 a:link, #branding h1 a:visited {
+  color: #7c9ef8 !important;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+#user-tools {
+  font-size: 0.78rem;
+  color: #6a6a88;
+  font-weight: 400;
+}
+#user-tools a {
+  color: #8888a8 !important;
+  font-weight: 500;
+}
+#user-tools a:hover { color: #eaeaf5 !important; }
+#user-tools .user-tools-welcome { font-weight: 400; }
+
+/* ── Breadcrumbs ─────────────────────────────────────────────────── */
+div.breadcrumbs {
+  background: #111119;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  padding: 8px 24px;
+  font-size: 0.78rem;
+  color: #6a6a88;
+}
+div.breadcrumbs a { color: #7c9ef8; font-weight: 500; }
+div.breadcrumbs a:hover { color: #a5b4fc; }
+
+/* ── Content ─────────────────────────────────────────────────────── */
+#container { background: #0a0a12; }
+#content { padding: 20px 24px; }
+#content h1 {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #eaeaf5;
+  letter-spacing: -0.3px;
+}
+#content h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #c0c0d8;
+}
+
+/* ── Module cards ────────────────────────────────────────────────── */
+.module {
+  background: #14141c;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.module table {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+}
+.module h2, .module caption, .module thead th {
+  background: #1a1a24;
+  color: #c0c0d8;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.module table td {
+  padding: 10px 16px;
+  border-top: 1px solid rgba(255,255,255,0.04);
+  font-size: 0.85rem;
+  vertical-align: middle;
+}
+.module table td a {
+  font-weight: 500;
+}
+.module table tr:hover td {
+  background: rgba(124,158,248,0.04);
+}
+
+/* ── Dashboard index ─────────────────────────────────────────────── */
+.dashboard #content { padding-top: 24px; }
+.dashboard #content-main { float: left; width: 65%; }
+.dashboard #content-related { float: right; width: 32%; }
+
+/* App index / change list module */
+.app-list .module {
+  margin-bottom: 16px;
+}
+/* "Add" and "Change" action links on dashboard */
+.module table td a.addlink,
+.module table td a.changelink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.module table td a.addlink {
+  background: rgba(124,158,248,0.12);
+  color: #7c9ef8;
+}
+.module table td a.addlink:hover {
+  background: rgba(124,158,248,0.22);
+  color: #a5b4fc;
+}
+.module table td a.changelink {
+  background: rgba(255,255,255,0.05);
+  color: #8888a8;
+}
+.module table td a.changelink:hover {
+  background: rgba(255,255,255,0.1);
+  color: #c0c0d8;
+}
+
+/* Recent actions module */
+.module.actions {
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.actionlist li {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  font-size: 0.82rem;
+}
+.actionlist li:last-child { border-bottom: none; }
+
+/* ── Change list page ────────────────────────────────────────────── */
+#changelist { background: transparent; }
+#changelist .results table {
+  background: #14141c;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  overflow: hidden;
+}
+#changelist table thead th {
+  background: #1a1a24;
+  padding: 10px 14px;
+  font-size: 0.7rem;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+#changelist table thead th a { color: #8888a8; }
+#changelist table thead th a:hover { color: #eaeaf5; }
+#changelist table thead th.sorted { background: #1e1e2a; }
+#changelist table thead th.sorted a { color: #7c9ef8; }
+#changelist table tbody td {
+  padding: 10px 14px;
+  font-size: 0.84rem;
+}
+#changelist table tbody tr:nth-child(odd) td { background: rgba(255,255,255,0.01); }
+#changelist table tbody tr:hover td { background: rgba(124,158,248,0.05); }
+#changelist table tbody tr.selected td { background: rgba(124,158,248,0.1); }
+
+/* Paginator */
+#changelist .paginator {
+  background: #14141c;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+  padding: 10px 16px;
+  color: #8888a8;
+  font-size: 0.8rem;
+}
+#changelist .paginator a:link, #changelist .paginator a:visited { color: #7c9ef8; }
+
+/* Actions bar */
+#changelist .actions {
+  background: #14141c;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 10px;
+  padding: 10px 16px;
+}
+#changelist .actions select {
+  min-width: 200px;
+}
+#changelist .actions label { color: #8888a8; font-size: 0.8rem; }
+
+/* ── Forms & fieldsets ───────────────────────────────────────────── */
+input[type="text"], input[type="password"], input[type="email"],
+input[type="url"], input[type="number"], input[type="tel"],
+input[type="date"], input[type="datetime-local"],
+textarea, select, .vTextField, .vLargeTextField, .vURLField {
+  background: #1a1a24 !important;
+  color: #e0e0f0 !important;
+  border: 1px solid rgba(255,255,255,0.1) !important;
+  border-radius: 8px !important;
+  padding: 9px 12px !important;
+  font-family: 'Inter', system-ui, sans-serif !important;
+  font-size: 0.85rem !important;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: #7c9ef8 !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(124,158,248,0.15) !important;
+}
+select { appearance: auto; }
+label { color: #8888a8; font-weight: 500; font-size: 0.82rem; }
+.help, .help-text, p.help { color: #5a5a75; font-size: 0.75rem; line-height: 1.5; }
+.required label::after { color: #ff5c8a; }
+
+fieldset {
+  background: #14141c;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  margin-bottom: 16px;
+  padding: 0;
+}
+fieldset h2 {
+  background: #1a1a24;
+  color: #c0c0d8;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+  padding: 10px 16px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  border-radius: 12px 12px 0 0;
+  margin: 0;
+}
+fieldset .form-row {
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+fieldset .form-row:last-child { border-bottom: none; }
+
+/* Inline groups */
+.inline-group h2 {
+  background: #1a1a24;
+  color: #c0c0d8;
+}
+.inline-group .tabular td { padding: 8px 12px; }
+.inline-related { background: #14141c; border-radius: 10px; margin-bottom: 12px; }
+
+/* ── Buttons ─────────────────────────────────────────────────────── */
+input[type="submit"], button, .submit-row input, .button, a.button {
+  background: #7c9ef8 !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 8px !important;
+  padding: 9px 18px !important;
+  font-weight: 600 !important;
+  font-size: 0.82rem !important;
+  font-family: 'Inter', system-ui, sans-serif !important;
+  cursor: pointer;
+  transition: all 0.15s;
+  letter-spacing: 0.2px;
+}
+input[type="submit"]:hover, button:hover, .submit-row input:hover,
+.button:hover, a.button:hover {
+  background: #6b8de8 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(124,158,248,0.25);
+}
+input[type="submit"].default, .submit-row input.default {
+  background: #7c9ef8 !important;
+}
+
+.submit-row {
+  background: #14141c;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  border-radius: 0 0 12px 12px;
+  padding: 14px 16px;
+  overflow: hidden;
+}
+.submit-row p { font-size: 0.8rem; }
+.submit-row a.deletelink {
+  color: #ff5c8a !important;
+  font-weight: 500;
+  background: none !important;
+  padding: 9px 14px !important;
+  border: 1px solid rgba(255,92,138,0.25) !important;
+  border-radius: 8px !important;
+}
+.submit-row a.deletelink:hover {
+  background: rgba(255,92,138,0.1) !important;
+  border-color: #ff5c8a !important;
+}
+
+/* ── Messages ────────────────────────────────────────────────────── */
+.messagelist { padding: 0 24px; }
+.messagelist li {
+  border-radius: 10px;
+  font-weight: 500;
+  font-size: 0.84rem;
+  margin-bottom: 8px;
+  padding: 12px 16px;
+}
+.messagelist li.success {
+  background: rgba(105,240,174,0.08);
+  color: #69f0ae;
+  border-left: 3px solid #69f0ae;
+}
+.messagelist li.warning {
+  background: rgba(255,213,79,0.08);
+  color: #ffd54f;
+  border-left: 3px solid #ffd54f;
+}
+.messagelist li.error {
+  background: rgba(255,92,138,0.08);
+  color: #ff5c8a;
+  border-left: 3px solid #ff5c8a;
+}
+
+/* ── Nav sidebar ─────────────────────────────────────────────────── */
+#nav-sidebar {
+  background: #0e0e16;
+  border-right: 1px solid rgba(255,255,255,0.05);
+  padding-top: 8px;
+}
+#nav-sidebar .module {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  margin-bottom: 4px;
+}
+#nav-sidebar .module h2 {
+  background: transparent;
+  border: none;
+  color: #5a5a75;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.2px;
+  padding: 14px 18px 6px;
+  margin: 0;
+}
+#nav-sidebar .module table { border: none; }
+#nav-sidebar .module td {
+  padding: 1px 10px;
+  border: none;
+}
+#nav-sidebar .module td a {
+  color: #8888a8;
+  padding: 7px 12px;
+  display: block;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  transition: all 0.12s;
+}
+#nav-sidebar .module td a:hover {
+  background: rgba(124,158,248,0.08);
+  color: #c0c0d8;
+}
+#nav-sidebar .current-app a,
+#nav-sidebar .current-model a {
+  background: rgba(124,158,248,0.12) !important;
+  color: #7c9ef8 !important;
+  font-weight: 600;
+}
+/* Sidebar toggle button */
+#toggle-nav-sidebar {
+  background: transparent;
+  border: none;
+  color: #5a5a75;
+  padding: 8px;
+  transition: color 0.15s;
+}
+#toggle-nav-sidebar:hover { color: #7c9ef8; }
+
+/* ── Filter sidebar (change list) ────────────────────────────────── */
+#changelist-filter {
+  background: #14141c;
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+  padding: 4px 0;
+}
+#changelist-filter h2 {
+  color: #c0c0d8;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  padding: 12px 16px 6px;
+  background: transparent;
+  border: none;
+}
+#changelist-filter h3 {
+  color: #7c9ef8;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 10px 16px 4px;
+}
+#changelist-filter ul { padding: 0 8px 8px; }
+#changelist-filter li {
+  list-style: none;
+  margin: 0;
+}
+#changelist-filter li a {
+  color: #8888a8;
+  font-size: 0.8rem;
+  padding: 5px 10px;
+  display: block;
+  border-radius: 6px;
+  transition: all 0.12s;
+}
+#changelist-filter li a:hover { background: rgba(255,255,255,0.04); color: #c0c0d8; }
+#changelist-filter li.selected a {
+  color: #7c9ef8;
+  font-weight: 600;
+  background: rgba(124,158,248,0.1);
+}
+
+/* ── Search bar ──────────────────────────────────────────────────── */
+#toolbar {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin-bottom: 16px;
+}
+#toolbar form { display: flex; gap: 8px; align-items: center; }
+#toolbar form #searchbar {
+  flex: 1;
+  background: #1a1a24 !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  border-radius: 10px !important;
+  color: #e0e0f0 !important;
+  padding: 10px 14px !important;
+  font-size: 0.84rem !important;
+}
+#toolbar form #searchbar:focus {
+  border-color: #7c9ef8 !important;
+  box-shadow: 0 0 0 3px rgba(124,158,248,0.12) !important;
+}
+
+/* ── Object tools (top-right action buttons) ─────────────────────── */
+.object-tools { margin-bottom: 12px; }
+.object-tools li { margin-left: 8px; }
+.object-tools a, .object-tools a:link, .object-tools a:visited {
+  background: #1a1a24 !important;
+  color: #c0c0d8 !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(255,255,255,0.08) !important;
+  padding: 7px 14px !important;
+  font-size: 0.78rem !important;
+  font-weight: 600 !important;
+  transition: all 0.15s;
+}
+.object-tools a:hover {
+  background: #22222e !important;
+  border-color: rgba(124,158,248,0.3) !important;
+  color: #7c9ef8 !important;
+}
+
+/* ── Related widget wrapper ──────────────────────────────────────── */
+.related-widget-wrapper { display: flex; align-items: center; gap: 6px; }
+.related-widget-wrapper-link { color: #7c9ef8; }
+.related-widget-wrapper select { flex: 1; }
+
+/* ── Calendar & date widgets ─────────────────────────────────────── */
+.calendarbox, .clockbox {
+  background: #1a1a24;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+}
+.calendar caption {
+  background: #22222e;
+  color: #8888a8;
+  font-weight: 600;
+  border-radius: 10px 10px 0 0;
+}
+.calendar td, .calendar th { padding: 6px 8px; }
+.calendar td a:link, .calendar td a:visited { color: #e0e0f0; }
+.calendar td a:hover { background: rgba(124,158,248,0.15); border-radius: 4px; }
+.calendar td.today a { background: rgba(124,158,248,0.2); font-weight: 700; color: #7c9ef8; border-radius: 4px; }
+.calendar-shortcuts a { color: #7c9ef8; font-size: 0.78rem; }
+.timezonewarning { color: #5a5a75; font-size: 0.75rem; }
+
+/* ── Checkbox styling ────────────────────────────────────────────── */
+input[type="checkbox"] {
+  accent-color: #7c9ef8;
+  width: 16px;
+  height: 16px;
+}
+
+/* ── Sortable table header arrows ────────────────────────────────── */
+table thead th .text a { color: #8888a8; }
+table thead th.sorted .text a { color: #7c9ef8; }
+
+/* ── Errornote & errorlist ───────────────────────────────────────── */
+.errornote {
+  background: rgba(255,92,138,0.1);
+  color: #ff5c8a;
+  border: 1px solid rgba(255,92,138,0.2);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-weight: 500;
+}
+ul.errorlist li {
+  color: #ff5c8a;
+  font-size: 0.8rem;
+  background: transparent;
+}
+
+/* ── Empty change list ───────────────────────────────────────────── */
+#changelist .results + p { color: #8888a8; font-size: 0.9rem; }
+
+/* ── Delete confirmation ─────────────────────────────────────────── */
+.delete-confirmation { background: #14141c; border-radius: 12px; padding: 20px; }
+
+/* ── Login page (fallback if ever shown) ─────────────────────────── */
+body.login #container { max-width: 420px; margin: 60px auto; }
+body.login #header { border-radius: 12px 12px 0 0; }
+body.login #content { background: #14141c; border-radius: 0 0 12px 12px; padding: 24px; }
+
+/* ── Responsive: Tablet ──────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .dashboard #content-main { float: none; width: 100%; }
+  .dashboard #content-related { float: none; width: 100%; margin-top: 16px; }
+}
+
+/* ── Responsive: Mobile ──────────────────────────────────────────── */
+@media (max-width: 767px) {
+  #header { padding: 10px 16px; }
+  #header #branding { float: none; text-align: center; }
+  #header #branding h1 { font-size: 1rem; }
+  #user-tools { float: none; text-align: center; padding-top: 6px; font-size: 0.72rem; }
+
+  div.breadcrumbs { padding: 8px 16px; font-size: 0.72rem; }
+  #content { padding: 14px 12px; }
+  #content h1 { font-size: 1.1rem; }
+
+  .module { border-radius: 10px; }
+  .module h2, .module caption { padding: 8px 12px; font-size: 0.65rem; }
+  .module table td { padding: 8px 12px; font-size: 0.8rem; }
+
+  fieldset { border-radius: 10px; }
+  fieldset h2 { border-radius: 10px 10px 0 0; padding: 8px 12px; }
+  fieldset .form-row { padding: 10px 12px; }
+
+  .submit-row { border-radius: 0 0 10px 10px; padding: 10px 12px; }
+  .submit-row input[type="submit"] { width: 100%; margin-bottom: 8px; }
+
+  #changelist .results table { border-radius: 10px; font-size: 0.78rem; }
+  #changelist table tbody td { padding: 8px 10px; }
+  #changelist .actions { border-radius: 10px; padding: 8px 12px; }
+  #changelist .paginator { border-radius: 8px; padding: 8px 12px; font-size: 0.75rem; }
+
+  .object-tools { padding: 0; margin: 0 0 12px; }
+  .object-tools li { margin: 0 0 6px; display: block; }
+  .object-tools a { display: block !important; text-align: center; }
+
+  #toolbar form { flex-wrap: wrap; }
+  #toolbar form #searchbar { min-width: 0; }
+
+  #changelist-filter { border-radius: 10px; margin-bottom: 12px; }
+
+  .messagelist { padding: 0 12px; }
+  .messagelist li { font-size: 0.78rem; padding: 10px 12px; border-radius: 8px; }
+
+  /* Stack "Add" and "Change" links vertically in dashboard */
+  .module table td { display: block; width: 100%; }
+  .dashboard .module table td:first-child { padding-bottom: 4px; }
+}
+
+/* ── Very small screens ──────────────────────────────────────────── */
+@media (max-width: 480px) {
+  #header { padding: 8px 12px; }
+  #header #branding h1 { font-size: 0.9rem; }
+  #user-tools { font-size: 0.65rem; }
+  #content { padding: 10px 8px; }
+  .module table td { padding: 6px 10px; }
+}
+
+/* ── Smooth scrollbar ────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.18); }

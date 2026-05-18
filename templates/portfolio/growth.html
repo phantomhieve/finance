@@ -1,0 +1,312 @@
+{% extends 'base.html' %}
+{% load indian_format %}
+
+{% block title %}Growth — Portfolio — Vault{% endblock %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+  <div>
+    <p class="text-xs font-bold tracking-widest uppercase text-primary">Portfolio Growth</p>
+    <h1 class="text-xl lg:text-2xl font-extrabold">{{ fy_label }}</h1>
+    <p class="text-xs opacity-50">Track money added vs returns over time</p>
+  </div>
+  <div class="flex flex-wrap items-center gap-2 sm:gap-2 justify-center sm:justify-start w-full sm:w-auto">
+    <div class="fy-tabs" id="fySwitcher">
+      {% for fy in fy_options %}
+      <a href="?fy={{ fy }}" class="fy-tab {% if fy == fy_year %}fy-tab-active{% endif %}">{{ fy }}-{{ fy|add:1 }}</a>
+      {% endfor %}
+    </div>
+    <a href="{% url 'portfolio_tracker' %}" class="btn btn-ghost btn-sm gap-1">
+      <span class="material-symbols-outlined text-base">arrow_back</span>Portfolio
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+
+{# ——— VIEW TOGGLE ——— #}
+<div class="join animate-up mb-4">
+  <button type="button" class="join-item btn btn-sm btn-primary gap-1" id="btnMonthly" onclick="switchView('monthly')">
+    <span class="material-symbols-outlined text-base">calendar_view_month</span>Monthly
+  </button>
+  <button type="button" class="join-item btn btn-sm btn-ghost gap-1" id="btnYearly" onclick="switchView('yearly')">
+    <span class="material-symbols-outlined text-base">bar_chart</span>Yearly
+  </button>
+</div>
+
+{# ——— MONTHLY VIEW ——— #}
+<div id="monthlyView">
+
+{# Charts #}
+<div class="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4 animate-up">
+  <div class="card bg-base-200 shadow-sm card-hover lg:col-span-3">
+    <div class="card-body p-4">
+      <h2 class="card-title text-base">Monthly Growth Breakdown</h2>
+      <div class="chart-wrap"><canvas id="growthBar"></canvas></div>
+    </div>
+  </div>
+  <div class="card bg-base-200 shadow-sm card-hover lg:col-span-2">
+    <div class="card-body p-4">
+      <h2 class="card-title text-base">Portfolio Value</h2>
+      <div class="chart-wrap"><canvas id="valueChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+{# Monthly table #}
+<div class="card bg-base-200 shadow-sm card-hover animate-up mb-4" style="animation-delay:0.1s">
+  <div class="card-body p-4">
+    <h2 class="card-title text-base mb-2">Monthly Snapshots</h2>
+    {# Desktop table #}
+    <div class="hidden md:block overflow-x-auto">
+      <table class="table table-sm hover">
+        <thead>
+          <tr>
+            <th>Month</th>
+            <th class="text-right">Total Value</th>
+            <th class="text-right">Invested</th>
+            <th class="text-right">Returns</th>
+            <th class="text-right">Money Added</th>
+            <th class="text-right">Returns Gained</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for m in months %}
+        <tr{% if not m.snapshot %} class="opacity-40"{% endif %}>
+          <td class="font-bold">{{ m.name }}</td>
+          <td class="text-right font-bold">
+            {% if m.snapshot %}₹{{ m.total_value|floatformat:0|indian_number }}{% else %}—{% endif %}
+          </td>
+          <td class="text-right">
+            {% if m.snapshot %}₹{{ m.invested|floatformat:0|indian_number }}{% else %}—{% endif %}
+          </td>
+          <td class="text-right">
+            {% if m.snapshot %}
+              <span class="{% if m.returns >= 0 %}text-success{% else %}text-error{% endif %}">
+                {% if m.returns >= 0 %}+{% endif %}₹{{ m.returns|floatformat:0|indian_number }}
+              </span>
+            {% else %}—{% endif %}
+          </td>
+          <td class="text-right whitespace-nowrap">
+            {% if m.snapshot and m.money_added %}
+              <span class="text-success">+₹{{ m.money_added|floatformat:0|indian_number }}</span>
+            {% elif m.snapshot %}<span class="opacity-40">₹0</span>{% else %}—{% endif %}
+          </td>
+          <td class="text-right whitespace-nowrap">
+            {% if m.snapshot %}
+              <span class="{% if m.returns_gained >= 0 %}text-success{% else %}text-error{% endif %}">
+                {% if m.returns_gained >= 0 %}+{% endif %}₹{{ m.returns_gained|floatformat:0|indian_number }}
+              </span>
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {# Mobile card view #}
+    <div class="md:hidden space-y-2">
+      {% for m in months %}
+      <div class="table-card {% if not m.snapshot %}opacity-40{% endif %}">
+        <div class="flex items-center justify-between gap-2">
+          <span class="font-bold text-sm">{{ m.name }}</span>
+          <span class="font-bold text-sm">{% if m.snapshot %}₹{{ m.total_value|floatformat:0|indian_number }}{% else %}—{% endif %}</span>
+        </div>
+        {% if m.snapshot %}
+        <div class="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-xs">
+          <div class="flex justify-between"><span class="opacity-50">Added</span><span class="text-success font-semibold">{% if m.money_added %}+₹{{ m.money_added|floatformat:0|indian_number }}{% else %}₹0{% endif %}</span></div>
+          <div class="flex justify-between"><span class="opacity-50">Returns</span><span class="{% if m.returns_gained >= 0 %}text-success{% else %}text-error{% endif %} font-semibold">{% if m.returns_gained >= 0 %}+{% endif %}₹{{ m.returns_gained|floatformat:0|indian_number }}</span></div>
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+</div>{# /monthlyView #}
+
+{# ——— YEARLY VIEW ——— #}
+<div id="yearlyView" class="hidden">
+
+<div class="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4 animate-up">
+  <div class="card bg-base-200 shadow-sm card-hover lg:col-span-3">
+    <div class="card-body p-4">
+      <h2 class="card-title text-base">Yearly Growth Breakdown</h2>
+      <div class="chart-wrap"><canvas id="yearlyBar"></canvas></div>
+    </div>
+  </div>
+  <div class="card bg-base-200 shadow-sm card-hover lg:col-span-2">
+    <div class="card-body p-4">
+      <h2 class="card-title text-base">Portfolio Value (Year-End)</h2>
+      <div class="chart-wrap"><canvas id="yearlyValueChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<div class="card bg-base-200 shadow-sm card-hover animate-up mb-4" style="animation-delay:0.1s">
+  <div class="card-body p-4">
+    <h2 class="card-title text-base mb-2">Yearly Summary</h2>
+    {# Desktop table #}
+    <div class="hidden md:block overflow-x-auto">
+      <table class="table table-sm hover">
+        <thead>
+          <tr>
+            <th>Financial Year</th>
+            <th class="text-right">Total Value</th>
+            <th class="text-right">Invested</th>
+            <th class="text-right">Returns</th>
+            <th class="text-right">Money Added</th>
+            <th class="text-right">Returns Gained</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for y in yearly %}
+        <tr>
+          <td class="font-bold">{{ y.label }}</td>
+          <td class="text-right font-bold">₹{{ y.total_value|floatformat:0|indian_number }}</td>
+          <td class="text-right">₹{{ y.invested|floatformat:0|indian_number }}</td>
+          <td class="text-right">
+            <span class="{% if y.returns >= 0 %}text-success{% else %}text-error{% endif %}">
+              {% if y.returns >= 0 %}+{% endif %}₹{{ y.returns|floatformat:0|indian_number }}
+            </span>
+          </td>
+          <td class="text-right whitespace-nowrap">
+            <span class="text-success">+₹{{ y.money_added|floatformat:0|indian_number }}</span>
+          </td>
+          <td class="text-right whitespace-nowrap">
+            <span class="{% if y.returns_gained >= 0 %}text-success{% else %}text-error{% endif %}">
+              {% if y.returns_gained >= 0 %}+{% endif %}₹{{ y.returns_gained|floatformat:0|indian_number }}
+            </span>
+          </td>
+        </tr>
+        {% endfor %}
+        {% if not yearly %}
+        <tr><td colspan="6" class="text-center opacity-60 py-4">No yearly data yet. Snapshots will accumulate over time.</td></tr>
+        {% endif %}
+        </tbody>
+      </table>
+    </div>
+    {# Mobile card view #}
+    <div class="md:hidden space-y-2">
+      {% for y in yearly %}
+      <div class="table-card">
+        <div class="flex items-center justify-between gap-2">
+          <span class="font-bold text-sm">{{ y.label }}</span>
+          <span class="font-bold text-sm">₹{{ y.total_value|floatformat:0|indian_number }}</span>
+        </div>
+        <div class="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-xs">
+          <div class="flex justify-between"><span class="opacity-50">Added</span><span class="text-success font-semibold">+₹{{ y.money_added|floatformat:0|indian_number }}</span></div>
+          <div class="flex justify-between"><span class="opacity-50">Returns</span><span class="{% if y.returns_gained >= 0 %}text-success{% else %}text-error{% endif %} font-semibold">{% if y.returns_gained >= 0 %}+{% endif %}₹{{ y.returns_gained|floatformat:0|indian_number }}</span></div>
+        </div>
+      </div>
+      {% endfor %}
+      {% if not yearly %}
+      <p class="text-center opacity-60 py-4 text-sm">No yearly data yet.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+</div>{# /yearlyView #}
+
+{{ growth_chart_data|json_script:"growth-data" }}
+{% endblock %}
+
+{% block chart_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  var cd = JSON.parse(document.getElementById('growth-data').textContent);
+  var tip = {
+    backgroundColor:'rgba(10,10,20,0.95)',borderColor:'rgba(255,255,255,0.08)',borderWidth:1,
+    titleColor:'#e2e2f0',bodyColor:'#8888aa',padding:10,
+    callbacks:{label:function(c){return ' \u20b9'+c.raw.toLocaleString('en-IN');}}
+  };
+  var scaleOpts = {
+    x:{grid:{display:false},ticks:{color:'#55556a'},border:{display:false}},
+    y:{grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'#55556a',callback:function(v){return v>=1e7?'\u20b9'+(v/1e7).toFixed(1)+'Cr':v>=1e5?'\u20b9'+(v/1e5).toFixed(1)+'L':'\u20b9'+v.toLocaleString('en-IN');}},border:{display:false}}
+  };
+  var legOpts = {labels:{color:'#8888aa',usePointStyle:true,boxWidth:6,padding:16}};
+
+  new Chart(document.getElementById('growthBar'),{
+    type:'bar',
+    data:{labels:cd.months,datasets:[
+      {label:'  Money Added',data:cd.money_added,backgroundColor:'rgba(124,158,248,0.5)',borderColor:'#7c9ef8',borderWidth:1.5,borderRadius:6,borderSkipped:false},
+      {label:'  Returns',data:cd.returns_gained,backgroundColor:cd.returns_gained.map(function(v){return v>=0?'rgba(105,240,174,0.5)':'rgba(255,92,138,0.4)';}),borderColor:cd.returns_gained.map(function(v){return v>=0?'#69f0ae':'#ff5c8a';}),borderWidth:1.5,borderRadius:6,borderSkipped:false}
+    ]},
+    options:{animation:{duration:900},responsive:true,maintainAspectRatio:false,
+      plugins:{legend:legOpts,tooltip:tip},
+      scales:{...scaleOpts,x:{...scaleOpts.x,stacked:true},y:{...scaleOpts.y,stacked:true}}}
+  });
+
+  new Chart(document.getElementById('valueChart'),{
+    type:'line',
+    data:{labels:cd.months,datasets:[{
+      label:'  Portfolio Value',data:cd.values,
+      borderColor:'#7c9ef8',backgroundColor:'rgba(124,158,248,0.07)',
+      borderWidth:2,pointRadius:3,pointBackgroundColor:'#7c9ef8',
+      pointBorderColor:'#0a0a14',pointBorderWidth:2,tension:0.35,fill:true
+    }]},
+    options:{animation:{duration:1100},responsive:true,maintainAspectRatio:false,
+      plugins:{legend:legOpts,tooltip:tip},
+      scales:scaleOpts}
+  });
+
+  if (cd.yearly_labels.length) {
+    new Chart(document.getElementById('yearlyBar'),{
+      type:'bar',
+      data:{labels:cd.yearly_labels,datasets:[
+        {label:'  Money Added',data:cd.yearly_added,backgroundColor:'rgba(124,158,248,0.5)',borderColor:'#7c9ef8',borderWidth:1.5,borderRadius:6,borderSkipped:false},
+        {label:'  Returns',data:cd.yearly_returns,backgroundColor:cd.yearly_returns.map(function(v){return v>=0?'rgba(105,240,174,0.5)':'rgba(255,92,138,0.4)';}),borderColor:cd.yearly_returns.map(function(v){return v>=0?'#69f0ae':'#ff5c8a';}),borderWidth:1.5,borderRadius:6,borderSkipped:false}
+      ]},
+      options:{animation:{duration:900},responsive:true,maintainAspectRatio:false,
+        plugins:{legend:legOpts,tooltip:tip},
+        scales:{...scaleOpts,x:{...scaleOpts.x,stacked:true},y:{...scaleOpts.y,stacked:true}}}
+    });
+
+    new Chart(document.getElementById('yearlyValueChart'),{
+      type:'line',
+      data:{labels:cd.yearly_labels,datasets:[{
+        label:'  Portfolio Value',data:cd.yearly_values,
+        borderColor:'#7c9ef8',backgroundColor:'rgba(124,158,248,0.07)',
+        borderWidth:2,pointRadius:4,pointBackgroundColor:'#7c9ef8',
+        pointBorderColor:'#0a0a14',pointBorderWidth:2,tension:0.35,fill:true
+      }]},
+      options:{animation:{duration:1100},responsive:true,maintainAspectRatio:false,
+        plugins:{legend:legOpts,tooltip:tip},
+        scales:scaleOpts}
+    });
+  }
+
+  var activeFy = document.querySelector('#fySwitcher .fy-tab-active');
+  if (activeFy) activeFy.scrollIntoView({behavior:'instant',inline:'center',block:'nearest'});
+});
+
+function switchView(view) {
+  var monthly = document.getElementById('monthlyView');
+  var yearly = document.getElementById('yearlyView');
+  var btnM = document.getElementById('btnMonthly');
+  var btnY = document.getElementById('btnYearly');
+  if (view === 'yearly') {
+    monthly.classList.add('hidden');
+    yearly.classList.remove('hidden');
+    btnM.classList.remove('btn-primary');
+    btnM.classList.add('btn-ghost');
+    btnY.classList.remove('btn-ghost');
+    btnY.classList.add('btn-primary');
+  } else {
+    monthly.classList.remove('hidden');
+    yearly.classList.add('hidden');
+    btnM.classList.remove('btn-ghost');
+    btnM.classList.add('btn-primary');
+    btnY.classList.remove('btn-primary');
+    btnY.classList.add('btn-ghost');
+  }
+}
+</script>
+{% endblock %}

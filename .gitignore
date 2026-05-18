@@ -1,0 +1,26 @@
+# Secrets & credentials
+credentials/
+.env
+.credentials
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Django
+db.sqlite3
+staticfiles/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
