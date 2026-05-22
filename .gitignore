@@ -30,3 +30,16 @@ staticfiles/
 # OS
 .DS_Store
 Thumbs.db
+
+# Docker local volumes (docker compose up creates these)
+postgres-data/
+pgadmin-data/
+.docker-data/
+docker-compose.override.yml
+
+# Logs
+*.log
+logs/
+
+# Node (if any tooling added later)
+node_modules/

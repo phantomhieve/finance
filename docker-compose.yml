@@ -1,0 +1,47 @@
+# Local development stack — mirrors production PostgreSQL.
+# Secrets are loaded from .env (gitignored) — never hardcode credentials here.
+#
+# Usage:
+#   docker compose up -d          # start Postgres + pgAdmin
+#   docker compose down           # stop (data persisted in postgres-data/)
+#   docker compose down -v        # stop AND wipe the DB volume
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: vault_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-vault_db}
+      POSTGRES_USER: ${POSTGRES_USER:-vault_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-vault_user} -d ${POSTGRES_DB:-vault_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: vault_pgadmin
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@vault.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+
+volumes:
+  postgres-data:
+  pgadmin-data:
