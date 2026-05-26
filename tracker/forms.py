@@ -258,7 +258,11 @@ class NoteForm(forms.ModelForm):
                 self.add_error('initial_amount', 'Initial Amount cannot be negative.')
                 
             if pending_amount is None:
-                self.add_error('pending_amount', 'Remaining Pending amount is required for Pending notes.')
+                if initial_amount is not None and initial_amount >= 0:
+                    pending_amount = initial_amount
+                    cleaned_data['pending_amount'] = initial_amount
+                else:
+                    self.add_error('pending_amount', 'Remaining Pending amount is required for Pending notes.')
             elif pending_amount < 0:
                 self.add_error('pending_amount', 'Remaining Pending amount cannot be negative.')
             elif initial_amount is not None and pending_amount > initial_amount:
