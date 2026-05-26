@@ -1,5 +1,5 @@
 from django import forms
-from .models import Transaction, GoalIncrement, FinancialGoal, HRAExpense, MonthlyGoalAdjustment
+from .models import Transaction, GoalIncrement, FinancialGoal, HRAExpense, MonthlyGoalAdjustment, Note
 
 ENTRY_TYPE_CHOICES = Transaction.TRANSACTION_TYPE_CHOICES
 
@@ -158,3 +158,109 @@ class HRAExpenseForm(forms.ModelForm):
         if commit:
             instance.save()
         return instance
+
+
+class NoteForm(forms.ModelForm):
+    """Form for creating / editing a personal note."""
+
+    SECTION_CHOICES = [
+        ('General', 'General'),
+        ('Tax', 'Tax'),
+        ('Reminder', 'Reminder'),
+        ('Pending', 'Pending'),
+    ]
+    section = forms.ChoiceField(
+        choices=SECTION_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-select', 'id': 'id_note_section'}),
+        initial='General',
+        label='Type',
+    )
+
+    pending_type = forms.ChoiceField(
+        choices=[('', 'Select Type'), ('CREDIT', 'To Receive'), ('DEBIT', 'To Pay')],
+        widget=forms.Select(attrs={'class': 'form-select', 'id': 'id_note_pending_type'}),
+        required=False,
+        label='Direction',
+    )
+
+    class Meta:
+        model = Note
+        fields = ['date', 'section', 'title', 'body', 'amount', 'pending_type', 'initial_amount', 'pending_amount']
+        widgets = {
+            'date': forms.DateInput(
+                attrs={'type': 'date', 'class': 'form-control', 'required': True, 'id': 'id_note_date'},
+            ),
+            'title': forms.TextInput(
+                attrs={
+                    'class': 'form-control',
+                    'placeholder': 'Short title…',
+                    'required': True,
+                    'id': 'id_note_title',
+                },
+            ),
+            'body': forms.Textarea(
+                attrs={
+                    'class': 'form-control',
+                    'placeholder': 'Details, thoughts, reminders…',
+                    'rows': 4,
+                    'id': 'id_note_body',
+                },
+            ),
+            'amount': forms.NumberInput(
+                attrs={
+                    'class': 'form-control',
+                    'placeholder': 'Optional amount (₹)',
+                    'step': '0.01',
+                    'min': '0',
+                    'id': 'id_note_amount',
+                },
+            ),
+            'initial_amount': forms.NumberInput(
+                attrs={
+                    'class': 'form-control',
+                    'placeholder': 'Initial amount (₹)',
+                    'step': '0.01',
+                    'min': '0',
+                    'id': 'id_note_initial_amount',
+                },
+            ),
+            'pending_amount': forms.NumberInput(
+                attrs={
+                    'class': 'form-control',
+                    'placeholder': 'Remaining (₹)',
+                    'step': '0.01',
+                    'min': '0',
+                    'id': 'id_note_pending_amount',
+                },
+            ),
+        }
+        labels = {
+            'title': 'Title',
+            'body': 'Note',
+            'amount': 'Amount (₹) — optional',
+            'initial_amount': 'Initial Amount (₹)',
+            'pending_amount': 'Remaining Pending (₹)',
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        section = cleaned_data.get('section')
+        if section == 'Pending':
+            pending_type = cleaned_data.get('pending_type')
+            initial_amount = cleaned_data.get('initial_amount')
+            pending_amount = cleaned_data.get('pending_amount')
+            
+            if not pending_type:
+                self.add_error('pending_type', 'Direction (To Receive / To Pay) is required for Pending notes.')
+            if initial_amount is None:
+                self.add_error('initial_amount', 'Initial Amount is required for Pending notes.')
+            elif initial_amount < 0:
+                self.add_error('initial_amount', 'Initial Amount cannot be negative.')
+                
+            if pending_amount is None:
+                self.add_error('pending_amount', 'Remaining Pending amount is required for Pending notes.')
+            elif pending_amount < 0:
+                self.add_error('pending_amount', 'Remaining Pending amount cannot be negative.')
+            elif initial_amount is not None and pending_amount > initial_amount:
+                self.add_error('pending_amount', 'Remaining Pending amount cannot exceed the Initial Amount.')
+        return cleaned_data
