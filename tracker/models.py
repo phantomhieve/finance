@@ -269,7 +269,7 @@ class Note(models.Model):
         ]
 
     def save(self, *args, **kwargs):
-        if self.date and self.financial_year is None:
+        if self.date:
             self.financial_year = self.date.year if self.date.month >= 4 else self.date.year - 1
         super().save(*args, **kwargs)
 

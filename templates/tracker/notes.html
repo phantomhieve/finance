@@ -380,11 +380,20 @@ function openNoteModal() {
   var form = document.getElementById('noteForm');
   form.action = "{% url 'add_note' %}";
   form.reset();
-  // Set today's date
-  var today = new Date().toISOString().split('T')[0];
+  
+  // Set default date based on active financial year
+  var defaultDate = '';
+  {% if active_fy and active_fy != current_fy %}
+    // If browsing an older financial year, default to the start of that financial year (1st April)
+    defaultDate = '{{ active_fy }}-04-01';
+  {% else %}
+    // Otherwise, default to today's date
+    defaultDate = new Date().toISOString().split('T')[0];
+  {% endif %}
+
   var dateEl = form.querySelector('[name="date"]');
   if (dateEl) {
-    dateEl.value = today;
+    dateEl.value = defaultDate;
   }
   
   // Hide pending fields
