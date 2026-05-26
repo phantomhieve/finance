@@ -15,13 +15,14 @@ from django.views.decorators.http import require_POST
 
 from pftracker.utils import safe_redirect
 
-from .models import Transaction, HRAExpense, FinancialGoal, GoalIncrement, MonthlyGoalAdjustment
+from .models import Transaction, HRAExpense, FinancialGoal, GoalIncrement, MonthlyGoalAdjustment, Note
 from .forms import (
     TransactionForm,
     GoalIncrementForm,
     FinancialGoalForm,
     MonthlyGoalAdjustmentForm,
     HRAExpenseForm,
+    NoteForm,
 )
 from .services import (
     MONTH_ORDER,
@@ -90,11 +91,14 @@ def _fy_context(request):
         for y, m in dates:
             fy_years.add(y if m >= 4 else y - 1)
 
-    if not fy_years:
-        fy_years.add(current_fy)
+    # Ensure the current financial year is always included as a base option.
+    fy_years.add(current_fy)
 
+    min_fy = min(fy_years)
     max_fy = max(fy_years)
-    fy_years.add(max_fy + 1)  # one extra FY on the right to plan ahead
+    # Fill in any gaps continuously, and add one future year for planning
+    for y in range(min_fy, max_fy + 2):
+        fy_years.add(y)
 
     return {
         'today': today,
@@ -716,6 +720,117 @@ def server_metrics(request):
             'response_ms': web_ms,
         },
     })
+
+
+# ---------------------------------------------------------------------------
+# Notes (all authenticated users, own notes only)
+# ---------------------------------------------------------------------------
+
+@login_required
+def notes_list(request):
+    """Display all notes for the current user, with section and FY filter."""
+    fc = _fy_context(request)
+    today = fc['today']
+    current_fy = fc['current_fy']
+
+    section_filter = request.GET.get('section', '')
+    fy_filter = request.GET.get('fy', '')
+
+    notes_qs = Note.objects.filter(user=request.user)
+    if section_filter:
+        notes_qs = notes_qs.filter(section=section_filter)
+
+    # Filter by financial year. If 'fy' is not provided, default to current FY.
+    active_fy = None
+    if fy_filter == 'all':
+        pass
+    elif fy_filter:
+        try:
+            active_fy = int(fy_filter)
+            notes_qs = notes_qs.filter(financial_year=active_fy)
+        except ValueError:
+            pass
+    else:
+        active_fy = current_fy
+        notes_qs = notes_qs.filter(financial_year=active_fy)
+
+    # All unique sections this user has used (for the filter pills + datalist)
+    all_sections = (
+        Note.objects.filter(user=request.user)
+        .exclude(section='')
+        .values_list('section', flat=True)
+        .distinct()
+        .order_by('section')
+    )
+
+    # Re-use the exact same FY options from dashboard context
+    fy_options = [{'year': y, 'label': f"{y}-{y+1}"} for y in fc['fy_options']]
+
+    note_form = NoteForm(initial={'date': today, 'financial_year': current_fy})
+
+    # Calculate progress for Pending notes
+    for note in notes_qs:
+        if note.section == 'Pending' and note.initial_amount and note.pending_amount:
+            try:
+                initial = float(note.initial_amount)
+                pending = float(note.pending_amount)
+                if initial > 0:
+                    note.settled_pct = max(0, min(100, int((initial - pending) / initial * 100)))
+                else:
+                    note.settled_pct = 0
+            except Exception:
+                note.settled_pct = 0
+        else:
+            note.settled_pct = None
+
+    context = {
+        'notes': notes_qs,
+        'note_form': note_form,
+        'all_sections': list(all_sections),
+        'active_section': section_filter,
+        'fy_options': fy_options,
+        'active_fy': active_fy,
+        'today': today,
+        'current_fy': current_fy,
+    }
+    return render(request, 'tracker/notes.html', context)
+
+
+@login_required
+@require_POST
+def add_note(request):
+    form = NoteForm(request.POST)
+    if form.is_valid():
+        note = form.save(commit=False)
+        note.user = request.user
+        note.save()
+        messages.success(request, f'Note "{note.title}" saved.')
+    else:
+        messages.error(request, 'Could not save note. Please check the fields.')
+    return safe_redirect(request, 'notes_list')
+
+
+@login_required
+@require_POST
+def edit_note(request, pk):
+    note = get_object_or_404(Note, pk=pk, user=request.user)
+    form = NoteForm(request.POST, instance=note)
+    if form.is_valid():
+        form.save()
+        messages.success(request, f'Note "{note.title}" updated.')
+    else:
+        messages.error(request, 'Could not update note.')
+    return safe_redirect(request, 'notes_list')
+
+
+@login_required
+@require_POST
+def delete_note(request, pk):
+    note = get_object_or_404(Note, pk=pk, user=request.user)
+    title = note.title
+    note.delete()
+    messages.success(request, f'Note "{title}" deleted.')
+    return safe_redirect(request, 'notes_list')
 
 
 # ---------------------------------------------------------------------------

@@ -102,6 +102,12 @@
         <span class="sidebar-label">HRA &amp; Rent</span>
       </a>
     </div>
+    <div class="tooltip tooltip-right sidebar-tip" data-tip="Notes">
+      <a href="{% url 'notes_list' %}" class="sidebar-link {% if request.resolver_match.url_name == 'notes_list' %}sidebar-active{% endif %}">
+        <span class="icon-filled material-symbols-outlined text-lg text-violet-400 flex-shrink-0">sticky_note_2</span>
+        <span class="sidebar-label">Notes</span>
+      </a>
+    </div>
     {% if user.is_superuser %}
     <p class="sidebar-section-title sidebar-label mt-5">Admin</p>
     <div class="tooltip tooltip-right sidebar-tip" data-tip="Server Monitor">
@@ -211,6 +217,10 @@
   <a href="{% url 'hra_tracker' %}" {% if request.resolver_match.url_name == 'hra_tracker' %}class="dock-active"{% endif %}>
     <span class="icon-filled material-symbols-outlined text-xl">home_work</span>
     <span class="dock-label">HRA</span>
+  </a>
+  <a href="{% url 'notes_list' %}" {% if request.resolver_match.url_name == 'notes_list' %}class="dock-active"{% endif %}>
+    <span class="icon-filled material-symbols-outlined text-xl">sticky_note_2</span>
+    <span class="dock-label">Notes</span>
   </a>
   {% if user.is_staff %}
   <a href="/vault-manage/" {% if 'admin' in request.path %}class="dock-active"{% endif %}>

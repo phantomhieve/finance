@@ -15,6 +15,13 @@ urlpatterns = [
     path('hra/add/', views.add_hra_entry, name='add_hra_entry'),
     path('hra/edit/<int:pk>/', views.edit_hra_entry, name='edit_hra_entry'),
     path('hra/delete/<int:pk>/', views.delete_hra_entry, name='delete_hra_entry'),
+
+    # Notes
+    path('notes/', views.notes_list, name='notes_list'),
+    path('notes/add/', views.add_note, name='add_note'),
+    path('notes/edit/<int:pk>/', views.edit_note, name='edit_note'),
+    path('notes/delete/<int:pk>/', views.delete_note, name='delete_note'),
+
     path('goals/increment/', views.add_goal_increment, name='add_goal_increment'),
     path('goals/increment/delete/<int:inc_id>/', views.delete_goal_increment, name='delete_goal_increment'),
     path('goals/adjustment/', views.add_goal_adjustment, name='add_goal_adjustment'),

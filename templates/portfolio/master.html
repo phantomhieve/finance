@@ -198,41 +198,54 @@
 </div>
 
 {# ——— ASSET BREAKDOWN + ALLOCATION ——— #}
-<div class="grid grid-cols-1 lg:grid-cols-5 gap-4 animate-up mb-4" style="animation-delay:0.1s">
-  <div class="card bg-base-200 shadow-sm lg:col-span-3 card-hover">
-    <div class="card-body p-4">
-      <h2 class="card-title text-base mb-2">Portfolio Breakdown</h2>
-      <div class="hidden md:block overflow-x-auto"><table class="table table-sm">
-        <thead><tr><th></th><th>Asset Class</th><th class="text-right">Value</th><th class="text-right">Allocation</th></tr></thead>
-        <tbody>
-        {% for a in assets %}
-        <tr class="hover"><td><span class="material-symbols-outlined text-base opacity-50">{{ a.icon }}</span></td><td class="font-semibold">{{ a.name }}</td><td class="text-right font-semibold">₹{{ a.value|floatformat:0|indian_number }}</td><td class="text-right"><span class="badge badge-ghost badge-sm">{{ a.pct }}%</span></td></tr>
-        {% endfor %}
-        <tr class="border-t-2 border-base-300"><td></td><td class="font-bold text-primary">Total</td><td class="text-right font-bold text-primary">₹{{ total_value|floatformat:0|indian_number }}</td><td class="text-right"><span class="badge badge-primary badge-sm">100%</span></td></tr>
-        </tbody>
-      </table></div>
-      <div class="md:hidden">
-        {% for a in assets %}
-        <div class="flex items-center gap-3 py-2.5">
-          <span class="material-symbols-outlined text-lg opacity-30">{{ a.icon }}</span>
-          <span class="flex-1 font-medium text-sm">{{ a.name }}</span>
-          <span class="text-sm tabular-nums opacity-80">₹{{ a.value|floatformat:0|indian_number }}</span>
-          <span class="text-xs tabular-nums opacity-40 w-11 text-right">{{ a.pct }}%</span>
+<div class="collapse collapse-arrow bg-base-200 shadow-sm animate-up mb-4 rounded-2xl card-hover" style="animation-delay:0.1s">
+  <input type="checkbox" id="breakdownCollapseToggle" />
+  <div class="collapse-title p-4 pr-12 min-h-0 flex items-center">
+    <h2 class="card-title text-base m-0">Portfolio Breakdown &amp; Allocation</h2>
+  </div>
+  <div class="collapse-content px-4 pb-4">
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 mt-2">
+      <!-- Breakdown Table (lg:col-span-3) -->
+      <div class="card bg-base-300/40 shadow-sm lg:col-span-3">
+        <div class="card-body p-4">
+          <h3 class="card-title text-sm mb-2 opacity-70">Asset Class Details</h3>
+          <div class="hidden md:block overflow-x-auto"><table class="table table-sm">
+            <thead><tr><th></th><th>Asset Class</th><th class="text-right">Value</th><th class="text-right">Allocation</th></tr></thead>
+            <tbody>
+            {% for a in assets %}
+            <tr class="hover"><td><span class="material-symbols-outlined text-base opacity-50">{{ a.icon }}</span></td><td class="font-semibold">{{ a.name }}</td><td class="text-right font-semibold">₹{{ a.value|floatformat:0|indian_number }}</td><td class="text-right"><span class="badge badge-ghost badge-sm">{{ a.pct }}%</span></td></tr>
+            {% endfor %}
+            <tr class="border-t-2 border-base-300"><td></td><td class="font-bold text-primary">Total</td><td class="text-right font-bold text-primary">₹{{ total_value|floatformat:0|indian_number }}</td><td class="text-right"><span class="badge badge-primary badge-sm">100%</span></td></tr>
+            </tbody>
+          </table></div>
+          <div class="md:hidden">
+            {% for a in assets %}
+            <div class="flex items-center gap-3 py-2.5">
+              <span class="material-symbols-outlined text-lg opacity-30">{{ a.icon }}</span>
+              <span class="flex-1 font-medium text-sm">{{ a.name }}</span>
+              <span class="text-sm tabular-nums opacity-80">₹{{ a.value|floatformat:0|indian_number }}</span>
+              <span class="text-xs tabular-nums opacity-40 w-11 text-right">{{ a.pct }}%</span>
+            </div>
+            {% if not forloop.last %}<div class="divider-fade"></div>{% endif %}
+            {% endfor %}
+            <div class="divider-fade"></div>
+            <div class="flex items-center gap-3 pt-2.5">
+              <span class="material-symbols-outlined text-lg opacity-0">add</span>
+              <span class="flex-1 font-bold text-sm text-primary">Total</span>
+              <span class="text-sm font-bold text-primary tabular-nums">₹{{ total_value|floatformat:0|indian_number }}</span>
+              <span class="text-xs font-bold text-primary tabular-nums w-11 text-right">100%</span>
+            </div>
+          </div>
         </div>
-        {% if not forloop.last %}<div class="divider-fade"></div>{% endif %}
-        {% endfor %}
-        <div class="divider-fade"></div>
-        <div class="flex items-center gap-3 pt-2.5">
-          <span class="material-symbols-outlined text-lg opacity-0">add</span>
-          <span class="flex-1 font-bold text-sm text-primary">Total</span>
-          <span class="text-sm font-bold text-primary tabular-nums">₹{{ total_value|floatformat:0|indian_number }}</span>
-          <span class="text-xs font-bold text-primary tabular-nums w-11 text-right">100%</span>
+      </div>
+      <!-- Allocation Chart (lg:col-span-2) -->
+      <div class="card bg-base-300/40 shadow-sm lg:col-span-2">
+        <div class="card-body p-4">
+          <h3 class="card-title text-sm mb-2 opacity-70">Allocation Breakdown</h3>
+          <div class="chart-wrap" style="height:280px"><canvas id="allocationChart"></canvas></div>
         </div>
       </div>
     </div>
-  </div>
-  <div class="card bg-base-200 shadow-sm lg:col-span-2 card-hover">
-    <div class="card-body p-4"><h2 class="card-title text-base mb-2">Allocation</h2><div class="chart-wrap" style="height:280px"><canvas id="allocationChart"></canvas></div></div>
   </div>
 </div>
 
@@ -716,6 +729,18 @@ document.addEventListener('DOMContentLoaded', function() {
     data:{labels:cd.consolidated_labels,datasets:[{data:cd.consolidated_values,backgroundColor:consColors,borderWidth:0,hoverOffset:6}]},
     options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:legendOpts,tooltip:tip}}
   });
+
+  // Trigger chart resize on breakdown collapse change so the doughnut chart is perfectly sized when expanded
+  var breakdownCollapse = document.getElementById('breakdownCollapseToggle');
+  if (breakdownCollapse) {
+    breakdownCollapse.addEventListener('change', function() {
+      if (this.checked) {
+        setTimeout(function() {
+          window.dispatchEvent(new Event('resize'));
+        }, 250);
+      }
+    });
+  }
 });
 
 function openGoalModal() {
