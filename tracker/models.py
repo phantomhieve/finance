@@ -216,3 +216,64 @@ class MonthlyGoalAdjustment(models.Model):
             f"{self.user.username}: adj {self.adjustment_amount} "
             f"for {self.month.strftime('%b %Y')}"
         )
+
+
+class Note(models.Model):
+    """A personal note — user-scoped, with an optional section tag, amount, and financial year."""
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notes')
+    date = models.DateField()
+    financial_year = models.IntegerField(
+        null=True, blank=True,
+        help_text="Start year of the financial year (e.g. 2025 for FY 2025-26)",
+    )
+    section = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        help_text="Free-text section/tag, e.g. 'Savings', 'Tax', 'Goal'",
+    )
+    title = models.CharField(max_length=200)
+    body = models.TextField(blank=True, default='')
+    amount = models.DecimalField(
+        max_digits=14, decimal_places=2,
+        null=True, blank=True,
+        help_text='Optional linked amount (₹)',
+    )
+    
+    # Extra fields for Pending notes
+    pending_type = models.CharField(
+        max_length=10,
+        choices=[('CREDIT', 'To Receive'), ('DEBIT', 'To Pay')],
+        blank=True,
+        default='',
+    )
+    initial_amount = models.DecimalField(
+        max_digits=14, decimal_places=2,
+        null=True, blank=True,
+    )
+    pending_amount = models.DecimalField(
+        max_digits=14, decimal_places=2,
+        null=True, blank=True,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-date', '-created_at']
+        indexes = [
+            Index(fields=['user', '-date']),
+            Index(fields=['user', 'section']),
+            Index(fields=['user', 'financial_year']),
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.date and self.financial_year is None:
+            self.financial_year = self.date.year if self.date.month >= 4 else self.date.year - 1
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        section_str = f'[{self.section}] ' if self.section else ''
+        return f"{section_str}{self.title} ({self.date})"
+

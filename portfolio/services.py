@@ -497,11 +497,15 @@ def _sync_mf(acct, spreadsheet, range_name, fund_type):
 
 # ---------------------------------------------------------------------------
 # Commodity price refresh
-#   Primary: gold-api.com (free, no key, returns troy-ounce prices in INR)
-#   Fallback: goodreturns.in via cloudscraper
+#   Priority 1: goodreturns.in via cloudscraper (India city scrape - free, no key)
+#   Priority 2: gold-api.com (global spot, no key, troy-oz → gram conversion + India tax adjustment)
 # ---------------------------------------------------------------------------
 
 _TROY_OZ_TO_GRAMS = 31.1035
+
+# As of 2026, India effective import duty is 15% (10% BCD + 5% AIDC) plus 3% GST/IGST.
+# We apply a ~18.45% tax adjustment factor (1.1845) to convert global spot to local India retail price.
+_INDIA_COMMODITY_TAX_ADJUSTMENT = 1.1845
 
 _GOODRETURNS_CITY = getattr(settings, 'COMMODITY_CITY', 'jaipur')
 
@@ -525,14 +529,21 @@ _scraper = cloudscraper.create_scraper(browser={'browser': 'chrome', 'platform':
 
 def refresh_commodity_prices():
     """
-    Fetch latest gold (24K) and silver prices and persist.
-    Returns e.g. {'gold': 15981.0, 'silver': 275.0}.
+    Fetch latest gold (24K) and silver prices (per gram, INR) and persist.
+    Returns e.g. {'gold': 9850.0, 'silver': 105.0}.
+
+    Source priority:
+      1. goodreturns.in — India city-wise scrape (free, no key needed)
+      2. gold-api.com — global spot converted to INR (free, no key needed) + Indian tax adjustment (~18.45%)
     """
     today = datetime.date.today().isoformat()
     results = {}
 
     for ctype, cfg in _COMMODITY_CONFIG.items():
-        rate = _fetch_gold_api_rate(cfg) or _fetch_goodreturns_rate(cfg, today)
+        rate = (
+            _fetch_goodreturns_rate(cfg, today)
+            or _fetch_gold_api_rate(cfg)
+        )
         if rate:
             CommodityPrice.objects.update_or_create(
                 commodity_type=ctype,
@@ -544,7 +555,8 @@ def refresh_commodity_prices():
 
 
 def _fetch_gold_api_rate(cfg):
-    """Fetch price per gram in INR from api.gold-api.com (free, no key)."""
+    """Fetch price per gram in INR from api.gold-api.com (free, no key).
+    Uses global spot price (LBMA) and applies India customs duty & tax adjustment (~18.45%)."""
     symbol = cfg.get('gold_api_symbol')
     if not symbol:
         return None
@@ -560,9 +572,10 @@ def _fetch_gold_api_rate(cfg):
         price_per_oz = data.get('price')
         if not price_per_oz or price_per_oz <= 0:
             return None
-        rate = round(price_per_oz / _TROY_OZ_TO_GRAMS, 2)
-        logger.info("gold-api.com %s: ₹%.2f/gram", symbol, rate)
-        return rate
+        rate_global = price_per_oz / _TROY_OZ_TO_GRAMS
+        rate_india = round(rate_global * _INDIA_COMMODITY_TAX_ADJUSTMENT, 2)
+        logger.info("gold-api.com %s: ₹%.2f/gram (adjusted global spot)", symbol, rate_india)
+        return rate_india
     except Exception as e:
         logger.warning("gold-api.com %s fetch failed: %s", symbol, e)
         return None
