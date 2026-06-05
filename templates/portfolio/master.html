@@ -30,7 +30,32 @@
       <div tabindex="0" role="button" class="btn btn-ghost btn-sm btn-square">
         <span class="material-symbols-outlined">more_vert</span>
       </div>
-      <ul tabindex="0" class="dropdown-content menu bg-base-200 rounded-xl z-50 w-44 p-2 shadow-2xl mt-2">
+      <ul tabindex="0" class="dropdown-content menu bg-base-200 rounded-xl z-50 w-52 p-2 shadow-2xl mt-2">
+        <li class="menu-title text-[10px] font-bold tracking-wider uppercase opacity-40 px-3 py-1">Portfolio</li>
+        <li>
+          <a href="{% url 'portfolio_tracker' %}" class="flex items-center justify-between text-sm {% if not is_baby_view %}font-semibold text-primary bg-primary/10{% endif %}">
+            <span class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-sm">wallet</span>
+              Master Portfolio
+            </span>
+            {% if not is_baby_view %}
+              <span class="material-symbols-outlined text-sm text-primary">check</span>
+            {% endif %}
+          </a>
+        </li>
+        <li>
+          <a href="{% url 'baby_portfolio' %}" class="flex items-center justify-between text-sm {% if is_baby_view %}font-semibold text-primary bg-primary/10{% endif %}">
+            <span class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-sm">child_care</span>
+              Baby Portfolio
+            </span>
+            {% if is_baby_view %}
+              <span class="material-symbols-outlined text-sm text-primary">check</span>
+            {% endif %}
+          </a>
+        </li>
+        <div class="divider my-1"></div>
+        <li class="menu-title text-[10px] font-bold tracking-wider uppercase opacity-40 px-3 py-1">Actions</li>
         <li><form method="post" action="{% url 'sync_from_sheets' %}" class="m-0">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button type="submit" class="flex items-center gap-2 w-full text-left text-sm"><span class="material-symbols-outlined text-sm">sync</span>Sync</button></form></li>
         <li><form method="post" action="{% url 'refresh_prices' %}" class="m-0">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><button type="submit" class="flex items-center gap-2 w-full text-left text-sm"><span class="material-symbols-outlined text-sm">currency_exchange</span>Refresh</button></form></li>
         <li><form method="post" action="{% url 'generate_insights' %}" class="m-0">{% csrf_token %}<button type="submit" class="flex items-center gap-2 w-full text-left text-sm{% if not can_generate_insight %} opacity-50{% endif %}"{% if not can_generate_insight %} disabled{% endif %}{% if not can_generate_insight %}{% if insight_cooldown_days_hint %} title="Minimum {{ insight_cooldown_days_hint }} day(s) between runs"{% else %} title="Dev: no cooldown"{% endif %}{% endif %}><span class="material-symbols-outlined text-sm">auto_awesome</span>AI Insights</button></form></li>
@@ -42,6 +67,15 @@
 {% endblock %}
 
 {% block content %}
+
+<div class="hidden sm:inline-flex tabs tabs-boxed bg-base-300/50 p-1 rounded-lg mb-4">
+  <a href="{% url 'portfolio_tracker' %}" class="tab tab-sm sm:tab-md rounded-md transition-all {% if not is_baby_view %}tab-active font-semibold text-primary{% else %}opacity-70{% endif %}">
+    <span class="material-symbols-outlined text-sm mr-1">wallet</span> Master Portfolio
+  </a>
+  <a href="{% url 'baby_portfolio' %}" class="tab tab-sm sm:tab-md rounded-md transition-all {% if is_baby_view %}tab-active font-semibold text-primary{% else %}opacity-70{% endif %}">
+    <span class="material-symbols-outlined text-sm mr-1">child_care</span> Baby Portfolio
+  </a>
+</div>
 
 {# ——— PORTFOLIO HERO ——— #}
 <div class="card hero-gradient-portfolio shadow-sm animate-up mb-4 card-hover">
