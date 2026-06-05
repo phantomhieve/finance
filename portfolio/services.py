@@ -56,7 +56,7 @@ def _gf(model_qs, group):
     return model_qs.filter(group=group)
 
 
-def get_commodity_summary(group=None):
+def get_commodity_summary(group=None, is_baby=False):
     """Aggregate commodity holdings into gold/silver weights, values, and P&L."""
     prices = {p.commodity_type: p for p in CommodityPrice.objects.filter(
         commodity_type__in=('GOLD', 'SILVER'),
@@ -66,15 +66,15 @@ def get_commodity_summary(group=None):
     gold_rate = gold_price.rate_per_gram if gold_price else _ZERO
     silver_rate = silver_price.rate_per_gram if silver_price else _ZERO
 
-    gold_qs = _gf(CommodityHolding.objects.filter(commodity_type='GOLD'), group)
-    silver_qs = _gf(CommodityHolding.objects.filter(commodity_type='SILVER'), group)
+    gold_qs = _gf(CommodityHolding.objects.filter(commodity_type='GOLD', is_baby=is_baby), group)
+    silver_qs = _gf(CommodityHolding.objects.filter(commodity_type='SILVER', is_baby=is_baby), group)
     gold_weight = _sum_qs(gold_qs, 'weight_grams')
     silver_weight = _sum_qs(silver_qs, 'weight_grams')
     gold_value = (gold_weight * gold_rate).quantize(_ROUND2) if gold_rate else _ZERO
     silver_value = (silver_weight * silver_rate).quantize(_ROUND2) if silver_rate else _ZERO
     total = gold_value + silver_value
 
-    invested = _gf(CommodityHolding.objects, group).aggregate(
+    invested = _gf(CommodityHolding.objects.filter(is_baby=is_baby), group).aggregate(
         t=Sum(F('weight_grams') * F('purchase_price_per_gram'))
     )['t'] or _ZERO
 
@@ -93,14 +93,14 @@ def get_commodity_summary(group=None):
     }
 
 
-def _zerodha_account_sums(z_accounts):
+def _zerodha_account_sums(z_accounts, is_baby=False):
     """Batch-fetch per-account current/purchase sums for stocks and MFs (6 queries → dict)."""
     def _agg(qs, field):
         return dict(qs.values_list('account_id').annotate(t=Sum(field)))
 
-    stock_qs = StockHolding.objects.filter(account__in=z_accounts)
-    index_qs = MutualFundHolding.objects.filter(account__in=z_accounts, fund_type='INDEX')
-    other_qs = MutualFundHolding.objects.filter(account__in=z_accounts, fund_type='OTHER')
+    stock_qs = StockHolding.objects.filter(account__in=z_accounts, is_baby=is_baby)
+    index_qs = MutualFundHolding.objects.filter(account__in=z_accounts, fund_type='INDEX', is_baby=is_baby)
+    other_qs = MutualFundHolding.objects.filter(account__in=z_accounts, fund_type='OTHER', is_baby=is_baby)
 
     maps = {
         'stocks_cur': _agg(stock_qs, 'current_value'),
@@ -121,18 +121,18 @@ def _zerodha_account_sums(z_accounts):
 # Portfolio summary
 # ---------------------------------------------------------------------------
 
-def get_portfolio_summary(group=None):
+def get_portfolio_summary(group=None, is_baby=False):
     """Aggregate every asset class into a master portfolio summary dict, scoped to group."""
 
     acct_ids = ZerodhaAccount.objects.filter(group=group).values_list('id', flat=True) if group else None
     if acct_ids is not None:
-        stocks_qs = StockHolding.objects.filter(account_id__in=acct_ids)
-        index_mf_qs = MutualFundHolding.objects.filter(account_id__in=acct_ids, fund_type='INDEX')
-        other_mf_qs = MutualFundHolding.objects.filter(account_id__in=acct_ids, fund_type='OTHER')
+        stocks_qs = StockHolding.objects.filter(account_id__in=acct_ids, is_baby=is_baby)
+        index_mf_qs = MutualFundHolding.objects.filter(account_id__in=acct_ids, fund_type='INDEX', is_baby=is_baby)
+        other_mf_qs = MutualFundHolding.objects.filter(account_id__in=acct_ids, fund_type='OTHER', is_baby=is_baby)
     else:
-        stocks_qs = StockHolding.objects.all()
-        index_mf_qs = MutualFundHolding.objects.filter(fund_type='INDEX')
-        other_mf_qs = MutualFundHolding.objects.filter(fund_type='OTHER')
+        stocks_qs = StockHolding.objects.filter(is_baby=is_baby)
+        index_mf_qs = MutualFundHolding.objects.filter(fund_type='INDEX', is_baby=is_baby)
+        other_mf_qs = MutualFundHolding.objects.filter(fund_type='OTHER', is_baby=is_baby)
 
     all_stocks_purchased = _sum_qs(stocks_qs, 'purchase_value')
     all_stocks_current = _sum_qs(stocks_qs, 'current_value')
@@ -141,39 +141,48 @@ def get_portfolio_summary(group=None):
     other_purchased = _sum_qs(other_mf_qs, 'purchase_value')
     other_current = _sum_qs(other_mf_qs, 'current_value')
 
-    epf_agg = _gf(EPFEntry.objects, group).aggregate(
-        contrib=Sum(Case(When(entry_type='CONTRIBUTION', then='amount'))),
-        interest=Sum(Case(When(entry_type='INTEREST', then='amount'))),
-    )
-    epf_total_contrib = epf_agg['contrib'] or _ZERO
-    epf_total_interest = epf_agg['interest'] or _ZERO
-    epf_balance = epf_total_contrib + epf_total_interest
+    if not is_baby:
+        epf_agg = _gf(EPFEntry.objects, group).aggregate(
+            contrib=Sum(Case(When(entry_type='CONTRIBUTION', then='amount'))),
+            interest=Sum(Case(When(entry_type='INTEREST', then='amount'))),
+        )
+        epf_total_contrib = epf_agg['contrib'] or _ZERO
+        epf_total_interest = epf_agg['interest'] or _ZERO
+        epf_balance = epf_total_contrib + epf_total_interest
 
-    nps_qs = _gf(NPSEntry.objects, group)
-    nps_latest = nps_qs.order_by('-date', '-created_at').first()
-    nps_balance = nps_latest.total_balance if nps_latest else _ZERO
-    nps_agg = nps_qs.aggregate(
-        contrib=Sum('contribution'), interest=Sum('interest_earned'),
-    )
-    nps_total_contrib = nps_agg['contrib'] or _ZERO
-    nps_total_interest = nps_agg['interest'] or _ZERO
+        nps_qs = _gf(NPSEntry.objects, group)
+        nps_latest = nps_qs.order_by('-date', '-created_at').first()
+        nps_balance = nps_latest.total_balance if nps_latest else _ZERO
+        nps_agg = nps_qs.aggregate(
+            contrib=Sum('contribution'), interest=Sum('interest_earned'),
+        )
+        nps_total_contrib = nps_agg['contrib'] or _ZERO
+        nps_total_interest = nps_agg['interest'] or _ZERO
+    else:
+        epf_total_contrib = _ZERO
+        epf_total_interest = _ZERO
+        epf_balance = _ZERO
+        nps_latest = None
+        nps_balance = _ZERO
+        nps_total_contrib = _ZERO
+        nps_total_interest = _ZERO
 
-    active_fds = list(_gf(FixedDeposit.objects.filter(is_active=True), group))
+    active_fds = list(_gf(FixedDeposit.objects.filter(is_active=True, is_baby=is_baby), group))
     fd_principal = sum(fd.principal for fd in active_fds)
     fd_current = sum(fd.current_value for fd in active_fds)
 
-    cash_total = _sum_qs(_gf(CashPosition.objects, group).all(), 'amount')
-    bonds_total = _sum_qs(_gf(BondHolding.objects, group).all(), 'amount')
+    cash_total = _sum_qs(_gf(CashPosition.objects.filter(is_baby=is_baby), group).all(), 'amount')
+    bonds_total = _sum_qs(_gf(BondHolding.objects.filter(is_baby=is_baby), group).all(), 'amount')
 
-    crypto_qs = _gf(CryptoHolding.objects, group).all()
+    crypto_qs = _gf(CryptoHolding.objects.filter(is_baby=is_baby), group).all()
     crypto_invested = _sum_qs(crypto_qs, 'amount_invested')
     crypto_current = _sum_qs(crypto_qs, 'current_value')
 
-    us_stocks = list(_gf(USStockHolding.objects, group).all())
+    us_stocks = list(_gf(USStockHolding.objects.filter(is_baby=is_baby), group).all())
     us_stocks_invested = sum((h.purchase_value for h in us_stocks), _ZERO)
     us_stocks_current = sum((h.current_value for h in us_stocks), _ZERO)
 
-    comm = get_commodity_summary(group)
+    comm = get_commodity_summary(group, is_baby=is_baby)
     gold_rate = comm['gold_rate']
     silver_rate = comm['silver_rate']
     gold_weight = comm['gold_weight']
@@ -255,7 +264,7 @@ def get_portfolio_summary(group=None):
 
     # Zerodha account summaries (prefetch totals to avoid N+1)
     z_accounts = _gf(ZerodhaAccount.objects, group).all() if group else ZerodhaAccount.objects.all()
-    acct_sums = _zerodha_account_sums(z_accounts)
+    acct_sums = _zerodha_account_sums(z_accounts, is_baby=is_baby)
     accounts = []
     for acct in z_accounts:
         rec = acct_sums.get(acct.id, {})
@@ -296,23 +305,23 @@ def get_portfolio_summary(group=None):
         'active_fds': sorted(active_fds, key=lambda fd: fd.current_value, reverse=True),
         'fd_principal': fd_principal,
         'fd_current': fd_current,
-        'cash_positions': _gf(CashPosition.objects, group).order_by('-amount'),
+        'cash_positions': _gf(CashPosition.objects.filter(is_baby=is_baby), group).order_by('-amount'),
         'cash_total': cash_total,
-        'bonds': _gf(BondHolding.objects, group).order_by('-amount'),
+        'bonds': _gf(BondHolding.objects.filter(is_baby=is_baby), group).order_by('-amount'),
         'bonds_total': bonds_total,
-        'crypto_holdings': _gf(CryptoHolding.objects, group).order_by('-current_value'),
+        'crypto_holdings': _gf(CryptoHolding.objects.filter(is_baby=is_baby), group).order_by('-current_value'),
         'crypto_invested': crypto_invested,
         'crypto_current': crypto_current,
-        'gold_holdings': _gf(CommodityHolding.objects.filter(commodity_type='GOLD'), group),
-        'silver_holdings': _gf(CommodityHolding.objects.filter(commodity_type='SILVER'), group),
+        'gold_holdings': _gf(CommodityHolding.objects.filter(commodity_type='GOLD', is_baby=is_baby), group),
+        'silver_holdings': _gf(CommodityHolding.objects.filter(commodity_type='SILVER', is_baby=is_baby), group),
         **{k: comm[k] for k in (
             'gold_rate', 'silver_rate', 'gold_weight', 'silver_weight',
             'gold_value', 'silver_value', 'commodity_total',
             'commodity_invested', 'commodity_returns',
             'gold_price_obj', 'silver_price_obj',
         )},
-        'epf_entries': _gf(EPFEntry.objects, group).all()[:10],
-        'nps_entries': _gf(NPSEntry.objects, group).all()[:10],
+        'epf_entries': [] if is_baby else _gf(EPFEntry.objects, group).all()[:10],
+        'nps_entries': [] if is_baby else _gf(NPSEntry.objects, group).all()[:10],
         'us_stocks': us_stocks,
         'us_stocks_invested': us_stocks_invested,
         'us_stocks_current': us_stocks_current,
@@ -435,6 +444,7 @@ def _sync_stocks(acct, spreadsheet, range_name):
     if not rows:
         return 0
 
+    baby_symbols = set(StockHolding.objects.filter(account=acct, is_baby=True).values_list('symbol', flat=True))
     StockHolding.objects.filter(account=acct).delete()
     bulk = []
     for row in rows:
@@ -455,6 +465,7 @@ def _sync_stocks(acct, spreadsheet, range_name):
             account=acct, symbol=symbol, quantity=qty,
             purchase_value=_parse_inr(row[2]),
             current_value=_parse_inr(row[3]),
+            is_baby=symbol in baby_symbols
         ))
     if bulk:
         StockHolding.objects.bulk_create(bulk)
@@ -468,6 +479,7 @@ def _sync_mf(acct, spreadsheet, range_name, fund_type):
     if not rows:
         return 0
 
+    baby_funds = set(MutualFundHolding.objects.filter(account=acct, fund_type=fund_type, is_baby=True).values_list('fund_name', flat=True))
     MutualFundHolding.objects.filter(account=acct, fund_type=fund_type).delete()
     bulk = []
     for row in rows:
@@ -489,6 +501,7 @@ def _sync_mf(acct, spreadsheet, range_name, fund_type):
             units=units,
             purchase_value=_parse_inr(row[2]),
             current_value=_parse_inr(row[3]),
+            is_baby=fund_name in baby_funds
         ))
     if bulk:
         MutualFundHolding.objects.bulk_create(bulk)

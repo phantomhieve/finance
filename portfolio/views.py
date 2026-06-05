@@ -360,9 +360,10 @@ def master_portfolio(request):
 @_require_portfolio
 def zerodha_detail(request, slug):
     account = get_object_or_404(ZerodhaAccount, slug=slug, group=_user_group(request))
-    stocks = list(account.stock_holdings.all())
-    index_mf = list(account.mf_holdings.filter(fund_type='INDEX'))
-    other_mf = list(account.mf_holdings.filter(fund_type='OTHER'))
+    # Exclude holdings tracked in the Baby Portfolio — they belong there, not here
+    stocks = list(account.stock_holdings.filter(is_baby=False))
+    index_mf = list(account.mf_holdings.filter(fund_type='INDEX', is_baby=False))
+    other_mf = list(account.mf_holdings.filter(fund_type='OTHER', is_baby=False))
 
     s_purch, s_curr, s_pnl = _holding_totals(stocks)
     i_purch, i_curr, i_pnl = _holding_totals(index_mf)
@@ -408,6 +409,8 @@ def _merge_holdings(items, key_fn):
         g['purchase_value'] += item.purchase_value
         g['current_value'] += item.current_value
         g['entries'].append({
+            'id': item.id,
+            'is_baby': item.is_baby,
             'account': item.account.name,
             'quantity': getattr(item, 'quantity', 0),
             'units': str(getattr(item, 'units', _ZERO)),
@@ -434,9 +437,10 @@ def zerodha_consolidated(request):
     group_accounts = ZerodhaAccount.objects.filter(group=group)
     acct_ids = group_accounts.values_list('id', flat=True)
 
-    all_stocks = list(StockHolding.objects.select_related('account').filter(account_id__in=acct_ids))
-    all_index = list(MutualFundHolding.objects.select_related('account').filter(account_id__in=acct_ids, fund_type='INDEX'))
-    all_other = list(MutualFundHolding.objects.select_related('account').filter(account_id__in=acct_ids, fund_type='OTHER'))
+    # Exclude holdings tracked in the Baby Portfolio — they belong there, not here
+    all_stocks = list(StockHolding.objects.select_related('account').filter(account_id__in=acct_ids, is_baby=False))
+    all_index = list(MutualFundHolding.objects.select_related('account').filter(account_id__in=acct_ids, fund_type='INDEX', is_baby=False))
+    all_other = list(MutualFundHolding.objects.select_related('account').filter(account_id__in=acct_ids, fund_type='OTHER', is_baby=False))
     accounts = list(group_accounts)
 
     stocks = _merge_holdings(all_stocks, lambda s: s.symbol)
@@ -958,3 +962,85 @@ def webauthn_remove(request):
     except (ValueError, TypeError):
         return JsonResponse({'error': 'Invalid request.'}, status=400)
     return JsonResponse({'ok': True})
+
+
+@login_required
+@_require_portfolio
+def baby_portfolio(request):
+    group = _user_group(request)
+    summary = get_portfolio_summary(group, is_baby=True)
+    
+    # Query baby holdings to list them in the template
+    acct_ids = ZerodhaAccount.objects.filter(group=group).values_list('id', flat=True)
+    baby_stocks = StockHolding.objects.filter(account_id__in=acct_ids, is_baby=True).select_related('account').order_by('symbol')
+    baby_index_mf = MutualFundHolding.objects.filter(account_id__in=acct_ids, fund_type='INDEX', is_baby=True).select_related('account').order_by('fund_name')
+    baby_other_mf = MutualFundHolding.objects.filter(account_id__in=acct_ids, fund_type='OTHER', is_baby=True).select_related('account').order_by('fund_name')
+    
+    labels = []
+    values = []
+    for a in summary['assets']:
+        val = float(a['value'])
+        if val > 0:
+            labels.append(a['name'])
+            values.append(val)
+            
+    pf_chart_data = {
+        'labels': labels,
+        'values': values,
+    }
+    ctx = {
+        **summary,
+        'is_baby_view': True,
+        'baby_stocks': baby_stocks,
+        'baby_index_mf': baby_index_mf,
+        'baby_other_mf': baby_other_mf,
+        # ALL Zerodha holdings from master portfolio (used by the "Select Holdings" modal)
+        'all_stocks': StockHolding.objects.filter(account_id__in=acct_ids).select_related('account').order_by('symbol'),
+        'all_index_mf': MutualFundHolding.objects.filter(account_id__in=acct_ids, fund_type='INDEX').select_related('account').order_by('fund_name'),
+        'all_other_mf': MutualFundHolding.objects.filter(account_id__in=acct_ids, fund_type='OTHER').select_related('account').order_by('fund_name'),
+        'epf_form': EPFEntryForm(),
+        'nps_form': NPSEntryForm(group=group),
+        'fd_form': FixedDepositForm(initial={'is_baby': True}),
+        'cash_form': CashPositionForm(initial={'is_baby': True}),
+        'bond_form': BondHoldingForm(initial={'is_baby': True}),
+        'crypto_form': CryptoHoldingForm(initial={'is_baby': True}),
+        'commodity_form': CommodityHoldingForm(initial={'is_baby': True}),
+        'us_stock_form': USStockHoldingForm(initial={'is_baby': True}),
+        'goal_form': FinancialGoalForm(),
+        'pf_chart_data': pf_chart_data,
+        'webauthn_credentials': WebAuthnCredential.objects.filter(user=request.user),
+    }
+    return render(request, 'portfolio/baby.html', ctx)
+
+
+@login_required
+@_require_portfolio
+def toggle_baby(request, model_name, pk):
+    from django.http import HttpResponseBadRequest
+    model_map = {
+        'stockholding': StockHolding,
+        'mutualfundholding': MutualFundHolding,
+        'fixeddeposit': FixedDeposit,
+        'cashposition': CashPosition,
+        'bondholding': BondHolding,
+        'cryptoholding': CryptoHolding,
+        'commodityholding': CommodityHolding,
+        'usstockholding': USStockHolding,
+    }
+    model_class = model_map.get(model_name.lower())
+    if not model_class:
+        return HttpResponseBadRequest("Invalid model name")
+    
+    group = _user_group(request)
+    if model_name.lower() in ('stockholding', 'mutualfundholding'):
+        obj = get_object_or_404(model_class, pk=pk, account__group=group)
+    else:
+        obj = get_object_or_404(model_class, pk=pk, group=group)
+        
+    obj.is_baby = not obj.is_baby
+    obj.save()
+    
+    status_msg = "moved to Baby Portfolio" if obj.is_baby else "moved to Master Portfolio"
+    messages.success(request, f"{getattr(obj, 'symbol', getattr(obj, 'fund_name', getattr(obj, 'name', 'Asset')))} {status_msg}.")
+    return _safe_redirect(request)
+
