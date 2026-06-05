@@ -159,7 +159,10 @@
     <div class="md:hidden space-y-2">
       {% for m in index_mf %}
       <div class="table-card">
-        <div class="font-semibold text-sm truncate" title="{{ m.fund_name }}">{{ m.fund_name }}</div>
+        <div class="flex items-center justify-between gap-2">
+          <span class="font-semibold text-sm truncate max-w-[200px]" title="{{ m.fund_name }}">{{ m.fund_name }}</span>
+          <span class="text-xs opacity-50">{{ m.units|floatformat:3 }} units</span>
+        </div>
         <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
           <div><span class="opacity-50">Bought</span><div class="font-semibold mt-0.5">₹{{ m.purchase_value|floatformat:0|indian_number }}</div></div>
           <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5">₹{{ m.current_value|floatformat:0|indian_number }}</div></div>
@@ -215,7 +218,10 @@
     <div class="md:hidden space-y-2">
       {% for m in other_mf %}
       <div class="table-card">
-        <div class="font-semibold text-sm truncate" title="{{ m.fund_name }}">{{ m.fund_name }}</div>
+        <div class="flex items-center justify-between gap-2">
+          <span class="font-semibold text-sm truncate max-w-[200px]" title="{{ m.fund_name }}">{{ m.fund_name }}</span>
+          <span class="text-xs opacity-50">{{ m.units|floatformat:3 }} units</span>
+        </div>
         <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
           <div><span class="opacity-50">Bought</span><div class="font-semibold mt-0.5">₹{{ m.purchase_value|floatformat:0|indian_number }}</div></div>
           <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5">₹{{ m.current_value|floatformat:0|indian_number }}</div></div>
@@ -235,9 +241,9 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function(){
-  initPagination('stocksTable', 20);
-  initPagination('indexTable', 20);
-  initPagination('otherTable', 20);
+  if (document.getElementById('stocksTable')) initPagination('stocksTable', 20);
+  if (document.getElementById('indexTable')) initPagination('indexTable', 20);
+  if (document.getElementById('otherTable')) initPagination('otherTable', 20);
 });
 </script>
 {% endblock %}
