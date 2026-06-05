@@ -73,7 +73,7 @@ class FixedDepositForm(forms.ModelForm):
         model = FixedDeposit
         fields = [
             'name', 'account_name', 'principal', 'interest_rate',
-            'compounding', 'start_date', 'maturity_date', 'is_active', 'remarks',
+            'compounding', 'start_date', 'maturity_date', 'is_active', 'is_baby', 'remarks',
         ]
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'e.g. SBI FD'}),
@@ -90,7 +90,7 @@ class FixedDepositForm(forms.ModelForm):
 class CashPositionForm(forms.ModelForm):
     class Meta:
         model = CashPosition
-        fields = ['name', 'amount', 'remarks']
+        fields = ['name', 'amount', 'is_baby', 'remarks']
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'e.g. Secondary Acc'}),
             'amount': forms.NumberInput(attrs={'step': '0.01'}),
@@ -101,7 +101,7 @@ class CashPositionForm(forms.ModelForm):
 class BondHoldingForm(forms.ModelForm):
     class Meta:
         model = BondHolding
-        fields = ['account_name', 'amount', 'remarks']
+        fields = ['account_name', 'amount', 'is_baby', 'remarks']
         widgets = {
             'account_name': forms.TextInput(attrs={'placeholder': 'e.g. Secondary Acc'}),
             'amount': forms.NumberInput(attrs={'step': '0.01'}),
@@ -112,7 +112,7 @@ class BondHoldingForm(forms.ModelForm):
 class CryptoHoldingForm(forms.ModelForm):
     class Meta:
         model = CryptoHolding
-        fields = ['name', 'amount_invested', 'current_value', 'remarks']
+        fields = ['name', 'amount_invested', 'current_value', 'is_baby', 'remarks']
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': 'e.g. Bitcoin, Crypto'}),
             'amount_invested': forms.NumberInput(attrs={'step': '0.01'}),
@@ -124,7 +124,7 @@ class CryptoHoldingForm(forms.ModelForm):
 class CommodityHoldingForm(forms.ModelForm):
     class Meta:
         model = CommodityHolding
-        fields = ['commodity_type', 'description', 'purity', 'weight_grams', 'purchase_price_per_gram']
+        fields = ['commodity_type', 'description', 'purity', 'weight_grams', 'purchase_price_per_gram', 'is_baby']
         widgets = {
             'description': forms.TextInput(attrs={'placeholder': 'e.g. 20gm Coin - 1 (24k)'}),
             'purity': forms.Select(),
@@ -138,7 +138,7 @@ class USStockHoldingForm(forms.ModelForm):
         model = USStockHolding
         fields = [
             'symbol', 'company_name', 'quantity', 'vest_date',
-            'purchase_price_usd', 'purchase_usd_inr', 'remarks',
+            'purchase_price_usd', 'purchase_usd_inr', 'is_baby', 'remarks',
         ]
         widgets = {
             'symbol': forms.TextInput(attrs={'placeholder': 'UBER', 'value': 'UBER'}),

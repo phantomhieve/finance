@@ -14,11 +14,12 @@ ROUND2 = Decimal('0.01')
 
 
 def safe_redirect(request, fallback='dashboard'):
-    """Redirect to the `next` POST param only if it's a safe, same-host URL."""
-    target = request.POST.get('next', '')
+    """Redirect to the `next` POST/GET param only if it's a safe, same-host URL."""
+    target = request.POST.get('next') or request.GET.get('next', '')
     if target and url_has_allowed_host_and_scheme(target, allowed_hosts={request.get_host()}):
         return redirect(target)
     return redirect(fallback)
+
 
 
 def fy_start_year(today=None):

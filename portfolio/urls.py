@@ -4,6 +4,8 @@ from . import views
 urlpatterns = [
     path('unlock/', views.portfolio_unlock, name='portfolio_unlock'),
     path('', views.master_portfolio, name='portfolio_tracker'),
+    path('baby/', views.baby_portfolio, name='baby_portfolio'),
+    path('toggle-baby/<str:model_name>/<int:pk>/', views.toggle_baby, name='toggle_baby'),
     path('zerodha/', views.zerodha_consolidated, name='zerodha_consolidated'),
     path('zerodha/<slug:slug>/', views.zerodha_detail, name='zerodha_detail'),
     path('growth/', views.portfolio_growth, name='portfolio_growth'),
