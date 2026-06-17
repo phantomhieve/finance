@@ -15,7 +15,7 @@ from django.views.decorators.http import require_POST
 
 from pftracker.utils import safe_redirect
 
-from .models import Transaction, HRAExpense, FinancialGoal, GoalIncrement, MonthlyGoalAdjustment, Note
+from .models import Transaction, HRAExpense, FinancialGoal, GoalIncrement, MonthlyGoalAdjustment, Note, MonthlySavingsComment
 from .forms import (
     TransactionForm,
     GoalIncrementForm,
@@ -23,6 +23,7 @@ from .forms import (
     MonthlyGoalAdjustmentForm,
     HRAExpenseForm,
     NoteForm,
+    MonthlySavingsCommentForm,
 )
 from .services import (
     MONTH_ORDER,
@@ -164,6 +165,7 @@ def dashboard(request):
     txn_form = TransactionForm(initial={'date': today})
     goal_form = GoalIncrementForm()
     adjust_form = MonthlyGoalAdjustmentForm()
+    comment_form = MonthlySavingsCommentForm()
     fy_goal_form = FinancialGoalForm(initial={
         'fy_year': fy_start,
         'monthly_goal': base_monthly,
@@ -197,6 +199,7 @@ def dashboard(request):
         'txn_form': txn_form,
         'goal_form': goal_form,
         'adjust_form': adjust_form,
+        'comment_form': comment_form,
         'fy_goal_form': fy_goal_form,
         'increments': increments,
         'adjustments': adjustments,
@@ -220,6 +223,14 @@ def _build_monthly_data(transactions, user, fy_start, today, per_month_goals):
         )
     )
     agg_map = {(r['_y'], r['_m']): r for r in monthly_agg}
+
+    # Fetch all month comments for this user in this FY
+    fy_start_date = datetime.date(fy_start, 4, 1)
+    fy_end_date = datetime.date(fy_start + 1, 3, 31)
+    comments_qs = MonthlySavingsComment.objects.filter(
+        user=user, month__gte=fy_start_date, month__lte=fy_end_date,
+    )
+    comments_map = {(c.month.year, c.month.month): c for c in comments_qs}
 
     monthly_data = []
     cumulative = 0.0
@@ -252,6 +263,8 @@ def _build_monthly_data(transactions, user, fy_start, today, per_month_goals):
         else:
             status = 'future'
 
+        comment_obj = comments_map.get((m_year, m_num))
+
         monthly_data.append({
             'name': month_name,
             'short': month_name[:3],
@@ -266,6 +279,9 @@ def _build_monthly_data(transactions, user, fy_start, today, per_month_goals):
             'status': status,
             'started': started,
             'pct': pct,
+            'comment': comment_obj.comment if comment_obj else '',
+            'comment_id': comment_obj.id if comment_obj else None,
+            'month_date': m_date.isoformat(),
         })
 
     return monthly_data
@@ -452,6 +468,37 @@ def delete_goal_adjustment(request, adj_id):
         messages.success(request, 'Monthly adjustment removed.')
     else:
         messages.error(request, 'Could not remove adjustment.')
+    return _safe_redirect(request, 'dashboard')
+
+
+@login_required
+@require_POST
+@_require_role('PRIMARY', 'ACCOUNT_HOLDER')
+def save_month_comment(request):
+    """Create or update a comment for a specific month's savings."""
+    month_str = request.POST.get('month', '')
+    comment_text = request.POST.get('comment', '').strip()
+    try:
+        month_date = datetime.date.fromisoformat(month_str)
+    except (ValueError, TypeError):
+        messages.error(request, 'Invalid month.')
+        return _safe_redirect(request, 'dashboard')
+
+    if comment_text:
+        obj, created = MonthlySavingsComment.objects.update_or_create(
+            user=request.user,
+            month=month_date,
+            defaults={'comment': comment_text},
+        )
+        action = 'added' if created else 'updated'
+        messages.success(request, f'Comment {action} for {month_date.strftime("%b %Y")}.')
+    else:
+        # Empty comment → delete if exists
+        deleted, _ = MonthlySavingsComment.objects.filter(
+            user=request.user, month=month_date,
+        ).delete()
+        if deleted:
+            messages.success(request, f'Comment removed for {month_date.strftime("%b %Y")}.')
     return _safe_redirect(request, 'dashboard')
 
 

@@ -12,6 +12,7 @@ from .models import (
     GoalIncrement,
     MonthlyGoalAdjustment,
     WebAuthnCredential,
+    MonthlySavingsComment,
 )
 
 
@@ -114,3 +115,10 @@ class MonthlyGoalAdjustmentAdmin(ModelAdmin):
     list_display = ('user', 'month', 'adjustment_amount', 'reason', 'created_at')
     list_filter = ('user', 'month')
     search_fields = ('reason',)
+
+
+@admin.register(MonthlySavingsComment)
+class MonthlySavingsCommentAdmin(ModelAdmin):
+    list_display = ('user', 'month', 'comment', 'updated_at')
+    list_filter = ('user', 'month')
+    search_fields = ('comment',)

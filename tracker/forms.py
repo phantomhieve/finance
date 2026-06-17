@@ -1,5 +1,5 @@
 from django import forms
-from .models import Transaction, GoalIncrement, FinancialGoal, HRAExpense, MonthlyGoalAdjustment, Note
+from .models import Transaction, GoalIncrement, FinancialGoal, HRAExpense, MonthlyGoalAdjustment, Note, MonthlySavingsComment
 
 ENTRY_TYPE_CHOICES = Transaction.TRANSACTION_TYPE_CHOICES
 
@@ -268,3 +268,26 @@ class NoteForm(forms.ModelForm):
             elif initial_amount is not None and pending_amount > initial_amount:
                 self.add_error('pending_amount', 'Remaining Pending amount cannot exceed the Initial Amount.')
         return cleaned_data
+
+
+class MonthlySavingsCommentForm(forms.ModelForm):
+    """Form for adding/editing a comment on a month's savings performance."""
+
+    class Meta:
+        model = MonthlySavingsComment
+        fields = ['month', 'comment']
+        widgets = {
+            'month': forms.HiddenInput(),
+            'comment': forms.Textarea(
+                attrs={
+                    'class': 'form-control',
+                    'placeholder': 'e.g. Medical emergency, couldn\u2019t save this month…',
+                    'rows': 3,
+                    'maxlength': 500,
+                    'id': 'id_month_comment',
+                },
+            ),
+        }
+        labels = {
+            'comment': 'Comment',
+        }
