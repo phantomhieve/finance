@@ -1,4 +1,3 @@
-<script>
 (function() {
   function updateNpsTotal() {
     var form = document.getElementById('npsForm');
@@ -88,5 +87,3 @@
     if (interestInput) interestInput.addEventListener('input', updateNpsTotal);
   });
 })();
-</script>
-

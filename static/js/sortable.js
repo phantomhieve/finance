@@ -1,4 +1,3 @@
-<script>
 document.addEventListener('click', function(e) {
   var th = e.target.closest('.sortable-th');
   if (!th) return;
@@ -35,4 +34,3 @@ document.addEventListener('click', function(e) {
     else tbody.appendChild(r);
   });
 });
-</script>

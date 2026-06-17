@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load humanize %}
+{% load static %}
 
 {% block title %}Monthly Savings — Vault{% endblock %}
 
@@ -354,56 +355,12 @@
 
 {% block chart_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script src="{% static 'js/charts.js' %}"></script>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  var cd = JSON.parse(document.getElementById('chart-data').textContent);
-  var months = cd.months, totals = cd.totals, goals = cd.goals, cumulative = cd.cumulative, cumulative_goals = cd.cumulative_goals;
-
-  var gridClr = 'rgba(128,128,128,0.08)';
-  var tickClr = 'rgba(128,128,128,0.45)';
-
-  var tip = {
-    backgroundColor: 'oklch(0.2 0 0 / 0.95)',
-    borderColor: 'rgba(128,128,128,0.15)',
-    borderWidth: 1,
-    titleColor: '#ddd',
-    bodyColor: '#aaa',
-    padding: 12,
-    cornerRadius: 8,
-    callbacks: { label: function (c) { return ' \u20b9' + c.raw.toLocaleString('en-IN'); } }
-  };
-
-  var scaleOpts = {
-    x: { grid: { display: false }, ticks: { color: tickClr, font: { size: 11 } }, border: { display: false } },
-    y: { grid: { color: gridClr }, ticks: { color: tickClr, font: { size: 11 }, callback: function (v) { return v >= 1e5 ? '\u20b9' + (v / 1e5).toFixed(0) + 'L' : '\u20b9' + v.toLocaleString('en-IN'); } }, border: { display: false } }
-  };
-
-  new Chart(document.getElementById('barChart'), {
-    data: {
-      labels: months,
-      datasets: [
-        { type: 'bar', label: '  Saved', data: totals, backgroundColor: totals.map(function (v, i) { return v >= goals[i] ? 'rgba(0,200,120,0.45)' : v > 0 ? 'rgba(250,200,50,0.4)' : 'rgba(240,80,80,0.25)'; }), borderColor: totals.map(function (v, i) { return v >= goals[i] ? '#00c878' : v > 0 ? '#fab032' : '#f05050'; }), borderWidth: 1.5, borderRadius: 8, borderSkipped: false },
-        { type: 'line', label: '  Goal', data: goals, borderColor: 'rgba(100,140,250,0.5)', borderWidth: 2, borderDash: [5, 4], pointRadius: 0, fill: false, tension: 0.1 }
-      ]
-    },
-    options: { animation: { duration: 900 }, responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: tickClr, usePointStyle: true, boxWidth: 6, padding: 16 } }, tooltip: tip }, scales: scaleOpts }
-  });
-
-  new Chart(document.getElementById('lineChart'), {
-    type: 'line',
-    data: {
-      labels: months,
-      datasets: [
-        { label: '  Saved', data: cumulative, borderColor: '#648cfa', backgroundColor: 'rgba(100,140,250,0.06)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#648cfa', pointBorderColor: 'transparent', pointBorderWidth: 0, tension: 0.35, fill: true },
-        { label: '  Goal', data: cumulative_goals, borderColor: 'rgba(100,140,250,0.5)', borderWidth: 2, borderDash: [5, 4], pointRadius: 0, fill: false, tension: 0.1 }
-      ]
-    },
-    options: { animation: { duration: 1100 }, responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: tickClr, usePointStyle: true, boxWidth: 6, padding: 16 } }, tooltip: tip }, scales: scaleOpts }
-  });
-
   initPagination('txnTable', window.innerWidth <= 640 ? 7 : 15);
 });
 
