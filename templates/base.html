@@ -44,10 +44,9 @@
   {% block extra_head %}{% endblock %}
 </head>
 <body class="font-sans">
-<div id="pageOverlay" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.2);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)">
-  <div style="width:36px;height:36px;border:3px solid rgba(124,158,248,0.25);border-top-color:#7c9ef8;border-radius:50%;animation:pg-spin .6s linear infinite"></div>
+<div id="pageOverlay" class="page-overlay" style="display: none;">
+  <div class="page-spinner"></div>
 </div>
-<style>@keyframes pg-spin{to{transform:rotate(360deg)}}</style>
 <svg style="position:absolute;width:0;height:0" aria-hidden="true"><defs>
   <linearGradient id="vg" x1="0%" y1="0%" x2="100%" y2="100%">
     <stop offset="0%" stop-color="#7c9ef8"/><stop offset="100%" stop-color="#b39ddb"/>

@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load indian_format %}
+{% load static %}
 
 {% block title %}Commodities — Portfolio — Vault{% endblock %}
 
@@ -258,12 +259,12 @@
 {% endblock %}
 
 {% block extra_js %}
-{% include 'portfolio/_sortable_js.html' %}
+<script src="{% static 'js/sortable.js' %}"></script>
 <script>
   window.GOLD_RATE = {{ gold_rate|default:0 }};
   window.SILVER_RATE = {{ silver_rate|default:0 }};
 </script>
-{% include 'portfolio/_commodity_purity_js.html' %}
+<script src="{% static 'js/commodity_purity.js' %}"></script>
 <script>
 function _editSetup(formId, delFormId, delBtnId, titleId, editUrlBase, delUrlBase, editTitle, modalId, d, fieldMap) {
   var form = document.getElementById(formId);

@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load indian_format %}
+{% load static %}
 
 {% block title %}Cash — Portfolio — Vault{% endblock %}
 
@@ -95,50 +96,11 @@
   </div>
 </div>
 
-<dialog class="modal" id="addCashModal">
-  <div class="modal-box max-w-lg">
-    <div class="flex items-start justify-between gap-2 mb-4">
-      <h3 id="cashModalTitle" class="font-bold text-lg flex items-center gap-2">
-        <span class="material-symbols-outlined text-primary">add_circle</span> Add Cash Position
-      </h3>
-      <button type="button" class="btn btn-ghost btn-xs btn-square" onclick="closeModal('addCashModal')" aria-label="Close">
-        <span class="material-symbols-outlined">close</span>
-      </button>
-    </div>
-    <form id="cashForm" method="post" action="{% url 'add_cash' %}">{% csrf_token %}
-      <input type="hidden" name="next" value="{{ request.get_full_path }}">
-      <div class="space-y-3">
-        <div class="form-field">
-          <label class="label text-xs font-semibold">Name</label>
-          {{ form.name }}
-        </div>
-        <div class="form-field">
-          <label class="label text-xs font-semibold">Amount (₹)</label>
-          {{ form.amount }}
-        </div>
-        <div class="form-field">
-          <label class="label text-xs font-semibold">Remarks <span class="opacity-40 font-normal">optional</span></label>
-          {{ form.remarks }}
-        </div>
-      </div>
-      <div class="modal-action flex-wrap gap-2 mt-6">
-        <button type="button" id="cashDeleteBtn" class="btn btn-error btn-sm gap-1 mr-auto hidden" onclick="confirmDelete('deleteCashForm')">
-          <span class="material-symbols-outlined text-base">delete</span>Delete
-        </button>
-        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addCashModal')">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm gap-1">
-          <span class="material-symbols-outlined text-base">save</span>Save
-        </button>
-      </div>
-    </form>
-    <form id="deleteCashForm" method="post" action="" class="hidden">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form>
-  </div>
-  <form method="dialog" class="modal-backdrop"><button>close</button></form>
-</dialog>
+{% include 'portfolio/_cash_form_modal.html' with form_obj=form %}
 {% endblock %}
 
 {% block extra_js %}
-{% include 'portfolio/_sortable_js.html' %}
+<script src="{% static 'js/sortable.js' %}"></script>
 <script>
 function openAddModal() {
   var form = document.getElementById('cashForm');

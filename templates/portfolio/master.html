@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load indian_format %}
+{% load static %}
 
 {% block title %}Portfolio — Vault{% endblock %}
 
@@ -659,25 +660,25 @@
 
 {# ——— ALL MODALS ——— #}
 {# EPF Modal #}
-<dialog class="modal" id="addEpfModal"><div class="modal-box"><h3 class="font-bold text-lg flex items-center gap-2" id="epfModalTitle"><span class="material-symbols-outlined text-primary">add_circle</span>Add EPF Entry</h3><form id="epfForm" method="post" action="{% url 'add_epf_entry' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><div class="grid grid-cols-2 gap-4 mt-4"><div class="form-field"><label class="label text-xs font-semibold">Date</label>{{ epf_form.date }}</div><div class="form-field"><label class="label text-xs font-semibold">Type</label>{{ epf_form.entry_type }}</div></div><div class="form-field mt-3"><label class="label text-xs font-semibold">Amount (₹)</label>{{ epf_form.amount }}</div><div class="form-field mt-3"><label class="label text-xs font-semibold">Remarks <span class="opacity-40">optional</span></label>{{ epf_form.remarks }}</div><div class="modal-action"><button type="button" id="epfDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteEpfForm')"><span class="material-symbols-outlined text-base">delete</span>Delete</button><button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addEpfModal')">Cancel</button><button type="submit" class="btn btn-primary btn-sm">Save</button></div></form><form id="deleteEpfForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form></div><form method="dialog" class="modal-backdrop"><button>close</button></form></dialog>
+{% include 'portfolio/_epf_form_modal.html' with form_obj=epf_form %}
 
 {# Goal Modal #}
 <dialog class="modal" id="addGoalModal"><div class="modal-box"><h3 class="font-bold text-lg flex items-center gap-2" id="goalModalTitle"><span class="material-symbols-outlined text-primary">add_circle</span>Add Goal</h3><form id="goalForm" method="post" action="{% url 'add_goal' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><div class="grid grid-cols-2 gap-4 mt-4"><div class="form-field"><label class="label text-xs font-semibold">Label</label>{{ goal_form.label }}</div><div class="form-field"><label class="label text-xs font-semibold">Target Amount (₹)</label>{{ goal_form.target_amount }}</div></div><div class="form-field mt-3"><label class="label text-xs font-semibold">Sort Order</label>{{ goal_form.sort_order }}</div><div class="modal-action"><button type="button" id="goalDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteGoalForm')"><span class="material-symbols-outlined text-base">delete</span>Delete</button><button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addGoalModal')">Cancel</button><button type="submit" class="btn btn-primary btn-sm">Save</button></div></form><form id="deleteGoalForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form></div><form method="dialog" class="modal-backdrop"><button>close</button></form></dialog>
 
 {# NPS Modal #}
-<dialog class="modal" id="addNpsModal"><div class="modal-box"><h3 class="font-bold text-lg flex items-center gap-2" id="npsModalTitle"><span class="material-symbols-outlined text-primary">add_circle</span>Add NPS Entry</h3><form id="npsForm" method="post" action="{% url 'add_nps_entry' %}" data-add-url="{% url 'add_nps_entry' %}" data-edit-url="{% url 'edit_nps_entry' pk=0 %}" data-delete-url="{% url 'delete_nps_entry' pk=0 %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><input type="hidden" id="npsPrevBalance" value="{{ nps_latest.total_balance|default_if_none:0|default:0 }}" data-current-balance="{{ nps_latest.total_balance|default_if_none:0|default:0 }}"><div class="form-field mt-4"><label class="label text-xs font-semibold">Date</label>{{ nps_form.date }}</div><div class="grid grid-cols-2 gap-4 mt-3"><div class="form-field"><label class="label text-xs font-semibold">Contribution (₹)</label>{{ nps_form.contribution }}</div><div class="form-field"><label class="label text-xs font-semibold">Returns (₹)</label>{{ nps_form.interest_earned }}</div></div><div class="form-field mt-3"><label class="label text-xs font-semibold">Total Balance (₹)</label>{{ nps_form.total_balance }}</div><div class="form-field mt-3"><label class="label text-xs font-semibold">Remarks <span class="opacity-40">optional</span></label>{{ nps_form.remarks }}</div><div class="modal-action"><button type="button" id="npsDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteNpsForm')"><span class="material-symbols-outlined text-base">delete</span>Delete</button><button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addNpsModal')">Cancel</button><button type="submit" class="btn btn-primary btn-sm">Save</button></div></form><form id="deleteNpsForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form></div><form method="dialog" class="modal-backdrop"><button>close</button></form></dialog>
+{% include 'portfolio/_nps_form_modal.html' with form_obj=nps_form nps_latest=nps_latest %}
 
 {# FD Modal #}
-<dialog class="modal" id="addFdModal"><div class="modal-box"><h3 class="font-bold text-lg flex items-center gap-2" id="fdModalTitle"><span class="material-symbols-outlined text-primary">add_circle</span>Add Fixed Deposit</h3><form id="fdForm" method="post" action="{% url 'add_fd' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><div class="grid grid-cols-2 gap-4 mt-4"><div class="form-field"><label class="label text-xs font-semibold">Name</label>{{ fd_form.name }}</div><div class="form-field"><label class="label text-xs font-semibold">Account</label>{{ fd_form.account_name }}</div></div><div class="grid grid-cols-2 gap-4 mt-3"><div class="form-field"><label class="label text-xs font-semibold">Principal (₹)</label>{{ fd_form.principal }}</div><div class="form-field"><label class="label text-xs font-semibold">Interest Rate (%)</label>{{ fd_form.interest_rate }}</div></div><div class="form-field mt-3"><label class="label text-xs font-semibold">Compounding</label>{{ fd_form.compounding }}</div><div class="grid grid-cols-2 gap-4 mt-3"><div class="form-field"><label class="label text-xs font-semibold">Start Date</label>{{ fd_form.start_date }}</div><div class="form-field"><label class="label text-xs font-semibold">Maturity Date</label>{{ fd_form.maturity_date }}</div></div><div class="form-field mt-3 flex items-center gap-2">{{ fd_form.is_active }}<label class="text-sm">Active</label></div><div class="form-field mt-3"><label class="label text-xs font-semibold">Remarks <span class="opacity-40">optional</span></label>{{ fd_form.remarks }}</div><div class="modal-action"><button type="button" id="fdDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteFdForm')"><span class="material-symbols-outlined text-base">delete</span>Delete</button><button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addFdModal')">Cancel</button><button type="submit" class="btn btn-primary btn-sm">Save</button></div></form><form id="deleteFdForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form></div><form method="dialog" class="modal-backdrop"><button>close</button></form></dialog>
+{% include 'portfolio/_fd_form_modal.html' with form_obj=fd_form %}
 
 {# Cash Modal #}
-<dialog class="modal" id="addCashModal"><div class="modal-box"><h3 class="font-bold text-lg flex items-center gap-2" id="cashModalTitle"><span class="material-symbols-outlined text-primary">add_circle</span>Add Cash Position</h3><form id="cashForm" method="post" action="{% url 'add_cash' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><div class="form-field mt-4"><label class="label text-xs font-semibold">Name</label>{{ cash_form.name }}</div><div class="form-field mt-3"><label class="label text-xs font-semibold">Amount (₹)</label>{{ cash_form.amount }}</div><div class="form-field mt-3"><label class="label text-xs font-semibold">Remarks <span class="opacity-40">optional</span></label>{{ cash_form.remarks }}</div><div class="modal-action"><button type="button" id="cashDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteCashForm')"><span class="material-symbols-outlined text-base">delete</span>Delete</button><button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addCashModal')">Cancel</button><button type="submit" class="btn btn-primary btn-sm">Save</button></div></form><form id="deleteCashForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form></div><form method="dialog" class="modal-backdrop"><button>close</button></form></dialog>
+{% include 'portfolio/_cash_form_modal.html' with form_obj=cash_form %}
 
 {# Bond Modal #}
-<dialog class="modal" id="addBondModal"><div class="modal-box"><h3 class="font-bold text-lg flex items-center gap-2" id="bondModalTitle"><span class="material-symbols-outlined text-primary">add_circle</span>Add Bond Holding</h3><form id="bondForm" method="post" action="{% url 'add_bond' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><div class="form-field mt-4"><label class="label text-xs font-semibold">Account Name</label>{{ bond_form.account_name }}</div><div class="form-field mt-3"><label class="label text-xs font-semibold">Amount (₹)</label>{{ bond_form.amount }}</div><div class="form-field mt-3"><label class="label text-xs font-semibold">Remarks <span class="opacity-40">optional</span></label>{{ bond_form.remarks }}</div><div class="modal-action"><button type="button" id="bondDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteBondForm')"><span class="material-symbols-outlined text-base">delete</span>Delete</button><button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addBondModal')">Cancel</button><button type="submit" class="btn btn-primary btn-sm">Save</button></div></form><form id="deleteBondForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form></div><form method="dialog" class="modal-backdrop"><button>close</button></form></dialog>
+{% include 'portfolio/_bond_form_modal.html' with form_obj=bond_form %}
 
 {# Crypto Modal #}
-<dialog class="modal" id="addCryptoModal"><div class="modal-box"><h3 class="font-bold text-lg flex items-center gap-2" id="cryptoModalTitle"><span class="material-symbols-outlined text-primary">add_circle</span>Add Crypto Holding</h3><form id="cryptoForm" method="post" action="{% url 'add_crypto' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><div class="form-field mt-4"><label class="label text-xs font-semibold">Name</label>{{ crypto_form.name }}</div><div class="grid grid-cols-2 gap-4 mt-3"><div class="form-field"><label class="label text-xs font-semibold">Invested (₹)</label>{{ crypto_form.amount_invested }}</div><div class="form-field"><label class="label text-xs font-semibold">Current Value (₹)</label>{{ crypto_form.current_value }}</div></div><div class="form-field mt-3"><label class="label text-xs font-semibold">Remarks <span class="opacity-40">optional</span></label>{{ crypto_form.remarks }}</div><div class="modal-action"><button type="button" id="cryptoDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteCryptoForm')"><span class="material-symbols-outlined text-base">delete</span>Delete</button><button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addCryptoModal')">Cancel</button><button type="submit" class="btn btn-primary btn-sm">Save</button></div></form><form id="deleteCryptoForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form></div><form method="dialog" class="modal-backdrop"><button>close</button></form></dialog>
+{% include 'portfolio/_crypto_form_modal.html' with form_obj=crypto_form %}
 
 {# Commodity Modal #}
 {% include 'portfolio/_commodity_form_modal.html' with modal_id="addCommodityModal" form_id="commodityForm" title_id="commodityModalTitle" delete_btn_id="commodityDeleteBtn" delete_form_id="deleteCommodityForm" form_obj=commodity_form is_baby=False %}
@@ -732,6 +733,7 @@
 
 {% block chart_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script src="{% static 'js/charts.js' %}"></script>
 {% endblock %}
 
 {% block extra_js %}
@@ -739,50 +741,9 @@
   window.GOLD_RATE = {{ gold_rate|default:0 }};
   window.SILVER_RATE = {{ silver_rate|default:0 }};
 </script>
-{% include 'portfolio/_commodity_purity_js.html' %}
-{% include 'portfolio/_nps_modal_js.html' %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-  var ring = document.querySelector('.ai-score-ring-fg');
-  if (ring) {
-    var score = parseInt(ring.getAttribute('data-score') || '0', 10);
-    var circ = 175.93;
-    setTimeout(function() { ring.style.strokeDashoffset = circ * (1 - score / 100); }, 100);
-  }
+<script src="{% static 'js/commodity_purity.js' %}"></script>
+<script src="{% static 'js/nps_modal.js' %}"></script>
 
-  var cd = JSON.parse(document.getElementById('pf-chart-data').textContent);
-  var colors = ['#648cfa','#a78bfa','#34d399','#fbbf24','#f87171','#fb923c','#94a3b8','#60a5fa','#f97316','#2dd4bf','#c084fc'];
-  var tip = {
-    backgroundColor:'oklch(0.2 0 0 / 0.95)',borderColor:'rgba(128,128,128,0.2)',borderWidth:1,
-    titleColor:'#ddd',bodyColor:'#aaa',padding:10,
-    callbacks:{label:function(c){return ' \u20b9'+c.raw.toLocaleString('en-IN');}}
-  };
-  var _isMobile = window.innerWidth <= 640;
-  var legendOpts = {position: _isMobile ? 'bottom' : 'right',labels:{color:'rgba(128,128,128,0.7)',usePointStyle:true,pointStyle:'circle',boxWidth:8,boxHeight:8,padding:10,font:{size:12}}};
-  new Chart(document.getElementById('allocationChart'),{
-    type:'doughnut',
-    data:{labels:cd.labels,datasets:[{data:cd.values,backgroundColor:colors,borderWidth:0,hoverOffset:6}]},
-    options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:legendOpts,tooltip:tip}}
-  });
-  var consColors = ['#648cfa','#a78bfa','#34d399','#fbbf24','#f97316'];
-  new Chart(document.getElementById('consolidatedChart'),{
-    type:'doughnut',
-    data:{labels:cd.consolidated_labels,datasets:[{data:cd.consolidated_values,backgroundColor:consColors,borderWidth:0,hoverOffset:6}]},
-    options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:legendOpts,tooltip:tip}}
-  });
-
-  // Trigger chart resize on breakdown collapse change so the doughnut chart is perfectly sized when expanded
-  var breakdownCollapse = document.getElementById('breakdownCollapseToggle');
-  if (breakdownCollapse) {
-    breakdownCollapse.addEventListener('change', function() {
-      if (this.checked) {
-        setTimeout(function() {
-          window.dispatchEvent(new Event('resize'));
-        }, 250);
-      }
-    });
-  }
-});
 
 function openGoalModal() {
   var form = document.getElementById('goalForm');
