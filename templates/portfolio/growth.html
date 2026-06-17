@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load indian_format %}
+{% load static %}
 
 {% block title %}Growth — Portfolio — Vault{% endblock %}
 
@@ -216,76 +217,12 @@
 
 {% block chart_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script src="{% static 'js/charts.js' %}"></script>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-  var cd = JSON.parse(document.getElementById('growth-data').textContent);
-  var tip = {
-    backgroundColor:'rgba(10,10,20,0.95)',borderColor:'rgba(255,255,255,0.08)',borderWidth:1,
-    titleColor:'#e2e2f0',bodyColor:'#8888aa',padding:10,
-    callbacks:{label:function(c){return ' \u20b9'+c.raw.toLocaleString('en-IN');}}
-  };
-  var scaleOpts = {
-    x:{grid:{display:false},ticks:{color:'#55556a'},border:{display:false}},
-    y:{grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'#55556a',callback:function(v){return v>=1e7?'\u20b9'+(v/1e7).toFixed(1)+'Cr':v>=1e5?'\u20b9'+(v/1e5).toFixed(1)+'L':'\u20b9'+v.toLocaleString('en-IN');}},border:{display:false}}
-  };
-  var legOpts = {labels:{color:'#8888aa',usePointStyle:true,boxWidth:6,padding:16}};
 
-  new Chart(document.getElementById('growthBar'),{
-    type:'bar',
-    data:{labels:cd.months,datasets:[
-      {label:'  Money Added',data:cd.money_added,backgroundColor:'rgba(124,158,248,0.5)',borderColor:'#7c9ef8',borderWidth:1.5,borderRadius:6,borderSkipped:false},
-      {label:'  Returns',data:cd.returns_gained,backgroundColor:cd.returns_gained.map(function(v){return v>=0?'rgba(105,240,174,0.5)':'rgba(255,92,138,0.4)';}),borderColor:cd.returns_gained.map(function(v){return v>=0?'#69f0ae':'#ff5c8a';}),borderWidth:1.5,borderRadius:6,borderSkipped:false}
-    ]},
-    options:{animation:{duration:900},responsive:true,maintainAspectRatio:false,
-      plugins:{legend:legOpts,tooltip:tip},
-      scales:{...scaleOpts,x:{...scaleOpts.x,stacked:true},y:{...scaleOpts.y,stacked:true}}}
-  });
-
-  new Chart(document.getElementById('valueChart'),{
-    type:'line',
-    data:{labels:cd.months,datasets:[{
-      label:'  Portfolio Value',data:cd.values,
-      borderColor:'#7c9ef8',backgroundColor:'rgba(124,158,248,0.07)',
-      borderWidth:2,pointRadius:3,pointBackgroundColor:'#7c9ef8',
-      pointBorderColor:'#0a0a14',pointBorderWidth:2,tension:0.35,fill:true
-    }]},
-    options:{animation:{duration:1100},responsive:true,maintainAspectRatio:false,
-      plugins:{legend:legOpts,tooltip:tip},
-      scales:scaleOpts}
-  });
-
-  if (cd.yearly_labels.length) {
-    new Chart(document.getElementById('yearlyBar'),{
-      type:'bar',
-      data:{labels:cd.yearly_labels,datasets:[
-        {label:'  Money Added',data:cd.yearly_added,backgroundColor:'rgba(124,158,248,0.5)',borderColor:'#7c9ef8',borderWidth:1.5,borderRadius:6,borderSkipped:false},
-        {label:'  Returns',data:cd.yearly_returns,backgroundColor:cd.yearly_returns.map(function(v){return v>=0?'rgba(105,240,174,0.5)':'rgba(255,92,138,0.4)';}),borderColor:cd.yearly_returns.map(function(v){return v>=0?'#69f0ae':'#ff5c8a';}),borderWidth:1.5,borderRadius:6,borderSkipped:false}
-      ]},
-      options:{animation:{duration:900},responsive:true,maintainAspectRatio:false,
-        plugins:{legend:legOpts,tooltip:tip},
-        scales:{...scaleOpts,x:{...scaleOpts.x,stacked:true},y:{...scaleOpts.y,stacked:true}}}
-    });
-
-    new Chart(document.getElementById('yearlyValueChart'),{
-      type:'line',
-      data:{labels:cd.yearly_labels,datasets:[{
-        label:'  Portfolio Value',data:cd.yearly_values,
-        borderColor:'#7c9ef8',backgroundColor:'rgba(124,158,248,0.07)',
-        borderWidth:2,pointRadius:4,pointBackgroundColor:'#7c9ef8',
-        pointBorderColor:'#0a0a14',pointBorderWidth:2,tension:0.35,fill:true
-      }]},
-      options:{animation:{duration:1100},responsive:true,maintainAspectRatio:false,
-        plugins:{legend:legOpts,tooltip:tip},
-        scales:scaleOpts}
-    });
-  }
-
-  var activeFy = document.querySelector('#fySwitcher .fy-tab-active');
-  if (activeFy) activeFy.scrollIntoView({behavior:'instant',inline:'center',block:'nearest'});
-});
 
 function switchView(view) {
   var monthly = document.getElementById('monthlyView');

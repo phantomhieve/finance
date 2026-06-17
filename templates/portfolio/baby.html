@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load indian_format %}
+{% load static %}
 
 {% block title %}Baby Portfolio — Vault{% endblock %}
 
@@ -572,6 +573,7 @@
 
 {% block chart_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script src="{% static 'js/charts.js' %}"></script>
 {% endblock %}
 
 {% block extra_js %}
@@ -579,7 +581,7 @@
   window.GOLD_RATE = {{ gold_rate|default:0 }};
   window.SILVER_RATE = {{ silver_rate|default:0 }};
 </script>
-{% include 'portfolio/_commodity_purity_js.html' %}
+<script src="{% static 'js/commodity_purity.js' %}"></script>
 <script>
 function openAddBabyCommodityModal() {
   var form = document.getElementById('babyCommodityForm');

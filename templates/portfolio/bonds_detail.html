@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load indian_format %}
+{% load static %}
 
 {% block title %}Bonds — Portfolio — Vault{% endblock %}
 
@@ -92,37 +93,11 @@
   </div>
 </div>
 
-<dialog class="modal" id="addBondModal">
-  <div class="modal-box">
-    <h3 class="font-bold text-lg flex items-center gap-2" id="bondModalTitle"><span class="material-symbols-outlined text-primary">add_circle</span>Add Bond Holding</h3>
-    <form id="bondForm" method="post" action="{% url 'add_bond' %}">{% csrf_token %}
-      <input type="hidden" name="next" value="{{ request.get_full_path }}">
-      <div class="form-field mt-4">
-        <label class="label text-xs font-semibold">Account Name</label>
-        {{ form.account_name }}
-      </div>
-      <div class="form-field mt-3">
-        <label class="label text-xs font-semibold">Amount (₹)</label>
-        {{ form.amount }}
-      </div>
-      <div class="form-field mt-3">
-        <label class="label text-xs font-semibold">Remarks <span class="opacity-40">optional</span></label>
-        {{ form.remarks }}
-      </div>
-      <div class="modal-action">
-        <button type="button" id="bondDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteBondForm')"><span class="material-symbols-outlined text-base">delete</span>Delete</button>
-        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addBondModal')">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm gap-1"><span class="material-symbols-outlined text-base">save</span>Save</button>
-      </div>
-    </form>
-    <form id="deleteBondForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form>
-  </div>
-  <form method="dialog" class="modal-backdrop"><button>close</button></form>
-</dialog>
+{% include 'portfolio/_bond_form_modal.html' with form_obj=form %}
 {% endblock %}
 
 {% block extra_js %}
-{% include 'portfolio/_sortable_js.html' %}
+<script src="{% static 'js/sortable.js' %}"></script>
 <script>
 function openAddModal() {
   var form = document.getElementById('bondForm');

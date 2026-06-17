@@ -1,4 +1,3 @@
-<script>
 (function() {
   var goldOpts = [
     {v:'24k', t:'24k (999)'},
@@ -68,4 +67,3 @@
 
   window._updateCommodityPurity = updatePurityOptions;
 })();
-</script>
