@@ -1,13 +1,8 @@
 {% extends 'base.html' %}
 {% load indian_format %}
+{% load static %}
 
 {% block extra_head %}
-<style>
-/* Row markup from showBreakdown() uses these class names (script unchanged) */
-.zerodha-breakdown-modal .td-pos { color: oklch(var(--su) / 1); }
-.zerodha-breakdown-modal .amount-danger { color: oklch(var(--er) / 1); }
-.zerodha-breakdown-modal .td-bold { font-weight: 600; }
-</style>
 {% endblock %}
 
 {% block title %}All Zerodha — Portfolio — Vault{% endblock %}
@@ -485,10 +480,11 @@
 
 {% block chart_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script src="{% static 'js/charts.js' %}"></script>
 {% endblock %}
 
 {% block extra_js %}
-{% include 'portfolio/_sortable_js.html' %}
+<script src="{% static 'js/sortable.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function(){
   initPagination('stocksTable', 20);
@@ -496,26 +492,7 @@ document.addEventListener('DOMContentLoaded', function(){
   initPagination('otherTable', 20);
 });
 
-var _eqData = JSON.parse(document.getElementById('equity-chart-data').textContent);
-var _isMobile = window.innerWidth <= 640;
-new Chart(document.getElementById('equityAllocationChart'), {
-  type: 'doughnut',
-  data: {
-    labels: _eqData.labels,
-    datasets: [{data: _eqData.values, backgroundColor: ['#7c9ef8','#b39ddb','#69f0ae'], borderWidth: 0, hoverOffset: 6}]
-  },
-  options: {
-    responsive: true, maintainAspectRatio: false, cutout: '65%',
-    plugins: {
-      legend: {position: _isMobile ? 'bottom' : 'right', labels:{color:'#9999bb', usePointStyle:true, pointStyle:'circle', boxWidth:8, boxHeight:8, padding:10, font:{size:12}}},
-      tooltip: {
-        backgroundColor:'rgba(10,10,20,0.95)', borderColor:'rgba(255,255,255,0.08)', borderWidth:1,
-        titleColor:'#e2e2f0', bodyColor:'#8888aa', padding:10,
-        callbacks:{label:function(c){return ' \u20b9'+c.raw.toLocaleString('en-IN');}}
-      }
-    }
-  }
-});
+
 
 var _cdata = JSON.parse(document.getElementById('consolidated-data').textContent);
 

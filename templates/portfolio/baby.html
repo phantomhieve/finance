@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load indian_format %}
+{% load static %}
 
 {% block title %}Baby Portfolio — Vault{% endblock %}
 
@@ -563,34 +564,8 @@
 </dialog>
 
 {# ——— ADD/EDIT COMMODITY MODAL ——— #}
-<dialog class="modal" id="addBabyCommodityModal">
-  <div class="modal-box">
-    <h3 class="font-bold text-lg flex items-center gap-2" id="babyCommodityModalTitle">
-      <span class="material-symbols-outlined text-primary">add_circle</span>Add Commodity
-    </h3>
-    <form id="babyCommodityForm" method="post" action="{% url 'add_commodity' %}">
-      {% csrf_token %}
-      <input type="hidden" name="next" value="{{ request.get_full_path }}">
-      <input type="hidden" name="is_baby" value="True">
-      <div class="grid grid-cols-2 gap-4 mt-4">
-        <div class="form-field"><label class="label text-xs font-semibold">Type</label>{{ commodity_form.commodity_type }}</div>
-        <div class="form-field"><label class="label text-xs font-semibold">Purity</label>{{ commodity_form.purity }}</div>
-      </div>
-      <div class="form-field mt-3"><label class="label text-xs font-semibold">Description</label>{{ commodity_form.description }}</div>
-      <div class="grid grid-cols-2 gap-4 mt-3">
-        <div class="form-field"><label class="label text-xs font-semibold">Weight (grams)</label>{{ commodity_form.weight_grams }}</div>
-        <div class="form-field"><label class="label text-xs font-semibold">Purchase Price / gram (₹)</label>{{ commodity_form.purchase_price_per_gram }}</div>
-      </div>
-      <div class="modal-action">
-        <button type="button" id="babyCommodityDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteBabyCommodityForm')"><span class="material-symbols-outlined text-base">delete</span>Delete</button>
-        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addBabyCommodityModal')">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm">Save</button>
-      </div>
-    </form>
-    <form id="deleteBabyCommodityForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form>
-  </div>
-  <form method="dialog" class="modal-backdrop"><button>close</button></form>
-</dialog>
+{% include 'portfolio/_commodity_form_modal.html' with modal_id="addBabyCommodityModal" form_id="babyCommodityForm" title_id="babyCommodityModalTitle" delete_btn_id="babyCommodityDeleteBtn" delete_form_id="deleteBabyCommodityForm" form_obj=commodity_form is_baby=True %}
+
 
 {{ pf_chart_data|json_script:"pf-chart-data" }}
 
@@ -598,6 +573,7 @@
 
 {% block chart_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<script src="{% static 'js/charts.js' %}"></script>
 {% endblock %}
 
 {% block extra_js %}
@@ -605,7 +581,7 @@
   window.GOLD_RATE = {{ gold_rate|default:0 }};
   window.SILVER_RATE = {{ silver_rate|default:0 }};
 </script>
-{% include 'portfolio/_commodity_purity_js.html' %}
+<script src="{% static 'js/commodity_purity.js' %}"></script>
 <script>
 function openAddBabyCommodityModal() {
   var form = document.getElementById('babyCommodityForm');
