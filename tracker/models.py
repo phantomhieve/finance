@@ -277,3 +277,23 @@ class Note(models.Model):
         section_str = f'[{self.section}] ' if self.section else ''
         return f"{section_str}{self.title} ({self.date})"
 
+
+class MonthlySavingsComment(models.Model):
+    """A comment attached to a specific month's savings performance."""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='monthly_comments')
+    month = models.DateField(
+        help_text="First day of the month (format: YYYY-MM-01).",
+    )
+    comment = models.CharField(max_length=500)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['month']
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'month'], name='unique_user_month_comment'),
+        ]
+
+    def __str__(self):
+        return f"{self.user.username}: {self.month.strftime('%b %Y')} — {self.comment[:50]}"
+
