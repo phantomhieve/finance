@@ -601,6 +601,10 @@
 {% endblock %}
 
 {% block extra_js %}
+<script>
+  window.GOLD_RATE = {{ gold_rate|default:0 }};
+  window.SILVER_RATE = {{ silver_rate|default:0 }};
+</script>
 {% include 'portfolio/_commodity_purity_js.html' %}
 <script>
 function openAddBabyCommodityModal() {
@@ -620,7 +624,7 @@ function openAddBabyCommodityModal() {
   var weightField = form.querySelector('[name=weight_grams]');
   if (weightField) weightField.value = '';
   var purchaseField = form.querySelector('[name=purchase_price_per_gram]');
-  if (purchaseField) purchaseField.value = '';
+  if (purchaseField) purchaseField.value = window.GOLD_RATE || '';
   
   document.getElementById('babyCommodityDeleteBtn').style.display = 'none';
   document.getElementById('babyCommodityModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span>Add Commodity';

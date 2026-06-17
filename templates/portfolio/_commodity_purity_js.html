@@ -14,6 +14,7 @@
   ];
 
   function updatePurityOptions(typeSelect, puritySelect, keepValue) {
+    if (!typeSelect || !puritySelect) return;
     var opts = typeSelect.value === 'SILVER' ? silverOpts : goldOpts;
     var prev = keepValue || puritySelect.value;
     puritySelect.innerHTML = '';
@@ -25,15 +26,44 @@
     });
     var found = opts.some(function(o) { return o.v === prev; });
     puritySelect.value = found ? prev : opts[0].v;
+
+    // Default the purchase price to today's price if we are in Add mode
+    var form = typeSelect.closest('form');
+    if (form) {
+      var deleteBtn = form.querySelector('[id*="DeleteBtn"]') || form.querySelector('[id*="deleteBtn"]');
+      var isAddMode = !deleteBtn || deleteBtn.style.display === 'none';
+      if (isAddMode) {
+        var purchaseInput = form.querySelector('[name=purchase_price_per_gram]');
+        if (purchaseInput) {
+          if (typeSelect.value === 'SILVER') {
+            purchaseInput.value = window.SILVER_RATE || '';
+          } else {
+            purchaseInput.value = window.GOLD_RATE || '';
+          }
+        }
+      }
+    }
   }
 
-  var typeEl = document.querySelector('#commodityForm [name=commodity_type]');
-  var purityEl = document.querySelector('#commodityForm [name=purity]');
-  if (typeEl && purityEl) {
-    typeEl.addEventListener('change', function() {
+  function init() {
+    document.querySelectorAll('[name=commodity_type]').forEach(function(typeEl) {
+      var form = typeEl.closest('form');
+      if (!form) return;
+      var purityEl = form.querySelector('[name=purity]');
+      if (!purityEl) return;
+      
+      typeEl.addEventListener('change', function() {
+        updatePurityOptions(typeEl, purityEl);
+      });
+      // Initialize
       updatePurityOptions(typeEl, purityEl);
     });
-    updatePurityOptions(typeEl, purityEl);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
   }
 
   window._updateCommodityPurity = updatePurityOptions;
