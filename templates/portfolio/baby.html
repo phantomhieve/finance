@@ -85,7 +85,7 @@
         <span class="material-symbols-outlined">checklist</span>
         Select Holdings to Track
       </button>
-      <button class="btn btn-outline btn-primary gap-2" onclick="openModal('addBabyCommodityModal')">
+      <button class="btn btn-outline btn-primary gap-2" onclick="openAddBabyCommodityModal()">
         <span class="material-symbols-outlined text-base">add</span>
         Add Gold/Silver
       </button>
@@ -383,7 +383,7 @@
       <h2 class="card-title text-base">Commodities</h2>
       <div class="flex flex-wrap items-center gap-1.5">
         <span class="badge badge-ghost badge-sm">₹{{ commodity_total|floatformat:0|indian_number }}</span>
-        <button class="btn btn-ghost btn-sm gap-1" onclick="openModal('addBabyCommodityModal')"><span class="material-symbols-outlined text-base">add</span>Add</button>
+        <button class="btn btn-ghost btn-sm gap-1" onclick="openAddBabyCommodityModal()"><span class="material-symbols-outlined text-base">add</span>Add</button>
       </div>
     </div>
     <div class="flex gap-4 text-xs opacity-60 mb-3">
@@ -601,8 +601,36 @@
 {% endblock %}
 
 {% block extra_js %}
+<script>
+  window.GOLD_RATE = {{ gold_rate|default:0 }};
+  window.SILVER_RATE = {{ silver_rate|default:0 }};
+</script>
 {% include 'portfolio/_commodity_purity_js.html' %}
 <script>
+function openAddBabyCommodityModal() {
+  var form = document.getElementById('babyCommodityForm');
+  form.action = "{% url 'add_commodity' %}";
+  form.reset();
+  var typeSelect = form.querySelector('[name=commodity_type]');
+  var puritySelect = form.querySelector('[name=purity]');
+  if (typeSelect) {
+    typeSelect.value = 'GOLD';
+    if (window._updateCommodityPurity) {
+      window._updateCommodityPurity(typeSelect, puritySelect, '');
+    }
+  }
+  var descField = form.querySelector('[name=description]');
+  if (descField) descField.value = '';
+  var weightField = form.querySelector('[name=weight_grams]');
+  if (weightField) weightField.value = '';
+  var purchaseField = form.querySelector('[name=purchase_price_per_gram]');
+  if (purchaseField) purchaseField.value = window.GOLD_RATE || '';
+  
+  document.getElementById('babyCommodityDeleteBtn').style.display = 'none';
+  document.getElementById('babyCommodityModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span>Add Commodity';
+  openModal('addBabyCommodityModal');
+}
+
 document.addEventListener('DOMContentLoaded', function(){
   if (document.getElementById('babyStocksTable')) initPagination('babyStocksTable', 20);
   if (document.getElementById('babyIndexTable')) initPagination('babyIndexTable', 20);

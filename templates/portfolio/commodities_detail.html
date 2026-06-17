@@ -297,6 +297,10 @@
 
 {% block extra_js %}
 {% include 'portfolio/_sortable_js.html' %}
+<script>
+  window.GOLD_RATE = {{ gold_rate|default:0 }};
+  window.SILVER_RATE = {{ silver_rate|default:0 }};
+</script>
 {% include 'portfolio/_commodity_purity_js.html' %}
 <script>
 function _editSetup(formId, delFormId, delBtnId, titleId, editUrlBase, delUrlBase, editTitle, modalId, d, fieldMap) {
