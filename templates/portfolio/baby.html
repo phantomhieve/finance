@@ -69,7 +69,7 @@
   </a>
 </div>
 
-{% if not baby_stocks and not baby_index_mf and not baby_other_mf %}
+{% if not baby_stocks and not baby_index_mf and not baby_other_mf and not gold_holdings and not silver_holdings %}
 {# ——— EMPTY STATE ——— #}
 <div class="card bg-base-200 shadow-sm border border-base-content/5 p-8 text-center max-w-2xl mx-auto my-8 animate-up">
   <div class="card-body items-center gap-4">
@@ -78,12 +78,16 @@
     </div>
     <h2 class="text-2xl font-bold">Baby Portfolio is Empty</h2>
     <p class="text-sm opacity-60 leading-relaxed max-w-md">
-      Select which stocks or mutual funds from your Zerodha accounts you want to track separately in this portfolio.
+      Select which stocks or mutual funds from your Zerodha accounts you want to track separately in this portfolio, or add gold/silver holdings.
     </p>
-    <div class="card-actions mt-4">
+    <div class="card-actions mt-4 flex flex-wrap gap-2 justify-center">
       <button class="btn btn-primary gap-2" onclick="openModal('selectHoldingsModal')">
         <span class="material-symbols-outlined">checklist</span>
         Select Holdings to Track
+      </button>
+      <button class="btn btn-outline btn-primary gap-2" onclick="openModal('addBabyCommodityModal')">
+        <span class="material-symbols-outlined text-base">add</span>
+        Add Gold/Silver
       </button>
     </div>
   </div>
@@ -221,7 +225,7 @@
     <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
       <h2 class="card-title text-base">Index Mutual Funds</h2>
       <div class="flex items-center gap-2">
-        <span class="badge badge-secondary badge-sm">{{ baby_index_mf|length }} funds</span>
+        <span class="badge badge-secondary badge-sm">{{ baby_index_mf|length }} holdings</span>
         <button class="btn btn-ghost btn-xs gap-1" onclick="openModal('selectHoldingsModal')">
           <span class="material-symbols-outlined text-sm">edit</span>Manage
         </button>
@@ -300,7 +304,7 @@
     <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
       <h2 class="card-title text-base">Other Mutual Funds</h2>
       <div class="flex items-center gap-2">
-        <span class="badge badge-accent badge-sm">{{ baby_other_mf|length }} funds</span>
+        <span class="badge badge-accent badge-sm">{{ baby_other_mf|length }} holdings</span>
         <button class="btn btn-ghost btn-xs gap-1" onclick="openModal('selectHoldingsModal')">
           <span class="material-symbols-outlined text-sm">edit</span>Manage
         </button>
@@ -371,6 +375,71 @@
   </div>
 </div>
 {% endif %}
+
+{# ——— COMMODITIES (GOLD & SILVER) ——— #}
+<div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover">
+  <div class="card-body p-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+      <h2 class="card-title text-base">Commodities</h2>
+      <div class="flex flex-wrap items-center gap-1.5">
+        <span class="badge badge-ghost badge-sm">₹{{ commodity_total|floatformat:0|indian_number }}</span>
+        <button class="btn btn-ghost btn-sm gap-1" onclick="openModal('addBabyCommodityModal')"><span class="material-symbols-outlined text-base">add</span>Add</button>
+      </div>
+    </div>
+    <div class="flex gap-4 text-xs opacity-60 mb-3">
+      <span>Invested: <strong class="text-success">₹{{ commodity_invested|floatformat:0|indian_number }}</strong></span>
+      <span>Returns: <strong class="{% if commodity_returns >= 0 %}text-success{% else %}text-error{% endif %}">{% if commodity_returns >= 0 %}+{% endif %}₹{{ commodity_returns|floatformat:0|indian_number }}</strong></span>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {# Gold #}
+      <div class="p-4 rounded-lg bg-base-300/50">
+        <div class="flex items-center gap-3 mb-3">
+          <span class="material-symbols-outlined text-2xl text-warning">diamond</span>
+          <div class="flex-1"><div class="font-semibold">Gold</div><div class="text-xs opacity-50">₹{{ gold_rate|floatformat:0|indian_number }}/g &middot; {{ gold_weight|floatformat:0 }}g</div></div>
+          <div class="font-bold">₹{{ gold_value|floatformat:0|indian_number }}</div>
+        </div>
+        {% if gold_holdings %}
+        <div class="space-y-1 max-h-44 overflow-y-auto text-sm">
+          {% for h in gold_holdings %}
+          <div class="flex justify-between items-center">
+            <span>{{ h.description }}</span>
+            <span class="flex items-center gap-1">
+              <span class="opacity-50">{{ h.weight_grams|floatformat:0 }}g</span>
+              <button class="btn btn-ghost btn-xs btn-square" data-edit-baby-commodity data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}" data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}"><span class="material-symbols-outlined text-base">edit</span></button>
+              <a href="{% url 'toggle_baby' 'commodityholding' h.id %}?next={% url 'baby_portfolio' %}" class="btn btn-ghost btn-xs btn-square text-warning" title="Move to Master Portfolio"><span class="material-symbols-outlined text-base">assignment_return</span></a>
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if gold_price_obj %}<div class="text-xs opacity-30 mt-2">Updated {{ gold_price_obj.fetched_at|timesince }} ago</div>{% endif %}
+      </div>
+      {# Silver #}
+      <div class="p-4 rounded-lg bg-base-300/50">
+        <div class="flex items-center gap-3 mb-3">
+          <span class="material-symbols-outlined text-2xl opacity-50">toll</span>
+          <div class="flex-1"><div class="font-semibold">Silver</div><div class="text-xs opacity-50">₹{{ silver_rate|floatformat:0|indian_number }}/g &middot; {{ silver_weight|floatformat:0|indian_number }}g</div></div>
+          <div class="font-bold">₹{{ silver_value|floatformat:0|indian_number }}</div>
+        </div>
+        {% if silver_holdings %}
+        <div class="space-y-1 max-h-44 overflow-y-auto text-sm">
+          {% for h in silver_holdings %}
+          <div class="flex justify-between items-center">
+            <span>{{ h.description }}</span>
+            <span class="flex items-center gap-1">
+              <span class="opacity-50">{{ h.weight_grams|floatformat:0 }}g</span>
+              <button class="btn btn-ghost btn-xs btn-square" data-edit-baby-commodity data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}" data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}"><span class="material-symbols-outlined text-base">edit</span></button>
+              <a href="{% url 'toggle_baby' 'commodityholding' h.id %}?next={% url 'baby_portfolio' %}" class="btn btn-ghost btn-xs btn-square text-warning" title="Move to Master Portfolio"><span class="material-symbols-outlined text-base">assignment_return</span></a>
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if silver_price_obj %}<div class="text-xs opacity-30 mt-2">Updated {{ silver_price_obj.fetched_at|timesince }} ago</div>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
 
 {% endif %}{# end if empty #}
 
@@ -493,6 +562,36 @@
   <form method="dialog" class="modal-backdrop"><button>close</button></form>
 </dialog>
 
+{# ——— ADD/EDIT COMMODITY MODAL ——— #}
+<dialog class="modal" id="addBabyCommodityModal">
+  <div class="modal-box">
+    <h3 class="font-bold text-lg flex items-center gap-2" id="babyCommodityModalTitle">
+      <span class="material-symbols-outlined text-primary">add_circle</span>Add Commodity
+    </h3>
+    <form id="babyCommodityForm" method="post" action="{% url 'add_commodity' %}">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <input type="hidden" name="is_baby" value="True">
+      <div class="grid grid-cols-2 gap-4 mt-4">
+        <div class="form-field"><label class="label text-xs font-semibold">Type</label>{{ commodity_form.commodity_type }}</div>
+        <div class="form-field"><label class="label text-xs font-semibold">Purity</label>{{ commodity_form.purity }}</div>
+      </div>
+      <div class="form-field mt-3"><label class="label text-xs font-semibold">Description</label>{{ commodity_form.description }}</div>
+      <div class="grid grid-cols-2 gap-4 mt-3">
+        <div class="form-field"><label class="label text-xs font-semibold">Weight (grams)</label>{{ commodity_form.weight_grams }}</div>
+        <div class="form-field"><label class="label text-xs font-semibold">Purchase Price / gram (₹)</label>{{ commodity_form.purchase_price_per_gram }}</div>
+      </div>
+      <div class="modal-action">
+        <button type="button" id="babyCommodityDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteBabyCommodityForm')"><span class="material-symbols-outlined text-base">delete</span>Delete</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addBabyCommodityModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm">Save</button>
+      </div>
+    </form>
+    <form id="deleteBabyCommodityForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
 {{ pf_chart_data|json_script:"pf-chart-data" }}
 
 {% endblock %}
@@ -502,11 +601,33 @@
 {% endblock %}
 
 {% block extra_js %}
+{% include 'portfolio/_commodity_purity_js.html' %}
 <script>
 document.addEventListener('DOMContentLoaded', function(){
   if (document.getElementById('babyStocksTable')) initPagination('babyStocksTable', 20);
   if (document.getElementById('babyIndexTable')) initPagination('babyIndexTable', 20);
   if (document.getElementById('babyOtherTable')) initPagination('babyOtherTable', 20);
+
+  // Commodity edit handler (delegation)
+  document.addEventListener('click', function(e) {
+    var btn = e.target.closest('[data-edit-baby-commodity]');
+    if (!btn) return;
+    var cf = document.getElementById('babyCommodityForm');
+    cf.querySelector('[name=commodity_type]').value = btn.dataset.type;
+    window._updateCommodityPurity(
+      cf.querySelector('[name=commodity_type]'),
+      cf.querySelector('[name=purity]'),
+      btn.dataset.purity
+    );
+    cf.action = "{% url 'edit_commodity' pk=0 %}".replace('/0/', '/' + btn.dataset.id + '/');
+    cf.querySelector('[name=description]').value = btn.dataset.desc;
+    cf.querySelector('[name=weight_grams]').value = btn.dataset.weight;
+    cf.querySelector('[name=purchase_price_per_gram]').value = btn.dataset.purchase;
+    document.getElementById('babyCommodityDeleteBtn').style.display = 'inline-flex';
+    document.getElementById('deleteBabyCommodityForm').action = "{% url 'delete_commodity' pk=0 %}".replace('/0/', '/' + btn.dataset.id + '/');
+    document.getElementById('babyCommodityModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">edit</span>Edit Commodity';
+    openModal('addBabyCommodityModal');
+  });
 
   // Allocation chart
   var chartEl = document.getElementById('babyAllocationChart');

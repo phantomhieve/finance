@@ -27,6 +27,7 @@ urlpatterns = [
     path('goals/adjustment/', views.add_goal_adjustment, name='add_goal_adjustment'),
     path('goals/adjustment/delete/<int:adj_id>/', views.delete_goal_adjustment, name='delete_goal_adjustment'),
     path('goals/annual/', views.set_annual_goal, name='set_annual_goal'),
+    path('month-comment/', views.save_month_comment, name='save_month_comment'),
 
     # Admin panels (superuser only)
     path('admin/monitor/', views.admin_monitor, name='admin_monitor'),
