@@ -428,7 +428,7 @@
   <div class="card-body p-4">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
       <h2 class="card-title text-base">Commodities</h2>
-      <div class="flex flex-wrap items-center gap-1.5"><span class="badge badge-ghost badge-sm">₹{{ commodity_total|floatformat:0|indian_number }}</span><a href="{% url 'commodities_detail' %}" class="btn btn-outline btn-primary btn-xs gap-1">View All<span class="material-symbols-outlined text-sm">arrow_forward</span></a><button class="btn btn-ghost btn-sm gap-1" onclick="openModal('addCommodityModal')"><span class="material-symbols-outlined text-base">add</span>Add</button></div>
+      <div class="flex flex-wrap items-center gap-1.5"><span class="badge badge-ghost badge-sm">₹{{ commodity_total|floatformat:0|indian_number }}</span><a href="{% url 'commodities_detail' %}" class="btn btn-outline btn-primary btn-xs gap-1">View All<span class="material-symbols-outlined text-sm">arrow_forward</span></a><button class="btn btn-ghost btn-sm gap-1" onclick="openAddCommodityModal()"><span class="material-symbols-outlined text-base">add</span>Add</button></div>
     </div>
     <div class="flex gap-4 text-xs opacity-60 mb-3">
       <span>Invested: <strong class="text-success">₹{{ commodity_invested|floatformat:0|indian_number }}</strong></span>
@@ -786,6 +786,30 @@ function openGoalModal() {
   document.getElementById('goalDeleteBtn').style.display = 'none';
   document.getElementById('goalModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span> Add Goal';
   openModal('addGoalModal');
+}
+
+function openAddCommodityModal() {
+  var form = document.getElementById('commodityForm');
+  form.action = "{% url 'add_commodity' %}";
+  form.reset();
+  var typeSelect = form.querySelector('[name=commodity_type]');
+  var puritySelect = form.querySelector('[name=purity]');
+  if (typeSelect) {
+    typeSelect.value = 'GOLD';
+    if (window._updateCommodityPurity) {
+      window._updateCommodityPurity(typeSelect, puritySelect, '');
+    }
+  }
+  var descField = form.querySelector('[name=description]');
+  if (descField) descField.value = '';
+  var weightField = form.querySelector('[name=weight_grams]');
+  if (weightField) weightField.value = '';
+  var purchaseField = form.querySelector('[name=purchase_price_per_gram]');
+  if (purchaseField) purchaseField.value = '';
+  
+  document.getElementById('commodityDeleteBtn').style.display = 'none';
+  document.getElementById('commodityModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span>Add Commodity';
+  openModal('addCommodityModal');
 }
 
 function _editSetup(formId, delFormId, delBtnId, titleId, editUrlBase, delUrlBase, editTitle, modalId, d, fieldMap) {

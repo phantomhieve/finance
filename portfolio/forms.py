@@ -132,6 +132,19 @@ class CommodityHoldingForm(forms.ModelForm):
             'purchase_price_per_gram': forms.NumberInput(attrs={'step': '0.01', 'placeholder': 'e.g. 6500'}),
         }
 
+    def clean_purchase_price_per_gram(self):
+        val = self.cleaned_data.get('purchase_price_per_gram')
+        if val is None or val <= 0:
+            raise forms.ValidationError("Purchase price per gram must be greater than 0.")
+        return val
+
+    def clean_weight_grams(self):
+        val = self.cleaned_data.get('weight_grams')
+        if val is None or val <= 0:
+            raise forms.ValidationError("Weight in grams must be greater than 0.")
+        return val
+
+
 
 class USStockHoldingForm(forms.ModelForm):
     class Meta:
