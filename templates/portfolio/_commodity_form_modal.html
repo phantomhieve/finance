@@ -1,0 +1,35 @@
+<dialog class="modal" id="{{ modal_id }}">
+  <div class="modal-box">
+    <h3 class="font-bold text-lg flex items-center gap-2" id="{{ title_id }}">
+      <span class="material-symbols-outlined text-primary">add_circle</span>Add Commodity
+    </h3>
+    <form id="{{ form_id }}" method="post" action="{% url 'add_commodity' %}">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      {% if is_baby %}
+        <input type="hidden" name="is_baby" value="True">
+      {% endif %}
+      <div class="grid grid-cols-2 gap-4 mt-4">
+        <div class="form-field"><label class="label text-xs font-semibold">Type</label>{{ form_obj.commodity_type }}</div>
+        <div class="form-field"><label class="label text-xs font-semibold">Purity</label>{{ form_obj.purity }}</div>
+      </div>
+      <div class="form-field mt-3"><label class="label text-xs font-semibold">Description</label>{{ form_obj.description }}</div>
+      <div class="grid grid-cols-2 gap-4 mt-3">
+        <div class="form-field"><label class="label text-xs font-semibold">Weight (grams)</label>{{ form_obj.weight_grams }}</div>
+        <div class="form-field"><label class="label text-xs font-semibold">Purchase Price / gram (₹)</label>{{ form_obj.purchase_price_per_gram }}</div>
+      </div>
+      <div class="modal-action">
+        <button type="button" id="{{ delete_btn_id }}" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('{{ delete_form_id }}')">
+          <span class="material-symbols-outlined text-base">delete</span>Delete
+        </button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('{{ modal_id }}')">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm"><span class="material-symbols-outlined text-base">save</span>Save</button>
+      </div>
+    </form>
+    <form id="{{ delete_form_id }}" method="post" action="" style="display:none">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    </form>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
