@@ -93,13 +93,23 @@
     </div>
     <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-2">
       {% for m in monthly_data %}
-      <div class="month-card rounded-xl p-2.5 text-center text-xs border {% if m.status == 'good' %}border-success/30 bg-success/5{% elif m.status == 'partial' %}border-warning/30 bg-warning/5{% elif m.status == 'missed' %}border-error/20 bg-error/5{% else %}border-base-300/50 bg-base-300/20{% endif %}">
+      <div class="month-card group rounded-xl p-2.5 text-center text-xs border relative {% if m.status == 'good' %}border-success/30 bg-success/5{% elif m.status == 'partial' %}border-warning/30 bg-warning/5{% elif m.status == 'missed' %}border-error/20 bg-error/5{% else %}border-base-300/50 bg-base-300/20{% endif %}">
         <div class="font-semibold opacity-60 mb-1.5 text-[10px] uppercase tracking-wider">{{ m.name }}</div>
         {% if m.started %}
         <div class="font-bold text-sm">₹{{ m.total|floatformat:0|intcomma }}</div>
         <div class="text-[10px] {% if m.surplus >= 0 %}text-success{% else %}text-error{% endif %} font-semibold mt-0.5">{% if m.surplus >= 0 %}+{% endif %}₹{{ m.surplus|floatformat:0|intcomma }}</div>
         <progress class="progress progress-xs w-full mt-1.5 {% if m.status == 'good' %}progress-success{% elif m.status == 'partial' %}progress-warning{% else %}progress-error{% endif %}" value="{{ m.pct }}" max="100"></progress>
         <div class="text-[10px] opacity-40 mt-0.5">{{ m.pct }}%</div>
+        {# Comment indicator / add button absolutely positioned to maintain grid height consistency #}
+        {% if m.comment %}
+        <button class="absolute top-1.5 right-1.5 btn btn-ghost btn-xs btn-square h-5 w-5 p-0 min-h-0 text-info opacity-75 hover:opacity-100" title="{{ m.comment }}" onclick="openMonthComment('{{ m.month_date }}', '{{ m.name }}', '{{ m.comment|escapejs }}')">
+          <span class="icon-filled material-symbols-outlined text-xs">chat_bubble</span>
+        </button>
+        {% elif m.status == 'missed' or m.status == 'partial' %}
+        <button class="absolute top-1.5 right-1.5 btn btn-ghost btn-xs btn-square h-5 w-5 p-0 min-h-0 opacity-25 sm:opacity-0 group-hover:opacity-60 transition-opacity {% if m.status == 'missed' %}text-error{% elif m.status == 'partial' %}text-warning{% endif %}" title="Add comment" onclick="openMonthComment('{{ m.month_date }}', '{{ m.name }}', '')">
+          <span class="material-symbols-outlined text-xs">add_comment</span>
+        </button>
+        {% endif %}
         {% else %}
         <div class="text-sm opacity-30 mt-1">₹{{ m.goal|floatformat:0|intcomma }}</div>
         <div class="text-[10px] opacity-20">Target</div>
@@ -109,6 +119,30 @@
     </div>
   </div>
 </div>
+
+{# ——— MONTH COMMENT MODAL ——— #}
+<dialog class="modal" id="monthCommentModal">
+  <div class="modal-box max-w-sm">
+    <h3 class="font-bold text-lg flex items-center gap-2" id="monthCommentTitle">
+      <span class="icon-filled material-symbols-outlined text-info">chat_bubble</span>Month Comment
+    </h3>
+    <form method="post" action="{% url 'save_month_comment' %}" id="monthCommentForm">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <input type="hidden" name="month" id="monthCommentDate" value="">
+      <div class="form-field mt-4">
+        <label class="label text-xs font-semibold">Comment</label>
+        {{ comment_form.comment }}
+      </div>
+      <p class="text-xs opacity-40 mt-2">Why did you miss or fall short this month?</p>
+      <div class="modal-action">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('monthCommentModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm"><span class="material-symbols-outlined text-base">save</span>Save</button>
+      </div>
+    </form>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
 
 {# ——— CHARTS ——— #}
 <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 animate-up mb-4" style="animation-delay:0.2s">
@@ -420,6 +454,12 @@ function editTransaction(id, date, type, amount, remarks) {
   document.getElementById('id_amount').value = parseFloat(amount);
   document.getElementById('id_remarks').value = remarks;
   openModal('addTxnModal');
+}
+function openMonthComment(monthDate, monthName, existingComment) {
+  document.getElementById('monthCommentDate').value = monthDate;
+  document.getElementById('monthCommentTitle').innerHTML = '<span class="icon-filled material-symbols-outlined text-info">chat_bubble</span>' + monthName + ' Comment';
+  document.getElementById('id_month_comment').value = existingComment;
+  openModal('monthCommentModal');
 }
 </script>
 {% endblock %}
