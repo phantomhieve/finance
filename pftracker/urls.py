@@ -31,5 +31,12 @@ urlpatterns = [
     path('accounts/2fa/', _blocked),
     path('accounts/', include('allauth.urls')),
     path('portfolio/', include('portfolio.urls')),
+    path('jewellery/', include('jewellery.urls')),
     path('', include('tracker.urls')),
 ]
+
+from django.conf import settings
+from django.conf.urls.static import static
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

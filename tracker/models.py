@@ -58,6 +58,14 @@ class User(AbstractUser):
     def can_view_portfolio(self):
         return self.user_type == 'PRIMARY'
 
+    @property
+    def can_view_jewellery(self):
+        return self.user_type in ('PRIMARY', 'ACCOUNT_HOLDER')
+
+    @property
+    def is_primary(self):
+        return self.user_type == 'PRIMARY'
+
 
 class WebAuthnCredential(models.Model):
     """Stores a WebAuthn (FaceID/TouchID/fingerprint) credential for portfolio unlock."""

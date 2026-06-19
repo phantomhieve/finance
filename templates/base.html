@@ -83,7 +83,7 @@
     {% if user.can_view_portfolio %}
     <div class="tooltip tooltip-right sidebar-tip" data-tip="Portfolio">
       <a href="{% url 'portfolio_tracker' %}" class="sidebar-link {% if request.resolver_match.url_name == 'portfolio_tracker' or 'portfolio' in request.resolver_match.url_name %}sidebar-active{% endif %}">
-        <span class="icon-filled material-symbols-outlined text-lg text-blue-400 flex-shrink-0">query_stats</span>
+        <span class="icon-filled material-symbols-outlined text-[20px] text-blue-400 flex-shrink-0">cases</span>
         <span class="sidebar-label">Portfolio</span>
       </a>
     </div>
@@ -92,6 +92,15 @@
       <a class="sidebar-link opacity-30 pointer-events-none">
         <span class="material-symbols-outlined text-lg flex-shrink-0">query_stats</span>
         <span class="sidebar-label">Portfolio</span>
+      </a>
+    </div>
+    {% endif %}
+
+    {% if user.can_view_jewellery %}
+    <div class="tooltip tooltip-right sidebar-tip" data-tip="Jewellery">
+      <a href="{% url 'jewellery_dashboard' %}" class="sidebar-link {% if 'jewellery' in request.resolver_match.url_name %}sidebar-active{% endif %}">
+        <span class="icon-filled material-symbols-outlined text-[20px] text-pink-400 flex-shrink-0">diamond</span>
+        <span class="sidebar-label">Jewellery</span>
       </a>
     </div>
     {% endif %}
@@ -211,6 +220,12 @@
   <a href="{% url 'portfolio_tracker' %}" {% if 'portfolio' in request.resolver_match.url_name or request.resolver_match.url_name == 'portfolio_tracker' %}class="dock-active"{% endif %}>
     <span class="icon-filled material-symbols-outlined text-xl">query_stats</span>
     <span class="dock-label">Portfolio</span>
+  </a>
+  {% endif %}
+  {% if user.can_view_jewellery %}
+  <a href="{% url 'jewellery_dashboard' %}" {% if 'jewellery' in request.resolver_match.url_name %}class="dock-active"{% endif %}>
+    <span class="icon-filled material-symbols-outlined text-xl">diamond</span>
+    <span class="dock-label">Jewellery</span>
   </a>
   {% endif %}
   <a href="{% url 'hra_tracker' %}" {% if request.resolver_match.url_name == 'hra_tracker' %}class="dock-active"{% endif %}>
