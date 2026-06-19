@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     # Local apps
     'tracker',
     'portfolio',
+    'jewellery',
 ]
 
 SITE_ID = 1
@@ -192,7 +193,13 @@ STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
     'staticfiles': {
         'BACKEND': 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
         if not DEBUG else 'django.contrib.staticfiles.storage.StaticFilesStorage',

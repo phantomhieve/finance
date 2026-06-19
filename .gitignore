@@ -43,3 +43,5 @@ logs/
 
 # Node (if any tooling added later)
 node_modules/
+
+media/

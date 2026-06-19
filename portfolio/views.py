@@ -69,6 +69,20 @@ def _require_portfolio(view_func):
         return view_func(request, *args, **kwargs)
     return _wrapped
 
+def _require_jewellery(view_func):
+    """PRIMARY and ACCOUNT_HOLDER can access jewellery; gate behind group password."""
+    @wraps(view_func)
+    def _wrapped(request, *args, **kwargs):
+        if not getattr(request.user, 'can_view_jewellery', False):
+            return HttpResponseForbidden('You do not have permission to view this page.')
+        unlocked_at = request.session.get('portfolio_unlocked_at')
+        if not unlocked_at or (time.time() - unlocked_at) > _PORTFOLIO_UNLOCK_TTL:
+            request.session.pop('portfolio_unlocked_at', None)
+            return redirect('/portfolio/unlock/?next=' + quote(request.get_full_path()))
+        request.portfolio_expires_at = int(unlocked_at + _PORTFOLIO_UNLOCK_TTL)
+        return view_func(request, *args, **kwargs)
+    return _wrapped
+
 
 _UNLOCK_ATTEMPT_KEY = '_portfolio_unlock_attempts'
 _UNLOCK_LOCKOUT_KEY = '_portfolio_unlock_lockout'
