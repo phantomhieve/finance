@@ -28,6 +28,18 @@ class JewelleryItemForm(forms.ModelForm):
                          'purity', 'photo'):
             self.fields[optional].required = False
 
+    def clean_purchase_price(self):
+        """Coerce blank/None → 0 so the NOT NULL DB column is never sent NULL."""
+        from decimal import Decimal
+        val = self.cleaned_data.get('purchase_price')
+        return val if val is not None else Decimal('0')
+
+    def clean_weight_grams(self):
+        """Coerce blank/None → 0 so the NOT NULL DB column is never sent NULL."""
+        from decimal import Decimal
+        val = self.cleaned_data.get('weight_grams')
+        return val if val is not None else Decimal('0')
+
     def clean_photo(self):
         photo = self.cleaned_data.get('photo')
         # Empty (None) or cleared (False) — nothing to validate.
