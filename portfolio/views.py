@@ -113,6 +113,19 @@ def portfolio_unlock(request):
             request.session.pop(_UNLOCK_ATTEMPT_KEY, None)
             request.session.pop(_UNLOCK_LOCKOUT_KEY, None)
             request.session['portfolio_unlocked_at'] = time.time()
+            
+            # If they don't have Face ID and can register, ask them to register instead of redirecting immediately.
+            has_webauthn = WebAuthnCredential.objects.filter(user=request.user).exists()
+            can_register = getattr(request.user, 'can_view_jewellery', False)
+            if can_register and not has_webauthn:
+                return render(request, 'portfolio/unlock.html', {
+                    'next': next_url,
+                    'has_password': has_password,
+                    'has_webauthn': False,
+                    'can_register_webauthn': True,
+                    'just_unlocked': True,
+                })
+                
             return redirect(next_url)
         attempts = request.session.get(_UNLOCK_ATTEMPT_KEY, 0) + 1
         request.session[_UNLOCK_ATTEMPT_KEY] = attempts
