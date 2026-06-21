@@ -1,11 +1,11 @@
 {% extends 'base.html' %}
 
-{% block title %}Unlock Portfolio — Vault{% endblock %}
+{% block title %}Unlock — Vault{% endblock %}
 
 {% block page_header %}
 <div class="flex items-center gap-2">
   <span class="material-symbols-outlined text-xl text-primary">lock</span>
-  <h1 class="text-lg font-bold">Portfolio Locked</h1>
+  <h1 class="text-lg font-bold">Vault Locked</h1>
 </div>
 {% endblock %}
 
@@ -30,8 +30,8 @@
 
       {% if has_webauthn %}
       <div id="biometricSection">
-        <h2 class="card-title text-base">Unlock Portfolio</h2>
-        <p class="text-xs opacity-50 mb-4">Authenticate to access your portfolio.</p>
+        <h2 class="card-title text-base">Unlock Vault</h2>
+        <p class="text-xs opacity-50 mb-4">Authenticate to access your vault.</p>
         <button type="button" id="biometricBtn" class="btn btn-primary btn-block gap-2" onclick="startBiometricAuth()">
           <span class="material-symbols-outlined text-base">fingerprint</span>
           Unlock with Biometrics
@@ -47,7 +47,7 @@
       {% endif %}
 
       <div id="passwordSection" {% if has_webauthn %}style="display:none"{% endif %}>
-        <h2 class="card-title text-base">Enter Portfolio Password</h2>
+        <h2 class="card-title text-base">Enter Vault Password</h2>
         <p class="text-xs opacity-50 mb-4">Access expires after 5 minutes of inactivity.</p>
         <form method="post" class="w-full">
           {% csrf_token %}
@@ -69,8 +69,22 @@
       </div>
 
       {% else %}
-      <h2 class="card-title text-base">Portfolio Unavailable</h2>
-      <p class="text-xs opacity-50">No portfolio password has been configured. Contact your administrator.</p>
+      <h2 class="card-title text-base">Vault Unavailable</h2>
+      <p class="text-xs opacity-50">No vault password has been configured. Contact your administrator.</p>
+      {% endif %}
+
+      {# ── Face ID registration prompt (shown after password unlock, no biometric yet) ── #}
+      {% if just_unlocked and can_register_webauthn %}
+      <div class="divider mt-4 text-xs opacity-40">already unlocked</div>
+      <div class="w-full text-left">
+        <p class="text-xs opacity-60 mb-2">Set up Face ID / fingerprint so you can skip the password next time.</p>
+        <button type="button" id="registerBiometricBtn" class="btn btn-outline btn-sm btn-block gap-2"
+                onclick="registerBiometric()">
+          <span class="material-symbols-outlined text-base">fingerprint</span>
+          Set up Face ID / Biometrics
+        </button>
+        <div id="registerMsg" class="text-xs mt-2 hidden"></div>
+      </div>
       {% endif %}
 
     </div>
@@ -174,6 +188,87 @@ document.addEventListener('DOMContentLoaded', function() {
     showPasswordForm();
   }
 });
+</script>
+{% endif %}
+
+{% if just_unlocked and can_register_webauthn %}
+<script>
+function _b64urlToBytes(b64url) {
+  var s = b64url.replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4) s += '=';
+  var raw = atob(s);
+  var arr = new Uint8Array(raw.length);
+  for (var i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
+}
+function _bytesToB64url(buf) {
+  var bytes = new Uint8Array(buf);
+  var str = '';
+  for (var i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i]);
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function _getCsrf() {
+  var c = document.cookie.match(/csrftoken=([^;]+)/);
+  return c ? c[1] : '';
+}
+
+async function registerBiometric() {
+  var btn = document.getElementById('registerBiometricBtn');
+  var msg = document.getElementById('registerMsg');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Setting up…';
+  msg.className = 'text-xs mt-2';
+  msg.textContent = '';
+
+  try {
+    var beginResp = await fetch('{% url "webauthn_register_begin" %}', {
+      method: 'POST',
+      headers: {'X-CSRFToken': _getCsrf(), 'Content-Type': 'application/json'},
+    });
+    if (!beginResp.ok) throw new Error((await beginResp.json()).error || 'Failed to start registration.');
+    var options = await beginResp.json();
+
+    options.challenge = _b64urlToBytes(options.challenge);
+    options.user.id = _b64urlToBytes(options.user.id);
+    if (options.excludeCredentials) {
+      options.excludeCredentials = options.excludeCredentials.map(function(c) {
+        return {id: _b64urlToBytes(c.id), type: c.type};
+      });
+    }
+
+    var cred = await navigator.credentials.create({publicKey: options});
+
+    var body = {
+      id: cred.id,
+      rawId: _bytesToB64url(cred.rawId),
+      type: cred.type,
+      device_name: navigator.platform || 'Device',
+      response: {
+        attestationObject: _bytesToB64url(cred.response.attestationObject),
+        clientDataJSON: _bytesToB64url(cred.response.clientDataJSON),
+      },
+    };
+
+    var completeResp = await fetch('{% url "webauthn_register_complete" %}', {
+      method: 'POST',
+      headers: {'X-CSRFToken': _getCsrf(), 'Content-Type': 'application/json'},
+      body: JSON.stringify(body),
+    });
+    if (!completeResp.ok) throw new Error((await completeResp.json()).error || 'Registration failed.');
+
+    msg.classList.remove('hidden');
+    msg.classList.add('text-success');
+    msg.textContent = '✓ Face ID / biometrics set up! You can now use it to unlock next time.';
+    btn.classList.add('hidden');
+  } catch (e) {
+    btn.disabled = false;
+    btn.innerHTML = '<span class="material-symbols-outlined text-base">fingerprint</span> Set up Face ID / Biometrics';
+    if (e.name === 'NotAllowedError') return;
+    msg.classList.remove('hidden');
+    msg.classList.add('text-error');
+    msg.textContent = e.message || 'Setup failed.';
+  }
+}
 </script>
 {% endif %}
 {% endblock %}

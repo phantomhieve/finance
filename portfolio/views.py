@@ -123,10 +123,15 @@ def portfolio_unlock(request):
         else:
             messages.error(request, 'Incorrect portfolio password.')
     has_webauthn = WebAuthnCredential.objects.filter(user=request.user).exists()
+    can_register = getattr(request.user, 'can_view_jewellery', False)
+    # Show registration prompt if the user just unlocked (session was just set)
+    just_unlocked = bool(request.session.get('portfolio_unlocked_at'))
     return render(request, 'portfolio/unlock.html', {
         'next': next_url,
         'has_password': has_password,
         'has_webauthn': has_webauthn,
+        'can_register_webauthn': can_register and not has_webauthn,
+        'just_unlocked': just_unlocked,
     })
 
 
@@ -806,12 +811,13 @@ _MAX_WEBAUTHN_CREDENTIALS = 5
 @login_required
 @require_POST
 def webauthn_register_begin(request):
-    """Start biometric registration. Requires portfolio already unlocked."""
-    if not request.user.can_view_portfolio:
+    """Start biometric registration. Requires vault already unlocked.
+    Accessible to PRIMARY and ACCOUNT_HOLDER (jewellery access)."""
+    if not getattr(request.user, 'can_view_jewellery', False):
         return JsonResponse({'error': 'Forbidden.'}, status=403)
     unlocked_at = request.session.get('portfolio_unlocked_at')
     if not unlocked_at or (time.time() - unlocked_at) > _PORTFOLIO_UNLOCK_TTL:
-        return JsonResponse({'error': 'Portfolio must be unlocked first.'}, status=403)
+        return JsonResponse({'error': 'Vault must be unlocked first.'}, status=403)
 
     from webauthn import generate_registration_options, options_to_json
     from webauthn.helpers.structs import (
@@ -854,7 +860,7 @@ def webauthn_register_begin(request):
 @require_POST
 def webauthn_register_complete(request):
     """Complete biometric registration and store the credential."""
-    if not request.user.can_view_portfolio:
+    if not getattr(request.user, 'can_view_jewellery', False):
         return JsonResponse({'error': 'Forbidden.'}, status=403)
     challenge_hex = request.session.pop('webauthn_reg_challenge', None)
     if not challenge_hex:
@@ -890,7 +896,7 @@ def webauthn_register_complete(request):
 @require_POST
 def webauthn_auth_begin(request):
     """Start biometric authentication on the unlock page."""
-    if not request.user.can_view_portfolio:
+    if not getattr(request.user, 'can_view_jewellery', False):
         return JsonResponse({'error': 'Forbidden.'}, status=403)
 
     from webauthn import generate_authentication_options, options_to_json
@@ -921,8 +927,8 @@ def webauthn_auth_begin(request):
 @login_required
 @require_POST
 def webauthn_auth_complete(request):
-    """Verify biometric authentication and unlock the portfolio."""
-    if not request.user.can_view_portfolio:
+    """Verify biometric authentication and unlock the portfolio/jewellery."""
+    if not getattr(request.user, 'can_view_jewellery', False):
         return JsonResponse({'error': 'Forbidden.'}, status=403)
     challenge_hex = request.session.pop('webauthn_auth_challenge', None)
     if not challenge_hex:
