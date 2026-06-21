@@ -54,6 +54,7 @@ from portfolio.models import (
     USStockHolding, FinancialGoal as PortfolioFinancialGoal,
     MonthlySnapshot,
 )
+from jewellery.models import JewelleryItem
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
@@ -496,6 +497,74 @@ MonthlySnapshot.objects.get_or_create(
     )
 )
 say("Monthly snapshot for March 2025 created")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 18. Jewellery Collection (physical assets, tag + location based)
+# ─────────────────────────────────────────────────────────────────────────────
+print("\n── Jewellery Collection ──────────────────────────────────────")
+
+# (category, metal, purity, weight_g, location,
+#  purchase_date, purchase_price, notes)
+JEWELLERY = [
+    ("NECKLACE", "GOLD",   "22k", Decimal("38.50"), "BANK_LOCKER",
+     d(2015, 11, 20), Decimal("1_85_000"),
+     "Bridal necklace set, part of wedding jewellery."),
+    ("BANGLE", "GOLD",     "22k", Decimal("24.00"), "BANK_LOCKER",
+     d(2015, 11, 20), Decimal("1_15_000"),
+     "Pair of bangles, matches the bridal set."),
+    ("RING", "GOLD",       "18k", Decimal("4.20"), "HOME_SAFE",
+     d(2015, 2, 14), Decimal("62_000"),
+     "Solitaire engagement ring, worn daily."),
+    ("RING", "GOLD",       "22k", Decimal("6.80"), "HOME_SAFE",
+     d(2015, 11, 20), Decimal("32_000"),
+     "Plain wedding band, worn daily."),
+    ("CHAIN", "GOLD",      "22k", Decimal("12.30"), "HOME_SAFE",
+     d(2018, 8, 10), Decimal("58_000"),
+     "Gifted by parents."),
+    ("EARRINGS", "GOLD",   "22k", Decimal("8.10"), "BANK_LOCKER",
+     d(2019, 10, 25), Decimal("46_000"),
+     "Festive jhumkas, worn on occasions."),
+    ("LOCKET", "GOLD",     "22k", Decimal("5.50"), "HOME_SAFE",
+     d(2020, 1, 5), Decimal("28_000"),
+     "Religious pendant."),
+    ("BRACELET", "GOLD",   "18k", Decimal("9.40"), "HOME_SAFE",
+     d(2021, 12, 18), Decimal("52_000"),
+     "Anniversary gift."),
+    ("COIN", "GOLD",       "24k", Decimal("20.00"), "BANK_LOCKER",
+     d(2022, 5, 3), Decimal("1_18_000"),
+     "Investment coin bought on Akshaya Tritiya."),
+    ("COIN", "GOLD",       "24k", Decimal("10.00"), "BANK_LOCKER",
+     d(2023, 11, 12), Decimal("62_000"),
+     "Investment coin bought on Dhanteras."),
+    ("NECKLACE", "SILVER", "925", Decimal("85.00"), "HOME_SAFE",
+     d(2021, 9, 14), Decimal("9_500"),
+     "Oxidised silver statement necklace."),
+    ("COIN", "SILVER",     "999", Decimal("250.00"), "BANK_LOCKER",
+     d(2020, 11, 14), Decimal("18_500"),
+     "Set of silver coins for gifting / investment."),
+    ("BANGLE", "SILVER",   "925", Decimal("60.00"), "HOME_SAFE",
+     d(2024, 3, 2), Decimal("7_200"),
+     "Silver anklets gifted for the baby."),
+]
+
+_jewellery_created = 0
+for cat, metal, purity, weight, loc, pdate, price, notes in JEWELLERY:
+    obj, created = JewelleryItem.objects.get_or_create(
+        group=group,
+        category=cat,
+        metal_type=metal,
+        purity=purity,
+        weight_grams=weight,
+        defaults=dict(
+            location=loc,
+            purchase_date=pdate,
+            purchase_price=price,
+            notes=notes,
+        ),
+    )
+    if created:
+        _jewellery_created += 1
+say(f"{len(JEWELLERY)} jewellery items ({_jewellery_created} new)")
 
 # ─────────────────────────────────────────────────────────────────────────────
 print("\n" + "═" * 60)

@@ -83,7 +83,7 @@
     {% if user.can_view_portfolio %}
     <div class="tooltip tooltip-right sidebar-tip" data-tip="Portfolio">
       <a href="{% url 'portfolio_tracker' %}" class="sidebar-link {% if request.resolver_match.url_name == 'portfolio_tracker' or 'portfolio' in request.resolver_match.url_name %}sidebar-active{% endif %}">
-        <span class="icon-filled material-symbols-outlined text-lg text-blue-400 flex-shrink-0">query_stats</span>
+        <span class="icon-filled material-symbols-outlined text-[20px] text-blue-400 flex-shrink-0">cases</span>
         <span class="sidebar-label">Portfolio</span>
       </a>
     </div>
@@ -92,6 +92,15 @@
       <a class="sidebar-link opacity-30 pointer-events-none">
         <span class="material-symbols-outlined text-lg flex-shrink-0">query_stats</span>
         <span class="sidebar-label">Portfolio</span>
+      </a>
+    </div>
+    {% endif %}
+
+    {% if user.can_view_jewellery %}
+    <div class="tooltip tooltip-right sidebar-tip" data-tip="Jewellery">
+      <a href="{% url 'jewellery_dashboard' %}" class="sidebar-link {% if 'jewellery' in request.resolver_match.url_name %}sidebar-active{% endif %}">
+        <span class="icon-filled material-symbols-outlined text-[20px] text-pink-400 flex-shrink-0">diamond</span>
+        <span class="sidebar-label">Jewellery</span>
       </a>
     </div>
     {% endif %}
@@ -164,6 +173,13 @@
             <div class="text-sm font-semibold truncate">{{ user.get_full_name|default:user.username }}</div>
             <div class="text-[11px] opacity-40 font-normal">{{ user.get_user_type_display }}</div>
           </li>
+          {% if user.is_staff %}
+          <li class="lg:hidden">
+            <a href="/vault-manage/" class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-base text-rose-400">admin_panel_settings</span>Admin
+            </a>
+          </li>
+          {% endif %}
           <li>
             <form method="post" action="{% url 'logout' %}" class="m-0">{% csrf_token %}
               <button type="submit" class="flex items-center gap-2 text-error w-full text-left">
@@ -213,6 +229,12 @@
     <span class="dock-label">Portfolio</span>
   </a>
   {% endif %}
+  {% if user.can_view_jewellery %}
+  <a href="{% url 'jewellery_dashboard' %}" {% if 'jewellery' in request.resolver_match.url_name %}class="dock-active"{% endif %}>
+    <span class="icon-filled material-symbols-outlined text-xl">diamond</span>
+    <span class="dock-label">Jewellery</span>
+  </a>
+  {% endif %}
   <a href="{% url 'hra_tracker' %}" {% if request.resolver_match.url_name == 'hra_tracker' %}class="dock-active"{% endif %}>
     <span class="icon-filled material-symbols-outlined text-xl">home_work</span>
     <span class="dock-label">HRA</span>
@@ -221,12 +243,6 @@
     <span class="icon-filled material-symbols-outlined text-xl">sticky_note_2</span>
     <span class="dock-label">Notes</span>
   </a>
-  {% if user.is_staff %}
-  <a href="/vault-manage/" {% if 'admin' in request.path %}class="dock-active"{% endif %}>
-    <span class="material-symbols-outlined text-xl">admin_panel_settings</span>
-    <span class="dock-label">Admin</span>
-  </a>
-  {% endif %}
   <a href="javascript:void(0)" onclick="Vault.showLoader();Vault.afterPaint(function(){history.back()})">
     <span class="material-symbols-outlined text-xl">arrow_back</span>
     <span class="dock-label">Back</span>
