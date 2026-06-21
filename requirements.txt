@@ -13,3 +13,6 @@ django-allauth[socialaccount]>=65.0
 google-genai>=1.0
 django-unfold>=0.87.0
 webauthn>=2.0
+# Image upload support
+Pillow>=11.0               # required by Django ImageField for validation/processing
+django-cleanup>=9.0        # auto-deletes media files when a model instance is deleted or photo replaced
