@@ -49,15 +49,20 @@ class JewelleryItemForm(forms.ModelForm):
 
         # Decode with Pillow to confirm it is genuinely an image of an allowed
         # format (defends against polyglots and mislabelled extensions).
+        # NOTE: Image.verify() must be called on a freshly opened image — it
+        # consumes/corrupts the image object and must NOT be used after the
+        # call (including accessing .format). Capture format first, then verify.
         try:
             from PIL import Image
 
+            photo.seek(0)
             image = Image.open(photo)
-            image.verify()
+            fmt = image.format          # capture BEFORE verify() destroys the object
+            image.verify()              # raises if the file is not a valid image
         except Exception:
             raise forms.ValidationError('The uploaded file is not a valid image.')
 
-        if image.format not in ALLOWED_PHOTO_FORMATS:
+        if fmt not in ALLOWED_PHOTO_FORMATS:
             raise forms.ValidationError('Unsupported image format.')
 
         # verify() leaves the file pointer consumed — rewind so save() works.
