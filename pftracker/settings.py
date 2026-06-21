@@ -48,6 +48,9 @@ INSTALLED_APPS = [
     'tracker',
     'portfolio',
     'jewellery',
+
+    # Must be last — auto-deletes media files on model delete / field replace
+    'django_cleanup.apps.CleanupConfig',
 ]
 
 SITE_ID = 1
