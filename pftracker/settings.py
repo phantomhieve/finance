@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     # Local apps
     'tracker',
     'portfolio',
+    'jewellery',
 ]
 
 SITE_ID = 1
@@ -192,7 +193,13 @@ STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
     'staticfiles': {
         'BACKEND': 'django.contrib.staticfiles.storage.ManifestStaticFilesStorage'
         if not DEBUG else 'django.contrib.staticfiles.storage.StaticFilesStorage',
@@ -252,7 +259,7 @@ SECURE_CSP = {
     ],
     "font-src": [CSP.SELF, "https://fonts.gstatic.com"],
     "connect-src": [CSP.SELF, "https://accounts.google.com"],
-    "img-src": [CSP.SELF, "data:", "https://*.googleusercontent.com"],
+    "img-src": [CSP.SELF, "data:", "blob:", "https://*.googleusercontent.com"],
     "frame-ancestors": [CSP.NONE],
     "base-uri": [CSP.SELF],
 }

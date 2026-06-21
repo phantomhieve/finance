@@ -1,0 +1,320 @@
+{% extends 'base.html' %}
+{% load indian_format %}
+{% load static %}
+
+{% block title %}{{ item.display_label }} — Jewellery Collection{% endblock %}
+
+{% block page_header %}
+<div class="flex items-center justify-between mb-2">
+  <a href="{% url 'jewellery_dashboard' %}" class="btn btn-ghost btn-sm gap-1 -ml-3 opacity-60 hover:opacity-100">
+    <span class="material-symbols-outlined text-base">arrow_back</span> <span class="hidden sm:inline">Back to Collection</span><span class="sm:hidden">Back</span>
+  </a>
+  <button type="button" class="btn btn-outline btn-sm gap-1" onclick="toggleEditMode()">
+    <span class="material-symbols-outlined text-base">edit</span> <span id="editBtnText">Edit</span>
+  </button>
+</div>
+<div class="flex flex-col md:flex-row md:items-start justify-between gap-3">
+  <div>
+    <h1 class="text-2xl lg:text-3xl font-extrabold">{{ item.display_label }}</h1>
+    <div class="flex flex-wrap items-center gap-2 mt-2">
+      <a href="{% url 'jewellery_dashboard' %}?category={{ item.category }}" class="jw-type-badge" style="--h:{{ item.category_hue }}">
+        <span class="icon-filled material-symbols-outlined" style="font-size:13px">{{ item.category_icon }}</span>{{ item.get_category_display }}
+      </a>
+      <span class="text-xs opacity-60 flex items-center gap-1">
+        <span class="w-1.5 h-1.5 rounded-full {% if item.location == 'BANK_LOCKER' %}bg-error{% else %}bg-warning{% endif %}"></span>
+        {{ item.get_location_display }}
+      </span>
+    </div>
+  </div>
+  {% if is_primary %}
+  <div class="text-left md:text-right shrink-0">
+    <p class="text-[10px] font-bold uppercase tracking-widest opacity-40">Current Est. Value</p>
+    <p class="text-2xl font-extrabold text-primary">₹{{ item.estimated_value|floatformat:0|indian_number }}</p>
+    {% if item.purchase_price > 0 %}
+      <p class="text-[10px] mt-0.5 opacity-60">
+        Cost: ₹{{ item.purchase_price|floatformat:0|indian_number }}
+        <span class="ml-1 {% if item.pnl >= 0 %}text-success{% else %}text-error{% endif %}">
+          ({% if item.pnl >= 0 %}+{% endif %}₹{{ item.pnl|floatformat:0|indian_number }})
+        </span>
+      </p>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+
+{# ——— VIEW MODE ——— #}
+<div id="viewModeContainer" class="animate-up">
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-6">
+
+    {# Photo #}
+    <div class="lg:col-span-1">
+      <div class="card bg-base-200 shadow-sm overflow-hidden aspect-square flex items-center justify-center group relative jw-type-tile {% if item.photo %}cursor-pointer{% endif %}" style="--h:{{ item.category_hue }}" {% if item.photo %}onclick="openPhotoModal()"{% endif %}>
+        <div class="flex flex-col items-center justify-center gap-2">
+          <span class="icon-filled material-symbols-outlined jw-type-icon text-7xl">{{ item.category_icon }}</span>
+          <span class="text-xs uppercase font-bold tracking-widest jw-type-icon opacity-70">{{ item.get_category_display }}</span>
+        </div>
+        {% if item.photo %}
+        <img src="{% url 'jewellery_photo' item.pk %}" alt="{{ item.display_label }}" onerror="this.remove()" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+        <div class="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+          <span class="btn btn-circle btn-ghost text-white backdrop-blur-sm bg-white/10 border border-white/20">
+            <span class="material-symbols-outlined text-2xl">zoom_in</span>
+          </span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    {# Details #}
+    <div class="lg:col-span-2 space-y-5 lg:space-y-6">
+      <div class="card bg-base-200 shadow-sm">
+        <div class="card-body p-5">
+          <h3 class="text-xs font-bold uppercase tracking-widest opacity-40 mb-4 border-b border-base-content/10 pb-2">Material & Location</h3>
+          <div class="grid grid-cols-2 md:grid-cols-3 gap-y-5 gap-x-4">
+            <div class="stat-card">
+              <div class="text-[10px] uppercase tracking-wider opacity-50">Metal</div>
+              <div class="text-base font-bold mt-1 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full {% if item.metal_type == 'GOLD' %}bg-warning{% elif item.metal_type == 'SILVER' %}bg-slate-400{% else %}bg-indigo-400{% endif %}"></span>
+                {{ item.get_metal_type_display }}
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="text-[10px] uppercase tracking-wider opacity-50">Purity</div>
+              <div class="text-base font-bold mt-1">{% if item.purity %}{{ item.get_purity_display }}{% else %}<span class="opacity-30">N/A</span>{% endif %}</div>
+            </div>
+            <div class="stat-card">
+              <div class="text-[10px] uppercase tracking-wider opacity-50">Weight</div>
+              <div class="text-base font-bold mt-1 text-primary">{{ item.weight_grams|floatformat:2 }}g</div>
+            </div>
+            <div class="stat-card">
+              <div class="text-[10px] uppercase tracking-wider opacity-50">Stored At</div>
+              <div class="text-base font-bold mt-1 flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full {% if item.location == 'BANK_LOCKER' %}bg-error{% else %}bg-warning{% endif %}"></span>
+                {{ item.get_location_display }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card bg-base-200 shadow-sm">
+        <div class="card-body p-5">
+          <h3 class="text-xs font-bold uppercase tracking-widest opacity-40 mb-4 border-b border-base-content/10 pb-2">Purchase & Notes</h3>
+          <div class="grid grid-cols-2 gap-y-5 gap-x-4 mb-5">
+            <div class="stat-card">
+              <div class="text-[10px] uppercase tracking-wider opacity-50">Purchase Date</div>
+              <div class="text-base font-bold mt-1">
+                {% if item.purchase_date %}{{ item.purchase_date|date:"M d, Y" }}{% else %}<span class="opacity-30">Not specified</span>{% endif %}
+              </div>
+            </div>
+            <div class="stat-card">
+              <div class="text-[10px] uppercase tracking-wider opacity-50">Purchase Cost</div>
+              <div class="text-base font-bold mt-1">
+                {% if item.purchase_price > 0 %}₹{{ item.purchase_price|floatformat:0|indian_number }}{% else %}<span class="opacity-30">Not specified</span>{% endif %}
+              </div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="text-[10px] uppercase tracking-wider opacity-50 mb-1.5">Notes</div>
+            <div class="text-sm bg-base-300/30 p-3 rounded-lg min-h-[60px]">
+              {% if item.notes %}{{ item.notes|linebreaksbr }}{% else %}<span class="opacity-30 italic">No notes provided.</span>{% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+{# ——— EDIT MODE ——— #}
+<div id="editModeContainer" class="hidden animate-up">
+  <div class="card bg-base-200 shadow-sm">
+    <div class="card-body p-5 lg:p-8">
+      <h2 class="text-lg font-bold border-b border-base-content/10 pb-3 mb-5 flex items-center gap-2">
+        <span class="material-symbols-outlined text-primary">edit_square</span> Update Item Details
+      </h2>
+
+      <form id="jewelleryEditForm" method="POST" action="{% url 'edit_jewellery' item.pk %}" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div class="form-field">
+            <label class="label py-1"><span class="label-text text-xs font-bold uppercase tracking-wider opacity-50">Type</span></label>
+            <select name="category" id="je_category">
+              {% for val, label in form.fields.category.choices %}
+              <option value="{{ val }}" {% if item.category == val %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-field">
+            <label class="label py-1"><span class="label-text text-xs font-bold uppercase tracking-wider opacity-50">Metal</span></label>
+            <select name="metal_type" id="je_metal" data-init="{{ item.metal_type }}">
+              {% for val, label in form.fields.metal_type.choices %}
+              <option value="{{ val }}" {% if item.metal_type == val %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-4">
+          <div class="form-field">
+            <label class="label py-1"><span class="label-text text-xs font-bold uppercase tracking-wider opacity-50">Purity</span></label>
+            <select name="purity" id="je_purity" data-init="{{ item.purity }}"></select>
+          </div>
+          <div class="form-field">
+            <label class="label py-1"><span class="label-text text-xs font-bold uppercase tracking-wider opacity-50">Weight (g) *</span></label>
+            <input type="number" step="0.01" name="weight_grams" id="je_weight" value="{{ item.weight_grams }}" min="0" required />
+          </div>
+        </div>
+
+        {# Location #}
+        <div class="mb-4">
+          <label class="label py-1"><span class="label-text text-xs font-bold uppercase tracking-wider opacity-50">Location</span></label>
+          <input type="hidden" name="location" id="je_location" value="{{ item.location }}" />
+          <div class="grid grid-cols-2 gap-2" id="je_location_chips">
+            <button type="button" data-loc="BANK_LOCKER" class="btn btn-sm btn-ghost border border-base-content/10 gap-1.5 justify-start">🏦 Bank Locker</button>
+            <button type="button" data-loc="HOME_SAFE" class="btn btn-sm btn-ghost border border-base-content/10 gap-1.5 justify-start">🏠 Home Safe</button>
+          </div>
+        </div>
+
+        {# Photo #}
+        <div class="mb-5">
+          <label class="label py-1"><span class="label-text text-xs font-bold uppercase tracking-wider opacity-50">Photo</span></label>
+
+          <div id="je_photo_preview_container" class="{% if not item.photo %}hidden{% endif %} mb-2 relative group w-full max-w-sm h-48 rounded-xl overflow-hidden bg-base-300/50">
+            <img id="je_photo_preview_img" {% if item.photo %}src="{% url 'jewellery_photo' item.pk %}"{% endif %} onerror="clearEditPhotoBroken()" class="w-full h-full object-cover transition-opacity duration-300" />
+            <div data-photo-loader class="hidden absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-base-300/80 backdrop-blur-sm">
+              <span class="loading loading-spinner loading-md text-primary"></span>
+              <span class="text-[10px] font-semibold uppercase tracking-wider opacity-60">Processing photo…</span>
+            </div>
+            <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" onclick="document.getElementById('je_photo').click()">
+              <span class="text-sm font-semibold text-white flex items-center gap-1"><span class="material-symbols-outlined">cached</span>Change Photo</span>
+            </div>
+            <button type="button" class="absolute top-2 right-2 btn btn-circle btn-xs btn-error shadow-lg" onclick="clearEditPhoto(event)">
+              <span class="material-symbols-outlined text-xs">close</span>
+            </button>
+          </div>
+
+          <label for="je_photo" id="je_photo_upload_box"
+                 class="{% if item.photo %}hidden{% endif %} flex flex-col items-center justify-center py-6 px-4 rounded-xl border-2 border-dashed border-base-content/10 bg-base-300/30 cursor-pointer hover:border-primary/40 hover:bg-base-300/50 transition-all group max-w-sm">
+            <span class="material-symbols-outlined text-3xl opacity-30 group-hover:text-primary group-hover:scale-110 transition-all mb-2">add_photo_alternate</span>
+            <span class="text-xs font-semibold opacity-40 group-hover:opacity-70">Tap to upload a new photo</span>
+          </label>
+
+          <input type="file" name="photo" id="je_photo" accept="image/*" class="hidden" onchange="handlePhotoSelect(this, 'je_photo_preview_container', 'je_photo_preview_img', 'je_photo_upload_box')" />
+          <input type="hidden" name="photo-clear" id="je_photo_clear" value="" />
+        </div>
+
+        <div class="divider my-6 text-xs opacity-40">Purchase Details</div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div class="form-field">
+            <label class="label py-1"><span class="label-text text-xs font-bold uppercase tracking-wider opacity-50">Purchase Date</span></label>
+            <input type="date" name="purchase_date" id="je_date" value="{{ item.purchase_date|date:'Y-m-d' }}" />
+          </div>
+          <div class="form-field">
+            <label class="label py-1"><span class="label-text text-xs font-bold uppercase tracking-wider opacity-50">Purchase Price (₹)</span></label>
+            <input type="number" step="0.01" name="purchase_price" id="je_price" value="{{ item.purchase_price }}" min="0" />
+          </div>
+        </div>
+
+        <div class="form-field mb-8">
+          <label class="label py-1"><span class="label-text text-xs font-bold uppercase tracking-wider opacity-50">Notes</span></label>
+          <textarea name="notes" id="je_notes" rows="3" placeholder="Optional notes…">{{ item.notes }}</textarea>
+        </div>
+
+        <div class="flex justify-between items-center pt-4 border-t border-base-content/10">
+          <div>
+            {% if is_primary %}
+            <button type="button" class="btn btn-error btn-outline btn-sm gap-1" onclick="confirmDelete('deleteJForm', 'Are you sure you want to delete this jewellery item?')">
+              <span class="material-symbols-outlined text-base">delete</span> Delete
+            </button>
+            {% endif %}
+          </div>
+          <div class="flex gap-3">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="toggleEditMode()">Cancel</button>
+            <button type="submit" class="btn btn-primary btn-sm px-8">Save Changes</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% if is_primary %}
+<form id="deleteJForm" method="POST" action="{% url 'delete_jewellery' item.pk %}" style="display:none">{% csrf_token %}</form>
+{% endif %}
+
+{# ——— PHOTO VIEWER MODAL ——— #}
+{% if item.photo %}
+<dialog id="photoModal" class="modal modal-bottom sm:modal-middle">
+  <div class="modal-box bg-base-200 p-0 overflow-hidden max-w-3xl rounded-2xl shadow-2xl">
+    <div class="bg-base-300/80 px-4 py-3 border-b border-base-content/5 flex justify-between items-center">
+      <h3 class="font-bold text-base">{{ item.display_label }}</h3>
+      <form method="dialog"><button class="btn btn-sm btn-circle btn-ghost">✕</button></form>
+    </div>
+    <div class="p-4 flex justify-center bg-black/20 min-h-[40vh]">
+      <img src="{% url 'jewellery_photo' item.pk %}" class="max-h-[75vh] object-contain rounded-lg" />
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/jewellery.js' %}"></script>
+<script>
+function clearEditPhoto(e) {
+  e.preventDefault();
+  e.stopPropagation();
+  var input = document.getElementById('je_photo');
+  input.value = '';
+  document.getElementById('je_photo_clear').value = 'true';
+  handlePhotoSelect(input, 'je_photo_preview_container', 'je_photo_preview_img', 'je_photo_upload_box');
+}
+
+// Stored photo could not be loaded (missing / corrupt) — show the uploader instead of a broken image.
+function clearEditPhotoBroken() {
+  var container = document.getElementById('je_photo_preview_container');
+  // Ignore errors from a blank src (no stored photo).
+  if (!document.getElementById('je_photo_preview_img').getAttribute('src')) return;
+  container.classList.add('hidden');
+  document.getElementById('je_photo_upload_box').classList.remove('hidden');
+}
+
+function toggleEditMode() {
+  var vMode = document.getElementById('viewModeContainer');
+  var eMode = document.getElementById('editModeContainer');
+  var btnText = document.getElementById('editBtnText');
+  if (vMode.classList.contains('hidden')) {
+    vMode.classList.remove('hidden');
+    eMode.classList.add('hidden');
+    btnText.textContent = 'Edit';
+  } else {
+    vMode.classList.add('hidden');
+    eMode.classList.remove('hidden');
+    btnText.textContent = 'Cancel';
+  }
+}
+
+function openPhotoModal() {
+  var modal = document.getElementById('photoModal');
+  if (modal) modal.showModal();
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+  var mSelect = document.getElementById('je_metal');
+  var pSelect = document.getElementById('je_purity');
+  Jewellery.updatePurityChoices(mSelect, pSelect, pSelect.dataset.init);
+  mSelect.addEventListener('change', function() {
+    Jewellery.updatePurityChoices(this, pSelect);
+  });
+  Jewellery.initLocation('je');
+});
+</script>
+{% endblock %}
