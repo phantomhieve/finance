@@ -259,7 +259,7 @@ SECURE_CSP = {
     ],
     "font-src": [CSP.SELF, "https://fonts.gstatic.com"],
     "connect-src": [CSP.SELF, "https://accounts.google.com"],
-    "img-src": [CSP.SELF, "data:", "https://*.googleusercontent.com"],
+    "img-src": [CSP.SELF, "data:", "blob:", "https://*.googleusercontent.com"],
     "frame-ancestors": [CSP.NONE],
     "base-uri": [CSP.SELF],
 }

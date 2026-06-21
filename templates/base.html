@@ -173,6 +173,13 @@
             <div class="text-sm font-semibold truncate">{{ user.get_full_name|default:user.username }}</div>
             <div class="text-[11px] opacity-40 font-normal">{{ user.get_user_type_display }}</div>
           </li>
+          {% if user.is_staff %}
+          <li class="lg:hidden">
+            <a href="/vault-manage/" class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-base text-rose-400">admin_panel_settings</span>Admin
+            </a>
+          </li>
+          {% endif %}
           <li>
             <form method="post" action="{% url 'logout' %}" class="m-0">{% csrf_token %}
               <button type="submit" class="flex items-center gap-2 text-error w-full text-left">
@@ -236,12 +243,6 @@
     <span class="icon-filled material-symbols-outlined text-xl">sticky_note_2</span>
     <span class="dock-label">Notes</span>
   </a>
-  {% if user.is_staff %}
-  <a href="/vault-manage/" {% if 'admin' in request.path %}class="dock-active"{% endif %}>
-    <span class="material-symbols-outlined text-xl">admin_panel_settings</span>
-    <span class="dock-label">Admin</span>
-  </a>
-  {% endif %}
   <a href="javascript:void(0)" onclick="Vault.showLoader();Vault.afterPaint(function(){history.back()})">
     <span class="material-symbols-outlined text-xl">arrow_back</span>
     <span class="dock-label">Back</span>

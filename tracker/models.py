@@ -46,9 +46,14 @@ class User(AbstractUser):
     def _is_account_member(self):
         return self.user_type in ('PRIMARY', 'ACCOUNT_HOLDER')
 
-    can_edit_savings = _is_account_member
+    # Savings: account members (incl. spouse) can view, but only the PRIMARY
+    # holder may add/edit/delete entries and goals.
     can_view_savings = _is_account_member
     can_edit_hra = _is_account_member
+
+    @property
+    def can_edit_savings(self):
+        return self.user_type == 'PRIMARY'
 
     @property
     def can_view_hra(self):

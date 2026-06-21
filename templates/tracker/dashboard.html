@@ -17,12 +17,14 @@
       <a href="?fy={{ fy }}" class="fy-tab {% if fy == fy_start %}fy-tab-active{% endif %}">{{ fy }}-{{ fy|add:1 }}</a>
       {% endfor %}
     </div>
+    {% if user.can_edit_savings %}
     <button class="btn btn-primary btn-sm gap-1" onclick="newTransaction()">
       <span class="material-symbols-outlined text-base">add_circle</span><span class="hidden sm:inline">Add Entry</span><span class="sm:hidden">Add</span>
     </button>
     <button class="btn btn-ghost btn-sm gap-1" onclick="openModal('goalModal')">
       <span class="material-symbols-outlined text-base">flag</span><span class="hidden sm:inline">Manage Goals</span><span class="sm:hidden">Goals</span>
     </button>
+    {% endif %}
   </div>
 </div>
 {% endblock %}
@@ -106,7 +108,7 @@
         <button class="absolute top-1.5 right-1.5 btn btn-ghost btn-xs btn-square h-5 w-5 p-0 min-h-0 text-info opacity-75 hover:opacity-100" title="{{ m.comment }}" onclick="openMonthComment('{{ m.month_date }}', '{{ m.name }}', '{{ m.comment|escapejs }}')">
           <span class="icon-filled material-symbols-outlined text-xs">chat_bubble</span>
         </button>
-        {% elif m.status == 'missed' or m.status == 'partial' %}
+        {% elif user.can_edit_savings and m.status == 'missed' or user.can_edit_savings and m.status == 'partial' %}
         <button class="absolute top-1.5 right-1.5 btn btn-ghost btn-xs btn-square h-5 w-5 p-0 min-h-0 opacity-25 sm:opacity-0 group-hover:opacity-60 transition-opacity {% if m.status == 'missed' %}text-error{% elif m.status == 'partial' %}text-warning{% endif %}" title="Add comment" onclick="openMonthComment('{{ m.month_date }}', '{{ m.name }}', '')">
           <span class="material-symbols-outlined text-xs">add_comment</span>
         </button>
@@ -137,8 +139,10 @@
       </div>
       <p class="text-xs opacity-40 mt-2">Why did you miss or fall short this month?</p>
       <div class="modal-action">
-        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('monthCommentModal')">Cancel</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('monthCommentModal')">Close</button>
+        {% if user.can_edit_savings %}
         <button type="submit" class="btn btn-primary btn-sm"><span class="material-symbols-outlined text-base">save</span>Save</button>
+        {% endif %}
       </div>
     </form>
   </div>
@@ -180,9 +184,11 @@
             </td>
             <td class="opacity-50 text-sm">{{ t.remarks|default:"—" }}</td>
             <td>
+              {% if user.can_edit_savings %}
               <button class="btn btn-ghost btn-xs btn-square" onclick="editTransaction({{ t.id }}, '{{ t.date|date:'Y-m-d' }}', '{{ t.type }}', '{{ t.amount }}', '{{ t.remarks|escapejs }}')">
                 <span class="material-symbols-outlined text-base">edit</span>
               </button>
+              {% endif %}
             </td>
           </tr>
           {% empty %}
@@ -209,9 +215,11 @@
           </div>
           <div class="text-xs opacity-50 mt-0.5 truncate">{{ t.date|date:"d M Y" }}{% if t.remarks %} · {{ t.remarks }}{% endif %}</div>
         </div>
+        {% if user.can_edit_savings %}
         <button class="btn btn-ghost btn-xs btn-square shrink-0" onclick="editTransaction({{ t.id }}, '{{ t.date|date:'Y-m-d' }}', '{{ t.type }}', '{{ t.amount }}', '{{ t.remarks|escapejs }}')">
           <span class="material-symbols-outlined text-base">edit</span>
         </button>
+        {% endif %}
       </div>
       {% empty %}
       <p class="text-center opacity-50 py-8 text-sm">No transactions yet — tap <strong>Add</strong> above.</p>

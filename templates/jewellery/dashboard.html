@@ -5,7 +5,7 @@
 {% block title %}Jewellery Collection — Vault{% endblock %}
 
 {% block page_header %}
-<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+<div class="flex flex-row items-start justify-between gap-3">
   <div>
     <p class="text-xs font-bold tracking-widest uppercase text-primary">Physical Assets</p>
     <h1 class="text-xl lg:text-2xl font-extrabold">Jewellery Collection</h1>
@@ -17,10 +17,10 @@
     </div>
     {% endif %}
   </div>
-  <div class="flex flex-wrap items-center gap-2">
-    <button type="button" class="btn btn-primary btn-sm gap-1" onclick="openAddJewelleryModal()"><span class="material-symbols-outlined text-base">add</span>Add Item</button>
+  <div class="flex flex-wrap items-center justify-end gap-2 shrink-0">
+    <button type="button" class="btn btn-primary btn-sm gap-1" onclick="openAddJewelleryModal()"><span class="material-symbols-outlined text-base">add</span><span class="hidden sm:inline">Add Item</span><span class="sm:hidden">Add</span></button>
     {% if user.can_view_portfolio %}
-    <a href="{% url 'portfolio_tracker' %}" class="btn btn-ghost btn-sm gap-1"><span class="material-symbols-outlined text-base">arrow_back</span>Portfolio</a>
+    <a href="{% url 'portfolio_tracker' %}" class="btn btn-ghost btn-sm gap-1 hidden sm:inline-flex"><span class="material-symbols-outlined text-base">arrow_back</span>Portfolio</a>
     {% endif %}
   </div>
 </div>
@@ -32,8 +32,8 @@
 {% if is_primary %}
 <div class="card hero-gradient-portfolio shadow-sm card-hover animate-up mb-4">
   <div class="card-body p-4 lg:p-6">
-    <div class="flex flex-wrap items-center gap-8">
-      <div>
+    <div class="flex flex-col lg:flex-row lg:items-center gap-5 lg:gap-8">
+      <div class="shrink-0">
         <p class="text-[10px] font-bold uppercase tracking-widest opacity-40">Estimated Collection Value</p>
         <p class="text-3xl lg:text-4xl font-extrabold mt-1">₹{{ total_estimated_value|floatformat:0|indian_number }}</p>
         <div class="mt-2">
@@ -42,7 +42,7 @@
           </span>
         </div>
       </div>
-      <div class="flex flex-wrap gap-4">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1 w-full">
         <div class="stat-card">
           <div class="text-[10px] uppercase tracking-wider opacity-50">Purchase Cost</div>
           <div class="text-base font-bold mt-0.5">₹{{ total_purchase_price|floatformat:0|indian_number }}</div>
@@ -65,152 +65,186 @@
 </div>
 {% endif %}
 
-{# ——— FILTER BAR ——— #}
-<div class="card bg-base-200 shadow-sm animate-up mb-4" style="animation-delay:0.05s">
-  <div class="card-body p-3 lg:p-4">
-    <form method="get" id="filterForm" class="flex flex-col gap-3" action="{% url 'jewellery_dashboard' %}">
-      <input type="hidden" name="metal" id="filter_metal_input" value="{{ filter_metal }}" />
-      <input type="hidden" name="category" id="filter_category_input" value="{{ filter_category }}" />
-
-      {# Search + Location row #}
-      <div class="flex flex-wrap items-center gap-3">
-        <div class="relative flex-1 min-w-[180px] max-w-sm">
-          <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-base-content/40">
-            <span class="material-symbols-outlined text-base">search</span>
-          </span>
-          <input type="text" name="search" id="filter_search" placeholder="Search items..."
-                 value="{{ filter_search }}"
-                 class="input input-sm pl-9 bg-base-300/50 border-base-content/8 focus:border-primary/50 focus:outline-none rounded-lg w-full text-xs"
-                 autocomplete="off" />
-          
-          {# Autocomplete dropdown #}
-          <div id="search_results" class="absolute z-50 mt-1 w-full bg-base-100 rounded-lg shadow-xl border border-base-content/10 hidden max-h-60 overflow-y-auto"></div>
-        </div>
-
-        <select name="location" onchange="this.form.submit()"
-                class="select select-sm bg-base-300/50 border-base-content/8 text-xs rounded-lg min-w-[140px] focus:outline-none focus:border-primary/50">
-          <option value="">📍 All Locations</option>
-          {% for val, label in location_choices %}
-          <option value="{{ val }}" {% if filter_location == val %}selected{% endif %}>
-            {% if val == 'BANK_LOCKER' %}🏦{% elif val == 'HOME_SAFE' %}🏠{% else %}📦{% endif %} {{ label }}
-          </option>
-          {% endfor %}
-        </select>
-
-        {% if filter_metal or filter_location or filter_category or filter_search %}
-        <a href="{% url 'jewellery_dashboard' %}" class="btn btn-ghost btn-xs gap-1 text-error/70 hover:text-error hover:bg-error/10">
-          <span class="material-symbols-outlined text-sm">close</span>Clear
-        </a>
-        {% endif %}
-
-        <span class="ml-auto text-[10px] font-bold uppercase tracking-wider opacity-35 hidden sm:inline">
-          {{ items|length }} of {{ all_items_count }} item{% if all_items_count != 1 %}s{% endif %}
-        </span>
-      </div>
-
-      {# Category pills #}
-      <div class="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none -mx-1 px-1">
-        <button type="button" onclick="setCategoryFilter('')"
-           class="btn btn-xs rounded-full px-3 font-semibold gap-1 shrink-0 {% if not filter_category %}btn-primary{% else %}btn-ghost bg-base-300/50{% endif %}">
-          All
-        </button>
-        {% for val, label in category_choices %}
-        <button type="button" onclick="setCategoryFilter('{{ val }}')"
-           class="btn btn-xs rounded-full px-3 font-semibold gap-1 shrink-0 {% if filter_category == val %}btn-primary{% else %}btn-ghost bg-base-300/50{% endif %}">
-          <span class="material-symbols-outlined text-xs">
-            {% if val == 'RING' %}blur_circular{% elif val == 'CHAIN' %}link{% elif val == 'NECKLACE' %}award_star{% elif val == 'BANGLE' %}circle{% elif val == 'BRACELET' %}linear_scale{% elif val == 'EARRINGS' %}star{% elif val == 'COIN' %}toll{% elif val == 'LOCKET' %}favorite{% else %}diamond{% endif %}
-          </span>
-          {{ label }}
-        </button>
-        {% endfor %}
-      </div>
-
-      {# Metal tabs #}
-      <div class="flex items-center gap-2">
-        <div class="tabs tabs-box tabs-sm bg-base-300/50 rounded-lg p-0.5">
-          <button type="button" onclick="setMetalFilter('')"
-             class="tab rounded-md text-xs {% if not filter_metal %}tab-active font-semibold{% endif %}">All Metals</button>
-          {% for val, label in metal_choices %}
-          <button type="button" onclick="setMetalFilter('{{ val }}')"
-             class="tab rounded-md text-xs {% if filter_metal == val %}tab-active font-semibold{% endif %}">{{ label }}</button>
-          {% endfor %}
-        </div>
-      </div>
-    </form>
-  </div>
+{# ——— LOCATION (primary filter — 3 chips, right under Add) ——— #}
+<div class="flex flex-wrap items-center gap-2 mb-3 animate-up">
+  <button type="button" onclick="setJFilter('filter_location_input','')"
+     class="filter-pill {% if not filter_location %}is-active{% endif %}">
+    <span class="material-symbols-outlined text-sm">apps</span>All
+  </button>
+  {% for val, label in location_choices %}
+  <button type="button" onclick="setJFilter('filter_location_input','{{ val }}')"
+     class="filter-pill {% if filter_location == val %}is-active{% endif %}">
+    <span class="w-2 h-2 rounded-full {% if val == 'BANK_LOCKER' %}bg-error{% else %}bg-warning{% endif %}"></span>{{ label }}
+  </button>
+  {% endfor %}
 </div>
 
-{# ——— CATALOG GRID ——— #}
-<div class="animate-up" style="animation-delay:0.1s">
-  {% if items %}
-  <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-5" id="jewelleryGrid">
-    {% for item in items %}
-    <a href="{% url 'jewellery_detail' item.pk %}" class="card bg-base-200 shadow-sm card-hover rounded-xl overflow-hidden group flex flex-col h-full cursor-pointer">
+{# ——— SEARCH + FILTERS (Unified Control Panel) ——— #}
+<form method="get" id="filterForm" action="{% url 'jewellery_dashboard' %}" class="relative z-50 mb-5 animate-up" style="animation-delay:0.05s">
+  <input type="hidden" name="metal" id="filter_metal_input" value="{{ filter_metal }}" />
+  <input type="hidden" name="category" id="filter_category_input" value="{{ filter_category }}" />
+  <input type="hidden" name="location" id="filter_location_input" value="{{ filter_location }}" />
 
-      {# Image area #}
-      <div class="relative aspect-square w-full bg-base-300 overflow-hidden flex items-center justify-center shrink-0">
-        {% if item.photo %}
-        <img src="{% url 'jewellery_photo' item.pk %}" alt="{{ item.name }}"
-             class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
-        <div class="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"></div>
-        {% else %}
-        <div class="w-full h-full bg-gradient-to-br from-base-300 to-base-200 flex flex-col items-center justify-center gap-1">
-          <span class="material-symbols-outlined text-3xl md:text-4xl opacity-10 group-hover:scale-110 transition-transform duration-500">
-            {% if item.category == 'RING' %}blur_circular{% elif item.category == 'CHAIN' %}link{% elif item.category == 'NECKLACE' %}award_star{% elif item.category == 'BANGLE' %}circle{% elif item.category == 'BRACELET' %}linear_scale{% elif item.category == 'EARRINGS' %}star{% elif item.category == 'COIN' %}toll{% elif item.category == 'LOCKET' %}favorite{% else %}diamond{% endif %}
-          </span>
-          <span class="text-[8px] md:text-[9px] uppercase font-bold tracking-widest opacity-20">No Photo</span>
-        </div>
-        {% endif %}
+  <div class="bg-base-200/40 border border-base-content/10 rounded-2xl p-3 flex flex-col gap-3 shadow-sm">
+    {# Full-width search #}
+    <div class="relative">
+      <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none z-10 text-base-content/50">
+        <span class="material-symbols-outlined text-[18px]">search</span>
+      </span>
+      <input type="text" name="search" id="filter_search" placeholder="Search type, notes…"
+             value="{{ filter_search }}"
+             class="input w-full h-[42px] min-h-[42px] pl-10 bg-base-100 border border-base-content/10 shadow-sm focus:border-primary/50 focus:ring-1 focus:ring-primary/50 rounded-xl text-sm transition-all"
+             autocomplete="off" />
+      <div id="search_results" class="absolute z-[80] mt-1 w-full bg-base-100 rounded-xl shadow-2xl border border-base-content/10 hidden max-h-72 overflow-y-auto"></div>
+    </div>
 
-        {# Floating badges #}
-        <span class="absolute top-2 left-2 badge badge-sm bg-base-100/80 text-base-content backdrop-blur-sm font-semibold text-[9px] md:text-[10px] px-2 py-0.5 rounded-md shadow-sm">
-          {{ item.get_category_display }}
-        </span>
-        <span class="absolute top-2 right-2 badge badge-sm bg-base-100/80 text-base-content backdrop-blur-sm font-semibold text-[9px] md:text-[10px] px-2 py-0.5 rounded-md shadow-sm flex items-center gap-1">
-          <span class="w-1.5 h-1.5 rounded-full {% if item.location == 'BANK_LOCKER' %}bg-error{% elif item.location == 'HOME_SAFE' %}bg-warning{% else %}bg-base-content/30{% endif %}"></span>
-          <span class="hidden sm:inline">{{ item.get_location_display }}</span>
-        </span>
-      </div>
-
-      {# Card body #}
-      <div class="p-3 md:p-4 flex-1 flex flex-col justify-between gap-2">
-        <div>
-          <h3 class="font-bold text-sm md:text-base text-base-content group-hover:text-primary transition-colors line-clamp-1" title="{{ item.name }}">
-            {{ item.name }}
-          </h3>
-          <div class="flex items-center gap-1.5 mt-1">
-            <span class="w-1.5 h-1.5 rounded-full {% if item.metal_type == 'GOLD' %}bg-warning{% elif item.metal_type == 'SILVER' %}bg-slate-400{% else %}bg-indigo-400{% endif %}"></span>
-            <span class="text-[10px] md:text-xs opacity-60 font-medium">{{ item.get_metal_type_display }}{% if item.purity %} · {{ item.get_purity_display }}{% endif %}</span>
-            <span class="text-[10px] md:text-xs opacity-60 font-mono ml-auto">{{ item.weight_grams|floatformat:2 }}g</span>
-          </div>
-        </div>
-      </div>
-    </a>
-    {% endfor %}
-  </div>
-  {% else %}
-  <div class="card bg-base-200 shadow-sm py-16 text-center">
-    <div class="card-body max-w-md mx-auto items-center">
-      <span class="material-symbols-outlined text-5xl opacity-15 block mb-3">diamond</span>
-      <h3 class="text-base font-semibold opacity-50">No jewellery items found</h3>
-      <p class="text-sm opacity-35 mt-1 mb-4">
-        {% if filter_metal or filter_location or filter_category or filter_search %}
-          Try adjusting your filters to see more items.
-        {% else %}
-          Add your first item to start building your secure catalog.
-        {% endif %}
-      </p>
-      {% if filter_metal or filter_location or filter_category or filter_search %}
-      <a href="{% url 'jewellery_dashboard' %}" class="btn btn-ghost btn-sm gap-1">
-        <span class="material-symbols-outlined text-base">filter_alt_off</span>Clear Filters
-      </a>
-      {% else %}
-      <button onclick="openAddJewelleryModal()" class="btn btn-primary btn-sm">Add First Item</button>
-      {% endif %}
+    {# Metal + Type — side by side dropdowns #}
+    <div class="grid grid-cols-2 gap-3">
+      {# Metal #}
+      <details class="dropdown w-full">
+        <summary class="btn h-[42px] min-h-[42px] px-3 btn-block justify-between font-normal text-xs bg-base-100 border border-base-content/10 shadow-sm hover:bg-base-200 hover:border-base-content/20 rounded-xl list-none [&::-webkit-details-marker]:hidden transition-all">
+          <span class="truncate text-base-content/80">{% if filter_metal %}{% for val, label in metal_choices %}{% if filter_metal == val %}{{ label }}{% endif %}{% endfor %}{% else %}All Metals{% endif %}</span>
+          <span class="material-symbols-outlined text-[18px] opacity-50">expand_more</span>
+        </summary>
+        <ul class="dropdown-content z-[80] w-full mt-1.5 p-1.5 bg-base-100 rounded-xl shadow-2xl border border-base-content/10 flex flex-col gap-0.5">
+          <li><button type="button" onclick="setJFilter('filter_metal_input','')" class="jw-opt {% if not filter_metal %}jw-opt-on{% endif %}">All Metals</button></li>
+          {% for val, label in metal_choices %}
+          <li><button type="button" onclick="setJFilter('filter_metal_input','{{ val }}')" class="jw-opt {% if filter_metal == val %}jw-opt-on{% endif %}">{{ label }}</button></li>
+          {% endfor %}
+        </ul>
+      </details>
+      {# Type #}
+      <details class="dropdown dropdown-end w-full">
+        <summary class="btn h-[42px] min-h-[42px] px-3 btn-block justify-between font-normal text-xs bg-base-100 border border-base-content/10 shadow-sm hover:bg-base-200 hover:border-base-content/20 rounded-xl list-none [&::-webkit-details-marker]:hidden transition-all">
+          <span class="truncate flex items-center gap-1.5 text-base-content/80">{% if filter_category %}{% for c in category_meta %}{% if filter_category == c.value %}<span class="icon-filled material-symbols-outlined text-sm" style="color:hsl({{ c.hue }} 70% 70%)">{{ c.icon }}</span>{{ c.label }}{% endif %}{% endfor %}{% else %}All Types{% endif %}</span>
+          <span class="material-symbols-outlined text-[18px] opacity-50">expand_more</span>
+        </summary>
+        <ul class="dropdown-content z-[80] w-full mt-1.5 p-1.5 bg-base-100 rounded-xl shadow-2xl border border-base-content/10 flex flex-col gap-0.5 max-h-72 overflow-y-auto">
+          <li><button type="button" onclick="setJFilter('filter_category_input','')" class="jw-opt {% if not filter_category %}jw-opt-on{% endif %}"><span class="material-symbols-outlined text-sm opacity-60">apps</span>All Types</button></li>
+          {% for c in category_meta %}
+          <li><button type="button" onclick="setJFilter('filter_category_input','{{ c.value }}')" class="jw-opt {% if filter_category == c.value %}jw-opt-on{% endif %}">
+            <span class="icon-filled material-symbols-outlined text-sm" style="color:hsl({{ c.hue }} 70% 70%)">{{ c.icon }}</span>{{ c.label }}
+            <span class="ml-auto opacity-50 font-mono text-[11px]">{{ c.count }}</span>
+          </button></li>
+          {% endfor %}
+        </ul>
+      </details>
     </div>
   </div>
+
+  {% if filter_metal or filter_location or filter_category or filter_search %}
+  <div class="flex items-center gap-2 mt-2 px-1">
+    <a href="{% url 'jewellery_dashboard' %}" class="btn btn-ghost btn-xs gap-1 text-error/70 hover:text-error hover:bg-error/10">
+      <span class="material-symbols-outlined text-sm">close</span>Clear all
+    </a>
+    <span class="ml-auto text-[10px] font-bold uppercase tracking-wider opacity-35">
+      {{ items|length }} of {{ all_items_count }} item{% if all_items_count != 1 %}s{% endif %}
+    </span>
+  </div>
+  {% endif %}
+</form>
+
+{# ——— CATALOG ——— #}
+{% if items %}
+
+{# Desktop: card grid #}
+<div class="hidden md:grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-5 animate-up" style="animation-delay:0.1s" id="jewelleryGrid">
+  {% for item in items %}
+  <a href="{% url 'jewellery_detail' item.pk %}" class="card bg-base-200 shadow-sm card-hover rounded-xl overflow-hidden group flex flex-col h-full">
+    <div class="relative aspect-square w-full overflow-hidden flex items-center justify-center shrink-0 jw-type-tile" style="--h:{{ item.category_hue }}">
+      {# Colour tile + icon always present; photo (if any) overlays it and is removed on load error. #}
+      <span class="icon-filled material-symbols-outlined jw-type-icon text-5xl lg:text-6xl opacity-80 group-hover:scale-110 transition-transform duration-500">{{ item.category_icon }}</span>
+      {% if item.photo %}
+      <img src="{% url 'jewellery_photo' item.pk %}" alt="{{ item.display_label }}" onerror="this.remove()"
+           class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
+      {% endif %}
+
+      <span class="jw-type-badge jw-badge-overlay absolute top-2 left-2 z-10" style="--h:{{ item.category_hue }}">
+        <span class="icon-filled material-symbols-outlined" style="font-size:12px">{{ item.category_icon }}</span>{{ item.get_category_display }}
+      </span>
+      <span class="absolute top-2 right-2 z-10 badge badge-sm bg-base-100/85 text-base-content backdrop-blur-sm font-semibold text-[9px] lg:text-[10px] px-2 py-0.5 rounded-md shadow-sm flex items-center gap-1">
+        <span class="w-1.5 h-1.5 rounded-full {% if item.location == 'BANK_LOCKER' %}bg-error{% else %}bg-warning{% endif %}"></span>
+        {{ item.get_location_display }}
+      </span>
+    </div>
+
+    <div class="p-3 lg:p-4 flex-1 flex flex-col justify-between gap-2">
+      <div>
+        <h3 class="font-bold text-sm lg:text-base text-base-content group-hover:text-primary transition-colors line-clamp-1">{{ item.display_label }}</h3>
+        <div class="flex items-center gap-1.5 mt-1">
+          <span class="w-1.5 h-1.5 rounded-full {% if item.metal_type == 'GOLD' %}bg-warning{% elif item.metal_type == 'SILVER' %}bg-slate-400{% else %}bg-indigo-400{% endif %}"></span>
+          <span class="text-[10px] lg:text-xs opacity-60 font-medium">{{ item.get_metal_type_display }}{% if item.purity %} · {{ item.purity }}{% endif %}</span>
+          <span class="text-[10px] lg:text-xs opacity-60 font-mono ml-auto">{{ item.weight_grams|floatformat:2 }}g</span>
+        </div>
+      </div>
+    </div>
+  </a>
+  {% endfor %}
+</div>
+
+{# Mobile: compact list (notes pattern) #}
+<div class="md:hidden space-y-2 animate-up" style="animation-delay:0.05s">
+  {% for item in items %}
+  <a href="{% url 'jewellery_detail' item.pk %}" class="table-card flex items-center gap-3">
+    <span class="relative w-16 h-16 shrink-0">
+      <span class="jw-type-avatar absolute inset-0" style="--h:{{ item.category_hue }};width:4rem;height:4rem;border-radius:1rem">
+        <span class="icon-filled material-symbols-outlined text-2xl">{{ item.category_icon }}</span>
+      </span>
+      {% if item.photo %}
+      <img src="{% url 'jewellery_photo' item.pk %}" alt="{{ item.display_label }}" onerror="this.remove()"
+           class="absolute inset-0 w-16 h-16 rounded-2xl object-cover" loading="lazy" />
+      {% endif %}
+    </span>
+    <div class="flex-1 min-w-0">
+      <div class="flex items-center gap-1.5">
+        <span class="font-semibold text-sm leading-snug truncate">{{ item.display_label }}</span>
+      </div>
+      <div class="flex items-center gap-1.5 mt-0.5 text-[11px] opacity-55">
+        <span class="w-1.5 h-1.5 rounded-full shrink-0 {% if item.metal_type == 'GOLD' %}bg-warning{% elif item.metal_type == 'SILVER' %}bg-slate-400{% else %}bg-indigo-400{% endif %}"></span>
+        {{ item.get_metal_type_display }}{% if item.purity %} · {{ item.purity }}{% endif %} · {{ item.weight_grams|floatformat:2 }}g
+      </div>
+      <div class="flex items-center gap-1 mt-0.5 text-[10px] opacity-45 truncate">
+        <span class="material-symbols-outlined text-[12px]">location_on</span>{{ item.get_location_display }}
+      </div>
+    </div>
+    {% if is_primary %}
+    <div class="text-right shrink-0">
+      <div class="text-sm font-bold text-primary">₹{{ item.estimated_value|floatformat:0|indian_number }}</div>
+      <div class="text-[9px] opacity-35 uppercase tracking-wider">est.</div>
+    </div>
+    {% endif %}
+    <span class="material-symbols-outlined text-base opacity-30 shrink-0">chevron_right</span>
+  </a>
+  {% endfor %}
+</div>
+
+{% else %}
+{# ——— EMPTY STATE ——— #}
+<div class="flex flex-col items-center justify-center py-20 gap-4 animate-up" style="animation-delay:0.1s">
+  <div class="w-16 h-16 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+    <span class="icon-filled material-symbols-outlined text-3xl text-primary">diamond</span>
+  </div>
+  <div class="text-center">
+    <p class="font-semibold opacity-60">No jewellery items found</p>
+    <p class="text-xs opacity-35 mt-1">
+      {% if filter_metal or filter_location or filter_category or filter_search %}
+        Try adjusting your filters to see more items.
+      {% else %}
+        Add your first item to start building your secure catalog.
+      {% endif %}
+    </p>
+  </div>
+  {% if filter_metal or filter_location or filter_category or filter_search %}
+  <a href="{% url 'jewellery_dashboard' %}" class="btn btn-ghost btn-sm gap-1 mt-2">
+    <span class="material-symbols-outlined text-base">filter_alt_off</span>Clear Filters
+  </a>
+  {% else %}
+  <button onclick="openAddJewelleryModal()" class="btn btn-primary btn-sm gap-1 mt-2">
+    <span class="material-symbols-outlined text-base">add_circle</span>Add First Item
+  </button>
   {% endif %}
 </div>
+{% endif %}
 
 
 {# ——— ADD MODAL ——— #}
@@ -225,31 +259,15 @@
     <form id="jewelleryAddForm" method="POST" action="{% url 'add_jewellery' %}" enctype="multipart/form-data">
       {% csrf_token %}
 
-      <div class="form-field mb-3">
-        <label class="label py-1"><span class="label-text text-xs font-bold uppercase tracking-wider opacity-50">Name / Description *</span></label>
-        <input type="text" name="name" id="ja_name" required placeholder="e.g. Wedding Gold Bangle" />
-      </div>
-
       <div class="grid grid-cols-2 gap-3 mb-3">
         <div class="form-field">
-          <label class="label py-1"><span class="label-text text-xs font-bold uppercase tracking-wider opacity-50">Category</span></label>
+          <label class="label py-1"><span class="label-text text-xs font-bold uppercase tracking-wider opacity-50">Type</span></label>
           <select name="category" id="ja_category">
             {% for val, label in form.fields.category.choices %}
             <option value="{{ val }}">{{ label }}</option>
             {% endfor %}
           </select>
         </div>
-        <div class="form-field">
-          <label class="label py-1"><span class="label-text text-xs font-bold uppercase tracking-wider opacity-50">Location</span></label>
-          <select name="location" id="ja_location">
-            {% for val, label in form.fields.location.choices %}
-            <option value="{{ val }}">{{ label }}</option>
-            {% endfor %}
-          </select>
-        </div>
-      </div>
-
-      <div class="grid grid-cols-3 gap-3 mb-3">
         <div class="form-field">
           <label class="label py-1"><span class="label-text text-xs font-bold uppercase tracking-wider opacity-50">Metal</span></label>
           <select name="metal_type" id="ja_metal">
@@ -258,15 +276,25 @@
             {% endfor %}
           </select>
         </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 mb-3">
         <div class="form-field">
           <label class="label py-1"><span class="label-text text-xs font-bold uppercase tracking-wider opacity-50">Purity</span></label>
-          <select name="purity" id="ja_purity">
-            <!-- Populated dynamically via JS -->
-          </select>
+          <select name="purity" id="ja_purity"></select>
         </div>
         <div class="form-field">
           <label class="label py-1"><span class="label-text text-xs font-bold uppercase tracking-wider opacity-50">Weight (g) *</span></label>
           <input type="number" step="0.01" name="weight_grams" id="ja_weight" value="0.00" min="0" required />
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="label py-1"><span class="label-text text-xs font-bold uppercase tracking-wider opacity-50">Location</span></label>
+        <input type="hidden" name="location" id="ja_location" value="BANK_LOCKER" />
+        <div class="grid grid-cols-2 gap-2" id="ja_location_chips">
+          <button type="button" data-loc="BANK_LOCKER" class="btn btn-sm btn-ghost border border-base-content/10 gap-1.5 justify-start">🏦 Bank Locker</button>
+          <button type="button" data-loc="HOME_SAFE" class="btn btn-sm btn-ghost border border-base-content/10 gap-1.5 justify-start">🏠 Home Safe</button>
         </div>
       </div>
 
@@ -275,7 +303,11 @@
         <label class="label py-1"><span class="label-text text-xs font-bold uppercase tracking-wider opacity-50">Photo</span></label>
 
         <div id="ja_photo_preview_container" class="hidden mb-2 relative group w-full h-32 rounded-xl overflow-hidden bg-base-300/50">
-          <img id="ja_photo_preview_img" class="w-full h-full object-cover" />
+          <img id="ja_photo_preview_img" class="w-full h-full object-cover opacity-0 transition-opacity duration-300" />
+          <div data-photo-loader class="hidden absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-base-300/80 backdrop-blur-sm">
+            <span class="loading loading-spinner loading-md text-primary"></span>
+            <span class="text-[10px] font-semibold uppercase tracking-wider opacity-60">Processing photo…</span>
+          </div>
           <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" onclick="document.getElementById('ja_photo').click()">
             <span class="text-xs font-semibold text-white flex items-center gap-1"><span class="material-symbols-outlined text-sm">cached</span>Change</span>
           </div>
@@ -287,14 +319,33 @@
         <label for="ja_photo" id="ja_photo_upload_box"
                class="flex flex-col items-center justify-center py-5 px-4 rounded-xl border border-dashed border-base-content/10 bg-base-300/30 cursor-pointer hover:border-primary/40 hover:bg-base-300/50 transition-all group">
           <span class="material-symbols-outlined text-2xl opacity-30 group-hover:text-primary group-hover:scale-110 transition-all mb-1">add_photo_alternate</span>
-          <span class="text-[10px] font-semibold opacity-40 group-hover:opacity-70">Drag or click to upload</span>
+          <span class="text-[10px] font-semibold opacity-40 group-hover:opacity-70">Tap to add a photo (optional)</span>
         </label>
 
         <input type="file" name="photo" id="ja_photo" accept="image/*" class="hidden" onchange="handlePhotoSelect(this, 'ja_photo_preview_container', 'ja_photo_preview_img', 'ja_photo_upload_box')" />
-        <p class="text-[10px] opacity-30 mt-1 px-1 flex items-center gap-1"><span class="material-symbols-outlined text-[10px]">lock</span>Encrypted & accessible only while authenticated</p>
       </div>
 
-      <div class="modal-action mt-0 flex justify-end gap-2">
+      <details class="mb-2 group">
+        <summary class="cursor-pointer text-xs font-semibold opacity-50 hover:opacity-80 flex items-center gap-1 select-none">
+          <span class="material-symbols-outlined text-sm transition-transform group-open:rotate-90">chevron_right</span>Purchase details (optional)
+        </summary>
+        <div class="grid grid-cols-2 gap-3 mt-3">
+          <div class="form-field">
+            <label class="label py-1"><span class="label-text text-xs font-bold uppercase tracking-wider opacity-50">Purchase Date</span></label>
+            <input type="date" name="purchase_date" id="ja_date" />
+          </div>
+          <div class="form-field">
+            <label class="label py-1"><span class="label-text text-xs font-bold uppercase tracking-wider opacity-50">Purchase Price (₹)</span></label>
+            <input type="number" step="0.01" name="purchase_price" id="ja_price" min="0" placeholder="0" />
+          </div>
+        </div>
+        <div class="form-field mt-3">
+          <label class="label py-1"><span class="label-text text-xs font-bold uppercase tracking-wider opacity-50">Notes</span></label>
+          <textarea name="notes" id="ja_notes" rows="2" placeholder="Optional notes…"></textarea>
+        </div>
+      </details>
+
+      <div class="modal-action mt-3 flex justify-end gap-2">
         <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('jewelleryAddModal')">Cancel</button>
         <button type="submit" class="btn btn-primary btn-sm px-6">Add Item</button>
       </div>
@@ -306,213 +357,103 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'js/jewellery.js' %}"></script>
 <script>
-// ── Purity Data ──────────────────────────────────────────────────────
-var GOLD_PURITIES = [
-  { value: '24k', label: '24k (999)' },
-  { value: '22k', label: '22k (916)' },
-  { value: '18k', label: '18k (750)' },
-  { value: '14k', label: '14k (585)' }
-];
-var SILVER_PURITIES = [
-  { value: '999', label: '999 (Fine Silver)' },
-  { value: '925', label: '925 (Sterling)' },
-  { value: '900', label: '900' },
-  { value: '800', label: '800' }
-];
-
-function updatePurityChoices(metalSelect, puritySelect, keepValue) {
-  var metal = metalSelect.value;
-  var prev = keepValue || puritySelect.value;
-  puritySelect.innerHTML = '';
-
-  if (metal === 'GOLD') {
-    GOLD_PURITIES.forEach(function(p) {
-      var opt = document.createElement('option');
-      opt.value = p.value;
-      opt.textContent = p.label;
-      puritySelect.appendChild(opt);
-    });
-    puritySelect.disabled = false;
-    var found = GOLD_PURITIES.some(function(p) { return p.value === prev; });
-    puritySelect.value = found ? prev : '22k';
-  } else if (metal === 'SILVER') {
-    SILVER_PURITIES.forEach(function(p) {
-      var opt = document.createElement('option');
-      opt.value = p.value;
-      opt.textContent = p.label;
-      puritySelect.appendChild(opt);
-    });
-    puritySelect.disabled = false;
-    var found = SILVER_PURITIES.some(function(p) { return p.value === prev; });
-    puritySelect.value = found ? prev : '999';
-  } else {
-    var opt = document.createElement('option');
-    opt.value = '';
-    opt.textContent = 'N/A';
-    puritySelect.appendChild(opt);
-    puritySelect.disabled = true;
-  }
-}
-
-// ── Photo Preview ────────────────────────────────────────────────────
-function handlePhotoSelect(input, previewContainerId, previewImgId, uploadBoxId) {
-  var file = input.files[0];
-  if (file) {
-    var url = URL.createObjectURL(file);
-    document.getElementById(previewImgId).src = url;
-    document.getElementById(previewContainerId).classList.remove('hidden');
-    document.getElementById(uploadBoxId).classList.add('hidden');
-  } else {
-    document.getElementById(previewContainerId).classList.add('hidden');
-    document.getElementById(uploadBoxId).classList.remove('hidden');
-  }
-}
-
-function clearAddPhoto(e) {
-  e.preventDefault();
-  e.stopPropagation();
-  var input = document.getElementById('ja_photo');
-  input.value = '';
-  handlePhotoSelect(input, 'ja_photo_preview_container', 'ja_photo_preview_img', 'ja_photo_upload_box');
-}
-
-// ── Filters ──────────────────────────────────────────────────────────
-function setMetalFilter(val) {
-  document.getElementById('filter_metal_input').value = val;
-  document.getElementById('filterForm').submit();
-}
-
-function setCategoryFilter(val) {
-  document.getElementById('filter_category_input').value = val;
+function setJFilter(inputId, val) {
+  document.getElementById(inputId).value = val;
   document.getElementById('filterForm').submit();
 }
 
 // ── Search Autocomplete ──────────────────────────────────────────────
-var searchInput = document.getElementById('filter_search');
-var searchResults = document.getElementById('search_results');
-var acTimer;
+(function() {
+  var searchInput = document.getElementById('filter_search');
+  var searchResults = document.getElementById('search_results');
+  var acTimer;
 
-searchInput.addEventListener('input', function() {
-  clearTimeout(acTimer);
-  var val = this.value.trim();
-  
-  if (!val) {
-    searchResults.classList.add('hidden');
-    return;
-  }
-  
-  acTimer = setTimeout(function() {
-    fetch('/jewellery/api/search/?q=' + encodeURIComponent(val))
-      .then(res => res.json())
-      .then(data => {
-        if (!data.results || data.results.length === 0) {
-          searchResults.innerHTML = '<div class="p-3 text-xs opacity-50 text-center">No matches found</div>';
-        } else {
-          var html = '<ul class="menu menu-sm bg-base-100 w-full p-2">';
-          data.results.forEach(function(item) {
-            var url = '/jewellery/' + item.id + '/';
-            html += `<li><a href="${url}" class="flex justify-between items-center py-2">
-                       <span class="font-medium truncate">${item.name}</span>
-                       <span class="text-[10px] opacity-40 uppercase">${item.metal}</span>
-                     </a></li>`;
-          });
-          html += '</ul>';
-          searchResults.innerHTML = html;
-        }
-        searchResults.classList.remove('hidden');
-      });
-  }, 300);
-});
+  searchInput.addEventListener('input', function() {
+    clearTimeout(acTimer);
+    var val = this.value.trim();
+    if (!val) { searchResults.classList.add('hidden'); return; }
 
-// Close autocomplete when clicking outside or hitting Enter
-document.addEventListener('click', function(e) {
-  if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
-    searchResults.classList.add('hidden');
-  }
-});
-searchInput.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter') {
-    searchResults.classList.add('hidden');
-    document.getElementById('filterForm').submit();
-  }
-});
+    acTimer = setTimeout(function() {
+      fetch('/jewellery/api/search/?q=' + encodeURIComponent(val))
+        .then(res => res.json())
+        .then(data => {
+          if (!data.results || data.results.length === 0) {
+            searchResults.innerHTML = '<div class="p-3 text-xs opacity-50 text-center">No matches found</div>';
+          } else {
+            var html = '<ul class="menu menu-sm w-full p-1.5 gap-0.5">';
+            data.results.forEach(function(item) {
+              var avatar = `<span class="jw-type-avatar absolute inset-0" style="--h:${item.hue};width:2.25rem;height:2.25rem;border-radius:0.5rem">
+                     <span class="icon-filled material-symbols-outlined text-base">${item.icon}</span></span>`;
+              var thumb = `<span class="relative w-9 h-9 shrink-0 block">${avatar}` +
+                (item.photo_url ? `<img src="${item.photo_url}" onerror="this.remove()" class="absolute inset-0 w-9 h-9 rounded-lg object-cover" />` : '') +
+                `</span>`;
+              html += `<li><a href="/jewellery/${item.id}/" class="flex items-center gap-2.5 py-1.5">
+                         ${thumb}
+                         <span class="flex-1 min-w-0">
+                           <span class="font-semibold text-xs block truncate">${item.label}</span>
+                           <span class="text-[10px] opacity-50">${item.category}</span>
+                         </span>
+                         <span class="text-[9px] opacity-40 text-right shrink-0">${item.location}<br>${item.weight}</span>
+                       </a></li>`;
+            });
+            html += '</ul>';
+            searchResults.innerHTML = html;
+          }
+          searchResults.classList.remove('hidden');
+        });
+    }, 250);
+  });
+
+  document.addEventListener('click', function(e) {
+    if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+      searchResults.classList.add('hidden');
+    }
+  });
+  searchInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      searchResults.classList.add('hidden');
+      document.getElementById('filterForm').submit();
+    }
+  });
+})();
 
 // ── Add Modal ────────────────────────────────────────────────────────
+function clearAddPhoto(e) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
+  var input = document.getElementById('ja_photo');
+  input.value = '';
+  Jewellery.handlePhotoSelect(input, 'ja_photo_preview_container', 'ja_photo_preview_img', 'ja_photo_upload_box');
+}
+
 function openAddJewelleryModal() {
   var form = document.getElementById('jewelleryAddForm');
   form.reset();
-
   var metalSelect = document.getElementById('ja_metal');
   var puritySelect = document.getElementById('ja_purity');
   metalSelect.value = 'GOLD';
-  updatePurityChoices(metalSelect, puritySelect, '22k');
-
+  Jewellery.updatePurityChoices(metalSelect, puritySelect, '22k');
+  Jewellery.selectLocation('ja', 'BANK_LOCKER');
   document.getElementById('ja_photo').value = '';
   document.getElementById('ja_photo_preview_container').classList.add('hidden');
   document.getElementById('ja_photo_upload_box').classList.remove('hidden');
-
   openModal('jewelleryAddModal');
 }
 
-// ── Grid Pagination ──────────────────────────────────────────────────
-function initGridPagination(gridId, itemsPerPage) {
-  var grid = document.getElementById(gridId);
-  if (!grid) return;
-  var items = Array.from(grid.children);
-  if (items.length <= itemsPerPage) return;
-
-  var totalPages = Math.ceil(items.length / itemsPerPage);
-  var currentPage = 1;
-
-  var nav = document.createElement('div');
-  nav.className = 'flex items-center justify-between mt-4 px-1';
-  grid.parentNode.insertBefore(nav, grid.nextSibling);
-
-  function render() {
-    var start = (currentPage - 1) * itemsPerPage;
-    var end = start + itemsPerPage;
-    items.forEach(function(item, i) {
-      item.style.display = (i >= start && i < end) ? '' : 'none';
-    });
-
-    var info = '<span class="pagination-info">Showing ' + (start + 1) + ' – ' + Math.min(end, items.length) + ' of ' + items.length + '</span>';
-    var btns = '<div class="join">';
-    btns += '<button class="join-item btn btn-xs btn-ghost' + (currentPage === 1 ? ' btn-disabled' : '') + '" data-page="prev"><span class="material-symbols-outlined text-sm">chevron_left</span></button>';
-
-    var sp = Math.max(1, currentPage - 2);
-    var ep = Math.min(totalPages, sp + 4);
-    if (ep - sp < 4) sp = Math.max(1, ep - 4);
-    for (var p = sp; p <= ep; p++) {
-      btns += '<button class="join-item btn btn-xs' + (p === currentPage ? ' btn-primary' : ' btn-ghost') + '" data-page="' + p + '">' + p + '</button>';
-    }
-
-    btns += '<button class="join-item btn btn-xs btn-ghost' + (currentPage === totalPages ? ' btn-disabled' : '') + '" data-page="next"><span class="material-symbols-outlined text-sm">chevron_right</span></button>';
-    btns += '</div>';
-
-    nav.innerHTML = info + btns;
-  }
-
-  nav.addEventListener('click', function(e) {
-    var btn = e.target.closest('[data-page]');
-    if (!btn || btn.classList.contains('btn-disabled')) return;
-    var p = btn.getAttribute('data-page');
-    if (p === 'prev') currentPage = Math.max(1, currentPage - 1);
-    else if (p === 'next') currentPage = Math.min(totalPages, currentPage + 1);
-    else currentPage = parseInt(p, 10);
-    render();
-    window.scrollTo({ top: grid.offsetTop - 100, behavior: 'smooth' });
+document.addEventListener('DOMContentLoaded', function() {
+  Jewellery.initGridPagination('jewelleryGrid', 16);
+  Jewellery.initLocation('ja');
+  document.getElementById('ja_metal').addEventListener('change', function() {
+    Jewellery.updatePurityChoices(this, document.getElementById('ja_purity'));
   });
 
-  render();
-}
-
-// ── Init ─────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', function() {
-  initGridPagination('jewelleryGrid', 16);
-
-  document.getElementById('ja_metal').addEventListener('change', function() {
-    updatePurityChoices(this, document.getElementById('ja_purity'));
+  // Close any open <details> dropdown when clicking outside of it.
+  document.addEventListener('click', function(e) {
+    document.querySelectorAll('details.dropdown[open]').forEach(function(d) {
+      if (!d.contains(e.target)) d.removeAttribute('open');
+    });
   });
 });
 </script>

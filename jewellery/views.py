@@ -2,6 +2,7 @@ import os
 from decimal import Decimal
 from collections import defaultdict
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.contrib import messages
@@ -34,6 +35,16 @@ def jewellery_dashboard(request):
         all_location_counts[i.location] += 1
         all_metal_counts[i.metal_type] += 1
 
+    # Type chips with icon + colour + count (only types that have items)
+    category_meta = []
+    for val, label in JewelleryItem.CATEGORY_CHOICES:
+        count = all_category_counts.get(val, 0)
+        if not count:
+            continue
+        icon, hue = JewelleryItem.CATEGORY_META.get(val, ('category', 230))
+        category_meta.append({'value': val, 'label': label, 'icon': icon,
+                              'hue': hue, 'count': count})
+
     filtered_items = items
     if filter_metal:
         filtered_items = [i for i in filtered_items if i.metal_type == filter_metal]
@@ -43,7 +54,7 @@ def jewellery_dashboard(request):
         filtered_items = [i for i in filtered_items if i.category == filter_category]
     if filter_search:
         q = filter_search.lower()
-        filtered_items = [i for i in filtered_items if q in i.name.lower() or q in i.notes.lower()]
+        filtered_items = [i for i in filtered_items if q in i.search_blob]
 
     gold_price = CommodityPrice.objects.filter(commodity_type='GOLD').first()
     silver_price = CommodityPrice.objects.filter(commodity_type='SILVER').first()
@@ -90,6 +101,7 @@ def jewellery_dashboard(request):
         'all_category_counts': dict(all_category_counts),
         'all_location_counts': dict(all_location_counts),
         'all_metal_counts': dict(all_metal_counts),
+        'category_meta': category_meta,
         # Choices for filter dropdowns
         'metal_choices': JewelleryItem.METAL_CHOICES,
         'location_choices': JewelleryItem.LOCATION_CHOICES,
@@ -108,7 +120,7 @@ def add_item(request):
         obj = form.save(commit=False)
         obj.group = _user_group(request)
         obj.save()
-        messages.success(request, f'Added {obj.name} to jewellery.')
+        messages.success(request, f'Added {obj.display_label} to your collection.')
     else:
         err_list = []
         for field, errors in form.errors.items():
@@ -126,7 +138,7 @@ def edit_item(request, pk):
     form = JewelleryItemForm(request.POST, request.FILES, instance=obj)
     if form.is_valid():
         form.save()
-        messages.success(request, f'Updated {obj.name}.')
+        messages.success(request, f'Updated {obj.display_label}.')
     else:
         err_list = []
         for field, errors in form.errors.items():
@@ -144,9 +156,9 @@ def delete_item(request, pk):
         return HttpResponseForbidden("You do not have permission to delete jewellery items.")
         
     obj = get_object_or_404(JewelleryItem, pk=pk, group=_user_group(request))
-    name = obj.name
+    label = obj.display_label
     obj.delete()
-    messages.success(request, f'Deleted {name}.')
+    messages.success(request, f'Deleted {label}.')
     return redirect('jewellery_dashboard')
 
 @login_required
@@ -177,20 +189,38 @@ def search_autocomplete(request):
         
     group = _user_group(request)
     items = JewelleryItem.objects.filter(group=group)
-    
-    # Simple substring match on name
+
     results = []
     for item in items:
-        if q in item.name.lower():
+        if q in item.search_blob:
             results.append({
                 'id': item.pk,
-                'name': item.name,
-                'metal': item.get_metal_type_display()
+                'label': item.display_label,
+                'category': item.get_category_display(),
+                'icon': item.category_icon,
+                'hue': item.category_hue,
+                'location': item.get_location_display(),
+                'weight': f'{item.weight_grams:g}g',
+                'photo_url': (
+                    reverse('jewellery_photo', args=[item.pk]) if item.photo else ''
+                ),
             })
             if len(results) >= 8:  # Limit suggestions
                 break
-                
+
     return JsonResponse({'results': results})
+
+
+# Map stored extension -> a fixed, safe image content type. We deliberately
+# never derive the content type from the filename via mimetypes (which could
+# yield text/html for a maliciously named file and enable stored XSS).
+_SAFE_PHOTO_CONTENT_TYPES = {
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.webp': 'image/webp',
+    '.gif': 'image/gif',
+}
 
 
 @login_required
@@ -199,13 +229,25 @@ def serve_photo(request, pk):
     """
     Secure media serving. Verifies authentication, portfolio access,
     and that the requested item belongs to the user's AccountGroup.
+    The content type is forced to a known-safe image type so a file can
+    never be served as HTML/script.
     """
     obj = get_object_or_404(JewelleryItem, pk=pk, group=_user_group(request))
     if not obj.photo or not obj.photo.name:
         raise Http404("Photo not found")
 
+    ext = os.path.splitext(obj.photo.name)[1].lower()
+    content_type = _SAFE_PHOTO_CONTENT_TYPES.get(ext)
+    if content_type is None:
+        raise Http404("Unsupported media type")
+
     file_path = obj.photo.path
     if not os.path.exists(file_path):
         raise Http404("File does not exist")
 
-    return FileResponse(open(file_path, 'rb'))
+    response = FileResponse(open(file_path, 'rb'), content_type=content_type)
+    response['Content-Disposition'] = (
+        f'inline; filename="{os.path.basename(obj.photo.name)}"'
+    )
+    response['X-Content-Type-Options'] = 'nosniff'
+    return response

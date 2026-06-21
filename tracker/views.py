@@ -291,12 +291,13 @@ def _build_monthly_data(transactions, user, fy_start, today, per_month_goals):
 # Transaction / HRA CRUD factory (PRIMARY + ACCOUNT_HOLDER only)
 # ---------------------------------------------------------------------------
 
-def _make_tracker_crud(model_class, form_class, label, redirect_to='dashboard'):
+def _make_tracker_crud(model_class, form_class, label, redirect_to='dashboard',
+                       allowed_roles=('PRIMARY', 'ACCOUNT_HOLDER')):
     """Generate add / edit / delete views for user-owned tracker models."""
 
     @login_required
     @require_POST
-    @_require_role('PRIMARY', 'ACCOUNT_HOLDER')
+    @_require_role(*allowed_roles)
     def add_view(request):
         form = form_class(request.POST)
         if form.is_valid():
@@ -310,7 +311,7 @@ def _make_tracker_crud(model_class, form_class, label, redirect_to='dashboard'):
 
     @login_required
     @require_POST
-    @_require_role('PRIMARY', 'ACCOUNT_HOLDER')
+    @_require_role(*allowed_roles)
     def edit_view(request, pk):
         gf = group_user_filter(request.user)
         obj = get_object_or_404(model_class, pk=pk, **_gf_kwargs(gf))
@@ -324,7 +325,7 @@ def _make_tracker_crud(model_class, form_class, label, redirect_to='dashboard'):
 
     @login_required
     @require_POST
-    @_require_role('PRIMARY', 'ACCOUNT_HOLDER')
+    @_require_role(*allowed_roles)
     def delete_view(request, pk):
         gf = group_user_filter(request.user)
         obj = get_object_or_404(model_class, pk=pk, **_gf_kwargs(gf))
@@ -340,20 +341,23 @@ def _make_tracker_crud(model_class, form_class, label, redirect_to='dashboard'):
     return add_view, edit_view, delete_view
 
 
+# Savings entries are editable by the PRIMARY holder only; the spouse has
+# read-only access to Monthly Savings.
 add_transaction, edit_transaction, delete_transaction = _make_tracker_crud(
-    Transaction, TransactionForm, 'Transaction', 'dashboard')
+    Transaction, TransactionForm, 'Transaction', 'dashboard',
+    allowed_roles=('PRIMARY',))
 
 add_hra_entry, edit_hra_entry, delete_hra_entry = _make_tracker_crud(
     HRAExpense, HRAExpenseForm, 'HRA', 'hra_tracker')
 
 
 # ---------------------------------------------------------------------------
-# Goal management (PRIMARY + ACCOUNT_HOLDER only)
+# Goal management (PRIMARY only — spouse has read-only Monthly Savings)
 # ---------------------------------------------------------------------------
 
 @login_required
 @require_POST
-@_require_role('PRIMARY', 'ACCOUNT_HOLDER')
+@_require_role('PRIMARY')
 def add_goal_increment(request):
     gf = group_user_filter(request.user)
     inc_id = request.POST.get('increment_id')
@@ -380,7 +384,7 @@ def add_goal_increment(request):
 
 @login_required
 @require_POST
-@_require_role('PRIMARY', 'ACCOUNT_HOLDER')
+@_require_role('PRIMARY')
 def delete_goal_increment(request, inc_id):
     gf = group_user_filter(request.user)
     deleted, _ = GoalIncrement.objects.filter(gf, id=inc_id).delete()
@@ -393,7 +397,7 @@ def delete_goal_increment(request, inc_id):
 
 @login_required
 @require_POST
-@_require_role('PRIMARY', 'ACCOUNT_HOLDER')
+@_require_role('PRIMARY')
 def set_annual_goal(request):
     """Create or update the FinancialGoal for a specific FY start year."""
     form = FinancialGoalForm(request.POST)
@@ -432,7 +436,7 @@ def set_annual_goal(request):
 
 @login_required
 @require_POST
-@_require_role('PRIMARY', 'ACCOUNT_HOLDER')
+@_require_role('PRIMARY')
 def add_goal_adjustment(request):
     """Create or update a one-off monthly adjustment."""
     gf = group_user_filter(request.user)
@@ -460,7 +464,7 @@ def add_goal_adjustment(request):
 
 @login_required
 @require_POST
-@_require_role('PRIMARY', 'ACCOUNT_HOLDER')
+@_require_role('PRIMARY')
 def delete_goal_adjustment(request, adj_id):
     gf = group_user_filter(request.user)
     deleted, _ = MonthlyGoalAdjustment.objects.filter(gf, id=adj_id).delete()
@@ -473,7 +477,7 @@ def delete_goal_adjustment(request, adj_id):
 
 @login_required
 @require_POST
-@_require_role('PRIMARY', 'ACCOUNT_HOLDER')
+@_require_role('PRIMARY')
 def save_month_comment(request):
     """Create or update a comment for a specific month's savings."""
     month_str = request.POST.get('month', '')

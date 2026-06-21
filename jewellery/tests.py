@@ -1,13 +1,24 @@
 import time
+import shutil
+import tempfile
 from decimal import Decimal
-from django.test import TestCase, Client
+from django.test import TestCase, Client, override_settings
 from django.urls import reverse
 from django.core.files.uploadedfile import SimpleUploadedFile
 from tracker.models import AccountGroup, User
 from portfolio.models import CommodityPrice
 from jewellery.models import JewelleryItem
 
+_TEST_MEDIA = tempfile.mkdtemp(prefix='jewellery_test_media_')
+
+
+@override_settings(MEDIA_ROOT=_TEST_MEDIA)
 class JewelleryTrackerTests(TestCase):
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(_TEST_MEDIA, ignore_errors=True)
+        super().tearDownClass()
+
     def setUp(self):
         # Create an AccountGroup
         self.group = AccountGroup.objects.create(name="Test Group")
@@ -44,13 +55,12 @@ class JewelleryTrackerTests(TestCase):
     def test_dashboard_loads_empty(self):
         response = self.client.get(reverse('jewellery_dashboard'))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "No jewellery items yet")
+        self.assertContains(response, "No jewellery items found")
         self.assertContains(response, "Jewellery Collection")
 
     def test_add_item_and_calculations(self):
         # Post to add_item
         post_data = {
-            'name': 'Wedding Ring 22k',
             'category': 'RING',
             'location': 'BANK_LOCKER',
             'metal_type': 'GOLD',
@@ -66,7 +76,9 @@ class JewelleryTrackerTests(TestCase):
         # Check in DB
         self.assertEqual(JewelleryItem.objects.count(), 1)
         item = JewelleryItem.objects.first()
-        self.assertEqual(item.name, 'Wedding Ring 22k')
+        self.assertEqual(item.location, 'BANK_LOCKER')
+        self.assertEqual(item.display_label, '22k Gold Ring')
+        self.assertEqual(item.category_icon, 'diamond')
         self.assertEqual(item.weight_grams, Decimal('10.00'))
         
         # Purity factor is 22k (0.916), gold rate is 6000.00. 
@@ -83,7 +95,6 @@ class JewelleryTrackerTests(TestCase):
         # Create an item first
         item = JewelleryItem.objects.create(
             group=self.group,
-            name='Old Necklace',
             category='CHAIN',
             metal_type='GOLD',
             purity='18k',
@@ -93,9 +104,8 @@ class JewelleryTrackerTests(TestCase):
         )
         # Edit details
         edit_data = {
-            'name': 'New Custom Chain',
             'category': 'CHAIN',
-            'location': 'WEARING',
+            'location': 'BANK_LOCKER',
             'metal_type': 'GOLD',
             'purity': '18k',
             'weight_grams': '20.00',
@@ -110,8 +120,7 @@ class JewelleryTrackerTests(TestCase):
         self.assertRedirects(response, reverse('jewellery_dashboard'))
 
         item.refresh_from_db()
-        self.assertEqual(item.name, 'New Custom Chain')
-        self.assertEqual(item.location, 'WEARING')
+        self.assertEqual(item.location, 'BANK_LOCKER')
         self.assertEqual(item.purchase_price, Decimal('60000.00'))
         # Estimated value = 20 * 6000 * 0.750 = 90000.00
         # P&L = 90000.00 - 60000.00 = 30000.00
@@ -121,7 +130,6 @@ class JewelleryTrackerTests(TestCase):
     def test_delete_item(self):
         item = JewelleryItem.objects.create(
             group=self.group,
-            name='Silver Coin',
             category='COIN',
             metal_type='SILVER',
             purity='999',
@@ -138,7 +146,6 @@ class JewelleryTrackerTests(TestCase):
         photo_file = SimpleUploadedFile("ring.jpg", b"file_content", content_type="image/jpeg")
         item = JewelleryItem.objects.create(
             group=self.group,
-            name='Photo Ring',
             category='RING',
             metal_type='GOLD',
             purity='22k',
