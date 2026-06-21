@@ -28,6 +28,7 @@
       {% endfor %}
       {% endif %}
 
+      {% if not just_unlocked %}
       {% if has_webauthn %}
       <div id="biometricSection">
         <h2 class="card-title text-base">Unlock Vault</h2>
@@ -67,6 +68,7 @@
         </button>
         {% endif %}
       </div>
+      {% endif %}
 
       {% else %}
       <h2 class="card-title text-base">Vault Unavailable</h2>
@@ -75,15 +77,23 @@
 
       {# ── Face ID registration prompt (shown after password unlock, no biometric yet) ── #}
       {% if just_unlocked and can_register_webauthn %}
-      <div class="divider mt-4 text-xs opacity-40">already unlocked</div>
-      <div class="w-full text-left">
-        <p class="text-xs opacity-60 mb-2">Set up Face ID / fingerprint so you can skip the password next time.</p>
-        <button type="button" id="registerBiometricBtn" class="btn btn-outline btn-sm btn-block gap-2"
+      <div class="w-full text-center">
+        <div class="mb-4 text-success">
+          <span class="material-symbols-outlined text-5xl">check_circle</span>
+          <h2 class="card-title text-base justify-center mt-2">Vault Unlocked</h2>
+        </div>
+        <p class="text-sm opacity-80 mb-6">Set up Face ID or fingerprint so you can skip the password next time.</p>
+        
+        <button type="button" id="registerBiometricBtn" class="btn btn-primary btn-block gap-2 mb-3"
                 onclick="registerBiometric()">
           <span class="material-symbols-outlined text-base">fingerprint</span>
-          Set up Face ID / Biometrics
+          Set up Face ID
         </button>
-        <div id="registerMsg" class="text-xs mt-2 hidden"></div>
+        <a href="{{ next }}" id="continueBtn" class="btn btn-ghost btn-block">
+          Not now, continue to Vault
+        </a>
+        
+        <div id="registerMsg" class="text-sm mt-4 hidden"></div>
       </div>
       {% endif %}
 
