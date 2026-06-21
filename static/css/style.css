@@ -900,3 +900,109 @@ progress {
 .mon-legend-dot { width: 0.5rem; height: 0.5rem; border-radius: 9999px; flex-shrink: 0; }
 .mon-stat-ok .mon-stat-val { color: oklch(var(--su) / 1); }
 .mon-stat-err .mon-stat-val { color: oklch(var(--er) / 1); }
+
+/* ── Jewellery: type colour-coding (hue passed via --h) ───────────── */
+
+/* Neutral, wrapping selectable pill — used for the Location filter chips. */
+.filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  min-height: 32px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  color: color-mix(in oklch, var(--color-base-content) 60%, transparent);
+  border: 1px solid color-mix(in oklch, var(--color-base-content) 12%, transparent);
+  background: color-mix(in oklch, var(--color-base-content) 5%, transparent);
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.12s;
+}
+.filter-pill:hover {
+  color: color-mix(in oklch, var(--color-base-content) 90%, transparent);
+  background: color-mix(in oklch, var(--color-base-content) 10%, transparent);
+}
+.filter-pill:active { transform: scale(0.96); }
+.filter-pill.is-active,
+.filter-pill.is-active:hover {
+  color: var(--color-primary-content);
+  background: var(--color-primary);
+  border-color: transparent;
+  box-shadow: 0 2px 10px color-mix(in oklch, var(--color-primary) 35%, transparent);
+}
+
+/* Selectable option row inside the Metal / Type dropdown menus.
+   Plain Tailwind list + this class — avoids DaisyUI .menu flex-wrap quirks. */
+.jw-opt {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  border-radius: 0.5rem;
+  font-size: 0.75rem;
+  line-height: 1.1;
+  text-align: left;
+  white-space: nowrap;
+  color: var(--color-base-content);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.jw-opt:hover {
+  background: color-mix(in oklch, var(--color-base-content) 9%, transparent);
+}
+.jw-opt-on,
+.jw-opt-on:hover {
+  background: var(--color-primary);
+  color: var(--color-primary-content);
+  font-weight: 600;
+}
+
+/* Colour-coded badge used on cards / detail */
+.jw-type-badge {
+  --h: 230;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+  color: hsl(var(--h) 80% 75%);
+  border: 1px solid hsl(var(--h) 55% 55% / 0.30);
+  background: hsl(var(--h) 55% 45% / 0.85);
+  backdrop-filter: blur(6px);
+}
+.jw-type-badge.jw-badge-overlay {
+  color: #fff;
+  border-color: hsl(var(--h) 60% 70% / 0.5);
+  background: hsl(var(--h) 60% 42% / 0.78);
+}
+
+/* Coloured icon tile used in place of an empty photo box */
+.jw-type-tile {
+  --h: 230;
+  background:
+    radial-gradient(ellipse at 30% 20%, hsl(var(--h) 65% 55% / 0.22) 0%, transparent 60%),
+    linear-gradient(135deg, hsl(var(--h) 55% 45% / 0.18) 0%, hsl(var(--h) 50% 30% / 0.04) 100%);
+}
+.jw-type-tile .jw-type-icon { color: hsl(var(--h) 70% 72%); }
+
+/* Rounded icon avatar for the mobile list rows */
+.jw-type-avatar {
+  --h: 230;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: hsl(var(--h) 72% 72%);
+  border: 1px solid hsl(var(--h) 55% 55% / 0.28);
+  background: hsl(var(--h) 55% 48% / 0.12);
+}
