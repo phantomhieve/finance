@@ -310,3 +310,41 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = 31_536_000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+
+# Logging — emit Django request errors and exceptions to the gunicorn error log
+# (stderr / GUNICORN_ERROR_LOG). Without this, 500s produce no traceback anywhere.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '[{asctime}] {levelname} {name} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        # Logs all unhandled request exceptions (the 500 traceback)
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        # Logs database queries at DEBUG level (disable in production if noisy)
+        'django.security': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+        # App-level logger — use logger = logging.getLogger(__name__) in views
+        '': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+        },
+    },
+}
