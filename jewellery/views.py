@@ -198,7 +198,7 @@ def search_autocomplete(request):
                 'location': item.get_location_display(),
                 'weight': f'{item.weight_grams:g}g',
                 'photo_url': (
-                    reverse('jewellery_photo', args=[item.pk]) if item.photo else ''
+                    f"{reverse('jewellery_photo', args=[item.pk])}?t={item.updated_at.timestamp()}" if item.photo else ''
                 ),
             })
             if len(results) >= 8:  # Limit suggestions
