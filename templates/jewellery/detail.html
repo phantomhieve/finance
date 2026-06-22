@@ -169,7 +169,7 @@
           <label class="label py-1"><span class="label-text text-xs font-bold uppercase tracking-wider opacity-50">Photo</span></label>
 
           <div id="je_photo_preview_container" class="{% if not item.photo %}hidden{% endif %} mb-2 relative group w-full max-w-sm h-48 rounded-xl overflow-hidden bg-base-300/50">
-            <img id="je_photo_preview_img" {% if item.photo %}src="{% url 'jewellery_photo' item.pk %}"{% endif %} onerror="clearEditPhotoBroken()" class="w-full h-full object-cover transition-opacity duration-300" />
+            <img id="je_photo_preview_img" {% if item.photo %}src="{% url 'jewellery_photo' item.pk %}?t={{ item.updated_at.timestamp }}"{% endif %} onerror="clearEditPhotoBroken()" class="w-full h-full object-cover transition-opacity duration-300" />
             <div data-photo-loader class="hidden absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-base-300/80 backdrop-blur-sm">
               <span class="loading loading-spinner loading-md text-primary"></span>
               <span class="text-[10px] font-semibold uppercase tracking-wider opacity-60">Processing photo…</span>
@@ -188,7 +188,7 @@
             <span class="text-xs font-semibold opacity-40 group-hover:opacity-70">Tap to upload a new photo</span>
           </label>
 
-          <input type="file" name="photo" id="je_photo" accept="image/*" class="hidden" onchange="handlePhotoSelect(this, 'je_photo_preview_container', 'je_photo_preview_img', 'je_photo_upload_box')" />
+          <input type="file" name="photo" id="je_photo" accept="image/*" class="hidden" onchange="document.getElementById('je_photo_clear').value=''; handlePhotoSelect(this, 'je_photo_preview_container', 'je_photo_preview_img', 'je_photo_upload_box')" />
           <input type="hidden" name="photo-clear" id="je_photo_clear" value="" />
         </div>
 
@@ -228,7 +228,7 @@
       <form method="dialog"><button class="btn btn-sm btn-circle btn-ghost">✕</button></form>
     </div>
     <div class="p-4 flex justify-center bg-black/20 min-h-[40vh]">
-      <img src="{% url 'jewellery_photo' item.pk %}" class="max-h-[75vh] object-contain rounded-lg" />
+      <img src="{% url 'jewellery_photo' item.pk %}?t={{ item.updated_at.timestamp }}" class="max-h-[75vh] object-contain rounded-lg" />
     </div>
   </div>
   <form method="dialog" class="modal-backdrop"><button>close</button></form>
