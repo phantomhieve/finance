@@ -141,6 +141,9 @@ def edit_item(request, pk):
             field_label = form.fields[field].label or field.replace('_', ' ').capitalize()
             err_list.append(f"{field_label}: {', '.join(errors)}")
         messages.error(request, 'Failed to update item: ' + '; '.join(err_list))
+    next_url = request.GET.get('next')
+    if next_url and next_url.startswith('/'):
+        return redirect(next_url)
     return redirect('jewellery_dashboard')
 
 
@@ -155,6 +158,9 @@ def delete_item(request, pk):
     label = obj.display_label
     obj.delete()
     messages.success(request, f'Deleted {label}.')
+    next_url = request.GET.get('next')
+    if next_url and next_url.startswith('/'):
+        return redirect(next_url)
     return redirect('jewellery_dashboard')
 
 @login_required
