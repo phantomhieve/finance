@@ -142,7 +142,7 @@ def edit_item(request, pk):
             err_list.append(f"{field_label}: {', '.join(errors)}")
         messages.error(request, 'Failed to update item: ' + '; '.join(err_list))
     next_url = request.GET.get('next')
-    if next_url and next_url.startswith('/'):
+    if next_url and next_url.startswith('/') and not next_url.startswith('//'):
         return redirect(next_url)
     return redirect('jewellery_dashboard')
 
@@ -159,7 +159,7 @@ def delete_item(request, pk):
     obj.delete()
     messages.success(request, f'Deleted {label}.')
     next_url = request.GET.get('next')
-    if next_url and next_url.startswith('/'):
+    if next_url and next_url.startswith('/') and not next_url.startswith('//'):
         return redirect(next_url)
     return redirect('jewellery_dashboard')
 
@@ -252,4 +252,5 @@ def serve_photo(request, pk):
         f'inline; filename="{os.path.basename(obj.photo.name)}"'
     )
     response['X-Content-Type-Options'] = 'nosniff'
+    response['Cache-Control'] = 'public, max-age=31536000, immutable'
     return response
