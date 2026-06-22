@@ -31,8 +31,9 @@
   function updatePurityChoices(metalSelect, puritySelect, keepValue) {
     var metal = metalSelect.value;
     var prev = keepValue || puritySelect.value;
-    if (metal === 'GOLD') {
-      fill(puritySelect, GOLD_PURITIES, prev, '22k');
+    if (metal === 'GOLD' || metal === 'DIAMOND_OTHER') {
+      var fallback = (metal === 'DIAMOND_OTHER') ? '18k' : '22k';
+      fill(puritySelect, GOLD_PURITIES, prev, fallback);
     } else if (metal === 'SILVER') {
       fill(puritySelect, SILVER_PURITIES, prev, '999');
     } else {

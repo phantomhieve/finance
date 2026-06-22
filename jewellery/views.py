@@ -61,11 +61,9 @@ def jewellery_dashboard(request):
     gold_rate = gold_price.rate_per_gram if gold_price else Decimal('0.00')
     silver_rate = silver_price.rate_per_gram if silver_price else Decimal('0.00')
 
-    total_weight_gold = sum((i.weight_grams for i in items if i.metal_type == 'GOLD'), Decimal('0.00'))
+    total_weight_gold = sum((i.weight_grams for i in items if i.metal_type in ['GOLD', 'DIAMOND_OTHER']), Decimal('0.00'))
     total_weight_silver = sum((i.weight_grams for i in items if i.metal_type == 'SILVER'), Decimal('0.00'))
     total_estimated_value = sum((i.estimated_value for i in items), Decimal('0.00'))
-    total_purchase_price = sum((i.purchase_price for i in items), Decimal('0.00'))
-    total_unrealised_gain = total_estimated_value - total_purchase_price
 
     # Group by location for summary
     location_counts = defaultdict(int)
@@ -83,8 +81,6 @@ def jewellery_dashboard(request):
         'total_weight_gold': total_weight_gold,
         'total_weight_silver': total_weight_silver,
         'total_estimated_value': total_estimated_value,
-        'total_purchase_price': total_purchase_price,
-        'total_unrealised_gain': total_unrealised_gain,
         'gold_rate': gold_rate,
         'silver_rate': silver_rate,
         'gold_price_obj': gold_price,
