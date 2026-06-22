@@ -181,3 +181,31 @@ class JewelleryTrackerTests(TestCase):
         # Should get 404 since item belongs to self.group, not other_group!
         response = self.client.get(reverse('jewellery_photo', kwargs={'pk': item.pk}))
         self.assertEqual(response.status_code, 404)
+
+    def test_heic_photo_conversion(self):
+        from io import BytesIO
+        from PIL import Image
+        import pillow_heif
+        pillow_heif.register_heif_opener()
+        
+        im = Image.new("RGB", (10, 10), color="blue")
+        heif_io = BytesIO()
+        im.save(heif_io, format="HEIF")
+        heif_io.seek(0)
+        
+        photo_file = SimpleUploadedFile("iphone_photo.heic", heif_io.read(), content_type="image/heic")
+        
+        post_data = {
+            'category': 'RING',
+            'location': 'BANK_LOCKER',
+            'metal_type': 'GOLD',
+            'purity': '22k',
+            'weight_grams': '5.00',
+            'photo': photo_file
+        }
+        response = self.client.post(reverse('add_jewellery'), data=post_data)
+        self.assertRedirects(response, reverse('jewellery_dashboard'))
+        
+        item = JewelleryItem.objects.latest('created_at')
+        self.assertTrue(item.photo.name.endswith('.jpg'))
+        self.assertFalse(item.photo.name.endswith('.heic'))
