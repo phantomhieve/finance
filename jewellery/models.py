@@ -138,10 +138,17 @@ class JewelleryItem(models.Model):
 
     @property
     def estimated_value(self):
-        if self.metal_type not in ['GOLD', 'SILVER'] or not self.weight_grams:
-            return self.purchase_price or Decimal('0.00')
+        if self.metal_type in ['GOLD', 'DIAMOND_OTHER']:
+            price_type = 'GOLD'
+        elif self.metal_type == 'SILVER':
+            price_type = 'SILVER'
+        else:
+            return Decimal('0.00')
 
-        price_obj = CommodityPrice.objects.filter(commodity_type=self.metal_type).first()
+        if not self.weight_grams:
+            return Decimal('0.00')
+
+        price_obj = CommodityPrice.objects.filter(commodity_type=price_type).first()
         if not price_obj:
             return Decimal('0.00')
 
@@ -150,4 +157,4 @@ class JewelleryItem(models.Model):
 
     @property
     def pnl(self):
-        return self.estimated_value - (self.purchase_price or Decimal('0.00'))
+        return Decimal('0.00')

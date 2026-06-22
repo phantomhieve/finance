@@ -66,8 +66,6 @@ class JewelleryTrackerTests(TestCase):
             'metal_type': 'GOLD',
             'purity': '22k',
             'weight_grams': '10.00',
-            'purchase_price': '0.00',
-            'purchase_date': '',
             'notes': ''
         }
         response = self.client.post(reverse('add_jewellery'), data=post_data)
@@ -84,7 +82,7 @@ class JewelleryTrackerTests(TestCase):
         # Purity factor is 22k (0.916), gold rate is 6000.00. 
         # Estimated value = 10 * 6000 * 0.916 = 54960.00
         self.assertEqual(item.estimated_value, Decimal('54960.00'))
-        self.assertEqual(item.pnl, Decimal('54960.00')) # purchase price is 0
+        self.assertEqual(item.pnl, Decimal('0.00'))
 
         # Now load dashboard to check numbers
         response = self.client.get(reverse('jewellery_dashboard'))
@@ -99,8 +97,7 @@ class JewelleryTrackerTests(TestCase):
             metal_type='GOLD',
             purity='18k',
             weight_grams=Decimal('20.00'),
-            location='HOME_SAFE',
-            purchase_price=Decimal('50000.00')
+            location='HOME_SAFE'
         )
         # Edit details
         edit_data = {
@@ -109,8 +106,6 @@ class JewelleryTrackerTests(TestCase):
             'metal_type': 'GOLD',
             'purity': '18k',
             'weight_grams': '20.00',
-            'purchase_price': '60000.00',
-            'purchase_date': '2026-06-01',
             'notes': 'Resized chain'
         }
         response = self.client.post(
@@ -121,11 +116,24 @@ class JewelleryTrackerTests(TestCase):
 
         item.refresh_from_db()
         self.assertEqual(item.location, 'BANK_LOCKER')
-        self.assertEqual(item.purchase_price, Decimal('60000.00'))
         # Estimated value = 20 * 6000 * 0.750 = 90000.00
-        # P&L = 90000.00 - 60000.00 = 30000.00
         self.assertEqual(item.estimated_value, Decimal('90000.00'))
-        self.assertEqual(item.pnl, Decimal('30000.00'))
+        self.assertEqual(item.pnl, Decimal('0.00'))
+
+    def test_diamond_other_valuation(self):
+        # DIAMOND_OTHER should use GOLD rate (6000.00) and support gold purity
+        item = JewelleryItem.objects.create(
+            group=self.group,
+            category='RING',
+            metal_type='DIAMOND_OTHER',
+            purity='18k',
+            weight_grams=Decimal('10.00'),
+            location='BANK_LOCKER'
+        )
+        # Purity factor is 18k (0.750), gold rate is 6000.00. 
+        # Estimated value = 10 * 6000 * 0.750 = 45000.00
+        self.assertEqual(item.estimated_value, Decimal('45000.00'))
+        self.assertEqual(item.pnl, Decimal('0.00'))
 
     def test_delete_item(self):
         item = JewelleryItem.objects.create(
@@ -134,8 +142,7 @@ class JewelleryTrackerTests(TestCase):
             metal_type='SILVER',
             purity='999',
             weight_grams=Decimal('100.00'),
-            location='HOME_SAFE',
-            purchase_price=Decimal('5000.00')
+            location='HOME_SAFE'
         )
         response = self.client.post(reverse('delete_jewellery', kwargs={'pk': item.pk}))
         self.assertRedirects(response, reverse('jewellery_dashboard'))

@@ -16,23 +16,15 @@ ALLOWED_PHOTO_FORMATS = {'JPEG', 'PNG', 'WEBP', 'GIF'}
 class JewelleryItemForm(forms.ModelForm):
     class Meta:
         model = JewelleryItem
-        exclude = ['group', 'created_at', 'updated_at']
+        exclude = ['group', 'purchase_date', 'purchase_price', 'created_at', 'updated_at']
         widgets = {
-            'purchase_date': forms.DateInput(attrs={'type': 'date'}),
             'notes': forms.Textarea(attrs={'rows': 2}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        for optional in ('purchase_date', 'purchase_price', 'notes',
-                         'purity', 'photo'):
+        for optional in ('notes', 'purity', 'photo'):
             self.fields[optional].required = False
-
-    def clean_purchase_price(self):
-        """Coerce blank/None → 0 so the NOT NULL DB column is never sent NULL."""
-        from decimal import Decimal
-        val = self.cleaned_data.get('purchase_price')
-        return val if val is not None else Decimal('0')
 
     def clean_weight_grams(self):
         """Coerce blank/None → 0 so the NOT NULL DB column is never sent NULL."""
