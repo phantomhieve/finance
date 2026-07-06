@@ -124,10 +124,12 @@ class FinancialGoal(models.Model):
     )
     label = models.CharField(max_length=50, help_text="e.g. 50L, 1Cr")
     target_amount = models.DecimalField(max_digits=14, decimal_places=0)
-    sort_order = models.IntegerField(default=0)
+    achieved_at = models.DateField(null=True, blank=True,
+                                   help_text="Auto-set when portfolio value first reaches the target")
+    notes = models.TextField(blank=True, help_text="Optional notes or comments for this goal")
 
     class Meta:
-        ordering = ['sort_order', 'target_amount']
+        ordering = ['target_amount']
 
     def __str__(self):
         return f"{self.label} — ₹{self.target_amount:,.0f}"

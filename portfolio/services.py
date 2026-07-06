@@ -253,14 +253,32 @@ def get_portfolio_summary(group=None, is_baby=False):
     for g in _gf(FinancialGoal.objects, group).all():
         target = float(g.target_amount)
         pct = min(float(total_value) / target * 100, 100) if target else 0
+        achieved = pct >= 100
+
+        # Auto-achieve: set the date when first reached
+        if achieved and g.achieved_at is None:
+            g.achieved_at = datetime.date.today()
+            g.save(update_fields=['achieved_at'])
+        # Auto-un-achieve: clear if portfolio drops below target
+        elif not achieved and g.achieved_at is not None:
+            g.achieved_at = None
+            g.save(update_fields=['achieved_at'])
+
         goals.append({
             'id': g.id,
             'label': g.label,
             'target': target,
-            'sort_order': g.sort_order,
             'pct': round(pct, 1),
-            'achieved': pct >= 100,
+            'achieved': achieved,
+            'achieved_at': g.achieved_at,
+            'notes': g.notes,
         })
+
+    # Pre-computed goal buckets for mobile layout
+    achieved_goals = [g for g in goals if g['achieved']]
+    pending_goals = [g for g in goals if not g['achieved']]
+    current_goal = pending_goals[0] if pending_goals else None
+    upcoming_goals = pending_goals[1:] if len(pending_goals) > 1 else []
 
     # Zerodha account summaries (prefetch totals to avoid N+1)
     z_accounts = _gf(ZerodhaAccount.objects, group).all() if group else ZerodhaAccount.objects.all()
@@ -295,6 +313,9 @@ def get_portfolio_summary(group=None, is_baby=False):
         'equity_returns': equity_returns,
         'consolidated': consolidated,
         'goals': goals,
+        'current_goal': current_goal,
+        'upcoming_goals': upcoming_goals,
+        'achieved_goals': achieved_goals,
         'accounts': accounts,
         'epf_balance': epf_balance,
         'epf_total_contrib': epf_total_contrib,
