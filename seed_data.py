@@ -459,14 +459,14 @@ say(f"{len(RSU_DATA)} US stock RSU batches")
 print("\n── Portfolio: Financial Goal Milestones ──────────────────────")
 
 MILESTONES = [
-    ("25L",  25_00_000, 1),
-    ("50L",  50_00_000, 2),
-    ("1Cr", 1_00_00_000, 3),
+    ("25L",  25_00_000),
+    ("50L",  50_00_000),
+    ("1Cr", 1_00_00_000),
 ]
-for label, target, order in MILESTONES:
+for label, target in MILESTONES:
     PortfolioFinancialGoal.objects.get_or_create(
         group=group, label=label,
-        defaults=dict(target_amount=target, sort_order=order)
+        defaults=dict(target_amount=target)
     )
 say(f"{len(MILESTONES)} portfolio milestones (25L → 50L → 1Cr)")
 
