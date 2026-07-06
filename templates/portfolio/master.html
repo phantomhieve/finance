@@ -217,15 +217,113 @@
       <button class="btn btn-ghost btn-sm gap-1" onclick="openGoalModal()"><span class="material-symbols-outlined text-base">add</span>Add</button>
     </div>
     {% if goals %}
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+
+    {# ——— DESKTOP: Enhanced grid with achieved dates ——— #}
+    <div class="hidden md:grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
       {% for g in goals %}
-      <div class="p-3 rounded-lg border cursor-pointer hover:bg-base-300/80 transition-colors {% if g.achieved %}border-success/30 bg-success/5{% else %}border-base-content/8 bg-base-300/30{% endif %}" data-edit-goal data-id="{{ g.id }}" data-label="{{ g.label }}" data-target="{{ g.target|floatformat:0 }}" data-sort="{{ g.sort_order }}">
-        <div class="text-sm font-semibold truncate">{{ g.label }}</div>
+      <div class="p-3 rounded-lg border cursor-pointer hover:bg-base-300/80 transition-colors {% if g.achieved %}border-success/30 bg-success/5{% else %}border-base-content/8 bg-base-300/30{% endif %}" data-edit-goal data-id="{{ g.id }}" data-label="{{ g.label }}" data-target="{{ g.target|floatformat:0 }}" data-notes="{{ g.notes }}">
+        <div class="flex items-center justify-between mb-1">
+          <div class="text-sm font-semibold truncate">{{ g.label }}</div>
+          {% if g.achieved %}<span class="material-symbols-outlined text-success text-base">check_circle</span>{% endif %}
+        </div>
         <progress class="progress w-full my-1.5 {% if g.achieved %}progress-success{% else %}progress-primary{% endif %}" value="{{ g.pct }}" max="100"></progress>
-        <div class="text-xs font-bold {% if g.achieved %}text-success{% endif %}">{{ g.pct }}%</div>
+        <div class="flex items-center justify-between">
+          <div class="text-xs font-bold {% if g.achieved %}text-success{% endif %}">{{ g.pct }}%</div>
+          {% if g.achieved and g.achieved_at %}
+          <div class="text-[10px] opacity-50">Achieved {{ g.achieved_at|date:"d M Y" }}</div>
+          {% endif %}
+        </div>
+        {% if g.notes %}
+        <div class="mt-1.5 text-[10px] opacity-40 italic truncate">{{ g.notes }}</div>
+        {% endif %}
       </div>
       {% endfor %}
     </div>
+
+    {# ——— MOBILE: Hero current goal + collapsed upcoming + collapsed achieved ——— #}
+    <div class="md:hidden space-y-3">
+      {# Current target — hero card #}
+      {% if current_goal %}
+      <div class="p-4 rounded-xl border-2 border-primary/30 bg-primary/5 relative overflow-hidden" data-edit-goal data-id="{{ current_goal.id }}" data-label="{{ current_goal.label }}" data-target="{{ current_goal.target|floatformat:0 }}" data-notes="{{ current_goal.notes }}">
+        <div class="absolute -right-4 -top-4 opacity-[0.04]">
+          <span class="material-symbols-outlined" style="font-size:120px">flag</span>
+        </div>
+        <div class="relative z-10">
+          <div class="text-[10px] font-bold uppercase tracking-widest text-primary/70 mb-1">Current Target</div>
+          <div class="text-lg font-extrabold">{{ current_goal.label }}</div>
+          <div class="flex items-center gap-3 mt-2">
+            <div class="flex-1">
+              <progress class="progress progress-primary w-full h-3" value="{{ current_goal.pct }}" max="100"></progress>
+            </div>
+            <div class="text-sm font-bold text-primary shrink-0">{{ current_goal.pct }}%</div>
+          </div>
+          <div class="flex items-center justify-between mt-1.5">
+            <div class="text-xs opacity-50">₹{{ current_goal.target|floatformat:0|indian_number }} target</div>
+            {% if current_goal.notes %}
+            <button class="btn btn-ghost btn-xs btn-circle opacity-60 hover:opacity-100" onclick="event.stopPropagation(); showNoteModal('{{ current_goal.label|escapejs }}', '{{ current_goal.notes|escapejs }}')">
+              <span class="material-symbols-outlined text-base">description</span>
+            </button>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      {# Upcoming goals — collapsible #}
+      {% if upcoming_goals %}
+      <div class="collapse collapse-arrow bg-error/5 border border-error/20 rounded-xl">
+        <input type="checkbox" />
+        <div class="collapse-title min-h-0 py-2.5 px-3 text-sm font-semibold text-error flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-base">flag</span>
+          Upcoming Goals
+          <span class="badge badge-error badge-xs ml-1">{{ upcoming_goals|length }}</span>
+        </div>
+        <div class="collapse-content px-3 pb-3">
+          <div class="space-y-2">
+            {% for g in upcoming_goals %}
+            <div class="flex items-center gap-3 p-2.5 rounded-lg bg-base-100/40" data-edit-goal data-id="{{ g.id }}" data-label="{{ g.label }}" data-target="{{ g.target|floatformat:0 }}" data-notes="{{ g.notes }}">
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-semibold truncate">{{ g.label }}</div>
+                <div class="text-xs opacity-50">₹{{ g.target|floatformat:0|indian_number }}</div>
+                {% if g.notes %}<div class="text-[10px] opacity-40 italic mt-0.5 truncate">{{ g.notes }}</div>{% endif %}
+              </div>
+              <div class="text-xs font-bold">{{ g.pct }}%</div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      {# Achieved goals — collapsed accordion #}
+      {% if achieved_goals %}
+      <div class="collapse collapse-arrow bg-success/5 border border-success/20 rounded-xl">
+        <input type="checkbox" />
+        <div class="collapse-title min-h-0 py-2.5 px-3 text-sm font-semibold text-success flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-base">emoji_events</span>
+          Achieved Goals
+          <span class="badge badge-success badge-xs ml-1">{{ achieved_goals|length }}</span>
+        </div>
+        <div class="collapse-content px-3 pb-3">
+          <div class="space-y-2">
+            {% for g in achieved_goals %}
+            <div class="flex items-center gap-2.5 p-2 rounded-lg bg-base-100/50" data-edit-goal data-id="{{ g.id }}" data-label="{{ g.label }}" data-target="{{ g.target|floatformat:0 }}" data-notes="{{ g.notes }}">
+              <span class="material-symbols-outlined text-success text-base">check_circle</span>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-semibold truncate">{{ g.label }}</div>
+                {% if g.achieved_at %}
+                <div class="text-[10px] opacity-50">{{ g.achieved_at|date:"d M Y" }}</div>
+                {% endif %}
+              </div>
+              <div class="text-xs font-bold text-success">100%</div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
     {% else %}
     <p class="text-sm opacity-40">No goals set. Add your first target!</p>
     {% endif %}
@@ -663,7 +761,7 @@
 {% include 'portfolio/_epf_form_modal.html' with form_obj=epf_form %}
 
 {# Goal Modal #}
-<dialog class="modal" id="addGoalModal"><div class="modal-box"><h3 class="font-bold text-lg flex items-center gap-2" id="goalModalTitle"><span class="material-symbols-outlined text-primary">add_circle</span>Add Goal</h3><form id="goalForm" method="post" action="{% url 'add_goal' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><div class="grid grid-cols-2 gap-4 mt-4"><div class="form-field"><label class="label text-xs font-semibold">Label</label>{{ goal_form.label }}</div><div class="form-field"><label class="label text-xs font-semibold">Target Amount (₹)</label>{{ goal_form.target_amount }}</div></div><div class="form-field mt-3"><label class="label text-xs font-semibold">Sort Order</label>{{ goal_form.sort_order }}</div><div class="modal-action"><button type="button" id="goalDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteGoalForm')"><span class="material-symbols-outlined text-base">delete</span>Delete</button><button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addGoalModal')">Cancel</button><button type="submit" class="btn btn-primary btn-sm">Save</button></div></form><form id="deleteGoalForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form></div><form method="dialog" class="modal-backdrop"><button>close</button></form></dialog>
+<dialog class="modal" id="addGoalModal"><div class="modal-box"><h3 class="font-bold text-lg flex items-center gap-2" id="goalModalTitle"><span class="material-symbols-outlined text-primary">add_circle</span>Add Goal</h3><form id="goalForm" method="post" action="{% url 'add_goal' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><div class="grid grid-cols-2 gap-4 mt-4"><div class="form-field"><label class="label text-xs font-semibold">Label</label>{{ goal_form.label }}</div><div class="form-field"><label class="label text-xs font-semibold">Target Amount (₹)</label>{{ goal_form.target_amount }}</div></div><div class="form-field mt-3"><label class="label text-xs font-semibold">Notes</label>{{ goal_form.notes }}</div><div class="modal-action"><button type="button" id="goalDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteGoalForm')"><span class="material-symbols-outlined text-base">delete</span>Delete</button><button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addGoalModal')">Cancel</button><button type="submit" class="btn btn-primary btn-sm">Save</button></div></form><form id="deleteGoalForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form></div><form method="dialog" class="modal-backdrop"><button>close</button></form></dialog>
 
 {# NPS Modal #}
 {% include 'portfolio/_nps_form_modal.html' with form_obj=nps_form nps_latest=nps_latest %}
@@ -728,6 +826,21 @@
   <form method="dialog" class="modal-backdrop"><button>close</button></form>
 </dialog>
 
+<!-- Note Viewer Modal -->
+<dialog class="modal" id="viewNoteModal">
+  <div class="modal-box">
+    <h3 class="font-bold text-lg flex items-center gap-2" id="viewNoteTitle">
+      <span class="material-symbols-outlined text-info">description</span>
+      <span id="viewNoteTitleText">Note</span>
+    </h3>
+    <div class="py-4 whitespace-pre-wrap italic opacity-80" id="viewNoteContent"></div>
+    <div class="modal-action">
+      <button class="btn btn-ghost btn-sm" onclick="closeModal('viewNoteModal')">Close</button>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
 {{ pf_chart_data|json_script:"pf-chart-data" }}
 {% endblock %}
 
@@ -740,6 +853,12 @@
 <script>
   window.GOLD_RATE = {{ gold_rate|default:0 }};
   window.SILVER_RATE = {{ silver_rate|default:0 }};
+
+  function showNoteModal(title, content) {
+    document.getElementById('viewNoteTitleText').textContent = title + " Notes";
+    document.getElementById('viewNoteContent').textContent = content;
+    document.getElementById('viewNoteModal').showModal();
+  }
 </script>
 <script src="{% static 'js/commodity_purity.js' %}"></script>
 <script src="{% static 'js/nps_modal.js' %}"></script>
@@ -897,7 +1016,7 @@ document.addEventListener('click', function(e) {
   if ((btn = e.target.closest('[data-edit-goal]'))) {
     _editSetup('goalForm','deleteGoalForm','goalDeleteBtn','goalModalTitle',
       "{% url 'edit_goal' pk=0 %}","{% url 'delete_goal' pk=0 %}",'Edit Goal','addGoalModal',btn.dataset,
-      {label:btn.dataset.label,target_amount:btn.dataset.target,sort_order:btn.dataset.sort});
+      {label:btn.dataset.label,target_amount:btn.dataset.target,notes:btn.dataset.notes});
   } else if ((btn = e.target.closest('[data-edit-epf]'))) {
     _editSetup('epfForm','deleteEpfForm','epfDeleteBtn','epfModalTitle',
       "{% url 'edit_epf_entry' pk=0 %}","{% url 'delete_epf_entry' pk=0 %}",'Edit EPF Entry','addEpfModal',btn.dataset,
