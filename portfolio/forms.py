@@ -183,9 +183,9 @@ class USStockHoldingForm(forms.ModelForm):
 class FinancialGoalForm(forms.ModelForm):
     class Meta:
         model = FinancialGoal
-        fields = ['label', 'target_amount', 'sort_order']
+        fields = ['label', 'target_amount', 'notes']
         widgets = {
             'label': forms.TextInput(attrs={'placeholder': 'e.g. 50L, 1Cr'}),
             'target_amount': forms.NumberInput(attrs={'step': '1', 'placeholder': '5000000'}),
-            'sort_order': forms.NumberInput(attrs={'placeholder': '0'}),
+            'notes': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Optional notes…'}),
         }
