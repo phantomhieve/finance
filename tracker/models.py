@@ -111,6 +111,7 @@ class Transaction(models.Model):
         ('SAVINGS', 'Savings'),
         ('TRANSFER', 'Transfer'),
         ('EXTRA_INCOME', 'Extra Income'),
+        ('EXPENSE', 'Expense'),
     )
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='transactions')
