@@ -21,7 +21,7 @@
     <button class="btn btn-primary btn-sm gap-1" onclick="newTransaction()">
       <span class="material-symbols-outlined text-base">add_circle</span><span class="hidden sm:inline">Add Entry</span><span class="sm:hidden">Add</span>
     </button>
-    <button class="btn btn-ghost btn-sm gap-1" onclick="openModal('goalModal')">
+    <button class="btn btn-outline btn-primary btn-sm gap-1" onclick="openModal('goalModal')">
       <span class="material-symbols-outlined text-base">flag</span><span class="hidden sm:inline">Manage Goals</span><span class="sm:hidden">Goals</span>
     </button>
     {% endif %}
@@ -61,7 +61,7 @@
           </div>
         </div>
       </div>
-      <div class="grid grid-cols-2 gap-2.5">
+      <div class="grid grid-cols-2 lg:grid-cols-3 gap-2.5">
         <div class="stat-card stat-card-primary">
           <div class="text-[10px] uppercase tracking-wider opacity-50">Savings</div>
           <div class="text-base font-bold mt-0.5 text-primary">₹{{ total_savings|floatformat:0|intcomma }}</div>
@@ -74,6 +74,12 @@
           <div class="text-[10px] uppercase tracking-wider opacity-50">Extra Income</div>
           <div class="text-base font-bold mt-0.5 text-success">₹{{ total_income|floatformat:0|intcomma }}</div>
         </div>
+        {% if total_expense %}
+        <div class="stat-card stat-card-error">
+          <div class="text-[10px] uppercase tracking-wider opacity-50">Expenses</div>
+          <div class="text-base font-bold mt-0.5 text-error">-₹{{ total_expense|floatformat:0|intcomma }}</div>
+        </div>
+        {% endif %}
         <div class="stat-card {% if hra_balance >= 0 %}stat-card-success{% else %}stat-card-error{% endif %}">
           <div class="text-[10px] uppercase tracking-wider opacity-50">HRA Balance</div>
           <div class="text-base font-bold mt-0.5 {% if hra_balance >= 0 %}text-success{% else %}text-error{% endif %}">{% if hra_balance >= 0 %}+{% endif %}₹{{ hra_balance|floatformat:0|intcomma }}</div>
@@ -139,6 +145,9 @@
       </div>
       <p class="text-xs opacity-40 mt-2">Why did you miss or fall short this month?</p>
       <div class="modal-action">
+        {% if user.can_edit_savings %}
+        <button type="button" id="deleteMonthCommentBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="document.getElementById('id_month_comment').value=''; document.getElementById('monthCommentForm').submit();"><span class="material-symbols-outlined text-base">delete</span>Delete</button>
+        {% endif %}
         <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('monthCommentModal')">Close</button>
         {% if user.can_edit_savings %}
         <button type="submit" class="btn btn-primary btn-sm"><span class="material-symbols-outlined text-base">save</span>Save</button>
@@ -173,13 +182,15 @@
           <tr class="hover">
             <td class="opacity-60 text-sm whitespace-nowrap">{{ t.date|date:"d M Y" }}</td>
             <td class="font-semibold whitespace-nowrap">
-              {% if t.type == 'EXTRA_INCOME' or t.type == 'SAVINGS' %}<span class="text-success">+₹{{ t.amount|intcomma }}</span>
+              {% if t.type == 'EXPENSE' %}<span class="text-error">-₹{{ t.amount|intcomma }}</span>
+              {% elif t.type == 'EXTRA_INCOME' or t.type == 'SAVINGS' %}<span class="text-success">+₹{{ t.amount|intcomma }}</span>
               {% else %}₹{{ t.amount|intcomma }}{% endif %}
             </td>
             <td>
               {% if t.type == 'SAVINGS' %}<span class="badge badge-primary badge-sm">Savings</span>
               {% elif t.type == 'TRANSFER' %}<span class="badge badge-info badge-sm">Transfer</span>
               {% elif t.type == 'EXTRA_INCOME' %}<span class="badge badge-success badge-sm">Income</span>
+              {% elif t.type == 'EXPENSE' %}<span class="badge badge-error badge-sm">Expense</span>
               {% else %}<span class="badge badge-ghost badge-sm">Other</span>{% endif %}
             </td>
             <td class="opacity-50 text-sm">{{ t.remarks|default:"—" }}</td>
@@ -205,12 +216,14 @@
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
             <span class="font-semibold text-sm whitespace-nowrap">
-              {% if t.type == 'EXTRA_INCOME' or t.type == 'SAVINGS' %}<span class="text-success">+₹{{ t.amount|intcomma }}</span>
+              {% if t.type == 'EXPENSE' %}<span class="text-error">-₹{{ t.amount|intcomma }}</span>
+              {% elif t.type == 'EXTRA_INCOME' or t.type == 'SAVINGS' %}<span class="text-success">+₹{{ t.amount|intcomma }}</span>
               {% else %}₹{{ t.amount|intcomma }}{% endif %}
             </span>
             {% if t.type == 'SAVINGS' %}<span class="badge badge-primary badge-xs">Savings</span>
             {% elif t.type == 'TRANSFER' %}<span class="badge badge-info badge-xs">Transfer</span>
             {% elif t.type == 'EXTRA_INCOME' %}<span class="badge badge-success badge-xs">Income</span>
+            {% elif t.type == 'EXPENSE' %}<span class="badge badge-error badge-xs">Expense</span>
             {% else %}<span class="badge badge-ghost badge-xs">Other</span>{% endif %}
           </div>
           <div class="text-xs opacity-50 mt-0.5 truncate">{{ t.date|date:"d M Y" }}{% if t.remarks %} · {{ t.remarks }}{% endif %}</div>
@@ -424,6 +437,10 @@ function openMonthComment(monthDate, monthName, existingComment) {
   document.getElementById('monthCommentDate').value = monthDate;
   document.getElementById('monthCommentTitle').innerHTML = '<span class="icon-filled material-symbols-outlined text-info">chat_bubble</span>' + monthName + ' Comment';
   document.getElementById('id_month_comment').value = existingComment;
+  var delBtn = document.getElementById('deleteMonthCommentBtn');
+  if (delBtn) {
+    delBtn.style.display = existingComment ? 'inline-flex' : 'none';
+  }
   openModal('monthCommentModal');
 }
 </script>

@@ -147,7 +147,7 @@ def dashboard(request):
     # Ensure the annual goal reflects base monthly goal plus all increments.
     total_goal = sum(per_month_goals.values())
 
-    total_savings, total_transfers, total_income = aggregate_transactions(transactions)
+    total_savings, total_transfers, total_income, total_expense = aggregate_transactions(transactions)
     hra_spent, hra_additions, hra_net = aggregate_hra(
         request.user, fc['fy_start_date'], fc['fy_end_date']
     )
@@ -185,6 +185,7 @@ def dashboard(request):
         'total_savings': total_savings,
         'total_transfers': total_transfers,
         'total_income': total_income,
+        'total_expense': total_expense,
         'total_goal': total_goal,
         'monthly_goal': base_monthly,
         'goal_achieved': goal_achieved,
@@ -220,6 +221,7 @@ def _build_monthly_data(transactions, user, fy_start, today, per_month_goals):
             savings=Sum(Case(When(type='SAVINGS', then='amount'), default=Value(0), output_field=DecimalField())),
             transfers=Sum(Case(When(type='TRANSFER', then='amount'), default=Value(0), output_field=DecimalField())),
             income=Sum(Case(When(type='EXTRA_INCOME', then='amount'), default=Value(0), output_field=DecimalField())),
+            expense=Sum(Case(When(type='EXPENSE', then='amount'), default=Value(0), output_field=DecimalField())),
         )
     )
     agg_map = {(r['_y'], r['_m']): r for r in monthly_agg}
@@ -246,13 +248,14 @@ def _build_monthly_data(transactions, user, fy_start, today, per_month_goals):
         savings = float(row.get('savings') or 0)
         transfers = float(row.get('transfers') or 0)
         income = float(row.get('income') or 0)
+        expense = float(row.get('expense') or 0)
 
-        total_put = savings + income
+        total_put = savings + income - expense
         cumulative += total_put
 
         monthly_goal = per_month_goals[month_name]
         cumulative_goal += (monthly_goal or 0)
-        pct = min(100, int(total_put / monthly_goal * 100)) if monthly_goal and started else 0
+        pct = min(100, int(total_put / monthly_goal * 100)) if monthly_goal and started and total_put > 0 else 0
 
         if total_put >= monthly_goal and started and total_put > 0:
             status = 'good'
@@ -271,6 +274,7 @@ def _build_monthly_data(transactions, user, fy_start, today, per_month_goals):
             'savings': savings,
             'transfers': transfers,
             'income': income,
+            'expense': expense,
             'total': total_put,
             'cumulative': cumulative,
             'cumulative_goal': cumulative_goal,
@@ -556,10 +560,7 @@ def hra_tracker(request):
 
 def _build_hra_monthly(expenses, fy_start, today):
     """Build per-month HRA breakdown for the month grid."""
-    # queryset must have no lingering ORDER BY: otherwise values().annotate()
-    # can GROUP BY ordering columns too, yielding multiple buckets per calendar
-    # month—the dict below then keeps only one row per (year, month) and hides
-    # the rest of that month's totals.
+    import calendar
     qs = expenses.order_by()
     monthly_agg = (
         qs
@@ -568,6 +569,7 @@ def _build_hra_monthly(expenses, fy_start, today):
         .annotate(
             expense=Sum(Case(When(hra_type='EXPENSE', then='amount'), default=Value(0), output_field=DecimalField())),
             addition=Sum(Case(When(hra_type__in=['RENT_PAID', 'REVERT'], then='amount'), default=Value(0), output_field=DecimalField())),
+            rent_paid=Sum(Case(When(hra_type='RENT_PAID', then='amount'), default=Value(0), output_field=DecimalField())),
         )
     )
     agg_map = {(r['_y'], r['_m']): r for r in monthly_agg}
@@ -576,28 +578,45 @@ def _build_hra_monthly(expenses, fy_start, today):
     for month_name in MONTH_ORDER:
         m_num = MONTH_TO_NUM[month_name]
         m_year = fy_start if m_num >= 4 else fy_start + 1
-        started = get_month_date(month_name, fy_start) <= today
+        m_date = get_month_date(month_name, fy_start)
+        started = m_date <= today
+        last_day = calendar.monthrange(m_year, m_num)[1]
+        month_ended = datetime.date(m_year, m_num, last_day) < today
 
         row = agg_map.get((m_year, m_num), {})
         m_expense = float(row.get('expense') or 0)
         m_addition = float(row.get('addition') or 0)
+        m_rent_paid = float(row.get('rent_paid') or 0)
 
-        if m_addition > 0 and m_expense == 0:
-            status = 'good'
-        elif m_expense > 0:
-            status = 'partial'
-        elif started:
-            status = 'missed'
-        else:
+        # Status logic:
+        # - rent_paid: month ended & rent was paid → green
+        # - rent_due:  month ended & rent NOT paid → red
+        # - current:   month in progress (started but not ended)
+        # - future:    month not started
+        if not started:
             status = 'future'
+        elif not month_ended:
+            # Current month
+            if m_rent_paid > 0:
+                status = 'rent_paid'
+            else:
+                status = 'current'
+        else:
+            # Past month (ended)
+            if m_rent_paid > 0:
+                status = 'rent_paid'
+            else:
+                status = 'rent_due'
 
         monthly_data.append({
             'name': month_name,
             'short': month_name[:3],
             'expense': m_expense,
             'addition': m_addition,
+            'rent_paid': m_rent_paid,
             'net': m_addition - m_expense,
             'started': started,
+            'month_ended': month_ended,
             'status': status,
         })
     return monthly_data

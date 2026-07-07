@@ -547,7 +547,7 @@
             <span>{{ h.description }}</span>
             <span class="flex items-center gap-1.5"><span class="opacity-50 mr-1">{{ h.weight_grams|floatformat:0 }}g</span>
             <button class="btn btn-ghost btn-xs btn-square" data-edit-commodity data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}" data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}"><span class="material-symbols-outlined text-base">edit</span></button>
-            <a href="{% url 'toggle_baby' 'commodityholding' h.id %}?next={% url 'portfolio_tracker' %}" class="btn btn-ghost btn-xs btn-square text-primary" title="Move to Baby Portfolio"><span class="material-symbols-outlined text-base">child_care</span></a></span>
+            {% if is_baby_view %}<a href="{% url 'toggle_baby' 'commodityholding' h.id %}?next={% url 'portfolio_tracker' %}" class="btn btn-ghost btn-xs btn-square text-primary" title="Move to Baby Portfolio"><span class="material-symbols-outlined text-base">child_care</span></a>{% endif %}</span>
           </div>
           {% endfor %}
         </div>
@@ -567,7 +567,7 @@
             <span>{{ h.description }}</span>
             <span class="flex items-center gap-1.5"><span class="opacity-50 mr-1">{{ h.weight_grams|floatformat:0 }}g</span>
             <button class="btn btn-ghost btn-xs btn-square" data-edit-commodity data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}" data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}"><span class="material-symbols-outlined text-base">edit</span></button>
-            <a href="{% url 'toggle_baby' 'commodityholding' h.id %}?next={% url 'portfolio_tracker' %}" class="btn btn-ghost btn-xs btn-square text-primary" title="Move to Baby Portfolio"><span class="material-symbols-outlined text-base">child_care</span></a></span>
+            {% if is_baby_view %}<a href="{% url 'toggle_baby' 'commodityholding' h.id %}?next={% url 'portfolio_tracker' %}" class="btn btn-ghost btn-xs btn-square text-primary" title="Move to Baby Portfolio"><span class="material-symbols-outlined text-base">child_care</span></a>{% endif %}</span>
           </div>
           {% endfor %}
         </div>
