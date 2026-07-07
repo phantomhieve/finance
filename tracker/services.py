@@ -159,10 +159,13 @@ def aggregate_hra(user, fy_start_date, fy_end_date):
 
 
 def aggregate_transactions(queryset):
-    """Return (savings, transfers, income) totals from a transaction queryset in a single query."""
+    """Return (net_savings, transfers, income, expense) totals from a transaction queryset."""
     agg = queryset.aggregate(
-        savings=Sum(Case(When(type='SAVINGS', then='amount'), default=Value(0), output_field=DecimalField())),
+        savings_pos=Sum(Case(When(type='SAVINGS', then='amount'), default=Value(0), output_field=DecimalField())),
+        expense=Sum(Case(When(type='EXPENSE', then='amount'), default=Value(0), output_field=DecimalField())),
         transfers=Sum(Case(When(type='TRANSFER', then='amount'), default=Value(0), output_field=DecimalField())),
         income=Sum(Case(When(type='EXTRA_INCOME', then='amount'), default=Value(0), output_field=DecimalField())),
     )
-    return float(agg['savings'] or 0), float(agg['transfers'] or 0), float(agg['income'] or 0)
+    gross_expense = float(agg['expense'] or 0)
+    net_savings = float(agg['savings_pos'] or 0) - gross_expense
+    return net_savings, float(agg['transfers'] or 0), float(agg['income'] or 0), gross_expense
