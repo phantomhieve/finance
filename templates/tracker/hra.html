@@ -55,16 +55,17 @@
   <div class="card-body p-4 lg:p-6">
     <div class="flex items-center justify-between mb-4">
       <h2 class="card-title text-base">Monthly Breakdown</h2>
-      <div class="flex gap-2 text-xs">
-        <span class="badge badge-success badge-sm">Added</span>
-        <span class="badge badge-error badge-sm">Spent</span>
-        <span class="badge badge-ghost badge-sm">None</span>
+      <div class="hidden sm:flex gap-2 text-xs">
+        <span class="badge badge-success badge-sm gap-1">Rent Paid</span>
+        <span class="badge badge-error badge-sm gap-1">Rent Due</span>
+        <span class="badge badge-info badge-sm gap-1">Current</span>
+        <span class="badge badge-ghost badge-sm gap-1">Upcoming</span>
       </div>
     </div>
     <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-2">
       {% for m in monthly_data %}
-      <div class="month-card rounded-xl p-2.5 text-center text-xs border {% if m.status == 'good' %}border-success/30 bg-success/5{% elif m.status == 'partial' %}border-warning/30 bg-warning/5{% elif m.status == 'missed' %}border-error/20 bg-error/5{% else %}border-base-300/50 bg-base-300/20{% endif %}">
-        <div class="font-semibold opacity-60 mb-1.5 text-[10px] uppercase tracking-wider">{{ m.name }}</div>
+      <div class="month-card rounded-xl p-2.5 text-center text-xs border {% if m.status == 'rent_paid' %}border-success/30 bg-success/5{% elif m.status == 'rent_due' %}border-error/20 bg-error/5{% elif m.status == 'current' %}border-info/30 bg-info/5{% else %}border-base-300/50 bg-base-300/20{% endif %}">
+        <div class="font-semibold mb-1.5 text-[10px] uppercase tracking-wider {% if m.status == 'rent_paid' %}text-success{% elif m.status == 'rent_due' %}text-error{% elif m.status == 'current' %}text-info{% else %}opacity-60{% endif %}">{{ m.name }}</div>
         {% if m.started %}
         <div class="font-bold text-success text-sm">₹{{ m.addition|floatformat:0|intcomma }}</div>
         <div class="text-[10px] opacity-30">Added</div>
