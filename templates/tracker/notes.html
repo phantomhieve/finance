@@ -92,7 +92,7 @@
     {% if todo_open %}
     <div id="todoOpenList">
       {% for note in todo_open %}
-      <div class="group flex items-start gap-3 px-4 py-3 border-b border-base-300/25 last:border-0 hover:bg-base-300/20 transition-colors">
+      <div class="group flex items-start gap-3 px-4 py-3 hover:bg-base-300/20 transition-colors">
 
         {# DaisyUI checkbox via form POST #}
         <form method="post" action="{% url 'toggle_todo' note.id %}" class="m-0 shrink-0 flex items-center pt-0.5">
