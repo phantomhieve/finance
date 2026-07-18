@@ -838,7 +838,10 @@ def notes_list(request):
 
     note_form = NoteForm(initial={'date': today, 'financial_year': current_fy})
 
-    # Calculate progress for Pending notes
+    # Separate Todo items from regular notes
+    todo_open = []
+    todo_done = []
+    regular_notes = []
     for note in notes_qs:
         if note.section == 'Pending' and note.initial_amount and note.pending_amount:
             try:
@@ -853,8 +856,18 @@ def notes_list(request):
         else:
             note.settled_pct = None
 
+        if note.section == 'Todo':
+            if note.is_done:
+                todo_done.append(note)
+            else:
+                todo_open.append(note)
+        else:
+            regular_notes.append(note)
+
     context = {
-        'notes': notes_qs,
+        'notes': regular_notes,
+        'todo_open': todo_open,
+        'todo_done': todo_done,
         'note_form': note_form,
         'all_sections': list(all_sections),
         'active_section': section_filter,
@@ -900,6 +913,27 @@ def delete_note(request, pk):
     title = note.title
     note.delete()
     messages.success(request, f'Note "{title}" deleted.')
+    return safe_redirect(request, 'notes_list')
+
+
+@login_required
+@require_POST
+def toggle_todo(request, pk):
+    """Toggle the is_done state of a Todo note."""
+    note = get_object_or_404(Note, pk=pk, user=request.user, section='Todo')
+    note.is_done = not note.is_done
+    if note.is_done:
+        from django.utils import timezone
+        note.done_at = timezone.now()
+    else:
+        note.done_at = None
+    note.save(update_fields=['is_done', 'done_at', 'updated_at'])
+
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return JsonResponse({'ok': True, 'is_done': note.is_done})
+
+    action = 'completed' if note.is_done else 'reopened'
+    messages.success(request, f'Todo "{note.title}" {action}.')
     return safe_redirect(request, 'notes_list')
 
 
