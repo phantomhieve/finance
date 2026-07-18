@@ -64,7 +64,7 @@
     {% endif %}
   </div>
 
-  {# Main todo card — uses same bg-base-200 + border-base-300/50 as note cards #}
+  {# Main todo card #}
   <div class="card bg-base-200 shadow-sm border border-base-300/50 overflow-hidden">
 
     {# ── Quick-add row — styled like a search/input bar, NOT a form-field ── #}
@@ -256,11 +256,11 @@
   {% endfor %}
 </div>
 
-{# Mobile: card list #}
-<div class="md:hidden space-y-2 animate-up" style="animation-delay:0.05s" id="noteCards">
+{# Mobile: individual cards with space gap (page bg shows between = separation without lines) #}
+<div class="md:hidden space-y-3 animate-up" style="animation-delay:0.05s" id="noteCards">
   {% for note in notes %}
-  <div class="table-card">
-    <div class="flex items-start justify-between gap-3">
+  <div class="card bg-base-200 border border-base-300/50 overflow-hidden">
+    <div class="flex items-start justify-between gap-3 px-4 py-4">
       <div class="flex-1 min-w-0">
         {# Section + date #}
         <div class="flex items-center gap-2 mb-1">
