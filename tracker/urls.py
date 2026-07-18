@@ -21,6 +21,7 @@ urlpatterns = [
     path('notes/add/', views.add_note, name='add_note'),
     path('notes/edit/<int:pk>/', views.edit_note, name='edit_note'),
     path('notes/delete/<int:pk>/', views.delete_note, name='delete_note'),
+    path('notes/toggle-todo/<int:pk>/', views.toggle_todo, name='toggle_todo'),
 
     path('goals/increment/', views.add_goal_increment, name='add_goal_increment'),
     path('goals/increment/delete/<int:inc_id>/', views.delete_goal_increment, name='delete_goal_increment'),

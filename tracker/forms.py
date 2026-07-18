@@ -166,7 +166,7 @@ class NoteForm(forms.ModelForm):
     SECTION_CHOICES = [
         ('General', 'General'),
         ('Tax', 'Tax'),
-        ('Reminder', 'Reminder'),
+        ('Todo', 'Todo'),
         ('Pending', 'Pending'),
     ]
     section = forms.ChoiceField(

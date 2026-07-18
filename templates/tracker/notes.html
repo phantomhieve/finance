@@ -28,10 +28,10 @@
 {% block content %}
 
 {# ——— SECTION FILTER PILLS ——— #}
-<div class="flex flex-wrap items-center gap-2 mb-4 animate-up">
+<div class="flex flex-wrap items-center gap-2 mb-5 animate-up">
   <a href="?fy={{ active_fy|default:'all' }}"
      class="badge {% if not active_section %}badge-primary{% else %}badge-ghost opacity-60{% endif %} badge-md cursor-pointer hover:opacity-100 transition-opacity px-3 py-2.5">
-    All Sections
+    All
   </a>
   {% for sec in all_sections %}
   <a href="?section={{ sec|urlencode }}{% if active_fy %}&fy={{ active_fy }}{% else %}&fy=all{% endif %}"
@@ -43,9 +43,133 @@
   {% endif %}
 </div>
 
-{# ——— NOTES GRID ——— #}
-{% if notes %}
+{# ——— TODO SECTION ——— #}
+{% if todo_open or todo_done or not active_section or active_section == 'Todo' %}
+<div class="mb-6 animate-up" id="todoSection">
 
+  {# Header row #}
+  <div class="flex items-center justify-between mb-3">
+    <div class="flex items-center gap-2">
+      <span class="material-symbols-outlined text-[18px]" style="color:hsl(262 75% 72%)">checklist</span>
+      <h2 class="text-xs font-bold uppercase tracking-widest" style="color:hsl(262 75% 72%)">To-Do</h2>
+      {% if todo_open %}
+      <span class="badge badge-xs font-semibold" style="background:hsl(262 60% 50%/0.2);color:hsl(262 75% 72%);border:1px solid hsl(262 60% 60%/0.2)">{{ todo_open|length }}</span>
+      {% endif %}
+    </div>
+    {% if todo_done %}
+    <button class="btn btn-ghost btn-xs gap-1 text-[11px] opacity-50 hover:opacity-100 transition-opacity" id="toggleDoneBtn" onclick="toggleDoneItems()">
+      <span class="material-symbols-outlined text-xs" id="toggleDoneIcon">expand_more</span>
+      {{ todo_done|length }} done
+    </button>
+    {% endif %}
+  </div>
+
+  {# Main todo card — uses same bg-base-200 + border-base-300/50 as note cards #}
+  <div class="card bg-base-200 shadow-sm border border-base-300/50 overflow-hidden">
+
+    {# ── Quick-add row — styled like a search/input bar, NOT a form-field ── #}
+    <form method="post" action="{% url 'add_note' %}" id="quickTodoForm"
+      class="flex items-center gap-2.5 px-4 py-3 border-b border-base-300/40">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <input type="hidden" name="section" value="Todo">
+      <input type="hidden" name="date" id="quickTodoDate" value="">
+      <span class="material-symbols-outlined text-[18px] opacity-25 shrink-0 select-none">add_task</span>
+      {# Use inline style to neutralize the global .form-field focus ring, since we're NOT in a .form-field div #}
+      <input type="text" name="title" id="quickTodoInput"
+        style="height:auto;padding:0;border:none;background:transparent;box-shadow:none;font-size:0.875rem;"
+        class="flex-1 outline-none placeholder:opacity-35 min-w-0 text-sm"
+        placeholder="Add a to-do and press Enter…"
+        autocomplete="off">
+      <button type="submit" id="quickTodoSubmit"
+        class="btn btn-primary btn-xs gap-1 shrink-0 hidden transition-all">
+        <span class="material-symbols-outlined text-[13px]">add</span>
+        <span class="hidden sm:inline">Add</span>
+      </button>
+    </form>
+
+    {# ── Open items ── #}
+    {% if todo_open %}
+    <div id="todoOpenList">
+      {% for note in todo_open %}
+      <div class="group flex items-start gap-3 px-4 py-3 border-b border-base-300/25 last:border-0 hover:bg-base-300/20 transition-colors">
+
+        {# DaisyUI checkbox via form POST #}
+        <form method="post" action="{% url 'toggle_todo' note.id %}" class="m-0 shrink-0 flex items-center pt-0.5">
+          {% csrf_token %}
+          <button type="submit" title="Mark done"
+            class="w-[22px] h-[22px] rounded-full border-2 border-base-content/20 hover:border-primary/70 flex items-center justify-center transition-all duration-150 hover:bg-primary/8 focus:outline-none">
+            <span class="material-symbols-outlined text-[13px] text-primary opacity-0 group-hover:opacity-50 transition-opacity">check</span>
+          </button>
+        </form>
+
+        {# Tap content area to edit #}
+        <div class="flex-1 min-w-0 cursor-pointer py-0.5"
+          onclick="editNote({{ note.id }}, '{{ note.date|date:'Y-m-d' }}', 'Todo', '{{ note.title|escapejs }}', '{{ note.body|escapejs }}', '', '', '', '')">
+          <p class="text-sm font-medium leading-snug">{{ note.title }}</p>
+          {% if note.body %}
+          <p class="text-xs opacity-50 mt-0.5 line-clamp-2 leading-relaxed">{{ note.body }}</p>
+          {% endif %}
+          <p class="text-[10px] opacity-30 mt-1.5 tabular-nums">{{ note.date|date:"d M Y" }}</p>
+        </div>
+
+        {# ⋯ action — visible on mobile, hover-reveal on desktop #}
+        <button class="btn btn-ghost btn-xs btn-square shrink-0 self-center opacity-40 sm:opacity-0 group-hover:opacity-50 hover:!opacity-100 transition-opacity"
+          onclick="editNote({{ note.id }}, '{{ note.date|date:'Y-m-d' }}', 'Todo', '{{ note.title|escapejs }}', '{{ note.body|escapejs }}', '', '', '', '')"
+          aria-label="Edit todo">
+          <span class="material-symbols-outlined text-base">more_horiz</span>
+        </button>
+
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    {# Empty state inside card #}
+    <div class="flex flex-col items-center justify-center py-8 gap-2 opacity-30">
+      <span class="material-symbols-outlined text-3xl">task_alt</span>
+      <p class="text-xs font-medium">All caught up — add a task above</p>
+    </div>
+    {% endif %}
+
+    {# ── Done items — collapsible section ── #}
+    {% if todo_done %}
+    <div id="todoDoneList" class="hidden border-t border-base-300/40">
+      <div class="px-4 pt-2 pb-1">
+        <span class="text-[9px] uppercase tracking-[0.12em] font-bold opacity-30">Completed</span>
+      </div>
+      {% for note in todo_done %}
+      <div class="flex items-center gap-3 px-4 py-2.5 border-b border-base-300/20 last:border-0 hover:bg-base-300/10 transition-colors">
+        {# Green filled circle → click to undo #}
+        <form method="post" action="{% url 'toggle_todo' note.id %}" class="m-0 shrink-0">
+          {% csrf_token %}
+          <button type="submit" title="Mark undone"
+            class="w-[22px] h-[22px] rounded-full bg-success/15 border border-success/30 flex items-center justify-center transition-all hover:bg-error/15 hover:border-error/30 focus:outline-none group/undo">
+            <span class="material-symbols-outlined text-[13px] text-success group-hover/undo:text-error transition-colors">check</span>
+          </button>
+        </form>
+        <span class="flex-1 text-sm line-through opacity-40 truncate">{{ note.title }}</span>
+        <button class="btn btn-ghost btn-xs btn-square shrink-0 opacity-30 hover:opacity-70 hover:text-error"
+          onclick="confirmNoteDelete({{ note.id }}, '{{ note.title|escapejs }}')" aria-label="Delete">
+          <span class="material-symbols-outlined text-sm">delete</span>
+        </button>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endif %}
+
+{# ——— NOTES HEADER (only when both todos and notes exist) ——— #}
+{% if notes %}
+<div class="flex items-center gap-3 mb-3 mt-1">
+  <span class="text-[10px] font-bold uppercase tracking-widest opacity-35">Notes</span>
+  <div class="flex-1 h-px bg-base-300/50"></div>
+</div>
+{% endif %}
+
+{% if notes %}
 {# Desktop: two-column masonry-like grid #}
 <div class="hidden md:grid grid-cols-2 lg:grid-cols-3 gap-4 animate-up" style="animation-delay:0.05s" id="notesGrid">
   {% for note in notes %}
@@ -96,13 +220,10 @@
           <span class="text-error font-bold text-sm">₹{{ note.pending_amount|floatformat:0|intcomma }}</span>
           {% endif %}
         </div>
-        
         {% if note.initial_amount %}
         <div class="flex justify-between items-center text-[10px] opacity-50 border-t border-base-300/40 pt-1.5 mt-0.5">
           <span>Initial: ₹{{ note.initial_amount|floatformat:0|intcomma }}</span>
-          {% if note.settled_pct is not None %}
-          <span>{{ note.settled_pct }}% settled</span>
-          {% endif %}
+          {% if note.settled_pct is not None %}<span>{{ note.settled_pct }}% settled</span>{% endif %}
         </div>
         {% if note.settled_pct is not None %}
         <progress class="progress progress-xs w-full {% if note.pending_type == 'CREDIT' %}progress-success{% else %}progress-error{% endif %}" value="{{ note.settled_pct }}" max="100"></progress>
@@ -111,7 +232,7 @@
       </div>
       {% endif %}
 
-      {# Amount + actions (Hides amount border line if there is no amount, making empty cards super clean) #}
+      {# Amount + actions #}
       <div class="flex items-center {% if note.amount and note.section != 'Pending' %}justify-between border-t border-base-300/40 pt-2 mt-auto{% else %}justify-end mt-auto pt-1{% endif %}">
         {% if note.amount and note.section != 'Pending' %}
         <span class="text-sm font-bold text-primary">₹{{ note.amount|floatformat:0|intcomma }}</span>
@@ -135,7 +256,7 @@
   {% endfor %}
 </div>
 
-{# Mobile: card list (matches HRA pattern) #}
+{# Mobile: card list #}
 <div class="md:hidden space-y-2 animate-up" style="animation-delay:0.05s" id="noteCards">
   {% for note in notes %}
   <div class="table-card">
@@ -151,14 +272,12 @@
           {% endif %}
           <span class="text-[10px] opacity-40">{{ note.date|date:"d M Y" }}</span>
         </div>
-        {# Title #}
         <div class="font-semibold text-sm leading-snug">{{ note.title }}</div>
-        {# Body preview #}
         {% if note.body %}
         <div class="text-xs opacity-50 mt-0.5 line-clamp-2">{{ note.body }}</div>
         {% endif %}
 
-        {# Mobile Pending Color-Coded Widget #}
+        {# Mobile Pending Widget #}
         {% if note.section == 'Pending' and note.pending_type %}
         <div class="mt-2 p-2 rounded-lg border {% if note.pending_type == 'CREDIT' %}bg-success/5 border-success/20{% else %}bg-error/5 border-error/20{% endif %} flex flex-col gap-1 text-xs">
           <div class="flex items-center justify-between font-semibold">
@@ -173,9 +292,7 @@
           {% if note.initial_amount %}
           <div class="flex justify-between items-center text-[9px] opacity-50 pt-1 mt-0.5 border-t border-base-300/40">
             <span>Initial: ₹{{ note.initial_amount|floatformat:0|intcomma }}</span>
-            {% if note.settled_pct is not None %}
-            <span>{{ note.settled_pct }}%</span>
-            {% endif %}
+            {% if note.settled_pct is not None %}<span>{{ note.settled_pct }}%</span>{% endif %}
           </div>
           {% if note.settled_pct is not None %}
           <progress class="progress progress-xs w-full {% if note.pending_type == 'CREDIT' %}progress-success{% else %}progress-error{% endif %}" value="{{ note.settled_pct }}" max="100"></progress>
@@ -184,12 +301,10 @@
         </div>
         {% endif %}
 
-        {# Amount #}
         {% if note.amount and note.section != 'Pending' %}
         <div class="text-sm font-bold text-primary mt-1">₹{{ note.amount|floatformat:0|intcomma }}</div>
         {% endif %}
       </div>
-      {# Actions #}
       <div class="flex flex-col gap-1 shrink-0">
         <button class="btn btn-ghost btn-xs btn-square"
           onclick="editNote({{ note.id }}, '{{ note.date|date:'Y-m-d' }}', '{{ note.section|escapejs }}', '{{ note.title|escapejs }}', '{{ note.body|escapejs }}', '{{ note.amount|default:'' }}', '{{ note.pending_type|escapejs }}', '{{ note.initial_amount|default:'' }}', '{{ note.pending_amount|default:'' }}')"
@@ -206,8 +321,9 @@
   </div>
   {% endfor %}
 </div>
+{% endif %}
 
-{% else %}
+{% if not notes and not todo_open and not todo_done %}
 {# ——— EMPTY STATE ——— #}
 <div class="flex flex-col items-center justify-center py-20 gap-4 animate-up" style="animation-delay:0.1s">
   <div class="w-16 h-16 rounded-2xl bg-violet-400/10 border border-violet-400/20 flex items-center justify-center">
@@ -218,7 +334,7 @@
       {% if active_section %}No notes in "{{ active_section }}"{% else %}No notes yet{% endif %}
       {% if active_fy %}for FY {{ active_fy }}-{{ active_fy|add:1|stringformat:"d"|slice:"2:" }}{% endif %}
     </p>
-    <p class="text-xs opacity-35 mt-1">Tap "Add Note" to create your first one.</p>
+    <p class="text-xs opacity-35 mt-1">Tap "Add" to create your first one.</p>
   </div>
   <button class="btn btn-primary btn-sm gap-1 mt-2" onclick="openNoteModal()">
     <span class="material-symbols-outlined text-base">add_circle</span>Add Note
@@ -251,15 +367,13 @@
         </div>
       </div>
 
-      {# Row 1.5: Extra Fields for Pending (toggled via JS - Spacious 2-column layout to prevent placeholder squishing) #}
+      {# Pending extra fields #}
       <div id="pending-fields-wrap" style="display:none" class="bg-base-300/40 rounded-xl p-3.5 mt-3 border border-base-300/60 animate-up">
         <p class="text-[10px] font-extrabold uppercase tracking-wider text-violet-400 mb-2.5">Pending Details</p>
-        
         <div class="form-field mb-2.5">
           <label class="label text-xs font-semibold" for="id_note_pending_type">Direction</label>
           {{ note_form.pending_type }}
         </div>
-        
         <div class="grid grid-cols-2 gap-3">
           <div class="form-field">
             <label class="label text-xs font-semibold" for="id_note_initial_amount">Initial Amount (₹)</label>
@@ -272,19 +386,19 @@
         </div>
       </div>
 
-      {# Row 2: Title #}
+      {# Title #}
       <div class="form-field mt-3">
         <label class="label text-xs font-semibold" for="id_note_title">Title</label>
         {{ note_form.title }}
       </div>
 
-      {# Row 3: Body #}
+      {# Body #}
       <div class="form-field mt-3">
         <label class="label text-xs font-semibold" for="id_note_body">Note</label>
         {{ note_form.body }}
       </div>
 
-      {# Row 4: Amount (optional) #}
+      {# Amount #}
       <div id="note-amount-field-wrap" class="form-field mt-3">
         <label class="label text-xs font-semibold flex items-center gap-1" for="id_note_amount">
           Amount (₹)
@@ -318,11 +432,12 @@
 
 {% block extra_js %}
 <script>
-// ── Pre-defined premium HSL colors for standard tags (General, Tax, Reminder, Pending) ──
+// ── Tag colours ─────────────────────────────────────────────────────────────
 var TAG_COLORS = {
-  'General':  { h: 160 }, // emerald
-  'Tax':      { h: 350 }, // rose
-  'Reminder': { h: 262 }, // violet
+  'General':  { h: 160 },
+  'Tax':      { h: 350 },
+  'Todo':     { h: 262 }, // violet
+  'Reminder': { h: 262 }, // violet (legacy)
   'Pending':  { h:  38 }, // amber
 };
 
@@ -330,80 +445,102 @@ function applyNoteSecColours() {
   document.querySelectorAll('[data-section]').forEach(function(el) {
     var sec = el.getAttribute('data-section');
     if (!sec) return;
-    
     var color = TAG_COLORS[sec];
     var h;
     if (color) {
       h = color.h;
     } else {
-      // Robust hash fallback for any existing legacy tags
       var hash = 0;
       for (var i = 0; i < sec.length; i++) {
         hash = sec.charCodeAt(i) + ((hash << 5) - hash);
       }
       h = Math.abs(hash) % 360;
     }
-    el.style.color        = 'hsl(' + h + ' 75% 72%)';
-    el.style.borderColor  = 'hsl(' + h + ' 60% 60% / 0.35)';
-    el.style.background   = 'hsl(' + h + ' 60% 50% / 0.08)';
+    el.style.color       = 'hsl(' + h + ' 75% 72%)';
+    el.style.borderColor = 'hsl(' + h + ' 60% 60% / 0.35)';
+    el.style.background  = 'hsl(' + h + ' 60% 50% / 0.08)';
   });
 }
-
 document.addEventListener('DOMContentLoaded', applyNoteSecColours);
 
-// ── Toggle Pending fields based on Type ──
-function togglePendingFields() {
-  var sectionEl = document.getElementById('id_note_section');
-  var pendingWrap = document.getElementById('pending-fields-wrap');
-  var amountWrap = document.getElementById('note-amount-field-wrap');
-  if (sectionEl) {
-    if (sectionEl.value === 'Pending') {
-      if (pendingWrap) pendingWrap.style.display = 'block';
-      if (amountWrap) amountWrap.style.display = 'none';
-    } else {
-      if (pendingWrap) pendingWrap.style.display = 'none';
-      if (amountWrap) amountWrap.style.display = 'block';
+// ── Quick-add todo inline ──────────────────────────────────────────────────
+(function() {
+  var input  = document.getElementById('quickTodoInput');
+  var submit = document.getElementById('quickTodoSubmit');
+  var dateEl = document.getElementById('quickTodoDate');
+  if (!input) return;
+
+  // Set today's date
+  dateEl.value = new Date().toISOString().split('T')[0];
+
+  input.addEventListener('input', function() {
+    submit.classList.toggle('hidden', !this.value.trim());
+  });
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (this.value.trim()) document.getElementById('quickTodoForm').submit();
     }
-  }
+    if (e.key === 'Escape') { this.value = ''; submit.classList.add('hidden'); }
+  });
+})();
+
+// ── Toggle done items ──────────────────────────────────────────────────────
+function toggleDoneItems() {
+  var list  = document.getElementById('todoDoneList');
+  var icon  = document.getElementById('toggleDoneIcon');
+  var label = document.getElementById('toggleDoneLabel');
+  if (!list) return;
+  var open = list.classList.toggle('hidden');
+  icon.textContent  = open ? 'expand_more' : 'expand_less';
 }
 
+// ── Toggle Pending fields ──────────────────────────────────────────────────
+function togglePendingFields() {
+  var sectionEl   = document.getElementById('id_note_section');
+  var pendingWrap = document.getElementById('pending-fields-wrap');
+  var amountWrap  = document.getElementById('note-amount-field-wrap');
+  if (!sectionEl) return;
+  if (sectionEl.value === 'Pending') {
+    if (pendingWrap) pendingWrap.style.display = 'block';
+    if (amountWrap)  amountWrap.style.display  = 'none';
+  } else {
+    if (pendingWrap) pendingWrap.style.display = 'none';
+    if (amountWrap)  amountWrap.style.display  = 'block';
+  }
+}
 document.addEventListener('DOMContentLoaded', function() {
   var sectionEl = document.getElementById('id_note_section');
-  if (sectionEl) {
-    sectionEl.addEventListener('change', togglePendingFields);
-  }
+  if (sectionEl) sectionEl.addEventListener('change', togglePendingFields);
 });
 
-// ── Note modal helpers ────────────────────────────────────────────────────
-
-function openNoteModal() {
+// ── Note modal helpers ─────────────────────────────────────────────────────
+function openNoteModal(defaultSection) {
   var form = document.getElementById('noteForm');
   form.action = "{% url 'add_note' %}";
   form.reset();
-  
-  // Set default date based on active financial year
+
   var defaultDate = '';
   {% if active_fy and active_fy != current_fy %}
-    // If browsing an older financial year, default to the start of that financial year (1st April)
     defaultDate = '{{ active_fy }}-04-01';
   {% else %}
-    // Otherwise, default to today's date
     defaultDate = new Date().toISOString().split('T')[0];
   {% endif %}
 
   var dateEl = form.querySelector('[name="date"]');
-  if (dateEl) {
-    dateEl.value = defaultDate;
-  }
-  
-  // Hide pending fields
-  setTimeout(togglePendingFields, 50);
+  if (dateEl) dateEl.value = defaultDate;
 
+  // Pre-select section if provided
+  if (defaultSection) {
+    var secEl = document.getElementById('id_note_section');
+    if (secEl) secEl.value = defaultSection;
+  }
+
+  setTimeout(togglePendingFields, 50);
   document.getElementById('noteDeleteBtn').style.display = 'none';
   document.getElementById('noteModalTitle').innerHTML =
     '<span class="icon-filled material-symbols-outlined text-violet-400">sticky_note_2</span> Add Note';
   openModal('noteModal');
-  // Focus title after modal opens
   setTimeout(function() {
     var t = document.getElementById('id_note_title');
     if (t) t.focus();
@@ -416,7 +553,6 @@ function editNote(id, date, section, title, body, amount, pendingType, initialAm
   var delForm = document.getElementById('noteDeleteForm');
   delForm.action = "{% url 'delete_note' pk=0 %}".replace('/0/', '/' + id + '/');
 
-  // Fill fields
   var f = function(name, val) {
     var el = form.querySelector('[name="' + name + '"]') || document.getElementById('id_note_' + name);
     if (el) el.value = val;
@@ -424,17 +560,13 @@ function editNote(id, date, section, title, body, amount, pendingType, initialAm
   f('date', date);
   f('section', section);
   document.getElementById('id_note_title').value = title;
-  document.getElementById('id_note_body').value = body;
+  document.getElementById('id_note_body').value  = body;
   document.getElementById('id_note_amount').value = amount;
+  f('pending_type',    pendingType    || '');
+  f('initial_amount',  initialAmount  || '');
+  f('pending_amount',  pendingAmount  || '');
 
-  // Fill pending details
-  f('pending_type', pendingType || '');
-  f('initial_amount', initialAmount || '');
-  f('pending_amount', pendingAmount || '');
-
-  // Toggle pending wrap
   setTimeout(togglePendingFields, 50);
-
   document.getElementById('noteDeleteBtn').style.display = 'inline-flex';
   document.getElementById('noteModalTitle').innerHTML =
     '<span class="icon-filled material-symbols-outlined text-violet-400">edit_note</span> Edit Note';
@@ -462,3 +594,5 @@ function confirmNoteDeleteFromModal() {
 }
 </script>
 {% endblock %}
+
+
