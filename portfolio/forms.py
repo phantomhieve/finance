@@ -6,7 +6,7 @@ from django import forms
 from .models import (
     EPFEntry, NPSEntry, FixedDeposit, CashPosition,
     BondHolding, CryptoHolding, CommodityHolding, FinancialGoal,
-    USStockHolding,
+    USStockHolding, RealEstateHolding,
 )
 
 
@@ -189,3 +189,69 @@ class FinancialGoalForm(forms.ModelForm):
             'target_amount': forms.NumberInput(attrs={'step': '1', 'placeholder': '5000000'}),
             'notes': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Optional notes…'}),
         }
+
+
+class RealEstateHoldingForm(forms.ModelForm):
+    class Meta:
+        model = RealEstateHolding
+        fields = [
+            'name', 'property_type', 'status', 'area_value', 'area_unit',
+            'locality', 'city', 'state', 'landmark', 'pincode',
+            'micro_market_tag', 'google_maps_url', 'khasra_khata_number',
+            'purchase_date', 'purchase_price', 'stamp_duty_charges',
+            'current_valuation', 'last_valuation_date', 'monthly_rental_income',
+            'is_baby', 'remarks',
+        ]
+        widgets = {
+            'name': forms.TextInput(attrs={'placeholder': 'e.g. Sector 150 Express Plot B-42'}),
+            'property_type': forms.Select(),
+            'status': forms.Select(),
+            'area_value': forms.NumberInput(attrs={'step': '0.01', 'placeholder': 'e.g. 200'}),
+            'area_unit': forms.Select(),
+            'locality': forms.TextInput(attrs={'placeholder': 'e.g. Sector 150, Express Corridor'}),
+            'city': forms.TextInput(attrs={'placeholder': 'e.g. Noida'}),
+            'state': forms.TextInput(attrs={'placeholder': 'e.g. Uttar Pradesh'}),
+            'landmark': forms.TextInput(attrs={'placeholder': 'e.g. Near Jewar Airport link / Sports City'}),
+            'pincode': forms.TextInput(attrs={'placeholder': 'e.g. 201310'}),
+            'micro_market_tag': forms.TextInput(attrs={'placeholder': 'e.g. Noida Expressway / Yamuna Expressway Corridor'}),
+            'google_maps_url': forms.URLInput(attrs={'placeholder': 'https://maps.app.goo.gl/...'}),
+            'khasra_khata_number': forms.TextInput(attrs={'placeholder': 'e.g. Khasra 412/1, Registry Doc #889'}),
+            'purchase_date': forms.DateInput(attrs={'type': 'date'}),
+            'purchase_price': forms.NumberInput(attrs={'step': '0.01', 'placeholder': 'Base purchase price in ₹'}),
+            'stamp_duty_charges': forms.NumberInput(attrs={'step': '0.01', 'placeholder': 'Stamp duty & registry fees in ₹'}),
+            'current_valuation': forms.NumberInput(attrs={'step': '0.01', 'placeholder': 'Current market price estimate in ₹'}),
+            'last_valuation_date': forms.DateInput(attrs={'type': 'date'}),
+            'monthly_rental_income': forms.NumberInput(attrs={'step': '0.01', 'placeholder': '0.00'}),
+            'remarks': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Registry notes, builder info, tenant details...'}),
+        }
+
+    def clean_purchase_price(self):
+        val = self.cleaned_data.get('purchase_price')
+        if val is None or val < 0:
+            raise forms.ValidationError("Purchase price must be zero or positive.")
+        return val
+
+    def clean_current_valuation(self):
+        val = self.cleaned_data.get('current_valuation')
+        if val is None or val < 0:
+            raise forms.ValidationError("Current valuation must be zero or positive.")
+        return val
+
+    def clean_area_value(self):
+        val = self.cleaned_data.get('area_value')
+        if val is None or val <= 0:
+            raise forms.ValidationError("Area value must be greater than zero.")
+        return val
+
+
+class RealEstateValuationForm(forms.ModelForm):
+    class Meta:
+        model = RealEstateHolding
+        fields = ['current_valuation', 'last_valuation_date', 'monthly_rental_income', 'remarks']
+        widgets = {
+            'current_valuation': forms.NumberInput(attrs={'step': '0.01', 'placeholder': 'Updated market price in ₹'}),
+            'last_valuation_date': forms.DateInput(attrs={'type': 'date', 'value': datetime.date.today().isoformat()}),
+            'monthly_rental_income': forms.NumberInput(attrs={'step': '0.01', 'placeholder': '0.00'}),
+            'remarks': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Reason for price update / market research notes...'}),
+        }
+

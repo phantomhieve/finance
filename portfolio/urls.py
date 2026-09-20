@@ -18,6 +18,7 @@ urlpatterns = [
     path('bonds/', views.bonds_detail, name='bonds_detail'),
     path('crypto/', views.crypto_detail, name='crypto_detail'),
     path('commodities/', views.commodities_detail, name='commodities_detail'),
+    path('real-estate/', views.real_estate_detail, name='real_estate_detail'),
 
     # Actions
     path('sync-sheets/', views.sync_from_sheets, name='sync_from_sheets'),
@@ -69,6 +70,13 @@ urlpatterns = [
     path('us-stock/add/', views.add_us_stock, name='add_us_stock'),
     path('us-stock/<int:pk>/edit/', views.edit_us_stock, name='edit_us_stock'),
     path('us-stock/<int:pk>/delete/', views.delete_us_stock, name='delete_us_stock'),
+
+    # Real Estate
+    path('real-estate/add/', views.add_real_estate, name='add_real_estate'),
+    path('real-estate/<int:pk>/edit/', views.edit_real_estate, name='edit_real_estate'),
+    path('real-estate/<int:pk>/valuation/', views.update_real_estate_valuation, name='update_real_estate_valuation'),
+    path('real-estate/<int:pk>/delete/', views.delete_real_estate, name='delete_real_estate'),
+    path('real-estate/<int:pk>/llm-prompt/', views.get_real_estate_llm_prompt_json, name='real_estate_llm_prompt_json'),
 
     # WebAuthn (FaceID / biometric)
     path('webauthn/register/begin/', views.webauthn_register_begin, name='webauthn_register_begin'),

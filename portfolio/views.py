@@ -2,6 +2,7 @@ import inspect
 import json
 import time
 import datetime
+from decimal import Decimal
 import logging
 from collections import OrderedDict
 from functools import wraps
@@ -26,12 +27,13 @@ from .models import (
     CommodityHolding, USStockHolding,
     MonthlySnapshot, FinancialGoal,
     PortfolioInsight,
-    InsightGenerationSettings,
+    InsightGenerationSettings, RealEstateHolding,
 )
 from .forms import (
     EPFEntryForm, NPSEntryForm, FixedDepositForm,
     CashPositionForm, BondHoldingForm, CryptoHoldingForm,
     CommodityHoldingForm, FinancialGoalForm, USStockHoldingForm,
+    RealEstateHoldingForm, RealEstateValuationForm,
 )
 from tracker.services import parse_fy_param
 from .services import (
@@ -277,6 +279,38 @@ add_commodity, edit_commodity, delete_commodity = _make_crud_views(
 add_goal, edit_goal, delete_goal = _make_crud_views(
     FinancialGoal, FinancialGoalForm, 'Financial goal')
 
+add_real_estate, edit_real_estate, delete_real_estate = _make_crud_views(
+    RealEstateHolding, RealEstateHoldingForm, 'Real estate property')
+
+
+@login_required
+@_require_portfolio
+@require_POST
+def update_real_estate_valuation(request, pk):
+    group = _user_group(request)
+    holding = get_object_or_404(RealEstateHolding, pk=pk, group=group)
+    form = RealEstateValuationForm(request.POST, instance=holding)
+    if form.is_valid():
+        form.save()
+        messages.success(request, f"Valuation for '{holding.name}' updated successfully.")
+    else:
+        logger.warning("Invalid real estate valuation form (pk=%s): %s", pk, form.errors.as_text())
+        messages.error(request, "Failed to update valuation. Please check entered values.")
+    return _safe_redirect(request)
+
+
+@login_required
+@_require_portfolio
+def get_real_estate_llm_prompt_json(request, pk):
+    group = _user_group(request)
+    holding = get_object_or_404(RealEstateHolding, pk=pk, group=group)
+    return JsonResponse({
+        'status': 'success',
+        'name': holding.name,
+        'prompt': holding.get_llm_research_prompt(),
+        'location_summary': holding.location_summary_for_llm,
+    })
+
 
 @login_required
 @_require_portfolio
@@ -381,6 +415,7 @@ def master_portfolio(request):
         'crypto_form': CryptoHoldingForm(),
         'commodity_form': CommodityHoldingForm(),
         'us_stock_form': USStockHoldingForm(),
+        'real_estate_form': RealEstateHoldingForm(),
         'goal_form': FinancialGoalForm(),
         'pf_chart_data': pf_chart_data,
         'webauthn_credentials': WebAuthnCredential.objects.filter(user=request.user),
@@ -677,6 +712,33 @@ def commodities_detail(request):
         'total_invested': comm['commodity_invested'],
         'total_returns': comm['commodity_returns'],
         'form': CommodityHoldingForm(),
+    })
+
+
+@login_required
+@_require_portfolio
+def real_estate_detail(request):
+    group = _user_group(request)
+    holdings = list(RealEstateHolding.objects.filter(group=group, is_baby=False))
+    total_invested = sum((h.total_cost_basis for h in holdings), _ZERO)
+    total_current = sum((h.current_valuation for h in holdings), _ZERO)
+    total_rental = sum((h.monthly_rental_income for h in holdings), _ZERO)
+    total_pnl = total_current - total_invested
+    pnl_pct = (total_pnl / total_invested * 100).quantize(Decimal('0.01')) if total_invested else _ZERO
+    annual_rental = total_rental * Decimal('12')
+    portfolio_yield = (annual_rental / total_current * 100).quantize(Decimal('0.01')) if total_current else _ZERO
+
+    return render(request, 'portfolio/real_estate_detail.html', {
+        'holdings': holdings,
+        'total_invested': total_invested,
+        'total_current': total_current,
+        'total_rental': total_rental,
+        'annual_rental': annual_rental,
+        'portfolio_yield': portfolio_yield,
+        'total_pnl': total_pnl,
+        'pnl_pct': pnl_pct,
+        'form': RealEstateHoldingForm(),
+        'valuation_form': RealEstateValuationForm(),
     })
 
 
@@ -1039,6 +1101,7 @@ def baby_portfolio(request):
         'crypto_form': CryptoHoldingForm(initial={'is_baby': True}),
         'commodity_form': CommodityHoldingForm(initial={'is_baby': True}),
         'us_stock_form': USStockHoldingForm(initial={'is_baby': True}),
+        'real_estate_form': RealEstateHoldingForm(initial={'is_baby': True}),
         'goal_form': FinancialGoalForm(),
         'pf_chart_data': pf_chart_data,
         'webauthn_credentials': WebAuthnCredential.objects.filter(user=request.user),
@@ -1059,6 +1122,7 @@ def toggle_baby(request, model_name, pk):
         'cryptoholding': CryptoHolding,
         'commodityholding': CommodityHolding,
         'usstockholding': USStockHolding,
+        'realestateholding': RealEstateHolding,
     }
     model_class = model_map.get(model_name.lower())
     if not model_class:

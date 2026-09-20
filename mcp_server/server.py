@@ -61,7 +61,7 @@ from portfolio.models import (  # noqa: E402
     BondHolding, CryptoHolding, CommodityHolding,
     CommodityPrice, MonthlySnapshot,
     FinancialGoal as PortfolioGoal, USStockHolding,
-    PortfolioInsight,
+    PortfolioInsight, RealEstateHolding,
 )
 from jewellery.models import JewelleryItem  # noqa: E402
 from portfolio.services import (  # noqa: E402
@@ -218,6 +218,9 @@ def portfolio_summary() -> str:
         'silver_rate_per_gram': str(summary['silver_rate']),
         'us_stocks_invested': str(summary['us_stocks_invested']),
         'us_stocks_current': str(summary['us_stocks_current']),
+        'real_estate_invested': str(summary['real_estate_invested']),
+        'real_estate_current': str(summary['real_estate_current']),
+        'real_estate_returns': str(summary['real_estate_returns']),
     }
     return _to_json(result)
 
@@ -369,6 +372,30 @@ def portfolio_us_stocks() -> str:
         d['current_value_inr'] = str(h.current_value)
         d['pnl'] = str(h.pnl)
         d['pnl_pct'] = str(h.pnl_pct)
+        result.append(d)
+    return _to_json(result)
+
+
+@mcp.resource("vault://portfolio/real-estate")
+def portfolio_real_estate() -> str:
+    """Real estate property investments (land, plots, apartments, commercial)."""
+    group = _get_group()
+    qs = RealEstateHolding.objects.filter(group=group) if group else RealEstateHolding.objects.all()
+    result = []
+    for h in qs:
+        d = _model_to_dict(h)
+        d['area_in_gaj'] = str(h.area_in_gaj)
+        d['area_in_sqft'] = str(h.area_in_sqft)
+        d['area_display'] = h.area_display
+        d['total_cost_basis'] = str(h.total_cost_basis)
+        d['purchase_rate_per_gaj'] = str(h.purchase_rate_per_gaj)
+        d['current_rate_per_gaj'] = str(h.current_rate_per_gaj)
+        d['pnl'] = str(h.pnl)
+        d['pnl_pct'] = str(h.pnl_pct)
+        d['cagr_pct'] = str(h.cagr_pct)
+        d['annual_rental_income'] = str(h.annual_rental_income)
+        d['rental_yield_pct'] = str(h.rental_yield_pct)
+        d['location_summary'] = h.location_summary_for_llm
         result.append(d)
     return _to_json(result)
 
@@ -644,6 +671,58 @@ def get_commodity_holdings() -> str:
 def get_us_stock_holdings() -> str:
     """Get US stock (RSU) holdings with INR values and P&L."""
     return portfolio_us_stocks()
+
+
+@mcp.tool()
+def get_real_estate_holdings() -> str:
+    """Get all real estate property investments (plots, apartments, commercial, villas, agricultural) with measurements in Gaj/SqFt, acquisition costs, current valuation, and returns."""
+    return portfolio_real_estate()
+
+
+@mcp.tool()
+def get_real_estate_detail(holding_id: int) -> str:
+    """Get detailed structured data and LLM research metadata for a specific real estate property.
+
+    Args:
+        holding_id: ID of the RealEstateHolding record
+    """
+    group = _get_group()
+    try:
+        h = RealEstateHolding.objects.get(pk=holding_id, group=group) if group else RealEstateHolding.objects.get(pk=holding_id)
+    except RealEstateHolding.DoesNotExist:
+        return f"Error: RealEstateHolding #{holding_id} not found."
+
+    d = _model_to_dict(h)
+    d['area_in_gaj'] = str(h.area_in_gaj)
+    d['area_in_sqft'] = str(h.area_in_sqft)
+    d['area_display'] = h.area_display
+    d['total_cost_basis'] = str(h.total_cost_basis)
+    d['purchase_rate_per_gaj'] = str(h.purchase_rate_per_gaj)
+    d['current_rate_per_gaj'] = str(h.current_rate_per_gaj)
+    d['pnl'] = str(h.pnl)
+    d['pnl_pct'] = str(h.pnl_pct)
+    d['cagr_pct'] = str(h.cagr_pct)
+    d['annual_rental_income'] = str(h.annual_rental_income)
+    d['rental_yield_pct'] = str(h.rental_yield_pct)
+    d['location_summary'] = h.location_summary_for_llm
+    d['llm_research_prompt'] = h.get_llm_research_prompt()
+    return _to_json(d)
+
+
+@mcp.tool()
+def get_real_estate_llm_prompt(holding_id: int) -> str:
+    """Get a ready-to-run market research prompt for Gemini/LLMs to analyze circle rates, price growth, and catalysts for a property.
+
+    Args:
+        holding_id: ID of the RealEstateHolding record
+    """
+    group = _get_group()
+    try:
+        h = RealEstateHolding.objects.get(pk=holding_id, group=group) if group else RealEstateHolding.objects.get(pk=holding_id)
+    except RealEstateHolding.DoesNotExist:
+        return f"Error: RealEstateHolding #{holding_id} not found."
+
+    return h.get_llm_research_prompt()
 
 
 @mcp.tool()
@@ -1370,6 +1449,201 @@ def add_us_stock(
 
 
 @mcp.tool()
+def add_real_estate_holding(
+    name: str,
+    area_value: str,
+    purchase_date: str,
+    purchase_price: str,
+    current_valuation: str,
+    property_type: str = "PLOT_LAND",
+    status: str = "VACANT_PLOT",
+    area_unit: str = "GAJ",
+    locality: str = "",
+    city: str = "Noida",
+    state: str = "Uttar Pradesh",
+    landmark: str = "",
+    pincode: str = "",
+    micro_market_tag: str = "",
+    google_maps_url: str = "",
+    khasra_khata_number: str = "",
+    stamp_duty_charges: str = "0",
+    monthly_rental_income: str = "0",
+    is_baby: bool = False,
+    remarks: str = "",
+) -> str:
+    """Add a real estate property or land investment.
+
+    Args:
+        name: Name or description (e.g. 'Sector 150 Express Plot B-42')
+        area_value: Land or property size (e.g. 200)
+        purchase_date: Acquisition/registry date (YYYY-MM-DD)
+        purchase_price: Base purchase amount in INR
+        current_valuation: Current estimated market valuation in INR
+        property_type: PLOT_LAND, APARTMENT_FLAT, COMMERCIAL, VILLA_HOUSE, AGRICULTURAL, or OTHER
+        status: VACANT_PLOT, READY_SELF, RENTED, UNDER_CONSTRUCTION, or RESALE_PLANNED
+        area_unit: GAJ (sq yards), SQFT, SQYD, ACRE, BIGHA, or SQMT (default: GAJ)
+        locality: Locality or sector (e.g. 'Sector 150')
+        city: City (default: 'Noida')
+        state: State (default: 'Uttar Pradesh')
+        landmark: Key landmark or proximity (optional)
+        pincode: Postal code (optional)
+        micro_market_tag: Micro-market tag or growth corridor (e.g. 'Yamuna Expressway')
+        google_maps_url: Direct Google Maps link (optional)
+        khasra_khata_number: Khasra / Khatauni / Registry document ID (optional)
+        stamp_duty_charges: Stamp duty and registration charges in INR (default: 0)
+        monthly_rental_income: Monthly rental yield in INR (default: 0)
+        is_baby: Track in baby portfolio (default: false)
+        remarks: Notes, builder info, tenant details (optional)
+    """
+    group = _get_group()
+    holding = RealEstateHolding(
+        group=group,
+        name=name,
+        property_type=property_type.upper(),
+        status=status.upper(),
+        area_value=_parse_decimal(area_value),
+        area_unit=area_unit.upper(),
+        locality=locality,
+        city=city,
+        state=state,
+        landmark=landmark,
+        pincode=pincode,
+        micro_market_tag=micro_market_tag,
+        google_maps_url=google_maps_url,
+        khasra_khata_number=khasra_khata_number,
+        purchase_date=_parse_date(purchase_date),
+        purchase_price=_parse_decimal(purchase_price),
+        stamp_duty_charges=_parse_decimal(stamp_duty_charges),
+        current_valuation=_parse_decimal(current_valuation),
+        last_valuation_date=datetime.date.today(),
+        monthly_rental_income=_parse_decimal(monthly_rental_income),
+        is_baby=is_baby,
+        remarks=remarks,
+    )
+    holding.save()
+    log_create(holding, 'add_real_estate_holding')
+    return _to_json({
+        'status': 'created',
+        'id': holding.id,
+        'summary': str(holding),
+        'area': holding.area_display,
+        'total_cost_basis': str(holding.total_cost_basis),
+        'current_valuation': str(holding.current_valuation),
+        'rate_per_gaj': str(holding.current_rate_per_gaj),
+    })
+
+
+@mcp.tool()
+def update_real_estate_holding(
+    holding_id: int,
+    name: str = None,
+    current_valuation: str = None,
+    monthly_rental_income: str = None,
+    status: str = None,
+    landmark: str = None,
+    micro_market_tag: str = None,
+    google_maps_url: str = None,
+    khasra_khata_number: str = None,
+    remarks: str = None,
+) -> str:
+    """Update attributes or status of an existing real estate holding.
+
+    Args:
+        holding_id: Primary key of the RealEstateHolding
+        name: Updated name (optional)
+        current_valuation: Updated market price estimate in INR (optional)
+        monthly_rental_income: Updated monthly rent in INR (optional)
+        status: VACANT_PLOT, READY_SELF, RENTED, UNDER_CONSTRUCTION, RESALE_PLANNED (optional)
+        landmark: Updated landmark (optional)
+        micro_market_tag: Updated micro market tag (optional)
+        google_maps_url: Updated Google Maps link (optional)
+        khasra_khata_number: Updated legal doc number (optional)
+        remarks: Updated notes (optional)
+    """
+    group = _get_group()
+    try:
+        holding = RealEstateHolding.objects.get(pk=holding_id, group=group) if group else RealEstateHolding.objects.get(pk=holding_id)
+    except RealEstateHolding.DoesNotExist:
+        return f"Error: RealEstateHolding #{holding_id} not found."
+
+    old_state = serialize_instance(holding)
+    if name is not None:
+        holding.name = name
+    if current_valuation is not None:
+        holding.current_valuation = _parse_decimal(current_valuation)
+        holding.last_valuation_date = datetime.date.today()
+    if monthly_rental_income is not None:
+        holding.monthly_rental_income = _parse_decimal(monthly_rental_income)
+    if status is not None:
+        holding.status = status.upper()
+    if landmark is not None:
+        holding.landmark = landmark
+    if micro_market_tag is not None:
+        holding.micro_market_tag = micro_market_tag
+    if google_maps_url is not None:
+        holding.google_maps_url = google_maps_url
+    if khasra_khata_number is not None:
+        holding.khasra_khata_number = khasra_khata_number
+    if remarks is not None:
+        holding.remarks = remarks
+
+    holding.save()
+    log_update(holding, old_state, 'update_real_estate_holding')
+    return _to_json({
+        'status': 'updated',
+        'id': holding.id,
+        'summary': str(holding),
+        'current_valuation': str(holding.current_valuation),
+        'current_rate_per_gaj': str(holding.current_rate_per_gaj),
+    })
+
+
+@mcp.tool()
+def update_real_estate_valuation(
+    holding_id: int,
+    current_valuation: str,
+    valuation_date: str = "",
+    monthly_rental_income: str = None,
+    notes: str = "",
+) -> str:
+    """Quickly update the latest appraisal valuation and rental income for a real estate holding.
+
+    Args:
+        holding_id: Primary key of the RealEstateHolding
+        current_valuation: New market valuation estimate in INR
+        valuation_date: Date of valuation appraisal (YYYY-MM-DD, defaults to today)
+        monthly_rental_income: Optional updated monthly rental income in INR
+        notes: Context or notes regarding the market price adjustment
+    """
+    group = _get_group()
+    try:
+        holding = RealEstateHolding.objects.get(pk=holding_id, group=group) if group else RealEstateHolding.objects.get(pk=holding_id)
+    except RealEstateHolding.DoesNotExist:
+        return f"Error: RealEstateHolding #{holding_id} not found."
+
+    old_state = serialize_instance(holding)
+    holding.current_valuation = _parse_decimal(current_valuation)
+    holding.last_valuation_date = _parse_date(valuation_date) if valuation_date else datetime.date.today()
+    if monthly_rental_income is not None:
+        holding.monthly_rental_income = _parse_decimal(monthly_rental_income)
+    if notes:
+        holding.remarks = f"{holding.remarks}\n[Valuation {holding.last_valuation_date}]: {notes}".strip()
+
+    holding.save()
+    log_update(holding, old_state, 'update_real_estate_valuation')
+    return _to_json({
+        'status': 'updated',
+        'id': holding.id,
+        'name': holding.name,
+        'current_valuation': str(holding.current_valuation),
+        'current_rate_per_gaj': str(holding.current_rate_per_gaj),
+        'pnl': str(holding.pnl),
+        'pnl_pct': str(holding.pnl_pct),
+        'cagr_pct': str(holding.cagr_pct),
+    })
+
+
+@mcp.tool()
 def add_portfolio_goal(
     label: str,
     target_amount: str,
@@ -1462,6 +1736,7 @@ def delete_record(
         'portfolio.CashPosition', 'portfolio.BondHolding',
         'portfolio.CryptoHolding', 'portfolio.CommodityHolding',
         'portfolio.FinancialGoal', 'portfolio.USStockHolding',
+        'portfolio.RealEstateHolding',
         'jewellery.JewelleryItem',
     }
     if model_name not in allowed:

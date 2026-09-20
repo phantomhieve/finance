@@ -52,7 +52,7 @@ from portfolio.models import (
     EPFEntry, NPSEntry, FixedDeposit, CashPosition, BondHolding,
     CryptoHolding, CommodityHolding, CommodityPrice,
     USStockHolding, FinancialGoal as PortfolioFinancialGoal,
-    MonthlySnapshot,
+    MonthlySnapshot, RealEstateHolding,
 )
 from jewellery.models import JewelleryItem
 
@@ -565,6 +565,68 @@ for cat, metal, purity, weight, loc, pdate, price, notes in JEWELLERY:
     if created:
         _jewellery_created += 1
 say(f"{len(JEWELLERY)} jewellery items ({_jewellery_created} new)")
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 16. Real Estate Investments
+# ─────────────────────────────────────────────────────────────────────────────
+print("\n── Real Estate Holdings ──────────────────────────────────────")
+REAL_ESTATE = [
+    (
+        "Yamuna Expressway Sector 22D Residential Plot",
+        "PLOT_LAND", "VACANT_PLOT",
+        Decimal("250.00"), "GAJ",
+        "Sector 22D, Yamuna Expressway", "Greater Noida", "Uttar Pradesh",
+        "5 km from Upcoming Noida International Airport (Jewar)",
+        "203201", "Yamuna Expressway Aerocity Corridor",
+        "https://maps.app.goo.gl/example1", "Plot B-104, Block D, Sector 22D",
+        d(2022, 4, 15), Decimal("6250000"), Decimal("437500"),
+        Decimal("13750000"), d(2026, 2, 1), Decimal("0"),
+        "Direct YEIDA authority alloted residential plot on 45m wide sector road."
+    ),
+    (
+        "ATS Kingston Heath Luxury 3BHK",
+        "APARTMENT_FLAT", "RENTED",
+        Decimal("215.00"), "GAJ",
+        "Sector 150, Sports City", "Noida", "Uttar Pradesh",
+        "Overlooking 9-hole Golf Course & Shaheed Bhagat Singh Park",
+        "201310", "Noida Expressway Sector 150",
+        "https://maps.app.goo.gl/example2", "Tower 2, Unit 902",
+        d(2023, 8, 20), Decimal("14500000"), Decimal("1015000"),
+        Decimal("22000000"), d(2026, 1, 15), Decimal("55000"),
+        "Fully furnished, rented to corporate expat executive."
+    ),
+]
+
+_re_created = 0
+for (name, ptype, status, area, unit, loc, city, st, lmark, pin, micro, maps, khasra, pdate, pprice, stamp, cval, vdate, rent, rem) in REAL_ESTATE:
+    obj, created = RealEstateHolding.objects.get_or_create(
+        group=group,
+        name=name,
+        defaults=dict(
+            property_type=ptype,
+            status=status,
+            area_value=area,
+            area_unit=unit,
+            locality=loc,
+            city=city,
+            state=st,
+            landmark=lmark,
+            pincode=pin,
+            micro_market_tag=micro,
+            google_maps_url=maps,
+            khasra_khata_number=khasra,
+            purchase_date=pdate,
+            purchase_price=pprice,
+            stamp_duty_charges=stamp,
+            current_valuation=cval,
+            last_valuation_date=vdate,
+            monthly_rental_income=rent,
+            remarks=rem,
+        ),
+    )
+    if created:
+        _re_created += 1
+say(f"{len(REAL_ESTATE)} real estate properties ({_re_created} new)")
 
 # ─────────────────────────────────────────────────────────────────────────────
 print("\n" + "═" * 60)

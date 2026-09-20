@@ -18,7 +18,7 @@ from .models import (
     EPFEntry, NPSEntry, FixedDeposit, CashPosition,
     BondHolding, CryptoHolding, CommodityHolding,
     CommodityPrice, MonthlySnapshot, FinancialGoal,
-    USStockHolding,
+    USStockHolding, RealEstateHolding,
 )
 
 logger = logging.getLogger(__name__)
@@ -182,6 +182,10 @@ def get_portfolio_summary(group=None, is_baby=False):
     us_stocks_invested = sum((h.purchase_value for h in us_stocks), _ZERO)
     us_stocks_current = sum((h.current_value for h in us_stocks), _ZERO)
 
+    real_estate_holdings = list(_gf(RealEstateHolding.objects.filter(is_baby=is_baby), group).all())
+    real_estate_invested = sum((h.total_cost_basis for h in real_estate_holdings), _ZERO)
+    real_estate_current = sum((h.current_value for h in real_estate_holdings), _ZERO)
+
     comm = get_commodity_summary(group, is_baby=is_baby)
     gold_rate = comm['gold_rate']
     silver_rate = comm['silver_rate']
@@ -206,6 +210,7 @@ def get_portfolio_summary(group=None, is_baby=False):
         {'name': 'FD', 'value': fd_current, 'icon': 'lock'},
         {'name': 'Bonds', 'value': bonds_total, 'icon': 'receipt_long'},
         {'name': 'US Stocks (RSU)', 'value': us_stocks_current, 'icon': 'work'},
+        {'name': 'Real Estate', 'value': real_estate_current, 'icon': 'domain'},
     ]
     total_value = sum(a['value'] for a in assets)
     for a in assets:
@@ -231,6 +236,7 @@ def get_portfolio_summary(group=None, is_baby=False):
     consolidated = [
         {'name': 'Equity', 'value': equity_total},
         {'name': 'Debt Instruments', 'value': debt_total},
+        {'name': 'Real Estate', 'value': real_estate_current},
         {'name': 'Cash', 'value': cash_total},
         {'name': 'Commodity', 'value': commodity_total},
         {'name': 'Crypto', 'value': crypto_current},
@@ -243,7 +249,7 @@ def get_portfolio_summary(group=None, is_baby=False):
         all_stocks_purchased + index_purchased + other_purchased
         + epf_total_contrib + nps_total_contrib
         + fd_principal + cash_total + bonds_total + crypto_invested
-        + commodity_invested + us_stocks_invested
+        + commodity_invested + us_stocks_invested + real_estate_invested
     )
     total_returns = total_value - total_invested
     return_pct = _pct(total_returns, total_invested)
@@ -347,6 +353,10 @@ def get_portfolio_summary(group=None, is_baby=False):
         'us_stocks_invested': us_stocks_invested,
         'us_stocks_current': us_stocks_current,
         'us_stocks_returns': us_stocks_current - us_stocks_invested,
+        'real_estate_holdings': real_estate_holdings,
+        'real_estate_invested': real_estate_invested,
+        'real_estate_current': real_estate_current,
+        'real_estate_returns': real_estate_current - real_estate_invested,
     }
 
 
@@ -839,6 +849,8 @@ def _take_snapshot_for_group(month, group):
         _sum_qs(MutualFundHolding.objects.filter(account__group=group, fund_type='OTHER'), 'purchase_value'))
     data.setdefault('crypto', {})['invested'] = float(summary['crypto_invested'])
     data.setdefault('fd', {})['principal'] = float(summary['fd_principal'])
+    data.setdefault('us_stocks', {})['invested'] = float(summary['us_stocks_invested'])
+    data.setdefault('real_estate', {})['invested'] = float(summary['real_estate_invested'])
 
     total_invested = summary['total_invested']
     total_current = summary['total_value']
