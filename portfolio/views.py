@@ -53,7 +53,7 @@ logger = logging.getLogger(__name__)
 # Helpers
 # ---------------------------------------------------------------------------
 
-_PORTFOLIO_UNLOCK_TTL = 300  # 5 minutes
+_PORTFOLIO_UNLOCK_TTL = 1800  # 30 minutes
 
 def _require_portfolio(view_func):
     """Only PRIMARY users can access portfolio views; always gate behind group password."""

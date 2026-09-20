@@ -48,6 +48,8 @@ INSTALLED_APPS = [
     'tracker',
     'portfolio',
     'jewellery',
+    'mcp_server',
+    'oauth2_provider',
 
     # Must be last — auto-deletes media files on model delete / field replace
     'django_cleanup.apps.CleanupConfig',
@@ -127,6 +129,12 @@ UNFOLD = {
                     {"title": "AI insight cooldown", "icon": "schedule", "link": f"{_ADMIN_PREFIX}/portfolio/insightgenerationsettings/"},
                 ],
             },
+            {
+                "title": "MCP Server",
+                "items": [
+                    {"title": "Audit Log", "icon": "history", "link": f"{_ADMIN_PREFIX}/mcp_server/mcpauditlog/"},
+                ],
+            },
         ],
     },
 }
@@ -139,6 +147,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'oauth2_provider.middleware.OAuth2TokenMiddleware',
     'django.middleware.csp.ContentSecurityPolicyMiddleware',
     'allauth.account.middleware.AccountMiddleware',
 ]
@@ -347,4 +356,11 @@ LOGGING = {
             'level': 'WARNING',
         },
     },
+}
+
+# OAuth 2.0 Provider
+OAUTH2_PROVIDER = {
+    'SCOPES': {'read': 'Read scope', 'write': 'Write scope'},
+    'ACCESS_TOKEN_EXPIRE_SECONDS': 36000,
+    'PKCE_REQUIRED': False,
 }

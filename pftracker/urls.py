@@ -2,12 +2,23 @@ from django.contrib import admin
 from django.http import Http404
 from django.urls import path, include
 from django.views.generic import RedirectView
+from django.http import JsonResponse
 
 admin.site.site_header = 'Vault Administration'
 
 
 def _blocked(request, *args, **kwargs):
     raise Http404
+
+def oauth_discovery(request):
+    base = request.build_absolute_uri('/')[:-1]
+    return JsonResponse({
+        "issuer": base,
+        "authorization_endpoint": f"{base}/o/authorize/",
+        "token_endpoint": f"{base}/o/token/",
+        "response_types_supported": ["code", "token"],
+        "grant_types_supported": ["authorization_code", "client_credentials", "refresh_token"]
+    })
 
 
 urlpatterns = [
@@ -30,6 +41,8 @@ urlpatterns = [
     path('accounts/reauthenticate/', _blocked),
     path('accounts/2fa/', _blocked),
     path('accounts/', include('allauth.urls')),
+    path('o/', include('oauth2_provider.urls', namespace='oauth2_provider')),
+    path('.well-known/oauth-authorization-server', oauth_discovery),
     path('portfolio/', include('portfolio.urls')),
     path('jewellery/', include('jewellery.urls')),
     path('', include('tracker.urls')),

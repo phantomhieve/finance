@@ -16,3 +16,5 @@ max_requests_jitter = int(os.environ.get('GUNICORN_MAX_REQUESTS_JITTER', '50'))
 accesslog = os.environ.get('GUNICORN_ACCESS_LOG', '-')
 errorlog = os.environ.get('GUNICORN_ERROR_LOG', '-')
 loglevel = os.environ.get('GUNICORN_LOG_LEVEL', 'info')
+
+worker_class = 'uvicorn.workers.UvicornWorker'

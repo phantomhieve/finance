@@ -17,3 +17,8 @@ webauthn>=2.0
 Pillow>=11.0               # required by Django ImageField for validation/processing
 pillow-heif>=1.4.0         # enables iPhone HEIC/HEIF photo support and auto-JPEG conversion
 django-cleanup>=9.0        # auto-deletes media files when a model instance is deleted or photo replaced
+# MCP (Model Context Protocol) server
+mcp[cli]>=1.0
+django-oauth-toolkit>=3.0.0
+starlette>=0.40.0
+uvicorn[standard]>=0.30.0
