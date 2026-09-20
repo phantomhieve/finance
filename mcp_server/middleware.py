@@ -1,6 +1,6 @@
 import logging
 from asgiref.sync import sync_to_async
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.datastructures import Headers, QueryParams
 from starlette.responses import Response
 
 logger = logging.getLogger(__name__)
@@ -9,8 +9,6 @@ logger = logging.getLogger(__name__)
 def validate_oauth_token(token_string: str) -> bool:
     try:
         from oauth2_provider.models import AccessToken
-        from django.utils import timezone
-        
         token = AccessToken.objects.select_related("user").get(token=token_string)
         if token.is_valid(scopes=[]):
             return True
@@ -19,32 +17,64 @@ def validate_oauth_token(token_string: str) -> bool:
         logger.warning(f"OAuth token validation failed: {e}")
         return False
 
-class OAuthBearerMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request, call_next):
+class OAuthBearerMiddleware:
+    """
+    Pure ASGI middleware for OAuth Bearer token validation.
+    Avoids BaseHTTPMiddleware to maintain full compatibility with SSE streaming responses.
+    """
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
         # Allow OPTIONS for CORS preflight
-        if request.method == "OPTIONS":
-            return await call_next(request)
-            
+        if scope.get("method") == "OPTIONS":
+            await self.app(scope, receive, send)
+            return
+
+        headers = Headers(scope=scope)
+        query_params = QueryParams(scope.get("query_string", b"").decode("latin-1"))
+
         token_string = None
-        auth_header = request.headers.get("Authorization")
-        if auth_header and auth_header.startswith("Bearer "):
-            token_string = auth_header.split(" ", 1)[1].strip()
-        elif "token" in request.query_params:
-            token_string = request.query_params.get("token")
-        elif "access_token" in request.query_params:
-            token_string = request.query_params.get("access_token")
+        auth_header = headers.get("authorization")
+        if auth_header and auth_header.lower().startswith("bearer "):
+            token_string = auth_header[7:].strip()
+        elif "token" in query_params:
+            token_string = query_params["token"]
+        elif "access_token" in query_params:
+            token_string = query_params["access_token"]
+
+        server_host = headers.get("host", "localhost:8000")
+        scheme = "https" if headers.get("x-forwarded-proto") == "https" else scope.get("scheme", "https")
+        base_url = f"{scheme}://{server_host}"
 
         if not token_string:
-            res = Response("Unauthorized - Missing Bearer token", status_code=401)
-            base_url = str(request.base_url).rstrip('/')
-            res.headers["WWW-Authenticate"] = f'Bearer resource_metadata="{base_url}/.well-known/oauth-protected-resource"'
-            return res
-            
+            response = Response(
+                "Unauthorized - Missing Bearer token",
+                status_code=401,
+                headers={
+                    "WWW-Authenticate": f'Bearer resource_metadata="{base_url}/.well-known/oauth-protected-resource"',
+                    "Content-Type": "text/plain; charset=utf-8",
+                },
+            )
+            await response(scope, receive, send)
+            return
+
         is_valid = await validate_oauth_token(token_string)
         if not is_valid:
-            res = Response("Unauthorized - Invalid or expired token", status_code=401)
-            base_url = str(request.base_url).rstrip('/')
-            res.headers["WWW-Authenticate"] = f'Bearer error="invalid_token", resource_metadata="{base_url}/.well-known/oauth-protected-resource"'
-            return res
-            
-        return await call_next(request)
+            response = Response(
+                "Unauthorized - Invalid or expired token",
+                status_code=401,
+                headers={
+                    "WWW-Authenticate": f'Bearer error="invalid_token", resource_metadata="{base_url}/.well-known/oauth-protected-resource"',
+                    "Content-Type": "text/plain; charset=utf-8",
+                },
+            )
+            await response(scope, receive, send)
+            return
+
+        await self.app(scope, receive, send)
+
