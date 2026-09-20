@@ -336,7 +336,7 @@
                   <span class="material-symbols-outlined text-base">assignment_return</span>
                 </a>
               {% else %}
-                <a href="{% url 'toggle_baby' 'mutualfundholding' m.entries.0.id %}" class="btn btn-ghost btn-xs btn-square opacity-60 hover:opacity-100" title="Move to Baby Portfolio">
+                <a href="{% url 'toggle_baby' 'mutualfundholding' m.entries.0.id %}" class="btn btn-ghost btn-xs btn-square opacity-60 hover:opacity-100" title="Move to Child Portfolio">
                   <span class="material-symbols-outlined text-base">child_care</span>
                 </a>
               {% endif %}
@@ -414,7 +414,7 @@
                   <span class="material-symbols-outlined text-base">assignment_return</span>
                 </a>
               {% else %}
-                <a href="{% url 'toggle_baby' 'mutualfundholding' m.entries.0.id %}" class="btn btn-ghost btn-xs btn-square opacity-60 hover:opacity-100" title="Move to Baby Portfolio">
+                <a href="{% url 'toggle_baby' 'mutualfundholding' m.entries.0.id %}" class="btn btn-ghost btn-xs btn-square opacity-60 hover:opacity-100" title="Move to Child Portfolio">
                   <span class="material-symbols-outlined text-base">child_care</span>
                 </a>
               {% endif %}
@@ -563,7 +563,7 @@ function showBreakdown(name, type, idx) {
       iconSpan.textContent = "assignment_return";
     } else {
       toggleLink.classList.add("opacity-60", "hover:opacity-100");
-      toggleLink.title = "Move to Baby Portfolio";
+      toggleLink.title = "Move to Child Portfolio";
       iconSpan.textContent = "child_care";
     }
     toggleLink.appendChild(iconSpan);

@@ -1133,7 +1133,7 @@ def add_fixed_deposit(
         start_date: Start date in YYYY-MM-DD format
         maturity_date: Maturity date in YYYY-MM-DD format
         compounding: SIMPLE, MONTHLY, QUARTERLY, or ANNUAL (default: QUARTERLY)
-        is_baby: Track in baby portfolio (default: false)
+        is_baby: Track in Child portfolio (default: false)
         remarks: Optional remarks
     """
     group = _get_group()
@@ -1202,7 +1202,7 @@ def add_cash_position(
         name: Position name (e.g. 'Kanika Acc', 'Cash lent Reshu')
         amount: Amount in INR
         remarks: Optional remarks
-        is_baby: Track in baby portfolio (default: false)
+        is_baby: Track in Child portfolio (default: false)
     """
     group = _get_group()
     pos = CashPosition(
@@ -1262,7 +1262,7 @@ def add_bond_holding(
         account_name: Account/platform name
         amount: Bond value in INR
         remarks: Optional remarks
-        is_baby: Track in baby portfolio (default: false)
+        is_baby: Track in Child portfolio (default: false)
     """
     group = _get_group()
     bond = BondHolding(
@@ -1320,7 +1320,7 @@ def add_crypto_holding(
         amount_invested: Amount invested in INR
         current_value: Current value in INR
         remarks: Optional remarks
-        is_baby: Track in baby portfolio (default: false)
+        is_baby: Track in Child portfolio (default: false)
     """
     group = _get_group()
     crypto = CryptoHolding(
@@ -1385,7 +1385,7 @@ def add_commodity_holding(
         weight_grams: Weight in grams
         purchase_price_per_gram: Purchase price per gram in INR
         purity: For gold: 24k, 22k, 18k, 14k. For silver: 999, 925, 900, 800. Default: 24k
-        is_baby: Track in baby portfolio (default: false)
+        is_baby: Track in Child portfolio (default: false)
     """
     group = _get_group()
     if commodity_type.upper() not in ('GOLD', 'SILVER'):
@@ -1423,7 +1423,7 @@ def add_us_stock(
         units: Number of shares
         purchase_value: Total purchase value in INR
         remarks: Optional remarks
-        is_baby: Track in baby portfolio (default: false)
+        is_baby: Track in Child portfolio (default: false)
     """
     group = _get_group()
 
@@ -1492,7 +1492,7 @@ def add_real_estate_holding(
         khasra_khata_number: Khasra / Khatauni / Registry document ID (optional)
         stamp_duty_charges: Stamp duty and registration charges in INR (default: 0)
         monthly_rental_income: Monthly rental yield in INR (default: 0)
-        is_baby: Track in baby portfolio (default: false)
+        is_baby: Track in Child portfolio (default: false)
         remarks: Notes, builder info, tenant details (optional)
     """
     group = _get_group()

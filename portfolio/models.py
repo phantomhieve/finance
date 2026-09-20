@@ -78,7 +78,7 @@ class StockHolding(PnlMixin, models.Model):
     quantity = models.IntegerField(default=0)
     purchase_value = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     current_value = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    is_baby = models.BooleanField(default=False, help_text="Track in baby portfolio instead of master portfolio")
+    is_baby = models.BooleanField(default=False, help_text="Track in Child portfolio instead of master portfolio")
 
     class Meta:
         ordering = ['symbol']
@@ -104,7 +104,7 @@ class MutualFundHolding(PnlMixin, models.Model):
     units = models.DecimalField(max_digits=14, decimal_places=3, default=0)
     purchase_value = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     current_value = models.DecimalField(max_digits=14, decimal_places=2, default=0)
-    is_baby = models.BooleanField(default=False, help_text="Track in baby portfolio instead of master portfolio")
+    is_baby = models.BooleanField(default=False, help_text="Track in Child portfolio instead of master portfolio")
 
     class Meta:
         ordering = ['fund_name']
@@ -224,7 +224,7 @@ class FixedDeposit(models.Model):
     start_date = models.DateField()
     maturity_date = models.DateField()
     is_active = models.BooleanField(default=True)
-    is_baby = models.BooleanField(default=False, help_text="Track in baby portfolio instead of master portfolio")
+    is_baby = models.BooleanField(default=False, help_text="Track in Child portfolio instead of master portfolio")
     remarks = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -287,7 +287,7 @@ class CashPosition(models.Model):
     name = models.CharField(max_length=100, help_text="e.g. Kanika Acc, Cash lent Reshu")
     amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     remarks = models.CharField(max_length=255, blank=True)
-    is_baby = models.BooleanField(default=False, help_text="Track in baby portfolio instead of master portfolio")
+    is_baby = models.BooleanField(default=False, help_text="Track in Child portfolio instead of master portfolio")
 
     class Meta:
         ordering = ['name']
@@ -304,7 +304,7 @@ class BondHolding(models.Model):
     account_name = models.CharField(max_length=100)
     amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     remarks = models.CharField(max_length=255, blank=True)
-    is_baby = models.BooleanField(default=False, help_text="Track in baby portfolio instead of master portfolio")
+    is_baby = models.BooleanField(default=False, help_text="Track in Child portfolio instead of master portfolio")
 
     class Meta:
         ordering = ['account_name']
@@ -322,7 +322,7 @@ class CryptoHolding(models.Model):
     amount_invested = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     current_value = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     remarks = models.CharField(max_length=255, blank=True)
-    is_baby = models.BooleanField(default=False, help_text="Track in baby portfolio instead of master portfolio")
+    is_baby = models.BooleanField(default=False, help_text="Track in Child portfolio instead of master portfolio")
 
     class Meta:
         ordering = ['name']
@@ -372,7 +372,7 @@ class CommodityHolding(PnlMixin, models.Model):
         max_digits=12, decimal_places=2, default=0,
         help_text="Price per gram at the time of purchase (INR)",
     )
-    is_baby = models.BooleanField(default=False, help_text="Track in baby portfolio instead of master portfolio")
+    is_baby = models.BooleanField(default=False, help_text="Track in Child portfolio instead of master portfolio")
 
     class Meta:
         ordering = ['commodity_type', '-weight_grams']
@@ -427,7 +427,7 @@ class USStockHolding(models.Model):
     )
     last_refreshed = models.DateTimeField(null=True, blank=True)
     remarks = models.CharField(max_length=255, blank=True)
-    is_baby = models.BooleanField(default=False, help_text="Track in baby portfolio instead of master portfolio")
+    is_baby = models.BooleanField(default=False, help_text="Track in Child portfolio instead of master portfolio")
 
     class Meta:
         ordering = ['-vest_date']
@@ -669,7 +669,7 @@ class RealEstateHolding(PnlMixin, models.Model):
     )
 
     is_baby = models.BooleanField(
-        default=False, help_text="Track in baby portfolio instead of master portfolio",
+        default=False, help_text="Track in Child portfolio instead of master portfolio",
     )
     remarks = models.TextField(blank=True, help_text="Notes, registry details, builder info, etc.")
     created_at = models.DateTimeField(auto_now_add=True)

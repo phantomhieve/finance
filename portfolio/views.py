@@ -427,7 +427,7 @@ def master_portfolio(request):
 @_require_portfolio
 def zerodha_detail(request, slug):
     account = get_object_or_404(ZerodhaAccount, slug=slug, group=_user_group(request))
-    # Exclude holdings tracked in the Baby Portfolio — they belong there, not here
+    # Exclude holdings tracked in the Child Portfolio — they belong there, not here
     stocks = list(account.stock_holdings.filter(is_baby=False))
     index_mf = list(account.mf_holdings.filter(fund_type='INDEX', is_baby=False))
     other_mf = list(account.mf_holdings.filter(fund_type='OTHER', is_baby=False))
@@ -504,7 +504,7 @@ def zerodha_consolidated(request):
     group_accounts = ZerodhaAccount.objects.filter(group=group)
     acct_ids = group_accounts.values_list('id', flat=True)
 
-    # Exclude holdings tracked in the Baby Portfolio — they belong there, not here
+    # Exclude holdings tracked in the Child Portfolio — they belong there, not here
     all_stocks = list(StockHolding.objects.select_related('account').filter(account_id__in=acct_ids, is_baby=False))
     all_index = list(MutualFundHolding.objects.select_related('account').filter(account_id__in=acct_ids, fund_type='INDEX', is_baby=False))
     all_other = list(MutualFundHolding.objects.select_related('account').filter(account_id__in=acct_ids, fund_type='OTHER', is_baby=False))
@@ -1137,7 +1137,7 @@ def toggle_baby(request, model_name, pk):
     obj.is_baby = not obj.is_baby
     obj.save()
     
-    status_msg = "moved to Baby Portfolio" if obj.is_baby else "moved to Master Portfolio"
+    status_msg = "moved to Child Portfolio" if obj.is_baby else "moved to Master Portfolio"
     messages.success(request, f"{getattr(obj, 'symbol', getattr(obj, 'fund_name', getattr(obj, 'name', 'Asset')))} {status_msg}.")
     return _safe_redirect(request)
 
