@@ -1,0 +1,410 @@
+{% extends 'base.html' %}
+{% load indian_format %}
+{% load static %}
+
+{% block title %}Real Estate Investments — Portfolio — Vault{% endblock %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+  <div>
+    <p class="text-xs font-bold tracking-widest uppercase text-primary">Portfolio</p>
+    <h1 class="text-xl lg:text-2xl font-extrabold flex items-center gap-2">
+      <span class="material-symbols-outlined text-primary text-2xl">domain</span> Real Estate Investments
+    </h1>
+    <p class="text-xs opacity-50">Land, Plots, Residential, Commercial assets with North Indian measurement units &amp; AI research</p>
+  </div>
+  <div class="flex flex-wrap items-center gap-2">
+    <button type="button" class="btn btn-primary btn-sm gap-1" onclick="openAddRealEstateModal()">
+      <span class="material-symbols-outlined text-base">add_home</span> Add Property
+    </button>
+    <a href="{% url 'portfolio_tracker' %}" class="btn btn-ghost btn-sm gap-1">
+      <span class="material-symbols-outlined text-base">arrow_back</span> Portfolio
+    </a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+{# Hero Summary #}
+<div class="card hero-gradient-portfolio shadow-sm card-hover animate-up mb-4">
+  <div class="card-body p-4 lg:p-6">
+    <div class="flex flex-wrap items-center justify-between gap-6">
+      <div>
+        <p class="text-[10px] font-bold uppercase tracking-widest opacity-40">Total Real Estate Valuation</p>
+        <p class="text-3xl lg:text-4xl font-extrabold mt-1 text-base-content">₹{{ total_current|floatformat:0|indian_number }}</p>
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+          <span class="badge {% if total_pnl >= 0 %}badge-success{% else %}badge-error{% endif %} badge-sm gap-1">
+            {% if total_pnl >= 0 %}+{% endif %}₹{{ total_pnl|floatformat:0|indian_number }} ({{ pnl_pct }}%) Total P&amp;L
+          </span>
+          {% if annual_rental > 0 %}
+          <span class="badge badge-info badge-sm gap-1">
+            <span class="material-symbols-outlined text-xs">key</span> ₹{{ total_rental|floatformat:0|indian_number }}/mo ({{ portfolio_yield }}% Yield)
+          </span>
+          {% endif %}
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-3">
+        <div class="stat-card">
+          <div class="text-[10px] uppercase tracking-wider opacity-50">Total Cost Basis</div>
+          <div class="text-base font-bold mt-0.5">₹{{ total_invested|floatformat:0|indian_number }}</div>
+        </div>
+        <div class="stat-card stat-card-success">
+          <div class="text-[10px] uppercase tracking-wider opacity-50">Unrealized Gain</div>
+          <div class="text-base font-bold mt-0.5 {% if total_pnl >= 0 %}text-success{% else %}text-error{% endif %}">
+            {% if total_pnl >= 0 %}+{% endif %}₹{{ total_pnl|floatformat:0|indian_number }}
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="text-[10px] uppercase tracking-wider opacity-50">Annual Rental</div>
+          <div class="text-base font-bold mt-0.5 text-primary">₹{{ annual_rental|floatformat:0|indian_number }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# Property List #}
+<div class="card bg-base-200 shadow-sm card-hover animate-up mb-4" style="animation-delay:0.1s">
+  <div class="card-body p-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <h2 class="card-title text-base flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-primary text-lg">apartment</span> All Properties
+      </h2>
+      <span class="badge badge-ghost badge-sm">{{ holdings|length }} Properties</span>
+    </div>
+
+    {% if holdings %}
+    {# Desktop Table #}
+    <div class="hidden lg:block overflow-x-auto">
+      <table class="table table-sm" id="realEstateTable">
+        <thead>
+          <tr>
+            <th class="sortable-th">Property &amp; Location <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
+            <th class="sortable-th">Type / Status <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
+            <th class="sortable-th text-right">Area (Gaj / SqFt) <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
+            <th class="sortable-th text-right">Cost Basis <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
+            <th class="sortable-th text-right">Current Valuation <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
+            <th class="sortable-th text-right">Rate / Gaj <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
+            <th class="sortable-th text-right">Returns (P&amp;L) <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
+            <th class="sortable-th text-right">CAGR <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
+            <th class="text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in holdings %}
+          <tr class="hover">
+            <td>
+              <div class="font-bold text-sm text-base-content flex items-center gap-1.5">
+                {{ p.name }}
+                {% if p.google_maps_url %}
+                <a href="{{ p.google_maps_url }}" target="_blank" rel="noopener noreferrer" class="text-primary hover:opacity-80" title="View on Google Maps">
+                  <span class="material-symbols-outlined text-sm">pin_drop</span>
+                </a>
+                {% endif %}
+              </div>
+              <div class="text-xs opacity-60 flex items-center gap-1 mt-0.5">
+                <span class="material-symbols-outlined text-xs">location_on</span>
+                {{ p.locality }}, {{ p.city }}
+                {% if p.micro_market_tag %}<span class="badge badge-xs badge-neutral">{{ p.micro_market_tag }}</span>{% endif %}
+              </div>
+            </td>
+            <td>
+              <div class="flex flex-col gap-1 items-start">
+                <span class="badge badge-primary badge-outline badge-xs font-semibold">{{ p.get_property_type_display }}</span>
+                <span class="text-[11px] opacity-60">{{ p.get_status_display }}</span>
+              </div>
+            </td>
+            <td class="text-right" data-val="{{ p.area_in_gaj }}">
+              <div class="font-bold text-sm">{{ p.area_in_gaj|floatformat:0|indian_number }} Gaj</div>
+              <div class="text-xs opacity-50">{{ p.area_in_sqft|floatformat:0|indian_number }} sq.ft</div>
+            </td>
+            <td class="text-right" data-val="{{ p.total_cost_basis }}">
+              <div class="font-semibold">₹{{ p.total_cost_basis|floatformat:0|indian_number }}</div>
+              <div class="text-[11px] opacity-40">{{ p.purchase_date|date:"M Y" }}</div>
+            </td>
+            <td class="text-right font-bold" data-val="{{ p.current_valuation }}">
+              <div class="text-primary font-bold">₹{{ p.current_valuation|floatformat:0|indian_number }}</div>
+              {% if p.monthly_rental_income > 0 %}
+              <div class="text-[11px] text-info">₹{{ p.monthly_rental_income|floatformat:0|indian_number }}/mo ({{ p.rental_yield_pct }}%)</div>
+              {% endif %}
+            </td>
+            <td class="text-right font-semibold" data-val="{{ p.current_rate_per_gaj }}">
+              ₹{{ p.current_rate_per_gaj|floatformat:0|indian_number }}/Gaj
+              <div class="text-[11px] opacity-40">Bought: ₹{{ p.purchase_rate_per_gaj|floatformat:0|indian_number }}</div>
+            </td>
+            <td class="text-right font-semibold" data-val="{{ p.pnl }}">
+              <span class="{% if p.pnl >= 0 %}text-success{% else %}text-error{% endif %}">
+                {% if p.pnl >= 0 %}+{% endif %}₹{{ p.pnl|floatformat:0|indian_number }}
+              </span>
+              <div class="text-[11px] {% if p.pnl >= 0 %}text-success{% else %}text-error{% endif %}">
+                {% if p.pnl >= 0 %}+{% endif %}{{ p.pnl_pct }}%
+              </div>
+            </td>
+            <td class="text-right font-semibold" data-val="{{ p.cagr_pct }}">
+              {% if p.cagr_pct > 0 %}
+              <span class="text-success">{{ p.cagr_pct }}%</span>
+              {% else %}
+              <span class="opacity-40">—</span>
+              {% endif %}
+            </td>
+            <td class="text-right">
+              <div class="flex items-center justify-end gap-1">
+                <button type="button" class="btn btn-ghost btn-xs btn-square text-info" title="AI Market Research & Valuation Prompt" onclick="openLlmPromptModal({{ p.id }}, '{{ p.name|escapejs }}')">
+                  <span class="material-symbols-outlined text-base">psychology</span>
+                </button>
+                <button type="button" class="btn btn-ghost btn-xs btn-square text-success" title="Update Valuation" onclick="openValuationModal({{ p.id }}, '{{ p.name|escapejs }}', '{{ p.current_valuation }}', '{{ p.last_valuation_date|date:'Y-m-d'|default:'' }}', '{{ p.monthly_rental_income }}', '{{ p.remarks|escapejs }}')">
+                  <span class="material-symbols-outlined text-base">price_change</span>
+                </button>
+                <button type="button" class="btn btn-ghost btn-xs btn-square" data-edit-re data-id="{{ p.id }}" data-name="{{ p.name }}" data-type="{{ p.property_type }}" data-status="{{ p.status }}" data-area="{{ p.area_value }}" data-unit="{{ p.area_unit }}" data-locality="{{ p.locality }}" data-city="{{ p.city }}" data-state="{{ p.state }}" data-landmark="{{ p.landmark }}" data-pincode="{{ p.pincode }}" data-micro="{{ p.micro_market_tag }}" data-maps="{{ p.google_maps_url }}" data-khasra="{{ p.khasra_khata_number }}" data-date="{{ p.purchase_date|date:'Y-m-d' }}" data-price="{{ p.purchase_price }}" data-stamp="{{ p.stamp_duty_charges }}" data-valuation="{{ p.current_valuation }}" data-vdate="{{ p.last_valuation_date|date:'Y-m-d'|default:'' }}" data-rent="{{ p.monthly_rental_income }}" data-remarks="{{ p.remarks }}">
+                  <span class="material-symbols-outlined text-base">edit</span>
+                </button>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+          <tr class="total-row border-t-2 border-base-300">
+            <td class="font-bold text-primary">Total ({{ holdings|length }} properties)</td>
+            <td colspan="2"></td>
+            <td class="text-right font-bold text-primary" data-val="{{ total_invested }}">₹{{ total_invested|floatformat:0|indian_number }}</td>
+            <td class="text-right font-bold text-primary" data-val="{{ total_current }}">₹{{ total_current|floatformat:0|indian_number }}</td>
+            <td></td>
+            <td class="text-right font-bold {% if total_pnl >= 0 %}text-success{% else %}text-error{% endif %}" data-val="{{ total_pnl }}">
+              {% if total_pnl >= 0 %}+{% endif %}₹{{ total_pnl|floatformat:0|indian_number }}
+            </td>
+            <td colspan="2"></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    {# Mobile View #}
+    <div class="lg:hidden space-y-3">
+      {% for p in holdings %}
+      <div class="table-card p-3 rounded-lg bg-base-300/40 border border-base-content/5 space-y-2.5">
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0">
+            <div class="font-bold text-sm text-base-content flex items-center gap-1">
+              {{ p.name }}
+              {% if p.google_maps_url %}
+              <a href="{{ p.google_maps_url }}" target="_blank" rel="noopener noreferrer" class="text-primary">
+                <span class="material-symbols-outlined text-xs">pin_drop</span>
+              </a>
+              {% endif %}
+            </div>
+            <div class="text-xs opacity-60 flex items-center gap-1 mt-0.5">
+              <span class="material-symbols-outlined text-xs">location_on</span> {{ p.locality }}, {{ p.city }}
+            </div>
+          </div>
+          <div class="flex items-center gap-1 shrink-0">
+            <button type="button" class="btn btn-ghost btn-xs btn-square text-info" title="AI Prompt" onclick="openLlmPromptModal({{ p.id }}, '{{ p.name|escapejs }}')">
+              <span class="material-symbols-outlined text-base">psychology</span>
+            </button>
+            <button type="button" class="btn btn-ghost btn-xs btn-square text-success" title="Update Valuation" onclick="openValuationModal({{ p.id }}, '{{ p.name|escapejs }}', '{{ p.current_valuation }}', '{{ p.last_valuation_date|date:'Y-m-d'|default:'' }}', '{{ p.monthly_rental_income }}', '{{ p.remarks|escapejs }}')">
+              <span class="material-symbols-outlined text-base">price_change</span>
+            </button>
+            <button type="button" class="btn btn-ghost btn-xs btn-square" data-edit-re data-id="{{ p.id }}" data-name="{{ p.name }}" data-type="{{ p.property_type }}" data-status="{{ p.status }}" data-area="{{ p.area_value }}" data-unit="{{ p.area_unit }}" data-locality="{{ p.locality }}" data-city="{{ p.city }}" data-state="{{ p.state }}" data-landmark="{{ p.landmark }}" data-pincode="{{ p.pincode }}" data-micro="{{ p.micro_market_tag }}" data-maps="{{ p.google_maps_url }}" data-khasra="{{ p.khasra_khata_number }}" data-date="{{ p.purchase_date|date:'Y-m-d' }}" data-price="{{ p.purchase_price }}" data-stamp="{{ p.stamp_duty_charges }}" data-valuation="{{ p.current_valuation }}" data-vdate="{{ p.last_valuation_date|date:'Y-m-d'|default:'' }}" data-rent="{{ p.monthly_rental_income }}" data-remarks="{{ p.remarks }}">
+              <span class="material-symbols-outlined text-base">edit</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="flex flex-wrap items-center gap-1.5">
+          <span class="badge badge-primary badge-outline badge-xs">{{ p.get_property_type_display }}</span>
+          <span class="badge badge-ghost badge-xs">{{ p.area_in_gaj|floatformat:0|indian_number }} Gaj</span>
+          {% if p.cagr_pct > 0 %}<span class="badge badge-success badge-xs">{{ p.cagr_pct }}% CAGR</span>{% endif %}
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 text-xs pt-1 border-t border-base-content/5">
+          <div>
+            <span class="opacity-50 text-[10px] uppercase">Cost Basis</span>
+            <div class="font-semibold">₹{{ p.total_cost_basis|floatformat:0|indian_number }}</div>
+          </div>
+          <div>
+            <span class="opacity-50 text-[10px] uppercase">Current Val</span>
+            <div class="font-bold text-primary">₹{{ p.current_valuation|floatformat:0|indian_number }}</div>
+          </div>
+          <div>
+            <span class="opacity-50 text-[10px] uppercase">Returns</span>
+            <div class="font-semibold {% if p.pnl >= 0 %}text-success{% else %}text-error{% endif %}">
+              {% if p.pnl >= 0 %}+{% endif %}₹{{ p.pnl|floatformat:0|indian_number }}
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-12 opacity-50 space-y-2">
+      <span class="material-symbols-outlined text-4xl">domain_disabled</span>
+      <p class="text-sm">No real estate holdings added yet.</p>
+      <button type="button" class="btn btn-primary btn-sm mt-2 gap-1" onclick="openAddRealEstateModal()">
+        <span class="material-symbols-outlined text-base">add_home</span> Add First Property
+      </button>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{# Modals #}
+{% include 'portfolio/_real_estate_form_modal.html' with form_obj=form %}
+
+{# Quick Valuation Update Modal #}
+<dialog class="modal" id="valuationUpdateModal">
+  <div class="modal-box max-w-md bg-base-100 border border-base-content/10 shadow-2xl">
+    <div class="flex items-start justify-between gap-2 mb-3 pb-2 border-b border-base-content/10">
+      <h3 class="font-bold text-base flex items-center gap-2" id="valModalTitle">
+        <span class="material-symbols-outlined text-success">price_change</span> Update Property Valuation
+      </h3>
+      <button type="button" class="btn btn-ghost btn-xs btn-square" onclick="closeModal('valuationUpdateModal')">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <form id="valUpdateForm" method="post" action="">{% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <div class="space-y-3">
+        <div class="form-field">
+          <label class="label text-xs font-semibold">New Estimated Valuation (₹)</label>
+          {{ valuation_form.current_valuation }}
+        </div>
+        <div class="form-field">
+          <label class="label text-xs font-semibold">Appraisal / Valuation Date</label>
+          {{ valuation_form.last_valuation_date }}
+        </div>
+        <div class="form-field">
+          <label class="label text-xs font-semibold">Monthly Rental Income (₹) <span class="opacity-40 font-normal">optional</span></label>
+          {{ valuation_form.monthly_rental_income }}
+        </div>
+        <div class="form-field">
+          <label class="label text-xs font-semibold">Notes / Market Valuation Context</label>
+          {{ valuation_form.remarks }}
+        </div>
+      </div>
+      <div class="modal-action mt-5">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('valuationUpdateModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm gap-1">
+          <span class="material-symbols-outlined text-base">save</span> Update Valuation
+        </button>
+      </div>
+    </form>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+{# LLM Research Prompt Modal #}
+<dialog class="modal" id="llmPromptModal">
+  <div class="modal-box max-w-xl bg-base-100 border border-base-content/10 shadow-2xl">
+    <div class="flex items-start justify-between gap-2 mb-3 pb-2 border-b border-base-content/10">
+      <h3 class="font-bold text-base flex items-center gap-2 text-primary" id="llmPromptTitle">
+        <span class="material-symbols-outlined">psychology</span> AI Market Research Prompt
+      </h3>
+      <button type="button" class="btn btn-ghost btn-xs btn-square" onclick="closeModal('llmPromptModal')">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <p class="text-xs opacity-60 mb-3">
+      Copy this curated prompt to feed into Gemini / LLMs to analyze circle rates, micro-market growth, upcoming infrastructure, and expected capital appreciation.
+    </p>
+    <div class="relative">
+      <textarea id="llmPromptText" class="textarea textarea-bordered w-full font-mono text-xs leading-relaxed h-64 bg-base-300/40 p-3 rounded-lg" readonly></textarea>
+      <button type="button" class="btn btn-primary btn-xs absolute bottom-3 right-3 gap-1 shadow-md" onclick="copyPromptToClipboard()">
+        <span class="material-symbols-outlined text-sm">content_copy</span> <span id="copyBtnText">Copy Prompt</span>
+      </button>
+    </div>
+    <div class="modal-action mt-4">
+      <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('llmPromptModal')">Done</button>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/sortable.js' %}"></script>
+<script>
+function openAddRealEstateModal() {
+  var form = document.getElementById('realEstateForm');
+  form.action = "{% url 'add_real_estate' %}";
+  form.reset();
+  document.getElementById('realEstateDeleteBtn').style.display = 'none';
+  document.getElementById('realEstateModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">add_home</span> Add Real Estate Property';
+  openModal('addRealEstateModal');
+}
+
+function openValuationModal(id, name, valuation, vdate, rent, remarks) {
+  var form = document.getElementById('valUpdateForm');
+  form.action = "{% url 'update_real_estate_valuation' pk=0 %}".replace('/0/', '/' + id + '/');
+  document.getElementById('valModalTitle').innerHTML = '<span class="material-symbols-outlined text-success">price_change</span> Valuation — ' + name;
+  form.querySelector('[name=current_valuation]').value = valuation || '';
+  form.querySelector('[name=last_valuation_date]').value = vdate || new Date().toISOString().split('T')[0];
+  form.querySelector('[name=monthly_rental_income]').value = rent || '0';
+  form.querySelector('[name=remarks]').value = remarks || '';
+  openModal('valuationUpdateModal');
+}
+
+function openLlmPromptModal(id, name) {
+  document.getElementById('llmPromptTitle').innerHTML = '<span class="material-symbols-outlined">psychology</span> AI Market Research — ' + name;
+  document.getElementById('llmPromptText').value = 'Loading prompt data...';
+  document.getElementById('copyBtnText').textContent = 'Copy Prompt';
+  openModal('llmPromptModal');
+
+  fetch("{% url 'real_estate_llm_prompt_json' pk=0 %}".replace('/0/', '/' + id + '/'))
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.prompt) {
+        document.getElementById('llmPromptText').value = data.prompt;
+      }
+    })
+    .catch(function(err) {
+      document.getElementById('llmPromptText').value = 'Failed to load research prompt.';
+    });
+}
+
+function copyPromptToClipboard() {
+  var txt = document.getElementById('llmPromptText').value;
+  navigator.clipboard.writeText(txt).then(function() {
+    document.getElementById('copyBtnText').textContent = 'Copied!';
+    setTimeout(function() {
+      document.getElementById('copyBtnText').textContent = 'Copy Prompt';
+    }, 2000);
+  });
+}
+
+document.addEventListener('click', function(e) {
+  var btn = e.target.closest('[data-edit-re]');
+  if (!btn) return;
+  var form = document.getElementById('realEstateForm');
+  var id = btn.dataset.id;
+  form.action = "{% url 'edit_real_estate' pk=0 %}".replace('/0/', '/' + id + '/');
+  document.getElementById('deleteRealEstateForm').action = "{% url 'delete_real_estate' pk=0 %}".replace('/0/', '/' + id + '/');
+  document.getElementById('realEstateDeleteBtn').style.display = 'inline-flex';
+  document.getElementById('realEstateModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">edit</span> Edit Property';
+
+  form.querySelector('[name=name]').value = btn.dataset.name || '';
+  form.querySelector('[name=property_type]').value = btn.dataset.type || 'PLOT_LAND';
+  form.querySelector('[name=status]').value = btn.dataset.status || 'VACANT_PLOT';
+  form.querySelector('[name=area_value]').value = btn.dataset.area || '';
+  form.querySelector('[name=area_unit]').value = btn.dataset.unit || 'GAJ';
+  form.querySelector('[name=locality]').value = btn.dataset.locality || '';
+  form.querySelector('[name=city]').value = btn.dataset.city || '';
+  form.querySelector('[name=state]').value = btn.dataset.state || '';
+  form.querySelector('[name=landmark]').value = btn.dataset.landmark || '';
+  form.querySelector('[name=pincode]').value = btn.dataset.pincode || '';
+  form.querySelector('[name=micro_market_tag]').value = btn.dataset.micro || '';
+  form.querySelector('[name=google_maps_url]').value = btn.dataset.maps || '';
+  form.querySelector('[name=khasra_khata_number]').value = btn.dataset.khasra || '';
+  form.querySelector('[name=purchase_date]').value = btn.dataset.date || '';
+  form.querySelector('[name=purchase_price]').value = btn.dataset.price || '';
+  form.querySelector('[name=stamp_duty_charges]').value = btn.dataset.stamp || '0';
+  form.querySelector('[name=current_valuation]').value = btn.dataset.valuation || '';
+  form.querySelector('[name=last_valuation_date]').value = btn.dataset.vdate || '';
+  form.querySelector('[name=monthly_rental_income]').value = btn.dataset.rent || '0';
+  form.querySelector('[name=remarks]').value = btn.dataset.remarks || '';
+
+  openModal('addRealEstateModal');
+});
+
+document.addEventListener('DOMContentLoaded', function() {
+  initPagination('realEstateTable', 15);
+});
+</script>
+{% endblock %}

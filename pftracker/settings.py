@@ -123,6 +123,7 @@ UNFOLD = {
                     {"title": "Crypto", "icon": "currency_bitcoin", "link": f"{_ADMIN_PREFIX}/portfolio/cryptoholding/"},
                     {"title": "Commodities", "icon": "diamond", "link": f"{_ADMIN_PREFIX}/portfolio/commodityholding/"},
                     {"title": "US Stocks (RSU)", "icon": "work", "link": f"{_ADMIN_PREFIX}/portfolio/usstockholding/"},
+                    {"title": "Real Estate", "icon": "domain", "link": f"{_ADMIN_PREFIX}/portfolio/realestateholding/"},
                     {"title": "Commodity Prices", "icon": "price_change", "link": f"{_ADMIN_PREFIX}/portfolio/commodityprice/"},
                     {"title": "Snapshots", "icon": "photo_camera", "link": f"{_ADMIN_PREFIX}/portfolio/monthlysnapshot/"},
                     {"title": "Goals", "icon": "target", "link": f"{_ADMIN_PREFIX}/portfolio/financialgoal/"},

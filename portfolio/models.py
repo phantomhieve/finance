@@ -563,3 +563,266 @@ class MonthlySnapshot(models.Model):
         if self.total_invested:
             return (self.total_returns / self.total_invested * 100).quantize(Decimal('0.01'))
         return Decimal('0')
+
+
+class RealEstateHolding(PnlMixin, models.Model):
+    """
+    Real Estate investment asset (Plot, Apartment, Commercial, Villa, Agricultural).
+    Supports North Indian land units (Gaj / Sq. Yards) and structured metadata for LLM growth research.
+    """
+    PROPERTY_TYPE_CHOICES = (
+        ('PLOT_LAND', 'Plot / Land'),
+        ('APARTMENT_FLAT', 'Apartment / Flat'),
+        ('COMMERCIAL', 'Commercial / Shop / Office'),
+        ('VILLA_HOUSE', 'Villa / Independent House'),
+        ('AGRICULTURAL', 'Agricultural Land'),
+        ('OTHER', 'Other Real Estate'),
+    )
+
+    STATUS_CHOICES = (
+        ('VACANT_PLOT', 'Vacant Plot / Land'),
+        ('READY_SELF', 'Ready / Self-Use'),
+        ('RENTED', 'Rented / Yield-Generating'),
+        ('UNDER_CONSTRUCTION', 'Under Construction / Development'),
+        ('RESALE_PLANNED', 'Held for Resale / Investment'),
+    )
+
+    AREA_UNIT_CHOICES = (
+        ('GAJ', 'Gaj (Sq. Yards / 9 sq ft)'),
+        ('SQFT', 'Square Feet (sq ft)'),
+        ('SQYD', 'Square Yards (sq yd)'),
+        ('ACRE', 'Acres'),
+        ('BIGHA', 'Bigha'),
+        ('SQMT', 'Square Meters (sq m)'),
+    )
+
+    group = models.ForeignKey(
+        'tracker.AccountGroup', on_delete=models.CASCADE,
+        related_name='real_estate_holdings', null=True, blank=True,
+    )
+    name = models.CharField(
+        max_length=200,
+        help_text="e.g. Golf City Sector 150 Plot B-42, ATS Greens Flat 302",
+    )
+    property_type = models.CharField(
+        max_length=30, choices=PROPERTY_TYPE_CHOICES, default='PLOT_LAND',
+    )
+    status = models.CharField(
+        max_length=30, choices=STATUS_CHOICES, default='VACANT_PLOT',
+    )
+
+    # Measurement (Explicit Gaj support)
+    area_value = models.DecimalField(
+        max_digits=12, decimal_places=2,
+        help_text="Plot/Flat area in the selected unit (e.g. 200 Gaj, 1800 sq ft)",
+    )
+    area_unit = models.CharField(
+        max_length=20, choices=AREA_UNIT_CHOICES, default='GAJ',
+    )
+
+    # Location Details (Structured for LLM Research)
+    city = models.CharField(max_length=100, default='Noida')
+    state = models.CharField(max_length=100, default='Uttar Pradesh')
+    locality = models.CharField(
+        max_length=200,
+        help_text="e.g. Sector 150, Yamuna Expressway Sector 22D, Golf Course Ext Road",
+    )
+    landmark = models.CharField(
+        max_length=255, blank=True,
+        help_text="e.g. Near Jewar Airport link, 500m from Upcoming Metro Phase 4",
+    )
+    pincode = models.CharField(max_length=20, blank=True)
+    google_maps_url = models.URLField(
+        max_length=500, blank=True,
+        help_text="Direct Google Maps pin / location URL",
+    )
+    micro_market_tag = models.CharField(
+        max_length=150, blank=True,
+        help_text="e.g. Yamuna Expressway Corridor, Dwarka Expressway, Sohna Road",
+    )
+    khasra_khata_number = models.CharField(
+        max_length=100, blank=True,
+        help_text="Legal registry / Khasra / Khatauni / Unit number",
+    )
+
+    # Financials & Valuation
+    purchase_date = models.DateField(help_text="Date of purchase / registry agreement")
+    purchase_price = models.DecimalField(
+        max_digits=14, decimal_places=2,
+        help_text="Base purchase consideration in INR",
+    )
+    stamp_duty_charges = models.DecimalField(
+        max_digits=14, decimal_places=2, default=0,
+        help_text="Registration, stamp duty, development & legal costs in INR",
+    )
+    current_valuation = models.DecimalField(
+        max_digits=14, decimal_places=2,
+        help_text="Latest estimated total market price in INR",
+    )
+    last_valuation_date = models.DateField(
+        null=True, blank=True,
+        help_text="Date of latest market price appraisal",
+    )
+    monthly_rental_income = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0,
+        help_text="Monthly rental revenue in INR if rented out",
+    )
+
+    is_baby = models.BooleanField(
+        default=False, help_text="Track in baby portfolio instead of master portfolio",
+    )
+    remarks = models.TextField(blank=True, help_text="Notes, registry details, builder info, etc.")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-current_valuation', '-purchase_date']
+        indexes = [
+            Index(fields=['group', 'property_type']),
+            Index(fields=['group', 'city']),
+        ]
+
+    def __str__(self):
+        return f"{self.name} ({self.get_property_type_display()}) — {self.locality}, {self.city}"
+
+    @property
+    def area_in_gaj(self) -> Decimal:
+        """Normalized area in Gaj (1 Gaj = 1 Sq Yard = 9 Sq Ft = 0.836127 Sq M; 1 Acre = 4840 Gaj; 1 Bigha ~ 1008 Gaj)."""
+        val = self.area_value or Decimal('0')
+        u = self.area_unit
+        if u in ('GAJ', 'SQYD'):
+            return val
+        elif u == 'SQFT':
+            return (val / Decimal('9')).quantize(Decimal('0.01'))
+        elif u == 'ACRE':
+            return (val * Decimal('4840')).quantize(Decimal('0.01'))
+        elif u == 'BIGHA':
+            return (val * Decimal('1008')).quantize(Decimal('0.01'))
+        elif u == 'SQMT':
+            return (val * Decimal('1.19599')).quantize(Decimal('0.01'))
+        return val
+
+    @property
+    def area_in_sqft(self) -> Decimal:
+        """Normalized area in Square Feet."""
+        val = self.area_value or Decimal('0')
+        u = self.area_unit
+        if u == 'SQFT':
+            return val
+        elif u in ('GAJ', 'SQYD'):
+            return (val * Decimal('9')).quantize(Decimal('0.01'))
+        elif u == 'ACRE':
+            return (val * Decimal('43560')).quantize(Decimal('0.01'))
+        elif u == 'BIGHA':
+            return (val * Decimal('9072')).quantize(Decimal('0.01'))
+        elif u == 'SQMT':
+            return (val * Decimal('10.7639')).quantize(Decimal('0.01'))
+        return val * Decimal('9')
+
+    @property
+    def area_display(self) -> str:
+        """Formatted human readable display e.g. '200 Gaj (1,800 sq.ft)'."""
+        if self.area_unit in ('GAJ', 'SQYD'):
+            return f"{self.area_value:g} Gaj ({self.area_in_sqft:,.0f} sq.ft)"
+        elif self.area_unit == 'SQFT':
+            return f"{self.area_value:,.0f} sq.ft ({self.area_in_gaj:g} Gaj)"
+        return f"{self.area_value:g} {self.get_area_unit_display()}"
+
+    @property
+    def total_cost_basis(self) -> Decimal:
+        """Total invested amount: purchase price + stamp duty/registration/development."""
+        return (self.purchase_price or Decimal('0')) + (self.stamp_duty_charges or Decimal('0'))
+
+    @property
+    def purchase_value(self) -> Decimal:
+        """Alias for PnlMixin."""
+        return self.total_cost_basis
+
+    @property
+    def current_value(self) -> Decimal:
+        """Alias for PnlMixin."""
+        return self.current_valuation or Decimal('0')
+
+    @property
+    def purchase_rate_per_gaj(self) -> Decimal:
+        gaj = self.area_in_gaj
+        if gaj and gaj > 0:
+            return (self.purchase_price / gaj).quantize(Decimal('0.01'))
+        return Decimal('0')
+
+    @property
+    def current_rate_per_gaj(self) -> Decimal:
+        gaj = self.area_in_gaj
+        if gaj and gaj > 0:
+            return (self.current_valuation / gaj).quantize(Decimal('0.01'))
+        return Decimal('0')
+
+    @property
+    def purchase_rate_per_sqft(self) -> Decimal:
+        sqft = self.area_in_sqft
+        if sqft and sqft > 0:
+            return (self.purchase_price / sqft).quantize(Decimal('0.01'))
+        return Decimal('0')
+
+    @property
+    def current_rate_per_sqft(self) -> Decimal:
+        sqft = self.area_in_sqft
+        if sqft and sqft > 0:
+            return (self.current_valuation / sqft).quantize(Decimal('0.01'))
+        return Decimal('0')
+
+    @property
+    def annual_rental_income(self) -> Decimal:
+        return (self.monthly_rental_income or Decimal('0')) * Decimal('12')
+
+    @property
+    def rental_yield_pct(self) -> Decimal:
+        if self.current_valuation and self.current_valuation > 0:
+            return (self.annual_rental_income / self.current_valuation * 100).quantize(Decimal('0.01'))
+        return Decimal('0')
+
+    @property
+    def cagr_pct(self) -> Decimal:
+        """Annualized CAGR return % based on holding period."""
+        if not self.purchase_date or not self.total_cost_basis or self.total_cost_basis <= 0 or not self.current_valuation:
+            return Decimal('0')
+        days = (date.today() - self.purchase_date).days
+        if days <= 90:
+            return Decimal('0')
+        years = Decimal(str(days)) / Decimal('365.25')
+        try:
+            ratio = float(self.current_valuation / self.total_cost_basis)
+            cagr = (ratio ** (1.0 / float(years)) - 1.0) * 100.0
+            return Decimal(str(round(cagr, 2)))
+        except Exception:
+            return Decimal('0')
+
+    @property
+    def location_summary_for_llm(self) -> str:
+        """Clean summary string for AI prompts."""
+        parts = [self.locality, self.city, self.state]
+        if self.landmark:
+            parts.append(f"Landmark: {self.landmark}")
+        if self.micro_market_tag:
+            parts.append(f"Micro-market: {self.micro_market_tag}")
+        if self.pincode:
+            parts.append(f"PIN: {self.pincode}")
+        return ", ".join(parts)
+
+    def get_llm_research_prompt(self) -> str:
+        """Generate ready-to-use LLM prompt for deep real estate market research."""
+        return (
+            f"Please conduct a comprehensive real estate market research and valuation analysis for the following property:\n\n"
+            f"• Property Name: {self.name}\n"
+            f"• Type: {self.get_property_type_display()}\n"
+            f"• Status: {self.get_status_display()}\n"
+            f"• Size: {self.area_display}\n"
+            f"• Location: {self.location_summary_for_llm}\n"
+            f"• Purchase Year/Date: {self.purchase_date.strftime('%B %Y')} (Purchased at ₹{self.purchase_price:,.0f} / ₹{self.purchase_rate_per_gaj:,.0f} per Gaj)\n"
+            f"• Current Estimated Valuation: ₹{self.current_valuation:,.0f} (₹{self.current_rate_per_gaj:,.0f} per Gaj)\n\n"
+            f"Please provide:\n"
+            f"1. Current prevailing market price trends and circle rates in {self.locality}, {self.city}.\n"
+            f"2. Major infrastructure catalysts, connectivity improvements (e.g. Metro, Expressways, Airport, Commercial hubs) impacting this micro-market.\n"
+            f"3. 3-to-5 year capital appreciation and rental yield outlook.\n"
+            f"4. Key risks or supply overhangs in this specific sector/corridor."
+        )

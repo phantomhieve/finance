@@ -523,6 +523,77 @@
   </div>
 </div>
 
+{# ——— REAL ESTATE INVESTMENTS ——— #}
+<div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.29s">
+  <div class="card-body p-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+      <h2 class="card-title text-base flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-primary text-lg">domain</span> Real Estate
+      </h2>
+      <div class="flex flex-wrap items-center gap-1.5">
+        <span class="badge badge-primary badge-sm">₹{{ real_estate_current|floatformat:0|indian_number }}</span>
+        <a href="{% url 'real_estate_detail' %}" class="btn btn-outline btn-primary btn-xs gap-1">View All<span class="material-symbols-outlined text-sm">arrow_forward</span></a>
+        <button class="btn btn-ghost btn-sm gap-1" onclick="openModal('addRealEstateModal')"><span class="material-symbols-outlined text-base">add</span>Add</button>
+      </div>
+    </div>
+    <div class="flex gap-4 text-xs opacity-60 mb-3">
+      <span>Invested: <strong class="text-success">₹{{ real_estate_invested|floatformat:0|indian_number }}</strong></span>
+      <span>Returns: <strong class="{% if real_estate_returns >= 0 %}text-success{% else %}text-error{% endif %}">{% if real_estate_returns >= 0 %}+{% endif %}₹{{ real_estate_returns|floatformat:0|indian_number }}</strong></span>
+    </div>
+    {% if real_estate_holdings %}
+    <div class="hidden md:block overflow-x-auto"><table class="table table-sm">
+      <thead><tr><th>Property</th><th>Location</th><th class="text-right">Area</th><th class="text-right">Invested (₹)</th><th class="text-right">Current (₹)</th><th class="text-right">Rate/Gaj</th><th class="text-right">P&amp;L</th><th class="w-10"></th></tr></thead>
+      <tbody>
+      {% for h in real_estate_holdings %}
+      <tr class="hover">
+        <td class="font-semibold">
+          <div class="flex items-center gap-1">
+            {{ h.name }}
+            {% if h.google_maps_url %}
+            <a href="{{ h.google_maps_url }}" target="_blank" rel="noopener noreferrer" class="text-primary hover:opacity-80">
+              <span class="material-symbols-outlined text-xs">pin_drop</span>
+            </a>
+            {% endif %}
+          </div>
+          <div class="text-xs opacity-40">{{ h.get_property_type_display }} &middot; {{ h.get_status_display }}</div>
+        </td>
+        <td class="opacity-60 text-sm whitespace-nowrap">{{ h.locality }}, {{ h.city }}</td>
+        <td class="text-right font-semibold">{{ h.area_in_gaj|floatformat:0|indian_number }} Gaj</td>
+        <td class="text-right">₹{{ h.total_cost_basis|floatformat:0|indian_number }}</td>
+        <td class="text-right font-semibold text-primary">₹{{ h.current_valuation|floatformat:0|indian_number }}</td>
+        <td class="text-right font-semibold">₹{{ h.current_rate_per_gaj|floatformat:0|indian_number }}</td>
+        <td class="text-right"><span class="{% if h.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if h.pnl >= 0 %}+{% endif %}₹{{ h.pnl|floatformat:0|indian_number }}<div class="text-xs opacity-60">{{ h.pnl_pct }}%</div></span></td>
+        <td>
+          <button class="btn btn-ghost btn-xs btn-square" data-edit-re data-id="{{ h.id }}" data-name="{{ h.name }}" data-type="{{ h.property_type }}" data-status="{{ h.status }}" data-area="{{ h.area_value }}" data-unit="{{ h.area_unit }}" data-locality="{{ h.locality }}" data-city="{{ h.city }}" data-state="{{ h.state }}" data-landmark="{{ h.landmark }}" data-pincode="{{ h.pincode }}" data-micro="{{ h.micro_market_tag }}" data-maps="{{ h.google_maps_url }}" data-khasra="{{ h.khasra_khata_number }}" data-date="{{ h.purchase_date|date:'Y-m-d' }}" data-price="{{ h.purchase_price }}" data-stamp="{{ h.stamp_duty_charges }}" data-valuation="{{ h.current_valuation }}" data-vdate="{{ h.last_valuation_date|date:'Y-m-d'|default:'' }}" data-rent="{{ h.monthly_rental_income }}" data-remarks="{{ h.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button>
+        </td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table></div>
+    <div class="md:hidden space-y-2">
+      {% for h in real_estate_holdings %}
+      <div class="table-card">
+        <div class="flex items-center justify-between gap-2">
+          <div class="min-w-0">
+            <div class="font-semibold text-sm">{{ h.name }} <span class="opacity-40 font-normal">({{ h.area_in_gaj|floatformat:0|indian_number }} Gaj)</span></div>
+            <span class="text-xs opacity-40">{{ h.locality }}, {{ h.city }}</span>
+          </div>
+          <button class="btn btn-ghost btn-xs btn-square shrink-0" data-edit-re data-id="{{ h.id }}" data-name="{{ h.name }}" data-type="{{ h.property_type }}" data-status="{{ h.status }}" data-area="{{ h.area_value }}" data-unit="{{ h.area_unit }}" data-locality="{{ h.locality }}" data-city="{{ h.city }}" data-state="{{ h.state }}" data-landmark="{{ h.landmark }}" data-pincode="{{ h.pincode }}" data-micro="{{ h.micro_market_tag }}" data-maps="{{ h.google_maps_url }}" data-khasra="{{ h.khasra_khata_number }}" data-date="{{ h.purchase_date|date:'Y-m-d' }}" data-price="{{ h.purchase_price }}" data-stamp="{{ h.stamp_duty_charges }}" data-valuation="{{ h.current_valuation }}" data-vdate="{{ h.last_valuation_date|date:'Y-m-d'|default:'' }}" data-rent="{{ h.monthly_rental_income }}" data-remarks="{{ h.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button>
+        </div>
+        <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
+          <div><span class="opacity-50">Invested</span><div class="font-semibold mt-0.5 tabular-nums">₹{{ h.total_cost_basis|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5 tabular-nums text-primary">₹{{ h.current_valuation|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">P&L</span><div class="font-semibold mt-0.5 tabular-nums {% if h.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if h.pnl >= 0 %}+{% endif %}₹{{ h.pnl|floatformat:0|indian_number }}</div></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-sm opacity-40">No real estate holdings yet.</p>
+    {% endif %}
+  </div>
+</div>
+
 {# ——— COMMODITIES ——— #}
 <div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.3s">
   <div class="card-body p-4">
@@ -785,6 +856,9 @@
 
 {# US Stock Modal #}
 <dialog class="modal" id="addUSStockModal"><div class="modal-box"><h3 class="font-bold text-lg flex items-center gap-2" id="usStockModalTitle"><span class="material-symbols-outlined text-primary">add_circle</span>Add RSU Holding</h3><form id="usStockForm" method="post" action="{% url 'add_us_stock' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><div class="grid grid-cols-2 gap-4 mt-4"><div class="form-field"><label class="label text-xs font-semibold">Symbol</label>{{ us_stock_form.symbol }}</div><div class="form-field"><label class="label text-xs font-semibold">Company</label>{{ us_stock_form.company_name }}</div></div><div class="grid grid-cols-2 gap-4 mt-3"><div class="form-field"><label class="label text-xs font-semibold">Quantity (shares)</label>{{ us_stock_form.quantity }}</div><div class="form-field"><label class="label text-xs font-semibold">Vest Date</label>{{ us_stock_form.vest_date }}</div></div><div class="grid grid-cols-2 gap-4 mt-3"><div class="form-field"><label class="label text-xs font-semibold">Buy Price (USD) <span class="opacity-40">auto if blank</span></label>{{ us_stock_form.purchase_price_usd }}</div><div class="form-field"><label class="label text-xs font-semibold">USD/INR Rate <span class="opacity-40">auto if blank</span></label>{{ us_stock_form.purchase_usd_inr }}</div></div><div class="form-field mt-3"><label class="label text-xs font-semibold">Remarks <span class="opacity-40">optional</span></label>{{ us_stock_form.remarks }}</div><div class="modal-action"><button type="button" id="usStockDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteUSStockForm')"><span class="material-symbols-outlined text-base">delete</span>Delete</button><button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addUSStockModal')">Cancel</button><button type="submit" class="btn btn-primary btn-sm">Save</button></div></form><form id="deleteUSStockForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form></div><form method="dialog" class="modal-backdrop"><button>close</button></form></dialog>
+
+{# Real Estate Modal #}
+{% include 'portfolio/_real_estate_form_modal.html' with form_obj=real_estate_form is_baby=False %}
 
 {# ——— BIOMETRIC MODAL ——— #}
 <dialog class="modal" id="biometricModal">
@@ -1049,6 +1123,10 @@ document.addEventListener('click', function(e) {
     _editSetup('commodityForm','deleteCommodityForm','commodityDeleteBtn','commodityModalTitle',
       "{% url 'edit_commodity' pk=0 %}","{% url 'delete_commodity' pk=0 %}",'Edit Commodity','addCommodityModal',btn.dataset,
       {commodity_type:btn.dataset.type,description:btn.dataset.desc,weight_grams:btn.dataset.weight,purchase_price_per_gram:btn.dataset.purchase});
+  } else if ((btn = e.target.closest('[data-edit-re]'))) {
+    _editSetup('realEstateForm','deleteRealEstateForm','realEstateDeleteBtn','realEstateModalTitle',
+      "{% url 'edit_real_estate' pk=0 %}","{% url 'delete_real_estate' pk=0 %}",'Edit Property','addRealEstateModal',btn.dataset,
+      {name:btn.dataset.name,property_type:btn.dataset.type,status:btn.dataset.status,area_value:btn.dataset.area,area_unit:btn.dataset.unit,locality:btn.dataset.locality,city:btn.dataset.city,state:btn.dataset.state,landmark:btn.dataset.landmark,pincode:btn.dataset.pincode,micro_market_tag:btn.dataset.micro,google_maps_url:btn.dataset.maps,khasra_khata_number:btn.dataset.khasra,purchase_date:btn.dataset.date,purchase_price:btn.dataset.price,stamp_duty_charges:btn.dataset.stamp,current_valuation:btn.dataset.valuation,last_valuation_date:btn.dataset.vdate,monthly_rental_income:btn.dataset.rent,remarks:btn.dataset.remarks});
   }
 });
 </script>
