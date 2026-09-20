@@ -25,8 +25,10 @@ def oauth_discovery(request):
         "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post", "none"],
         "scopes_supported": ["read", "write"],
         "service_documentation": f"{base}/",
+        "client_name": "Vault Finance",
         "logo_uri": f"{base}/static/icons/icon-512.png",
         "icon_url": f"{base}/static/icons/icon-512.png",
+        "icon_uri": f"{base}/static/icons/icon-512.png",
     })
 
 def oauth_protected_resource(request, path=""):
@@ -36,8 +38,10 @@ def oauth_protected_resource(request, path=""):
         "authorization_servers": [base],
         "scopes_supported": ["read", "write"],
         "bearer_methods_supported": ["header"],
+        "resource_name": "Vault Finance",
         "logo_uri": f"{base}/static/icons/icon-512.png",
         "icon_url": f"{base}/static/icons/icon-512.png",
+        "icon_uri": f"{base}/static/icons/icon-512.png",
     })
 
 
@@ -49,6 +53,9 @@ urlpatterns = [
     path('.well-known/oauth-protected-resource', oauth_protected_resource),
     path('.well-known/oauth-protected-resource/', oauth_protected_resource),
     path('.well-known/oauth-protected-resource/<path:path>', oauth_protected_resource),
+    path('favicon.ico', RedirectView.as_view(url='/static/icons/icon-192.png', permanent=True)),
+    path('apple-touch-icon.png', RedirectView.as_view(url='/static/icons/icon-180.png', permanent=True)),
+    path('apple-touch-icon-precomposed.png', RedirectView.as_view(url='/static/icons/icon-180.png', permanent=True)),
     path('sw.js', RedirectView.as_view(url='/static/sw.js', permanent=True)),
     path('vault-manage/', admin.site.urls),
     # Block allauth endpoints we don't use (must come before the allauth include)
