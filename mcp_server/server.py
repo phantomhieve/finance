@@ -1,0 +1,1260 @@
+"""
+Vault Finance — MCP Server
+
+Exposes all Vault financial data as MCP resources (read-only) and provides
+tools for writes with full audit logging via MCPAuditLog.
+
+Run with:
+    python manage.py run_mcp_server          (stdio, for Gemini CLI)
+    mcp dev mcp_server/server.py             (dev inspector UI)
+"""
+
+import datetime
+import json
+import logging
+import os
+import sys
+from decimal import Decimal, InvalidOperation
+
+# ---------------------------------------------------------------------------
+# Bootstrap Django before importing any models
+# ---------------------------------------------------------------------------
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'pftracker.settings')
+
+# Ensure the project root is on sys.path so Django can find the apps
+_project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _project_root not in sys.path:
+    sys.path.insert(0, _project_root)
+
+# Load .env so DATABASE_URL etc. are available
+try:
+    from pftracker.dotenv import load_dotenv  # noqa: E402
+    load_dotenv()
+except ImportError:
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(os.path.join(_project_root, '.env'))
+    except ImportError:
+        pass
+
+import django  # noqa: E402
+django.setup()
+
+# ---------------------------------------------------------------------------
+# Now safe to import Django models and app code
+# ---------------------------------------------------------------------------
+from django.apps import apps as django_apps  # noqa: E402
+from django.db.models import Sum, Case, When  # noqa: E402
+
+from mcp.server import MCPServer  # noqa: E402
+
+from tracker.models import (  # noqa: E402
+    AccountGroup, User, Transaction, Category,
+    HRAExpense, FinancialGoal as TrackerGoal,
+    GoalIncrement, MonthlyGoalAdjustment, Note,
+    MonthlySavingsComment,
+)
+from portfolio.models import (  # noqa: E402
+    ZerodhaAccount, StockHolding, MutualFundHolding,
+    EPFEntry, NPSEntry, FixedDeposit, CashPosition,
+    BondHolding, CryptoHolding, CommodityHolding,
+    CommodityPrice, MonthlySnapshot,
+    FinancialGoal as PortfolioGoal, USStockHolding,
+    PortfolioInsight,
+)
+from jewellery.models import JewelleryItem  # noqa: E402
+from portfolio.services import (  # noqa: E402
+    get_portfolio_summary, refresh_commodity_prices,
+    refresh_us_stock_prices,
+)
+from mcp_server.models import MCPAuditLog  # noqa: E402
+from mcp_server.audit import (  # noqa: E402
+    log_create, log_update, log_delete,
+    serialize_instance, revert_entry,
+)
+
+# Logging — write to stderr, never stdout (stdio transport uses stdout)
+logging.basicConfig(
+    level=logging.INFO,
+    format='[%(asctime)s] %(levelname)s %(name)s %(message)s',
+    stream=sys.stderr,
+)
+logger = logging.getLogger('mcp_server')
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+_ZERO = Decimal('0')
+
+
+def _json_serial(obj):
+    """JSON serialiser for types json.dumps can't handle natively."""
+    if isinstance(obj, Decimal):
+        return str(obj)
+    if isinstance(obj, (datetime.date, datetime.datetime)):
+        return obj.isoformat()
+    if isinstance(obj, bytes):
+        return obj.hex()
+    return str(obj)
+
+
+def _to_json(data) -> str:
+    """Serialise data to a compact JSON string."""
+    return json.dumps(data, default=_json_serial, ensure_ascii=False)
+
+
+def _get_group():
+    """Return the first AccountGroup (single-tenant app)."""
+    return AccountGroup.objects.first()
+
+
+def _get_primary_user():
+    """Return the primary user for write operations."""
+    return User.objects.filter(user_type='PRIMARY').first()
+
+
+def _parse_date(date_str: str) -> datetime.date:
+    """Parse a date string in YYYY-MM-DD format."""
+    return datetime.date.fromisoformat(date_str)
+
+
+def _parse_decimal(value) -> Decimal:
+    """Parse a decimal value from string or number."""
+    if value is None:
+        return _ZERO
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return _ZERO
+
+
+def _qs_to_dicts(qs, fields):
+    """Convert a queryset to a list of dicts with specified fields."""
+    return list(qs.values(*fields))
+
+
+def _model_to_dict(instance, exclude=None):
+    """Convert a model instance to a dict, handling special types."""
+    exclude = exclude or set()
+    data = {}
+    for field in instance._meta.concrete_fields:
+        name = field.name
+        if name in exclude:
+            continue
+        value = getattr(instance, name)
+        if isinstance(value, Decimal):
+            value = str(value)
+        elif isinstance(value, (datetime.date, datetime.datetime)):
+            value = value.isoformat()
+        data[name] = value
+    return data
+
+
+# ---------------------------------------------------------------------------
+# MCP Server
+# ---------------------------------------------------------------------------
+
+mcp = MCPServer("Vault Finance")
+
+
+# =====================================================================
+#  RESOURCES — Read-only data access
+# =====================================================================
+
+@mcp.resource("vault://portfolio/summary")
+def portfolio_summary() -> str:
+    """Full portfolio summary: total value, per-asset breakdown, P&L, goals, equity split, consolidated view."""
+    group = _get_group()
+    summary = get_portfolio_summary(group=group)
+
+    # Convert to serialisable format (strip Django objects)
+    result = {
+        'total_value': str(summary['total_value']),
+        'total_invested': str(summary['total_invested']),
+        'total_returns': str(summary['total_returns']),
+        'return_pct': str(summary['return_pct']),
+        'assets': [
+            {'name': a['name'], 'value': str(a['value']), 'pct': str(a['pct'])}
+            for a in summary['assets']
+        ],
+        'equity_total': str(summary['equity_total']),
+        'equity_invested': str(summary['equity_invested']),
+        'equity_returns': str(summary['equity_returns']),
+        'equity_items': [
+            {'name': e['name'], 'value': str(e['value']), 'pct': str(e['pct'])}
+            for e in summary['equity_items']
+        ],
+        'consolidated': [
+            {'name': c['name'], 'value': str(c['value']), 'pct': str(c['pct'])}
+            for c in summary['consolidated']
+        ],
+        'goals': summary['goals'],
+        'epf_balance': str(summary['epf_balance']),
+        'nps_balance': str(summary.get('nps_latest').total_balance if summary.get('nps_latest') else 0),
+        'fd_principal': str(summary['fd_principal']),
+        'fd_current': str(summary['fd_current']),
+        'cash_total': str(summary['cash_total']),
+        'bonds_total': str(summary['bonds_total']),
+        'crypto_invested': str(summary['crypto_invested']),
+        'crypto_current': str(summary['crypto_current']),
+        'commodity_total': str(summary['commodity_total']),
+        'gold_rate_per_gram': str(summary['gold_rate']),
+        'silver_rate_per_gram': str(summary['silver_rate']),
+        'us_stocks_invested': str(summary['us_stocks_invested']),
+        'us_stocks_current': str(summary['us_stocks_current']),
+    }
+    return _to_json(result)
+
+
+@mcp.resource("vault://portfolio/stocks")
+def portfolio_stocks() -> str:
+    """All stock holdings across all Zerodha accounts."""
+    group = _get_group()
+    accounts = ZerodhaAccount.objects.filter(group=group) if group else ZerodhaAccount.objects.all()
+    result = []
+    for acct in accounts:
+        for h in acct.stock_holdings.all():
+            result.append({
+                'account': acct.name,
+                'symbol': h.symbol,
+                'quantity': h.quantity,
+                'purchase_value': str(h.purchase_value),
+                'current_value': str(h.current_value),
+                'pnl': str(h.pnl),
+                'pnl_pct': str(h.pnl_pct),
+                'is_baby': h.is_baby,
+            })
+    return _to_json(result)
+
+
+@mcp.resource("vault://portfolio/mutual-funds")
+def portfolio_mutual_funds() -> str:
+    """All mutual fund holdings (index + other) across all Zerodha accounts."""
+    group = _get_group()
+    accounts = ZerodhaAccount.objects.filter(group=group) if group else ZerodhaAccount.objects.all()
+    result = []
+    for acct in accounts:
+        for h in acct.mf_holdings.all():
+            result.append({
+                'account': acct.name,
+                'fund_name': h.fund_name,
+                'fund_type': h.fund_type,
+                'units': str(h.units),
+                'purchase_value': str(h.purchase_value),
+                'current_value': str(h.current_value),
+                'pnl': str(h.pnl),
+                'pnl_pct': str(h.pnl_pct),
+                'is_baby': h.is_baby,
+            })
+    return _to_json(result)
+
+
+@mcp.resource("vault://portfolio/epf")
+def portfolio_epf() -> str:
+    """EPF entries and running balance."""
+    group = _get_group()
+    qs = EPFEntry.objects.filter(group=group) if group else EPFEntry.objects.all()
+    entries = [_model_to_dict(e) for e in qs[:50]]
+    total_contrib = qs.filter(entry_type='CONTRIBUTION').aggregate(t=Sum('amount'))['t'] or _ZERO
+    total_interest = qs.filter(entry_type='INTEREST').aggregate(t=Sum('amount'))['t'] or _ZERO
+    return _to_json({
+        'total_contribution': str(total_contrib),
+        'total_interest': str(total_interest),
+        'balance': str(total_contrib + total_interest),
+        'entries': entries,
+    })
+
+
+@mcp.resource("vault://portfolio/nps")
+def portfolio_nps() -> str:
+    """NPS entries and current balance."""
+    group = _get_group()
+    qs = NPSEntry.objects.filter(group=group) if group else NPSEntry.objects.all()
+    latest = qs.order_by('-date', '-created_at').first()
+    entries = [_model_to_dict(e) for e in qs[:50]]
+    return _to_json({
+        'current_balance': str(latest.total_balance if latest else 0),
+        'total_contribution': str(qs.aggregate(t=Sum('contribution'))['t'] or 0),
+        'total_interest': str(qs.aggregate(t=Sum('interest_earned'))['t'] or 0),
+        'entries': entries,
+    })
+
+
+@mcp.resource("vault://portfolio/fixed-deposits")
+def portfolio_fixed_deposits() -> str:
+    """All fixed deposits (active and inactive)."""
+    group = _get_group()
+    qs = FixedDeposit.objects.filter(group=group) if group else FixedDeposit.objects.all()
+    result = []
+    for fd in qs:
+        d = _model_to_dict(fd)
+        d['current_value'] = str(fd.current_value)
+        d['maturity_value'] = str(fd.maturity_value)
+        d['interest_accrued'] = str(fd.interest_accrued)
+        d['days_remaining'] = fd.days_remaining
+        result.append(d)
+    return _to_json(result)
+
+
+@mcp.resource("vault://portfolio/cash")
+def portfolio_cash() -> str:
+    """Cash positions."""
+    group = _get_group()
+    qs = CashPosition.objects.filter(group=group) if group else CashPosition.objects.all()
+    return _to_json([_model_to_dict(c) for c in qs])
+
+
+@mcp.resource("vault://portfolio/bonds")
+def portfolio_bonds() -> str:
+    """Bond holdings."""
+    group = _get_group()
+    qs = BondHolding.objects.filter(group=group) if group else BondHolding.objects.all()
+    return _to_json([_model_to_dict(b) for b in qs])
+
+
+@mcp.resource("vault://portfolio/crypto")
+def portfolio_crypto() -> str:
+    """Crypto holdings."""
+    group = _get_group()
+    qs = CryptoHolding.objects.filter(group=group) if group else CryptoHolding.objects.all()
+    result = []
+    for c in qs:
+        d = _model_to_dict(c)
+        d['pnl'] = str(c.pnl)
+        result.append(d)
+    return _to_json(result)
+
+
+@mcp.resource("vault://portfolio/commodities")
+def portfolio_commodities() -> str:
+    """Commodity (gold/silver) holdings with current market prices."""
+    group = _get_group()
+    qs = CommodityHolding.objects.filter(group=group) if group else CommodityHolding.objects.all()
+    prices = {p.commodity_type: str(p.rate_per_gram) for p in CommodityPrice.objects.all()}
+    result = []
+    for h in qs:
+        d = _model_to_dict(h)
+        d['purchase_value'] = str(h.purchase_value)
+        d['current_value'] = str(h.current_value)
+        d['current_rate'] = str(h.current_rate)
+        result.append(d)
+    return _to_json({'prices_per_gram': prices, 'holdings': result})
+
+
+@mcp.resource("vault://portfolio/us-stocks")
+def portfolio_us_stocks() -> str:
+    """US stock (RSU) holdings."""
+    group = _get_group()
+    qs = USStockHolding.objects.filter(group=group) if group else USStockHolding.objects.all()
+    result = []
+    for h in qs:
+        d = _model_to_dict(h)
+        d['purchase_value_inr'] = str(h.purchase_value)
+        d['current_value_inr'] = str(h.current_value)
+        d['pnl'] = str(h.pnl)
+        d['pnl_pct'] = str(h.pnl_pct)
+        result.append(d)
+    return _to_json(result)
+
+
+@mcp.resource("vault://portfolio/goals")
+def portfolio_goals() -> str:
+    """Portfolio financial goals and progress."""
+    group = _get_group()
+    qs = PortfolioGoal.objects.filter(group=group) if group else PortfolioGoal.objects.all()
+    return _to_json([_model_to_dict(g) for g in qs])
+
+
+@mcp.resource("vault://portfolio/snapshots")
+def portfolio_snapshots() -> str:
+    """Monthly portfolio snapshots (growth data). Returns last 24 months."""
+    group = _get_group()
+    qs = MonthlySnapshot.objects.filter(group=group) if group else MonthlySnapshot.objects.all()
+    result = []
+    for s in qs[:24]:
+        d = _model_to_dict(s)
+        d['return_pct'] = str(s.return_pct)
+        result.append(d)
+    return _to_json(result)
+
+
+@mcp.resource("vault://tracker/transactions/{fy_year}")
+def tracker_transactions(fy_year: str) -> str:
+    """Savings transactions for a financial year (e.g. fy_year=2025 for FY 2025-26)."""
+    try:
+        fy = int(fy_year)
+    except ValueError:
+        return _to_json({'error': f'Invalid fy_year: {fy_year}. Use YYYY format (e.g. 2025).'})
+    start = datetime.date(fy, 4, 1)
+    end = datetime.date(fy + 1, 3, 31)
+    user = _get_primary_user()
+    if not user:
+        return _to_json({'error': 'No primary user found.'})
+    qs = Transaction.objects.filter(
+        user__group=user.group, date__gte=start, date__lte=end,
+    ).select_related('category')
+    result = []
+    for t in qs:
+        result.append({
+            'id': t.id,
+            'date': t.date.isoformat(),
+            'amount': str(t.amount),
+            'type': t.type,
+            'category': t.category.name if t.category else None,
+            'category_type': t.category.type if t.category else None,
+            'remarks': t.remarks,
+        })
+    return _to_json({
+        'fy': f'FY {fy}-{str(fy + 1)[-2:]}',
+        'count': len(result),
+        'transactions': result,
+    })
+
+
+@mcp.resource("vault://tracker/hra/{fy_year}")
+def tracker_hra(fy_year: str) -> str:
+    """HRA expenses for a financial year."""
+    try:
+        fy = int(fy_year)
+    except ValueError:
+        return _to_json({'error': f'Invalid fy_year: {fy_year}.'})
+    start = datetime.date(fy, 4, 1)
+    end = datetime.date(fy + 1, 3, 31)
+    user = _get_primary_user()
+    if not user:
+        return _to_json({'error': 'No primary user found.'})
+    qs = HRAExpense.objects.filter(
+        user__group=user.group, date__gte=start, date__lte=end,
+    )
+    return _to_json([_model_to_dict(h) for h in qs])
+
+
+@mcp.resource("vault://tracker/goals")
+def tracker_goals() -> str:
+    """Monthly savings goals, increments, and adjustments."""
+    user = _get_primary_user()
+    if not user:
+        return _to_json({'error': 'No primary user found.'})
+    goals = [_model_to_dict(g) for g in TrackerGoal.objects.filter(user=user)]
+    increments = [_model_to_dict(i) for i in GoalIncrement.objects.filter(user=user)]
+    adjustments = [_model_to_dict(a) for a in MonthlyGoalAdjustment.objects.filter(user=user)]
+    comments = [_model_to_dict(c) for c in MonthlySavingsComment.objects.filter(user=user)]
+    return _to_json({
+        'goals': goals,
+        'increments': increments,
+        'adjustments': adjustments,
+        'comments': comments,
+    })
+
+
+@mcp.resource("vault://tracker/notes")
+def tracker_notes() -> str:
+    """Personal notes (last 100)."""
+    user = _get_primary_user()
+    if not user:
+        return _to_json({'error': 'No primary user found.'})
+    qs = Note.objects.filter(user__group=user.group)[:100]
+    return _to_json([_model_to_dict(n) for n in qs])
+
+
+@mcp.resource("vault://jewellery/items")
+def jewellery_items() -> str:
+    """All jewellery items with estimated values."""
+    group = _get_group()
+    qs = JewelleryItem.objects.filter(group=group) if group else JewelleryItem.objects.all()
+    result = []
+    for item in qs:
+        d = _model_to_dict(item, exclude={'photo'})
+        d['display_label'] = item.display_label
+        d['estimated_value'] = str(item.estimated_value)
+        result.append(d)
+    return _to_json(result)
+
+
+@mcp.resource("vault://mcp/audit-log")
+def mcp_audit_log() -> str:
+    """Recent MCP audit log entries (last 50)."""
+    entries = MCPAuditLog.objects.all()[:50]
+    result = []
+    for e in entries:
+        result.append({
+            'id': e.id,
+            'timestamp': e.timestamp.isoformat(),
+            'action': e.action,
+            'model_name': e.model_name,
+            'object_id': e.object_id,
+            'object_repr': e.object_repr,
+            'tool_name': e.tool_name,
+            'reverted': e.reverted,
+            'reverted_at': e.reverted_at.isoformat() if e.reverted_at else None,
+            'data_before': e.data_before,
+            'data_after': e.data_after,
+        })
+    return _to_json(result)
+
+
+# =====================================================================
+#  TOOLS — Write operations (all audit-logged)
+# =====================================================================
+
+@mcp.tool()
+def add_transaction(
+    date: str,
+    amount: str,
+    type: str,
+    category_name: str = "",
+    remarks: str = "",
+) -> str:
+    """Add a savings/expense/transfer/income transaction.
+
+    Args:
+        date: Transaction date in YYYY-MM-DD format
+        amount: Transaction amount (positive number)
+        type: One of SAVINGS, EXPENSE, TRANSFER, EXTRA_INCOME
+        category_name: Category name (must exist). Leave empty if none.
+        remarks: Optional remarks
+    """
+    user = _get_primary_user()
+    if not user:
+        return "Error: No primary user found."
+
+    valid_types = ['SAVINGS', 'TRANSFER', 'EXTRA_INCOME', 'EXPENSE']
+    if type.upper() not in valid_types:
+        return f"Error: type must be one of {valid_types}"
+
+    category = None
+    if category_name:
+        category = Category.objects.filter(user=user, name__iexact=category_name).first()
+        if not category:
+            available = list(Category.objects.filter(user=user).values_list('name', flat=True))
+            return f"Error: Category '{category_name}' not found. Available: {available}"
+
+    txn = Transaction(
+        user=user,
+        date=_parse_date(date),
+        amount=_parse_decimal(amount),
+        type=type.upper(),
+        category=category,
+        remarks=remarks,
+    )
+    txn.save()
+    log_create(txn, 'add_transaction')
+    return _to_json({
+        'status': 'created',
+        'id': txn.id,
+        'summary': str(txn),
+    })
+
+
+@mcp.tool()
+def add_hra_entry(
+    date: str,
+    amount: str,
+    remarks: str = "",
+) -> str:
+    """Add a House Rent Allowance (HRA) expense.
+
+    Args:
+        date: Date in YYYY-MM-DD format
+        amount: Rent amount
+        remarks: Optional remarks
+    """
+    user = _get_primary_user()
+    if not user:
+        return "Error: No primary user found."
+
+    entry = HRAExpense(
+        user=user,
+        date=_parse_date(date),
+        amount=_parse_decimal(amount),
+        remarks=remarks,
+    )
+    entry.save()
+    log_create(entry, 'add_hra_entry')
+    return _to_json({
+        'status': 'created',
+        'id': entry.id,
+        'summary': str(entry),
+    })
+
+
+@mcp.tool()
+def add_note(
+    title: str,
+    date: str,
+    body: str = "",
+    section: str = "",
+    amount: str = "",
+    pending_type: str = "",
+    initial_amount: str = "",
+) -> str:
+    """Create a personal note.
+
+    Args:
+        title: Note title
+        date: Note date in YYYY-MM-DD format
+        body: Note body text (optional)
+        section: Section tag like 'Savings', 'Tax', 'Goal' (optional)
+        amount: Optional linked amount
+        pending_type: CREDIT (To Receive) or DEBIT (To Pay) — leave empty for regular notes
+        initial_amount: Initial pending amount (required if pending_type is set)
+    """
+    user = _get_primary_user()
+    if not user:
+        return "Error: No primary user found."
+
+    note = Note(
+        user=user,
+        title=title,
+        date=_parse_date(date),
+        body=body,
+        section=section,
+    )
+    if amount:
+        note.amount = _parse_decimal(amount)
+    if pending_type and pending_type.upper() in ('CREDIT', 'DEBIT'):
+        note.pending_type = pending_type.upper()
+        if initial_amount:
+            note.initial_amount = _parse_decimal(initial_amount)
+            note.pending_amount = note.initial_amount
+    note.save()
+    log_create(note, 'add_note')
+    return _to_json({'status': 'created', 'id': note.id, 'summary': str(note)})
+
+
+@mcp.tool()
+def update_note(
+    note_id: int,
+    title: str = "",
+    body: str = "",
+    section: str = "",
+    amount: str = "",
+    is_done: bool = False,
+) -> str:
+    """Update an existing note.
+
+    Args:
+        note_id: ID of the note to update
+        title: New title (leave empty to keep current)
+        body: New body text (leave empty to keep current)
+        section: New section tag (leave empty to keep current)
+        amount: New amount (leave empty to keep current)
+        is_done: Mark as done (for todo-type notes)
+    """
+    try:
+        note = Note.objects.get(pk=note_id)
+    except Note.DoesNotExist:
+        return f"Error: Note #{note_id} not found."
+
+    old_data = serialize_instance(note)
+    if title:
+        note.title = title
+    if body:
+        note.body = body
+    if section:
+        note.section = section
+    if amount:
+        note.amount = _parse_decimal(amount)
+    if is_done and not note.is_done:
+        from django.utils import timezone as tz
+        note.is_done = True
+        note.done_at = tz.now()
+    note.save()
+    log_update(note, old_data, 'update_note')
+    return _to_json({'status': 'updated', 'id': note.id, 'summary': str(note)})
+
+
+@mcp.tool()
+def add_epf_entry(
+    date: str,
+    amount: str,
+    entry_type: str = "CONTRIBUTION",
+    remarks: str = "",
+) -> str:
+    """Add an EPF contribution or interest entry.
+
+    Args:
+        date: Entry date in YYYY-MM-DD format
+        amount: Amount in INR
+        entry_type: CONTRIBUTION or INTEREST
+        remarks: Optional remarks
+    """
+    group = _get_group()
+    if entry_type.upper() not in ('CONTRIBUTION', 'INTEREST'):
+        return "Error: entry_type must be CONTRIBUTION or INTEREST"
+
+    entry = EPFEntry(
+        group=group,
+        date=_parse_date(date),
+        amount=_parse_decimal(amount),
+        entry_type=entry_type.upper(),
+        remarks=remarks,
+    )
+    entry.save()
+    log_create(entry, 'add_epf_entry')
+    return _to_json({'status': 'created', 'id': entry.id, 'summary': str(entry)})
+
+
+@mcp.tool()
+def add_nps_entry(
+    date: str,
+    contribution: str,
+    interest_earned: str,
+    total_balance: str,
+    remarks: str = "",
+) -> str:
+    """Add an NPS update entry.
+
+    Args:
+        date: Entry date in YYYY-MM-DD format
+        contribution: Money added in this update
+        interest_earned: Returns credited in this update
+        total_balance: Running total after this update
+        remarks: Optional remarks
+    """
+    group = _get_group()
+    entry = NPSEntry(
+        group=group,
+        date=_parse_date(date),
+        contribution=_parse_decimal(contribution),
+        interest_earned=_parse_decimal(interest_earned),
+        total_balance=_parse_decimal(total_balance),
+        remarks=remarks,
+    )
+    entry.save()
+    log_create(entry, 'add_nps_entry')
+    return _to_json({'status': 'created', 'id': entry.id, 'summary': str(entry)})
+
+
+@mcp.tool()
+def add_fixed_deposit(
+    name: str,
+    account_name: str,
+    principal: str,
+    interest_rate: str,
+    start_date: str,
+    maturity_date: str,
+    compounding: str = "QUARTERLY",
+    is_baby: bool = False,
+    remarks: str = "",
+) -> str:
+    """Create a new fixed deposit.
+
+    Args:
+        name: FD name/description
+        account_name: Bank account name (e.g. 'Atul Acc', 'HUF Acc')
+        principal: Principal amount in INR
+        interest_rate: Annual interest rate in % (e.g. '7.5')
+        start_date: Start date in YYYY-MM-DD format
+        maturity_date: Maturity date in YYYY-MM-DD format
+        compounding: SIMPLE, MONTHLY, QUARTERLY, or ANNUAL (default: QUARTERLY)
+        is_baby: Track in baby portfolio (default: false)
+        remarks: Optional remarks
+    """
+    group = _get_group()
+    valid_comp = ['SIMPLE', 'MONTHLY', 'QUARTERLY', 'ANNUAL']
+    if compounding.upper() not in valid_comp:
+        return f"Error: compounding must be one of {valid_comp}"
+
+    fd = FixedDeposit(
+        group=group,
+        name=name,
+        account_name=account_name,
+        principal=_parse_decimal(principal),
+        interest_rate=_parse_decimal(interest_rate),
+        start_date=_parse_date(start_date),
+        maturity_date=_parse_date(maturity_date),
+        compounding=compounding.upper(),
+        is_baby=is_baby,
+        remarks=remarks,
+    )
+    fd.save()
+    log_create(fd, 'add_fixed_deposit')
+    return _to_json({
+        'status': 'created', 'id': fd.id, 'summary': str(fd),
+        'current_value': str(fd.current_value),
+        'maturity_value': str(fd.maturity_value),
+    })
+
+
+@mcp.tool()
+def update_fixed_deposit(
+    fd_id: int,
+    is_active: bool = True,
+    remarks: str = "",
+) -> str:
+    """Update an existing fixed deposit (e.g. mark as inactive on maturity).
+
+    Args:
+        fd_id: ID of the fixed deposit
+        is_active: Set to false to mark as matured/closed
+        remarks: Updated remarks
+    """
+    try:
+        fd = FixedDeposit.objects.get(pk=fd_id)
+    except FixedDeposit.DoesNotExist:
+        return f"Error: FD #{fd_id} not found."
+
+    old_data = serialize_instance(fd)
+    fd.is_active = is_active
+    if remarks:
+        fd.remarks = remarks
+    fd.save()
+    log_update(fd, old_data, 'update_fixed_deposit')
+    return _to_json({'status': 'updated', 'id': fd.id, 'summary': str(fd)})
+
+
+@mcp.tool()
+def add_cash_position(
+    name: str,
+    amount: str,
+    remarks: str = "",
+    is_baby: bool = False,
+) -> str:
+    """Add a cash position.
+
+    Args:
+        name: Position name (e.g. 'Kanika Acc', 'Cash lent Reshu')
+        amount: Amount in INR
+        remarks: Optional remarks
+        is_baby: Track in baby portfolio (default: false)
+    """
+    group = _get_group()
+    pos = CashPosition(
+        group=group,
+        name=name,
+        amount=_parse_decimal(amount),
+        remarks=remarks,
+        is_baby=is_baby,
+    )
+    pos.save()
+    log_create(pos, 'add_cash_position')
+    return _to_json({'status': 'created', 'id': pos.id, 'summary': str(pos)})
+
+
+@mcp.tool()
+def update_cash_position(
+    position_id: int,
+    amount: str = "",
+    name: str = "",
+    remarks: str = "",
+) -> str:
+    """Update an existing cash position.
+
+    Args:
+        position_id: ID of the cash position
+        amount: New amount (leave empty to keep current)
+        name: New name (leave empty to keep current)
+        remarks: New remarks (leave empty to keep current)
+    """
+    try:
+        pos = CashPosition.objects.get(pk=position_id)
+    except CashPosition.DoesNotExist:
+        return f"Error: Cash position #{position_id} not found."
+
+    old_data = serialize_instance(pos)
+    if amount:
+        pos.amount = _parse_decimal(amount)
+    if name:
+        pos.name = name
+    if remarks:
+        pos.remarks = remarks
+    pos.save()
+    log_update(pos, old_data, 'update_cash_position')
+    return _to_json({'status': 'updated', 'id': pos.id, 'summary': str(pos)})
+
+
+@mcp.tool()
+def add_bond_holding(
+    account_name: str,
+    amount: str,
+    remarks: str = "",
+    is_baby: bool = False,
+) -> str:
+    """Add a bond holding.
+
+    Args:
+        account_name: Account/platform name
+        amount: Bond value in INR
+        remarks: Optional remarks
+        is_baby: Track in baby portfolio (default: false)
+    """
+    group = _get_group()
+    bond = BondHolding(
+        group=group,
+        account_name=account_name,
+        amount=_parse_decimal(amount),
+        remarks=remarks,
+        is_baby=is_baby,
+    )
+    bond.save()
+    log_create(bond, 'add_bond_holding')
+    return _to_json({'status': 'created', 'id': bond.id, 'summary': str(bond)})
+
+
+@mcp.tool()
+def update_bond_holding(
+    bond_id: int,
+    amount: str = "",
+    remarks: str = "",
+) -> str:
+    """Update an existing bond holding.
+
+    Args:
+        bond_id: ID of the bond holding
+        amount: New amount (leave empty to keep current)
+        remarks: New remarks (leave empty to keep current)
+    """
+    try:
+        bond = BondHolding.objects.get(pk=bond_id)
+    except BondHolding.DoesNotExist:
+        return f"Error: Bond #{bond_id} not found."
+
+    old_data = serialize_instance(bond)
+    if amount:
+        bond.amount = _parse_decimal(amount)
+    if remarks:
+        bond.remarks = remarks
+    bond.save()
+    log_update(bond, old_data, 'update_bond_holding')
+    return _to_json({'status': 'updated', 'id': bond.id, 'summary': str(bond)})
+
+
+@mcp.tool()
+def add_crypto_holding(
+    name: str,
+    amount_invested: str,
+    current_value: str,
+    remarks: str = "",
+    is_baby: bool = False,
+) -> str:
+    """Add a crypto holding.
+
+    Args:
+        name: Crypto name (e.g. 'Bitcoin', 'Ethereum')
+        amount_invested: Amount invested in INR
+        current_value: Current value in INR
+        remarks: Optional remarks
+        is_baby: Track in baby portfolio (default: false)
+    """
+    group = _get_group()
+    crypto = CryptoHolding(
+        group=group,
+        name=name,
+        amount_invested=_parse_decimal(amount_invested),
+        current_value=_parse_decimal(current_value),
+        remarks=remarks,
+        is_baby=is_baby,
+    )
+    crypto.save()
+    log_create(crypto, 'add_crypto_holding')
+    return _to_json({'status': 'created', 'id': crypto.id, 'summary': str(crypto)})
+
+
+@mcp.tool()
+def update_crypto_holding(
+    crypto_id: int,
+    current_value: str = "",
+    amount_invested: str = "",
+    remarks: str = "",
+) -> str:
+    """Update an existing crypto holding.
+
+    Args:
+        crypto_id: ID of the crypto holding
+        current_value: New current value (leave empty to keep current)
+        amount_invested: New invested amount (leave empty to keep current)
+        remarks: New remarks (leave empty to keep current)
+    """
+    try:
+        crypto = CryptoHolding.objects.get(pk=crypto_id)
+    except CryptoHolding.DoesNotExist:
+        return f"Error: Crypto #{crypto_id} not found."
+
+    old_data = serialize_instance(crypto)
+    if current_value:
+        crypto.current_value = _parse_decimal(current_value)
+    if amount_invested:
+        crypto.amount_invested = _parse_decimal(amount_invested)
+    if remarks:
+        crypto.remarks = remarks
+    crypto.save()
+    log_update(crypto, old_data, 'update_crypto_holding')
+    return _to_json({'status': 'updated', 'id': crypto.id, 'summary': str(crypto)})
+
+
+@mcp.tool()
+def add_commodity_holding(
+    commodity_type: str,
+    description: str,
+    weight_grams: str,
+    purchase_price_per_gram: str,
+    purity: str = "24k",
+    is_baby: bool = False,
+) -> str:
+    """Add a commodity (gold/silver) holding.
+
+    Args:
+        commodity_type: GOLD or SILVER
+        description: Description (e.g. '20gm Coin - 1 (24k)')
+        weight_grams: Weight in grams
+        purchase_price_per_gram: Purchase price per gram in INR
+        purity: For gold: 24k, 22k, 18k, 14k. For silver: 999, 925, 900, 800. Default: 24k
+        is_baby: Track in baby portfolio (default: false)
+    """
+    group = _get_group()
+    if commodity_type.upper() not in ('GOLD', 'SILVER'):
+        return "Error: commodity_type must be GOLD or SILVER"
+
+    holding = CommodityHolding(
+        group=group,
+        commodity_type=commodity_type.upper(),
+        description=description,
+        weight_grams=_parse_decimal(weight_grams),
+        purchase_price_per_gram=_parse_decimal(purchase_price_per_gram),
+        purity=purity,
+        is_baby=is_baby,
+    )
+    holding.save()
+    log_create(holding, 'add_commodity_holding')
+    return _to_json({
+        'status': 'created', 'id': holding.id, 'summary': str(holding),
+        'purchase_value': str(holding.purchase_value),
+    })
+
+
+@mcp.tool()
+def add_us_stock(
+    symbol: str,
+    units: str,
+    purchase_value: str,
+    remarks: str = "",
+    is_baby: bool = False,
+) -> str:
+    """Add a US stock (RSU) holding.
+
+    Args:
+        symbol: Stock symbol (e.g. 'GOOG')
+        units: Number of shares
+        purchase_value: Total purchase value in INR
+        remarks: Optional remarks
+        is_baby: Track in baby portfolio (default: false)
+    """
+    group = _get_group()
+
+    holding = USStockHolding(
+        group=group,
+        symbol=symbol.upper(),
+        units=_parse_decimal(units),
+        purchase_value=_parse_decimal(purchase_value),
+        remarks=remarks,
+        is_baby=is_baby,
+    )
+    # Refresh current rate from DB if available (or it syncs later)
+    rate = CommodityPrice.objects.filter(commodity_type='USD_INR').first()
+    if rate:
+        holding.current_usd_rate = rate.rate_per_gram  # USD_INR uses this field
+    
+    holding.save()
+    log_create(holding, 'add_us_stock')
+    return _to_json({
+        'status': 'created', 'id': holding.id, 'summary': str(holding),
+        'purchase_value': str(holding.purchase_value),
+    })
+
+
+@mcp.tool()
+def add_portfolio_goal(
+    label: str,
+    target_amount: str,
+    notes: str = "",
+) -> str:
+    """Add a portfolio financial goal (milestone).
+
+    Args:
+        label: Goal label (e.g. '50L', '1Cr')
+        target_amount: Target portfolio value in INR
+        notes: Optional notes
+    """
+    group = _get_group()
+    goal = PortfolioGoal(
+        group=group,
+        label=label,
+        target_amount=_parse_decimal(target_amount),
+        notes=notes,
+    )
+    goal.save()
+    log_create(goal, 'add_portfolio_goal')
+    return _to_json({'status': 'created', 'id': goal.id, 'summary': str(goal)})
+
+
+@mcp.tool()
+def add_jewellery_item(
+    category: str,
+    metal_type: str,
+    weight_grams: str,
+    location: str = "BANK_LOCKER",
+    purity: str = "22k",
+    purchase_price: str = "0",
+    purchase_date: str = "",
+    notes: str = "",
+) -> str:
+    """Add a jewellery item.
+
+    Args:
+        category: CHAIN, LOCKET, NECKLACE, RING, BANGLE, BRACELET, EARRINGS, COIN, or OTHER
+        metal_type: GOLD, SILVER, PLATINUM, or DIAMOND_OTHER
+        weight_grams: Weight in grams
+        location: BANK_LOCKER or HOME_SAFE (default: BANK_LOCKER)
+        purity: For gold: 24k, 22k, 18k, 14k. For silver: 999, 925, 900, 800. Default: 22k
+        purchase_price: Total purchase price in INR (default: 0)
+        purchase_date: Purchase date in YYYY-MM-DD format (optional)
+        notes: Optional notes
+    """
+    group = _get_group()
+    valid_cats = ['CHAIN', 'LOCKET', 'NECKLACE', 'RING', 'BANGLE',
+                  'BRACELET', 'EARRINGS', 'COIN', 'OTHER']
+    if category.upper() not in valid_cats:
+        return f"Error: category must be one of {valid_cats}"
+
+    item = JewelleryItem(
+        group=group,
+        category=category.upper(),
+        metal_type=metal_type.upper(),
+        weight_grams=_parse_decimal(weight_grams),
+        location=location.upper(),
+        purity=purity,
+        purchase_price=_parse_decimal(purchase_price),
+        notes=notes,
+    )
+    if purchase_date:
+        item.purchase_date = _parse_date(purchase_date)
+    item.save()
+    log_create(item, 'add_jewellery_item')
+    return _to_json({
+        'status': 'created', 'id': item.id,
+        'label': item.display_label,
+        'estimated_value': str(item.estimated_value),
+    })
+
+
+@mcp.tool()
+def delete_record(
+    model_name: str,
+    record_id: int,
+) -> str:
+    """Delete any MCP-supported record by model name and ID.
+
+    Args:
+        model_name: Model in 'app_label.ModelName' format (e.g. 'portfolio.FixedDeposit', 'tracker.Note')
+        record_id: Primary key of the record to delete
+    """
+    # Allowlist of models that can be deleted via MCP
+    allowed = {
+        'tracker.Transaction', 'tracker.Note', 'tracker.HRAExpense',
+        'portfolio.EPFEntry', 'portfolio.NPSEntry', 'portfolio.FixedDeposit',
+        'portfolio.CashPosition', 'portfolio.BondHolding',
+        'portfolio.CryptoHolding', 'portfolio.CommodityHolding',
+        'portfolio.FinancialGoal', 'portfolio.USStockHolding',
+        'jewellery.JewelleryItem',
+    }
+    if model_name not in allowed:
+        return f"Error: Deletion not allowed for '{model_name}'. Allowed: {sorted(allowed)}"
+
+    try:
+        Model = django_apps.get_model(model_name)
+    except (LookupError, ValueError) as exc:
+        return f"Error: Cannot resolve model '{model_name}': {exc}"
+
+    try:
+        obj = Model.objects.get(pk=record_id)
+    except Model.DoesNotExist:
+        return f"Error: {model_name}#{record_id} not found."
+
+    obj_repr = str(obj)
+    log_delete(obj, 'delete_record')
+    obj.delete()
+    return _to_json({
+        'status': 'deleted',
+        'model': model_name,
+        'id': record_id,
+        'was': obj_repr,
+    })
+
+
+@mcp.tool()
+def revert_mcp_change(audit_log_id: int) -> str:
+    """Revert a specific MCP audit log entry, undoing the change it describes.
+
+    Args:
+        audit_log_id: ID of the MCPAuditLog entry to revert
+    """
+    try:
+        entry = MCPAuditLog.objects.get(pk=audit_log_id)
+    except MCPAuditLog.DoesNotExist:
+        return f"Error: Audit log entry #{audit_log_id} not found."
+
+    result = revert_entry(entry)
+    return _to_json({'status': 'reverted', 'detail': result})
+
+
+@mcp.tool()
+def list_mcp_audit_log(
+    limit: int = 20,
+    action: str = "",
+    model_name: str = "",
+) -> str:
+    """List recent MCP audit log entries with optional filters.
+
+    Args:
+        limit: Number of entries to return (default: 20, max: 100)
+        action: Filter by action: CREATE, UPDATE, or DELETE (optional)
+        model_name: Filter by model name like 'portfolio.FixedDeposit' (optional)
+    """
+    limit = min(max(1, limit), 100)
+    qs = MCPAuditLog.objects.all()
+    if action:
+        qs = qs.filter(action=action.upper())
+    if model_name:
+        qs = qs.filter(model_name=model_name)
+    entries = []
+    for e in qs[:limit]:
+        entries.append({
+            'id': e.id,
+            'timestamp': e.timestamp.isoformat(),
+            'action': e.action,
+            'model_name': e.model_name,
+            'object_id': e.object_id,
+            'object_repr': e.object_repr,
+            'tool_name': e.tool_name,
+            'reverted': e.reverted,
+        })
+    return _to_json({'count': len(entries), 'entries': entries})
+
+
+@mcp.tool()
+def do_refresh_commodity_prices() -> str:
+    """Trigger a refresh of gold and silver prices from external APIs."""
+    result = refresh_commodity_prices()
+    if result:
+        return _to_json({'status': 'refreshed', 'prices': result})
+    return _to_json({'status': 'failed', 'detail': 'Could not fetch commodity prices.'})
+
+
+@mcp.tool()
+def do_refresh_us_stock_prices() -> str:
+    """Trigger a refresh of US stock (RSU) prices and USD/INR rate."""
+    group = _get_group()
+    result = refresh_us_stock_prices(group=group)
+    if result:
+        return _to_json({'status': 'refreshed', 'detail': result})
+    return _to_json({'status': 'failed', 'detail': 'Could not fetch US stock prices.'})
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
+
+if __name__ == "__main__":
+    mcp.run(transport='stdio')
