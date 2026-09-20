@@ -87,7 +87,7 @@
           <tr class="hover">
             <td class="font-semibold">
               {{ h.description }}
-              {% if h.is_baby %}<span class="badge badge-warning badge-xs ml-1">Baby</span>{% endif %}
+              {% if h.is_baby %}<span class="badge badge-warning badge-xs ml-1">Advay</span>{% endif %}
             </td>
             <td class="opacity-60 text-sm">{{ h.purity }}</td>
             <td class="text-right" data-val="{{ h.weight_grams }}">{{ h.weight_grams|floatformat:2 }}g</td>
@@ -100,7 +100,7 @@
                 {% if h.is_baby %}
                 <a href="{% url 'toggle_baby' 'commodityholding' h.id %}?next={{ request.get_full_path|urlencode }}" class="btn btn-ghost btn-xs btn-square text-warning" title="Move to Master Portfolio"><span class="material-symbols-outlined text-base">assignment_return</span></a>
                 {% else %}
-                <a href="{% url 'toggle_baby' 'commodityholding' h.id %}?next={{ request.get_full_path|urlencode }}" class="btn btn-ghost btn-xs btn-square text-primary" title="Move to Baby Portfolio"><span class="material-symbols-outlined text-base">child_care</span></a>
+                <a href="{% url 'toggle_baby' 'commodityholding' h.id %}?next={{ request.get_full_path|urlencode }}" class="btn btn-ghost btn-xs btn-square text-primary" title="Move to Advay Portfolio"><span class="material-symbols-outlined text-base">child_care</span></a>
                 {% endif %}
               </div>
             </td>
@@ -124,7 +124,7 @@
           <div class="flex-1 min-w-0">
             <div class="font-semibold text-sm">
               {{ h.description }}
-              {% if h.is_baby %}<span class="badge badge-warning badge-xs ml-1">Baby</span>{% endif %}
+              {% if h.is_baby %}<span class="badge badge-warning badge-xs ml-1">Advay</span>{% endif %}
             </div>
             <span class="badge badge-ghost badge-xs mt-1">{{ h.purity }} · {{ h.weight_grams|floatformat:2 }}g</span>
           </div>
@@ -133,7 +133,7 @@
             {% if h.is_baby %}
             <a href="{% url 'toggle_baby' 'commodityholding' h.id %}?next={{ request.get_full_path|urlencode }}" class="btn btn-ghost btn-xs btn-square text-warning shrink-0" title="Move to Master Portfolio"><span class="material-symbols-outlined text-base">assignment_return</span></a>
             {% else %}
-            <a href="{% url 'toggle_baby' 'commodityholding' h.id %}?next={{ request.get_full_path|urlencode }}" class="btn btn-ghost btn-xs btn-square text-primary shrink-0" title="Move to Baby Portfolio"><span class="material-symbols-outlined text-base">child_care</span></a>
+            <a href="{% url 'toggle_baby' 'commodityholding' h.id %}?next={{ request.get_full_path|urlencode }}" class="btn btn-ghost btn-xs btn-square text-primary shrink-0" title="Move to Advay Portfolio"><span class="material-symbols-outlined text-base">child_care</span></a>
             {% endif %}
           </div>
         </div>
@@ -186,7 +186,7 @@
           <tr class="hover">
             <td class="font-semibold">
               {{ h.description }}
-              {% if h.is_baby %}<span class="badge badge-warning badge-xs ml-1">Baby</span>{% endif %}
+              {% if h.is_baby %}<span class="badge badge-warning badge-xs ml-1">Advay</span>{% endif %}
             </td>
             <td class="opacity-60 text-sm">{{ h.purity }}</td>
             <td class="text-right" data-val="{{ h.weight_grams }}">{{ h.weight_grams|floatformat:2 }}g</td>
@@ -199,7 +199,7 @@
                 {% if h.is_baby %}
                 <a href="{% url 'toggle_baby' 'commodityholding' h.id %}?next={{ request.get_full_path|urlencode }}" class="btn btn-ghost btn-xs btn-square text-warning" title="Move to Master Portfolio"><span class="material-symbols-outlined text-base">assignment_return</span></a>
                 {% else %}
-                <a href="{% url 'toggle_baby' 'commodityholding' h.id %}?next={{ request.get_full_path|urlencode }}" class="btn btn-ghost btn-xs btn-square text-primary" title="Move to Baby Portfolio"><span class="material-symbols-outlined text-base">child_care</span></a>
+                <a href="{% url 'toggle_baby' 'commodityholding' h.id %}?next={{ request.get_full_path|urlencode }}" class="btn btn-ghost btn-xs btn-square text-primary" title="Move to Advay Portfolio"><span class="material-symbols-outlined text-base">child_care</span></a>
                 {% endif %}
               </div>
             </td>
@@ -223,7 +223,7 @@
           <div class="flex-1 min-w-0">
             <div class="font-semibold text-sm">
               {{ h.description }}
-              {% if h.is_baby %}<span class="badge badge-warning badge-xs ml-1">Baby</span>{% endif %}
+              {% if h.is_baby %}<span class="badge badge-warning badge-xs ml-1">Advay</span>{% endif %}
             </div>
             <span class="badge badge-ghost badge-xs mt-1">{{ h.purity }} · {{ h.weight_grams|floatformat:2 }}g</span>
           </div>
@@ -232,7 +232,7 @@
             {% if h.is_baby %}
             <a href="{% url 'toggle_baby' 'commodityholding' h.id %}?next={{ request.get_full_path|urlencode }}" class="btn btn-ghost btn-xs btn-square text-warning shrink-0" title="Move to Master Portfolio"><span class="material-symbols-outlined text-base">assignment_return</span></a>
             {% else %}
-            <a href="{% url 'toggle_baby' 'commodityholding' h.id %}?next={{ request.get_full_path|urlencode }}" class="btn btn-ghost btn-xs btn-square text-primary shrink-0" title="Move to Baby Portfolio"><span class="material-symbols-outlined text-base">child_care</span></a>
+            <a href="{% url 'toggle_baby' 'commodityholding' h.id %}?next={{ request.get_full_path|urlencode }}" class="btn btn-ghost btn-xs btn-square text-primary shrink-0" title="Move to Advay Portfolio"><span class="material-symbols-outlined text-base">child_care</span></a>
             {% endif %}
           </div>
         </div>
