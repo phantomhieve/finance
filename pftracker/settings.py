@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'jewellery',
     'mcp_server',
     'oauth2_provider',
+    'corsheaders',
 
     # Must be last — auto-deletes media files on model delete / field replace
     'django_cleanup.apps.CleanupConfig',
@@ -149,6 +150,7 @@ UNFOLD = {
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -371,3 +373,19 @@ OAUTH2_PROVIDER = {
     'ACCESS_TOKEN_EXPIRE_SECONDS': 36000,
     'PKCE_REQUIRED': False,
 }
+
+# CORS Configuration for MCP
+# Only allow CORS for the discovery endpoint and MCP API
+CORS_URLS_REGEX = r'^/(\.well-known/oauth-authorization-server|mcp/.*)$'
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_HEADERS = (
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+)
