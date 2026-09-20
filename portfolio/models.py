@@ -596,6 +596,12 @@ class RealEstateHolding(PnlMixin, models.Model):
         ('SQMT', 'Square Meters (sq m)'),
     )
 
+    ACQUISITION_TYPE_CHOICES = (
+        ('PURCHASED', 'Purchased / Self-Acquired'),
+        ('INHERITED', 'Inherited / Ancestral'),
+        ('GIFTED', 'Gifted'),
+    )
+
     group = models.ForeignKey(
         'tracker.AccountGroup', on_delete=models.CASCADE,
         related_name='real_estate_holdings', null=True, blank=True,
@@ -609,6 +615,20 @@ class RealEstateHolding(PnlMixin, models.Model):
     )
     status = models.CharField(
         max_length=30, choices=STATUS_CHOICES, default='VACANT_PLOT',
+    )
+
+    # Acquisition context (inheritance / gift / self-purchase)
+    acquisition_type = models.CharField(
+        max_length=20, choices=ACQUISITION_TYPE_CHOICES, default='PURCHASED',
+        help_text="How this property was acquired (purchased, inherited, or gifted)",
+    )
+    original_owner = models.CharField(
+        max_length=200, blank=True,
+        help_text="Original owner for inherited/gifted properties (e.g. 'Late Shri R. K. Sharma, Father')",
+    )
+    inherited_year = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="Year of inheritance/gift for tax holding period reference",
     )
 
     # Measurement (Explicit Gaj support)
@@ -811,11 +831,19 @@ class RealEstateHolding(PnlMixin, models.Model):
 
     def get_llm_research_prompt(self) -> str:
         """Generate ready-to-use LLM prompt for deep real estate market research."""
+        acq_line = f"• Acquisition: {self.get_acquisition_type_display()}"
+        if self.acquisition_type in ('INHERITED', 'GIFTED') and self.original_owner:
+            acq_line += f" from {self.original_owner}"
+        if self.inherited_year:
+            acq_line += f" (year: {self.inherited_year})"
+        acq_line += "\n"
+
         return (
             f"Please conduct a comprehensive real estate market research and valuation analysis for the following property:\n\n"
             f"• Property Name: {self.name}\n"
             f"• Type: {self.get_property_type_display()}\n"
             f"• Status: {self.get_status_display()}\n"
+            f"{acq_line}"
             f"• Size: {self.area_display}\n"
             f"• Location: {self.location_summary_for_llm}\n"
             f"• Purchase Year/Date: {self.purchase_date.strftime('%B %Y')} (Purchased at ₹{self.purchase_price:,.0f} / ₹{self.purchase_rate_per_gaj:,.0f} per Gaj)\n"
@@ -823,6 +851,10 @@ class RealEstateHolding(PnlMixin, models.Model):
             f"Please provide:\n"
             f"1. Current prevailing market price trends and circle rates in {self.locality}, {self.city}.\n"
             f"2. Major infrastructure catalysts, connectivity improvements (e.g. Metro, Expressways, Airport, Commercial hubs) impacting this micro-market.\n"
-            f"3. 3-to-5 year capital appreciation and rental yield outlook.\n"
-            f"4. Key risks or supply overhangs in this specific sector/corridor."
+            f"3. Micro-market level supply-demand dynamics, absorption rates, and inventory overhang assessment.\n"
+            f"4. 3-to-5 year capital appreciation outlook with growth potential analysis specific to this corridor/locality.\n"
+            f"5. Rental yield outlook and comparison to the 2-4% Indian residential norm.\n"
+            f"6. Key risks or supply overhangs in this specific sector/corridor.\n"
+            f"7. Comparison of this property's CAGR against micro-market and city-level benchmarks."
         )
+
