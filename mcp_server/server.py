@@ -61,14 +61,16 @@ from portfolio.models import (  # noqa: E402
     BondHolding, CryptoHolding, CommodityHolding,
     CommodityPrice, MonthlySnapshot,
     FinancialGoal as PortfolioGoal, USStockHolding,
-    PortfolioInsight, RealEstateHolding,
+    PortfolioInsight, InsightGenerationSettings, RealEstateHolding,
 )
 from jewellery.models import JewelleryItem  # noqa: E402
 from portfolio.services import (  # noqa: E402
     get_portfolio_summary as _fetch_portfolio_summary,
     refresh_commodity_prices as _refresh_commodity_prices,
     refresh_us_stock_prices as _refresh_us_stock_prices,
+    get_growth_data as _fetch_growth_data,
 )
+from portfolio.ai import build_prompt_data, call_gemini  # noqa: E402
 from mcp_server.models import MCPAuditLog  # noqa: E402
 from mcp_server.audit import (  # noqa: E402
     log_create, log_update, log_delete,
@@ -747,6 +749,170 @@ def get_portfolio_snapshots(limit: int = 12) -> str:
         d['return_pct'] = str(s.return_pct)
         result.append(d)
     return _to_json(result)
+
+
+@mcp.tool()
+def get_ai_insights(limit: int = 1) -> str:
+    """Get the latest AI-generated portfolio insights. Returns the full structured analysis including
+    summary, portfolio health score (0-100), individual insights with severity and actions,
+    market context, and forward outlook.
+
+    Args:
+        limit: Number of insight records to return (default: 1 = latest only, max: 10)
+    """
+    limit = min(max(1, limit), 10)
+    group = _get_group()
+    qs = PortfolioInsight.objects.filter(group=group) if group else PortfolioInsight.objects.all()
+    qs = qs.order_by('-generated_at')[:limit]
+    result = []
+    for insight in qs:
+        entry = {
+            'id': insight.id,
+            'generated_at': insight.generated_at.isoformat(),
+            'model_used': insight.model_used,
+            'insights': insight.insights,
+        }
+        result.append(entry)
+    if not result:
+        return _to_json({'message': 'No AI insights have been generated yet. Use trigger_ai_insights to generate one.'})
+    return _to_json(result[0] if limit == 1 else result)
+
+
+@mcp.tool()
+def get_ai_insight_status() -> str:
+    """Check the AI insight generation cooldown status — whether a new generation
+    is allowed, when the last one was run, and the configured cooldown period.
+    Call this before trigger_ai_insights to verify availability."""
+    from django.utils import timezone as _tz
+    from django.conf import settings as _settings
+
+    group = _get_group()
+    settings_obj = InsightGenerationSettings.get_solo()
+    cooldown_days = settings_obj.cooldown_days
+    is_debug = _settings.DEBUG
+
+    qs = PortfolioInsight.objects.filter(group=group) if group else PortfolioInsight.objects.all()
+    latest = qs.order_by('-generated_at').first()
+
+    if not latest:
+        return _to_json({
+            'can_generate': True,
+            'last_generated': None,
+            'cooldown_days': cooldown_days,
+            'cooldown_bypassed': is_debug,
+            'total_generations': 0,
+            'message': 'No insights generated yet. Ready to generate.',
+        })
+
+    now = _tz.now()
+    elapsed = now - latest.generated_at
+    elapsed_days = elapsed.days
+    elapsed_hours = (elapsed.total_seconds() % 86400) // 3600
+
+    if is_debug:
+        can_generate = True
+    else:
+        cooldown_td = datetime.timedelta(days=cooldown_days)
+        can_generate = elapsed >= cooldown_td
+
+    remaining_secs = 0
+    if not can_generate:
+        cooldown_td = datetime.timedelta(days=cooldown_days)
+        remaining = cooldown_td - elapsed
+        remaining_secs = max(0, int(remaining.total_seconds()))
+
+    remaining_days = remaining_secs // 86400
+    remaining_hours = (remaining_secs % 86400) // 3600
+
+    total = qs.count()
+
+    result = {
+        'can_generate': can_generate,
+        'last_generated': latest.generated_at.isoformat(),
+        'last_model_used': latest.model_used,
+        'elapsed_since_last': f'{elapsed_days}d {int(elapsed_hours)}h',
+        'cooldown_days': cooldown_days,
+        'cooldown_bypassed': is_debug,
+        'total_generations': total,
+    }
+    if can_generate:
+        result['message'] = 'Ready to generate new AI insights.'
+    else:
+        result['remaining'] = f'{remaining_days}d {remaining_hours}h'
+        result['message'] = f'Cooldown active. Try again in {remaining_days}d {remaining_hours}h.'
+
+    return _to_json(result)
+
+
+@mcp.tool()
+def trigger_ai_insights(force: bool = False) -> str:
+    """Generate new AI portfolio insights using Gemini. This performs a full portfolio
+    analysis including allocation, risk, tax optimization, real estate growth analysis,
+    and macro context. Respects the configured cooldown period unless force=True.
+
+    This operation may take 15-30 seconds as it calls Gemini with live macro data.
+
+    Args:
+        force: If True, bypass the cooldown check (use sparingly). Default: False.
+    """
+    from django.utils import timezone as _tz
+    from django.conf import settings as _settings
+
+    group = _get_group()
+
+    # ── Cooldown check ──
+    if not force:
+        settings_obj = InsightGenerationSettings.get_solo()
+        cooldown_days = settings_obj.cooldown_days
+        is_debug = _settings.DEBUG
+
+        latest = PortfolioInsight.objects.filter(group=group).order_by('-generated_at').first() if group \
+            else PortfolioInsight.objects.order_by('-generated_at').first()
+
+        if latest and not is_debug:
+            cooldown_td = datetime.timedelta(days=cooldown_days)
+            elapsed = _tz.now() - latest.generated_at
+            if elapsed < cooldown_td:
+                remaining = cooldown_td - elapsed
+                remaining_secs = max(0, int(remaining.total_seconds()))
+                days = remaining_secs // 86400
+                hours = (remaining_secs % 86400) // 3600
+                return _to_json({
+                    'status': 'cooldown_active',
+                    'message': f'AI insights cooldown is {cooldown_days} day(s). '
+                               f'Try again in {days}d {hours}h, or use force=True to bypass.',
+                    'last_generated': latest.generated_at.isoformat(),
+                    'cooldown_days': cooldown_days,
+                })
+
+    # ── Generate insights ──
+    try:
+        summary = _fetch_portfolio_summary(group)
+        growth = _fetch_growth_data(group=group)
+        prompt_data = build_prompt_data(summary, growth, group)
+        result = call_gemini(prompt_data)
+        insight = PortfolioInsight.objects.create(
+            group=group,
+            model_used=result.model,
+            prompt_data=prompt_data,
+            insights=result.insights_dict,
+        )
+        return _to_json({
+            'status': 'success',
+            'id': insight.id,
+            'model_used': result.model,
+            'generated_at': insight.generated_at.isoformat(),
+            'score': result.insights_dict.get('score'),
+            'summary': result.insights_dict.get('summary'),
+            'insight_count': len(result.insights_dict.get('insights', [])),
+            'insights': result.insights_dict,
+        })
+    except Exception as e:
+        logger.exception('AI insight generation failed via MCP')
+        return _to_json({
+            'status': 'error',
+            'message': f'AI insight generation failed: {str(e)}',
+        })
 
 
 @mcp.tool()
