@@ -373,6 +373,11 @@ OAUTH2_PROVIDER = {
     'SCOPES': {'read': 'Read scope', 'write': 'Write scope'},
     'ACCESS_TOKEN_EXPIRE_SECONDS': 36000,
     'PKCE_REQUIRED': False,
+    'DCR_ENABLED': True,
+    'DCR_REGISTRATION_PERMISSION_CLASSES': (
+        'oauth2_provider.dcr.AllowAllDCRPermission',
+    ),
+    'CIMD_ENABLED': True,
 }
 
 # CORS Configuration for MCP & OAuth
