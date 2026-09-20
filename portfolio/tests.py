@@ -112,6 +112,7 @@ class RealEstateViewsTests(TestCase):
             'name': 'ATS Greens Apartment 404',
             'property_type': 'APARTMENT_FLAT',
             'status': 'RENTED',
+            'acquisition_type': 'PURCHASED',
             'area_value': '150',
             'area_unit': 'GAJ',
             'locality': 'Sector 150',

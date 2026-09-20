@@ -20,7 +20,7 @@ from django.conf import settings
 from google import genai
 from pydantic import BaseModel
 
-from .models import StockHolding, MutualFundHolding, USStockHolding
+from .models import StockHolding, MutualFundHolding, USStockHolding, RealEstateHolding
 from .services import get_portfolio_summary, get_growth_data
 
 logger = logging.getLogger(__name__)
@@ -114,6 +114,15 @@ The portfolio JSON contains these pre-computed fields — use them directly:
 - epf, nps: balance, contributions, interest earned
 - fixed_deposits: principal, rate, compounding, maturity_date, days_remaining
 - commodities: gold/silver with weight_grams, rate, invested, current, items[]
+- real_estate: holdings[] with name, property_type, status, acquisition_type
+  (PURCHASED|INHERITED|GIFTED), original_owner, inherited_year, area_gaj, area_sqft,
+  location_summary, micro_market_tag, landmark, purchase_date, cost_basis,
+  current_valuation, cagr_pct, purchase_rate_per_gaj, current_rate_per_gaj,
+  monthly_rental, annual_rental, rental_yield_pct.
+  Aggregated: total_cost_basis, total_current, total_pnl, total_area_gaj,
+  total_annual_rental, pct_of_portfolio.
+  NOTE: acquisition_type=INHERITED means zero out-of-pocket investment;
+  the cost_basis shown is the ORIGINAL OWNER's acquisition cost (for tax purposes).
 - cash: positions[] with remarks (check for "lent"/"given" = non-liquid)
 - bonds: total value
 - crypto: invested, current, pnl, holdings[]
@@ -124,7 +133,7 @@ The portfolio JSON contains these pre-computed fields — use them directly:
 </data_map>
 
 <analysis_framework>
-Generate insights through six analytical lenses in priority order.
+Generate insights through seven analytical lenses in priority order.
 Each insight maps to a category: risk | opportunity | rebalancing | goal |
 tax | macro | consolidation | international.
 
@@ -143,6 +152,8 @@ f) Commodities: total_pct_of_portfolio vs 5-15% norm. Physical holdings
    carry storage/purity risk — recommend ETF/ETCD for future allocation.
 g) Crypto: position size and risk characterization.
 h) Geographic: domestic vs international (RSU) as % of equity.
+i) Real estate as % of total net worth. >30% of net worth in illiquid
+   real estate = portfolio liquidity warning. Include in allocation assessment.
 
 ━━━ LENS 2: EQUITY & FUND QUALITY [High Priority] ━━━
 
@@ -166,7 +177,8 @@ d) Bond holdings: assess total relative to portfolio size.
 e) Liquidity tiers:
    - Tier 1 (instant): listed equity, liquid cash
    - Tier 2 (1-7 days): FDs with premature withdrawal, RSU (T+2)
-   - Tier 3 (locked): EPF, NPS, physical commodities, lent cash
+   - Tier 3 (locked): EPF, NPS, physical commodities, lent cash,
+     REAL ESTATE (illiquid — cannot be liquidated in 7 days)
    Does Tier 1 cover 6 months of household expenses?
 f) NPS: contribution pattern, 80CCD(1B) utilization, equity-debt allocation.
 
@@ -177,6 +189,7 @@ a) Crash simulation: equity drops 35% (2020-style). New portfolio value
 b) Employer stress test: RSU drops 30% AND layoff. Net worth and goal impact.
 c) Currency risk: USD-denominated RSU exposure as % of total portfolio.
 d) Liquidity stress: if 50% of portfolio needed in 7 days, what is accessible?
+   Real estate is fully illiquid in this scenario.
 e) Portfolio trajectory: use growth_history to identify trend — accelerating,
    stable, or decelerating growth. Monthly money_added vs returns_gained.
 
@@ -190,6 +203,11 @@ Reference rates (Indian FY 2026-27 — verify against latest rules):
 - EPF interest: tax-free up to 2.5L annual contribution
 - NPS: 50K deduction under 80CCD(1B) in OLD regime only
 - Physical gold LTCG (held > 24 months): 12.5%
+- Real estate LTCG (held > 24 months): 12.5% without indexation,
+  OR 20% with CII indexation (for properties acquired before 23 Jul 2024).
+  For INHERITED properties: holding period starts from ORIGINAL OWNER's
+  acquisition date, and cost basis = original owner's purchase price
+  (or FMV as of 1 Apr 2001 for pre-2001 acquisitions).
 
 Analyse:
 a) LTCG harvesting: unrealized gains across all accounts. Plan to
@@ -199,6 +217,9 @@ c) Legacy ELSS: past 3-year lock-in? Redeem and consolidate?
 d) RSU tax strategy: optimal holding period post-vesting.
 e) Multi-entity (if HUF exists): entity-level allocation for tax efficiency.
 f) Debt MF post-tax yield vs EPF — competitive?
+g) Inherited real estate: evaluate Section 54/54EC reinvestment exemptions
+   if sale is being considered. Compute both with-indexation (20%) and
+   without-indexation (12.5%) LTCG to recommend the lower-tax path.
 
 ━━━ LENS 6: GOALS & BEHAVIORAL PATTERNS [Standard Priority] ━━━
 
@@ -212,6 +233,58 @@ b) Behavioral red flags:
      large-cap exposure = expensive index clone. Name the overlapping funds.
    - Home bias: Indian vs international %.
    - Recency bias: disproportionate allocation to recent outperformers?
+
+━━━ LENS 7: REAL ESTATE & LAND ASSETS [Medium Priority] ━━━
+
+CRITICAL CONTEXT — Inherited vs purchased properties require different analysis:
+
+a) ACQUISITION CONTEXT & INHERITANCE HANDLING:
+   - For acquisition_type=INHERITED or GIFTED: the investor had ZERO out-of-pocket
+     investment. The cost_basis shown is the ORIGINAL OWNER's purchase cost, retained
+     only for capital gains tax computation. Do NOT treat inherited property P&L as
+     "investment returns" — frame it as "unrealized inheritance appreciation."
+   - For INHERITED properties: evaluate whether the asset is a productive holding
+     (generating rental yield, appreciating above inflation) or dead/underutilized
+     capital that could be monetized and redeployed into higher-yielding assets.
+   - Note the original_owner and inherited_year for context.
+
+b) LOCATION-BASED GROWTH & MICRO-MARKET ANALYSIS:
+   Use the location_summary, micro_market_tag, and landmark fields to analyze
+   each property at the CORRIDOR/LOCALITY level, NOT generic city level:
+   - Identify known INFRASTRUCTURE CATALYSTS in or near the property's micro-market:
+     upcoming metro phases, expressway links (e.g. Yamuna Expressway, Dwarka Expressway),
+     airport connectivity (e.g. Jewar/Noida International Airport, Navi Mumbai Airport),
+     SEZ/IT park proximity, industrial corridors, Smart City projects.
+   - Evaluate GROWTH POTENTIAL based on: developer activity in the corridor,
+     supply-demand dynamics, absorption rates, inventory overhang levels,
+     and circle rate trajectory as a floor indicator.
+   - Compare the property's CAGR (from cagr_pct field) against reasonable
+     micro-market benchmarks: 8-12% CAGR is strong for Indian land/plots,
+     5-8% is moderate, below 5% is underperforming.
+   - For North Indian plots specifically, use Yamuna Expressway Industrial
+     Development Authority (YEIDA), Greater Noida Extension, and Dwarka
+     Expressway benchmarks as contextual reference points.
+
+c) FINANCIAL ASSESSMENT:
+   - Rate per Gaj analysis: compare purchase_rate_per_gaj vs current_rate_per_gaj.
+     Reference locality circle rates as a floor validation.
+   - Rental yield: compare against the 2-4% norm for Indian residential.
+     If rental_yield_pct < 2%, the property is primarily an appreciation play.
+   - Opportunity cost: compare real estate CAGR against the investor's equity
+     portfolio CAGR. If equity CAGR significantly exceeds real estate CAGR,
+     consider whether the capital is better deployed in financial instruments.
+   - For INHERITED properties with zero cost basis: compute "effective yield
+     since inheritance" — the annualized return from inherited_year to today
+     provides the true return on this legacy asset.
+
+d) PORTFOLIO INTEGRATION & LIQUIDITY IMPACT:
+   - Real estate pct_of_portfolio: is it making the overall portfolio illiquid?
+   - Geographic concentration: multiple properties in the same micro-market/city
+     = correlated risk (policy changes, builder defaults, market correction).
+   - Generational wealth framing: inherited properties are legacy assets.
+     Evaluate hold-vs-monetize based on appreciation potential, rental yield,
+     emotional value, and opportunity cost of locked capital.
+   - Include real estate in Tier 3 (fully illiquid) in liquidity assessment.
 </analysis_framework>
 
 <scoring>
@@ -517,6 +590,48 @@ def build_prompt_data(summary, growth, group):
         ],
     }
 
+    # ── Real Estate holdings ──
+    re_holdings = list(summary.get('real_estate_holdings', []))
+    re_total_cost = float(summary.get('real_estate_invested', 0))
+    re_total_current = float(summary.get('real_estate_current', 0))
+    re_total_pnl = re_total_current - re_total_cost
+    re_total_area_gaj = sum(float(h.area_in_gaj) for h in re_holdings)
+    re_total_annual_rental = sum(float(h.annual_rental_income) for h in re_holdings)
+
+    real_estate = {
+        'total_cost_basis': re_total_cost,
+        'total_current': re_total_current,
+        'total_pnl': re_total_pnl,
+        'total_area_gaj': re_total_area_gaj,
+        'total_annual_rental': re_total_annual_rental,
+        'pct_of_portfolio': round(re_total_current / total_value * 100, 2) if total_value else 0,
+        'holdings': [],
+    }
+    for h in re_holdings:
+        re_entry = {
+            'name': h.name,
+            'property_type': h.get_property_type_display(),
+            'status': h.get_status_display(),
+            'acquisition_type': h.acquisition_type,
+            'original_owner': h.original_owner or None,
+            'inherited_year': h.inherited_year,
+            'area_gaj': float(h.area_in_gaj),
+            'area_sqft': float(h.area_in_sqft),
+            'location_summary': h.location_summary_for_llm,
+            'micro_market_tag': h.micro_market_tag or None,
+            'landmark': h.landmark or None,
+            'purchase_date': h.purchase_date.isoformat(),
+            'cost_basis': float(h.total_cost_basis),
+            'current_valuation': float(h.current_valuation),
+            'cagr_pct': float(h.cagr_pct),
+            'purchase_rate_per_gaj': float(h.purchase_rate_per_gaj),
+            'current_rate_per_gaj': float(h.current_rate_per_gaj),
+            'monthly_rental': float(h.monthly_rental_income or 0),
+            'annual_rental': float(h.annual_rental_income),
+            'rental_yield_pct': float(h.rental_yield_pct),
+        }
+        real_estate['holdings'].append(re_entry)
+
     goals = [
         {'label': g['label'], 'target': g['target'],
          'progress_pct': g['pct'], 'achieved': g['achieved']}
@@ -576,6 +691,7 @@ def build_prompt_data(summary, growth, group):
         'nps': nps,
         'fixed_deposits': fixed_deposits,
         'commodities': commodities,
+        'real_estate': real_estate,
         'cash': cash,
         'bonds': bonds,
         'crypto': crypto,

@@ -1722,6 +1722,9 @@ def add_real_estate_holding(
     current_valuation: str,
     property_type: str = "PLOT_LAND",
     status: str = "VACANT_PLOT",
+    acquisition_type: str = "PURCHASED",
+    original_owner: str = "",
+    inherited_year: int = None,
     area_unit: str = "GAJ",
     locality: str = "",
     city: str = "Noida",
@@ -1746,6 +1749,9 @@ def add_real_estate_holding(
         current_valuation: Current estimated market valuation in INR
         property_type: PLOT_LAND, APARTMENT_FLAT, COMMERCIAL, VILLA_HOUSE, AGRICULTURAL, or OTHER
         status: VACANT_PLOT, READY_SELF, RENTED, UNDER_CONSTRUCTION, or RESALE_PLANNED
+        acquisition_type: PURCHASED (self-acquired), INHERITED (ancestral/will), or GIFTED (default: PURCHASED)
+        original_owner: Original owner for inherited/gifted properties (e.g. 'Late Shri Ram Khetan, Father')
+        inherited_year: Year of inheritance/gift for tax holding period reference (optional)
         area_unit: GAJ (sq yards), SQFT, SQYD, ACRE, BIGHA, or SQMT (default: GAJ)
         locality: Locality or sector (e.g. 'Sector 150')
         city: City (default: 'Noida')
@@ -1766,6 +1772,9 @@ def add_real_estate_holding(
         name=name,
         property_type=property_type.upper(),
         status=status.upper(),
+        acquisition_type=acquisition_type.upper(),
+        original_owner=original_owner,
+        inherited_year=inherited_year,
         area_value=_parse_decimal(area_value),
         area_unit=area_unit.upper(),
         locality=locality,
@@ -1791,6 +1800,7 @@ def add_real_estate_holding(
         'status': 'created',
         'id': holding.id,
         'summary': str(holding),
+        'acquisition_type': holding.acquisition_type,
         'area': holding.area_display,
         'total_cost_basis': str(holding.total_cost_basis),
         'current_valuation': str(holding.current_valuation),
@@ -1805,6 +1815,9 @@ def update_real_estate_holding(
     current_valuation: str = None,
     monthly_rental_income: str = None,
     status: str = None,
+    acquisition_type: str = None,
+    original_owner: str = None,
+    inherited_year: int = None,
     landmark: str = None,
     micro_market_tag: str = None,
     google_maps_url: str = None,
@@ -1819,6 +1832,9 @@ def update_real_estate_holding(
         current_valuation: Updated market price estimate in INR (optional)
         monthly_rental_income: Updated monthly rent in INR (optional)
         status: VACANT_PLOT, READY_SELF, RENTED, UNDER_CONSTRUCTION, RESALE_PLANNED (optional)
+        acquisition_type: PURCHASED, INHERITED, or GIFTED (optional)
+        original_owner: Original owner for inherited/gifted properties (optional)
+        inherited_year: Year of inheritance/gift (optional, set to 0 to clear)
         landmark: Updated landmark (optional)
         micro_market_tag: Updated micro market tag (optional)
         google_maps_url: Updated Google Maps link (optional)
@@ -1841,6 +1857,12 @@ def update_real_estate_holding(
         holding.monthly_rental_income = _parse_decimal(monthly_rental_income)
     if status is not None:
         holding.status = status.upper()
+    if acquisition_type is not None:
+        holding.acquisition_type = acquisition_type.upper()
+    if original_owner is not None:
+        holding.original_owner = original_owner
+    if inherited_year is not None:
+        holding.inherited_year = inherited_year if inherited_year > 0 else None
     if landmark is not None:
         holding.landmark = landmark
     if micro_market_tag is not None:
@@ -1858,6 +1880,7 @@ def update_real_estate_holding(
         'status': 'updated',
         'id': holding.id,
         'summary': str(holding),
+        'acquisition_type': holding.acquisition_type,
         'current_valuation': str(holding.current_valuation),
         'current_rate_per_gaj': str(holding.current_rate_per_gaj),
     })

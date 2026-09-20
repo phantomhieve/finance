@@ -195,7 +195,9 @@ class RealEstateHoldingForm(forms.ModelForm):
     class Meta:
         model = RealEstateHolding
         fields = [
-            'name', 'property_type', 'status', 'area_value', 'area_unit',
+            'name', 'property_type', 'status',
+            'acquisition_type', 'original_owner', 'inherited_year',
+            'area_value', 'area_unit',
             'locality', 'city', 'state', 'landmark', 'pincode',
             'micro_market_tag', 'google_maps_url', 'khasra_khata_number',
             'purchase_date', 'purchase_price', 'stamp_duty_charges',
@@ -206,6 +208,9 @@ class RealEstateHoldingForm(forms.ModelForm):
             'name': forms.TextInput(attrs={'placeholder': 'e.g. Sector 150 Express Plot B-42'}),
             'property_type': forms.Select(),
             'status': forms.Select(),
+            'acquisition_type': forms.Select(),
+            'original_owner': forms.TextInput(attrs={'placeholder': 'e.g. Late Shri Ram Khetan, Father'}),
+            'inherited_year': forms.NumberInput(attrs={'placeholder': 'e.g. 2015'}),
             'area_value': forms.NumberInput(attrs={'step': '0.01', 'placeholder': 'e.g. 200'}),
             'area_unit': forms.Select(),
             'locality': forms.TextInput(attrs={'placeholder': 'e.g. Sector 150, Express Corridor'}),
