@@ -309,6 +309,7 @@ CSRF_COOKIE_HTTPONLY = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
 
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'
@@ -374,9 +375,9 @@ OAUTH2_PROVIDER = {
     'PKCE_REQUIRED': False,
 }
 
-# CORS Configuration for MCP
-# Only allow CORS for the discovery endpoint and MCP API
-CORS_URLS_REGEX = r'^/(\.well-known/oauth-authorization-server|mcp/.*)$'
+# CORS Configuration for MCP & OAuth
+# Allow CORS for discovery endpoints, MCP API, and OAuth token endpoints
+CORS_URLS_REGEX = r'^/(\.well-known/.*|mcp/.*|o/.*)$'
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_HEADERS = (
     'accept',

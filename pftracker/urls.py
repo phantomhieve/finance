@@ -16,21 +16,35 @@ def oauth_discovery(request):
         "issuer": base,
         "authorization_endpoint": f"{base}/o/authorize/",
         "token_endpoint": f"{base}/o/token/",
-        "response_types_supported": ["code", "token"],
-        "grant_types_supported": ["authorization_code", "client_credentials", "refresh_token"]
+        "response_types_supported": ["code"],
+        "grant_types_supported": ["authorization_code", "refresh_token"],
+        "code_challenge_methods_supported": ["S256"],
+        "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post", "none"],
+        "scopes_supported": ["read", "write"],
+        "logo_uri": f"{base}/static/icons/icon-512.png",
+        "icon_url": f"{base}/static/icons/icon-512.png",
     })
 
-def oauth_protected_resource(request):
+def oauth_protected_resource(request, path=""):
     base = request.build_absolute_uri('/')[:-1]
     return JsonResponse({
-        "resource": base,
-        "authorization_servers": [base]
+        "resource": f"{base}/mcp/sse",
+        "authorization_servers": [base],
+        "scopes_supported": ["read", "write"],
+        "bearer_methods_supported": ["header"],
+        "logo_uri": f"{base}/static/icons/icon-512.png",
+        "icon_url": f"{base}/static/icons/icon-512.png",
     })
 
 
 urlpatterns = [
     path('.well-known/oauth-authorization-server', oauth_discovery),
+    path('.well-known/oauth-authorization-server/', oauth_discovery),
+    path('.well-known/openid-configuration', oauth_discovery),
+    path('.well-known/openid-configuration/', oauth_discovery),
     path('.well-known/oauth-protected-resource', oauth_protected_resource),
+    path('.well-known/oauth-protected-resource/', oauth_protected_resource),
+    path('.well-known/oauth-protected-resource/<path:path>', oauth_protected_resource),
     path('sw.js', RedirectView.as_view(url='/static/sw.js', permanent=True)),
     path('vault-manage/', admin.site.urls),
     # Block allauth endpoints we don't use (must come before the allauth include)
@@ -51,7 +65,6 @@ urlpatterns = [
     path('accounts/2fa/', _blocked),
     path('accounts/', include('allauth.urls')),
     path('o/', include('oauth2_provider.urls', namespace='oauth2_provider')),
-    path('.well-known/oauth-authorization-server', oauth_discovery),
     path('portfolio/', include('portfolio.urls')),
     path('jewellery/', include('jewellery.urls')),
     path('', include('tracker.urls')),
