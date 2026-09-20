@@ -27,12 +27,18 @@ class OAuthBearerMiddleware(BaseHTTPMiddleware):
             
         auth_header = request.headers.get("Authorization")
         if not auth_header or not auth_header.startswith("Bearer "):
-            return Response("Unauthorized - Missing or invalid Bearer token", status_code=401)
+            res = Response("Unauthorized - Missing or invalid Bearer token", status_code=401)
+            base_url = str(request.base_url).rstrip('/')
+            res.headers["WWW-Authenticate"] = f'Bearer resource_metadata="{base_url}/.well-known/oauth-authorization-server"'
+            return res
             
         token_string = auth_header.split(" ")[1]
         
         is_valid = await validate_oauth_token(token_string)
         if not is_valid:
-            return Response("Unauthorized - Invalid or expired token", status_code=401)
+            res = Response("Unauthorized - Invalid or expired token", status_code=401)
+            base_url = str(request.base_url).rstrip('/')
+            res.headers["WWW-Authenticate"] = f'Bearer resource_metadata="{base_url}/.well-known/oauth-authorization-server"'
+            return res
             
         return await call_next(request)
