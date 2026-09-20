@@ -47,6 +47,7 @@ from django.apps import apps as django_apps  # noqa: E402
 from django.db.models import Sum, Case, When  # noqa: E402
 
 from mcp.server import MCPServer  # noqa: E402
+from mcp.types import Icon  # noqa: E402
 
 from tracker.models import (  # noqa: E402
     AccountGroup, User, Transaction, Category,
@@ -64,8 +65,9 @@ from portfolio.models import (  # noqa: E402
 )
 from jewellery.models import JewelleryItem  # noqa: E402
 from portfolio.services import (  # noqa: E402
-    get_portfolio_summary, refresh_commodity_prices,
-    refresh_us_stock_prices,
+    get_portfolio_summary as _fetch_portfolio_summary,
+    refresh_commodity_prices as _refresh_commodity_prices,
+    refresh_us_stock_prices as _refresh_us_stock_prices,
 )
 from mcp_server.models import MCPAuditLog  # noqa: E402
 from mcp_server.audit import (  # noqa: E402
@@ -75,7 +77,7 @@ from mcp_server.audit import (  # noqa: E402
 
 # Logging — write to stderr, never stdout (stdio transport uses stdout)
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='[%(asctime)s] %(levelname)s %(name)s %(message)s',
     stream=sys.stderr,
 )
@@ -155,7 +157,20 @@ def _model_to_dict(instance, exclude=None):
 # MCP Server
 # ---------------------------------------------------------------------------
 
-mcp = MCPServer("Vault Finance")
+mcp = MCPServer(
+    name="Vault Finance",
+    title="Vault Finance",
+    description="Personal Finance & Portfolio Tracker MCP Server",
+    version="1.0.0",
+    website_url="https://localhost:8000",
+    icons=[
+        Icon(
+            src="https://localhost:8000/static/icons/icon-512.png",
+            mime_type="image/png",
+            sizes=["512x512"],
+        )
+    ],
+)
 
 
 # =====================================================================
@@ -166,7 +181,7 @@ mcp = MCPServer("Vault Finance")
 def portfolio_summary() -> str:
     """Full portfolio summary: total value, per-asset breakdown, P&L, goals, equity split, consolidated view."""
     group = _get_group()
-    summary = get_portfolio_summary(group=group)
+    summary = _fetch_portfolio_summary(group=group)
 
     # Convert to serialisable format (strip Django objects)
     result = {
@@ -491,6 +506,296 @@ def mcp_audit_log() -> str:
             'data_before': e.data_before,
             'data_after': e.data_after,
         })
+    return _to_json(result)
+
+
+# =====================================================================
+#  TOOLS — Read operations (Data queries)
+# =====================================================================
+
+@mcp.tool()
+def get_portfolio_summary() -> str:
+    """Get complete portfolio summary: total net worth, invested value, total returns, P&L %, asset breakdown, goals, and consolidated holdings."""
+    return portfolio_summary()
+
+
+@mcp.tool()
+def get_portfolio_stocks(symbol: str = "", account_name: str = "") -> str:
+    """Get all stock holdings across Zerodha accounts with purchase values, current market values, and P&L.
+
+    Args:
+        symbol: Optional stock symbol filter (e.g. 'TCS', 'INFY')
+        account_name: Optional Zerodha account name filter
+    """
+    group = _get_group()
+    accounts = ZerodhaAccount.objects.filter(group=group) if group else ZerodhaAccount.objects.all()
+    if account_name:
+        accounts = accounts.filter(name__icontains=account_name)
+    result = []
+    for acct in accounts:
+        holdings = acct.stock_holdings.all()
+        if symbol:
+            holdings = holdings.filter(symbol__icontains=symbol)
+        for h in holdings:
+            result.append({
+                'account': acct.name,
+                'symbol': h.symbol,
+                'quantity': h.quantity,
+                'purchase_value': str(h.purchase_value),
+                'current_value': str(h.current_value),
+                'pnl': str(h.pnl),
+                'pnl_pct': str(h.pnl_pct),
+                'is_baby': h.is_baby,
+            })
+    return _to_json(result)
+
+
+@mcp.tool()
+def get_portfolio_mutual_funds(fund_name: str = "", account_name: str = "") -> str:
+    """Get all mutual fund holdings across Zerodha accounts.
+
+    Args:
+        fund_name: Optional fund name filter
+        account_name: Optional account name filter
+    """
+    group = _get_group()
+    accounts = ZerodhaAccount.objects.filter(group=group) if group else ZerodhaAccount.objects.all()
+    if account_name:
+        accounts = accounts.filter(name__icontains=account_name)
+    result = []
+    for acct in accounts:
+        holdings = acct.mf_holdings.all()
+        if fund_name:
+            holdings = holdings.filter(fund_name__icontains=fund_name)
+        for h in holdings:
+            result.append({
+                'account': acct.name,
+                'fund_name': h.fund_name,
+                'fund_type': h.fund_type,
+                'units': str(h.units),
+                'purchase_value': str(h.purchase_value),
+                'current_value': str(h.current_value),
+                'pnl': str(h.pnl),
+                'pnl_pct': str(h.pnl_pct),
+                'is_baby': h.is_baby,
+            })
+    return _to_json(result)
+
+
+@mcp.tool()
+def get_epf_details() -> str:
+    """Get EPF (Employee Provident Fund) running balance, total contribution, total interest, and recent entries."""
+    return portfolio_epf()
+
+
+@mcp.tool()
+def get_nps_details() -> str:
+    """Get NPS (National Pension System) current balance, total contribution, total interest, and recent entries."""
+    return portfolio_nps()
+
+
+@mcp.tool()
+def get_fixed_deposits(is_active_only: bool = True) -> str:
+    """Get fixed deposits with principal, interest rate, maturity date, accrued interest, current value, and days remaining.
+
+    Args:
+        is_active_only: Whether to return only active FDs (default: True)
+    """
+    group = _get_group()
+    qs = FixedDeposit.objects.filter(group=group) if group else FixedDeposit.objects.all()
+    if is_active_only:
+        qs = qs.filter(is_active=True)
+    result = []
+    for fd in qs:
+        d = _model_to_dict(fd)
+        d['current_value'] = str(fd.current_value)
+        d['maturity_value'] = str(fd.maturity_value)
+        d['interest_accrued'] = str(fd.interest_accrued)
+        d['days_remaining'] = fd.days_remaining
+        result.append(d)
+    return _to_json(result)
+
+
+@mcp.tool()
+def get_cash_positions() -> str:
+    """Get all cash positions and bank account balances."""
+    return portfolio_cash()
+
+
+@mcp.tool()
+def get_bond_holdings() -> str:
+    """Get all bond holdings."""
+    return portfolio_bonds()
+
+
+@mcp.tool()
+def get_crypto_holdings() -> str:
+    """Get all crypto holdings with invested amount, current value, and P&L."""
+    return portfolio_crypto()
+
+
+@mcp.tool()
+def get_commodity_holdings() -> str:
+    """Get physical gold and silver commodity holdings with current market prices and value."""
+    return portfolio_commodities()
+
+
+@mcp.tool()
+def get_us_stock_holdings() -> str:
+    """Get US stock (RSU) holdings with INR values and P&L."""
+    return portfolio_us_stocks()
+
+
+@mcp.tool()
+def get_portfolio_goals() -> str:
+    """Get portfolio milestone goals and progress."""
+    return portfolio_goals()
+
+
+@mcp.tool()
+def get_portfolio_snapshots(limit: int = 12) -> str:
+    """Get monthly portfolio snapshots to see net worth and returns growth over time.
+
+    Args:
+        limit: Number of monthly snapshots to return (default: 12)
+    """
+    limit = min(max(1, limit), 60)
+    group = _get_group()
+    qs = MonthlySnapshot.objects.filter(group=group) if group else MonthlySnapshot.objects.all()
+    result = []
+    for s in qs[:limit]:
+        d = _model_to_dict(s)
+        d['return_pct'] = str(s.return_pct)
+        result.append(d)
+    return _to_json(result)
+
+
+@mcp.tool()
+def get_transactions(
+    fy_year: str = "",
+    limit: int = 50,
+    category_name: str = "",
+    type: str = "",
+) -> str:
+    """Get transactions (savings, expenses, transfers, extra income) with optional filters.
+
+    Args:
+        fy_year: Optional financial year filter (e.g. '2025' for FY 2025-26)
+        limit: Max transactions to return (default: 50, max: 200)
+        category_name: Optional category name filter
+        type: Optional type filter (SAVINGS, EXPENSE, TRANSFER, EXTRA_INCOME)
+    """
+    limit = min(max(1, limit), 200)
+    user = _get_primary_user()
+    if not user:
+        return _to_json({'error': 'No primary user found.'})
+    qs = Transaction.objects.filter(user__group=user.group).select_related('category')
+    if fy_year:
+        try:
+            fy = int(fy_year)
+            start = datetime.date(fy, 4, 1)
+            end = datetime.date(fy + 1, 3, 31)
+            qs = qs.filter(date__gte=start, date__lte=end)
+        except ValueError:
+            return _to_json({'error': f'Invalid fy_year: {fy_year}. Use YYYY format (e.g. 2025).'})
+    if category_name:
+        qs = qs.filter(category__name__icontains=category_name)
+    if type:
+        qs = qs.filter(type=type.upper())
+    result = []
+    for t in qs[:limit]:
+        result.append({
+            'id': t.id,
+            'date': t.date.isoformat(),
+            'amount': str(t.amount),
+            'type': t.type,
+            'category': t.category.name if t.category else None,
+            'category_type': t.category.type if t.category else None,
+            'remarks': t.remarks,
+        })
+    return _to_json({'count': len(result), 'transactions': result})
+
+
+@mcp.tool()
+def get_hra_expenses(fy_year: str = "") -> str:
+    """Get House Rent Allowance (HRA) expenses.
+
+    Args:
+        fy_year: Optional financial year (e.g. '2025' for FY 2025-26)
+    """
+    user = _get_primary_user()
+    if not user:
+        return _to_json({'error': 'No primary user found.'})
+    qs = HRAExpense.objects.filter(user__group=user.group)
+    if fy_year:
+        try:
+            fy = int(fy_year)
+            start = datetime.date(fy, 4, 1)
+            end = datetime.date(fy + 1, 3, 31)
+            qs = qs.filter(date__gte=start, date__lte=end)
+        except ValueError:
+            return _to_json({'error': f'Invalid fy_year: {fy_year}.'})
+    return _to_json([_model_to_dict(h) for h in qs])
+
+
+@mcp.tool()
+def get_tracker_goals() -> str:
+    """Get monthly savings goals, increments, and adjustments."""
+    return tracker_goals()
+
+
+@mcp.tool()
+def get_notes(
+    limit: int = 50,
+    section: str = "",
+    pending_only: bool = False,
+) -> str:
+    """Get personal notes, todo items, or pending credit/debit trackers.
+
+    Args:
+        limit: Max notes to return (default: 50, max: 100)
+        section: Optional section filter (e.g. 'Savings', 'Tax', 'Goal')
+        pending_only: If true, only return notes with pending CREDIT/DEBIT amounts
+    """
+    limit = min(max(1, limit), 100)
+    user = _get_primary_user()
+    if not user:
+        return _to_json({'error': 'No primary user found.'})
+    qs = Note.objects.filter(user__group=user.group)
+    if section:
+        qs = qs.filter(section__icontains=section)
+    if pending_only:
+        qs = qs.filter(pending_type__in=['CREDIT', 'DEBIT']).exclude(pending_amount=0)
+    return _to_json([_model_to_dict(n) for n in qs[:limit]])
+
+
+@mcp.tool()
+def get_jewellery_items(
+    category: str = "",
+    metal_type: str = "",
+    location: str = "",
+) -> str:
+    """Get all jewellery items with weights, purity, locker/safe location, and estimated market values.
+
+    Args:
+        category: Optional filter (e.g. 'CHAIN', 'RING', 'BANGLE', 'COIN')
+        metal_type: Optional filter ('GOLD', 'SILVER', 'PLATINUM', 'DIAMOND_OTHER')
+        location: Optional filter ('BANK_LOCKER', 'HOME_SAFE')
+    """
+    group = _get_group()
+    qs = JewelleryItem.objects.filter(group=group) if group else JewelleryItem.objects.all()
+    if category:
+        qs = qs.filter(category=category.upper())
+    if metal_type:
+        qs = qs.filter(metal_type=metal_type.upper())
+    if location:
+        qs = qs.filter(location=location.upper())
+    result = []
+    for item in qs:
+        d = _model_to_dict(item, exclude={'photo'})
+        d['display_label'] = item.display_label
+        d['estimated_value'] = str(item.estimated_value)
+        result.append(d)
     return _to_json(result)
 
 
@@ -1236,7 +1541,7 @@ def list_mcp_audit_log(
 @mcp.tool()
 def do_refresh_commodity_prices() -> str:
     """Trigger a refresh of gold and silver prices from external APIs."""
-    result = refresh_commodity_prices()
+    result = _refresh_commodity_prices()
     if result:
         return _to_json({'status': 'refreshed', 'prices': result})
     return _to_json({'status': 'failed', 'detail': 'Could not fetch commodity prices.'})
@@ -1246,7 +1551,7 @@ def do_refresh_commodity_prices() -> str:
 def do_refresh_us_stock_prices() -> str:
     """Trigger a refresh of US stock (RSU) prices and USD/INR rate."""
     group = _get_group()
-    result = refresh_us_stock_prices(group=group)
+    result = _refresh_us_stock_prices(group=group)
     if result:
         return _to_json({'status': 'refreshed', 'detail': result})
     return _to_json({'status': 'failed', 'detail': 'Could not fetch US stock prices.'})
