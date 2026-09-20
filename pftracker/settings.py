@@ -175,7 +175,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'pftracker.wsgi.application'
+WSGI_APPLICATION = 'pftracker.wsgi.wsgi_application'
 
 
 # Database — uses DATABASE_URL env var if set, otherwise SQLite for local dev
