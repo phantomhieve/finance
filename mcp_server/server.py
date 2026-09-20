@@ -932,6 +932,57 @@ def add_transaction(
 
 
 @mcp.tool()
+def update_transaction(
+    txn_id: int,
+    amount: str = None,
+    date: str = None,
+    type: str = None,
+    category_name: str = None,
+    remarks: str = None,
+) -> str:
+    """Update an existing savings/expense/transfer/income transaction.
+
+    Args:
+        txn_id: ID of the transaction to update
+        amount: New transaction amount (optional)
+        date: New date in YYYY-MM-DD format (optional)
+        type: SAVINGS, EXPENSE, TRANSFER, or EXTRA_INCOME (optional)
+        category_name: Category name (optional)
+        remarks: Updated remarks (optional)
+    """
+    user = _get_primary_user()
+    try:
+        txn = Transaction.objects.get(pk=txn_id, user=user) if user else Transaction.objects.get(pk=txn_id)
+    except Transaction.DoesNotExist:
+        return f"Error: Transaction #{txn_id} not found."
+
+    old_data = serialize_instance(txn)
+    if amount is not None and amount != "":
+        txn.amount = _parse_decimal(amount)
+    if date is not None and date != "":
+        txn.date = _parse_date(date)
+    if type is not None and type != "":
+        valid_types = ['SAVINGS', 'TRANSFER', 'EXTRA_INCOME', 'EXPENSE']
+        if type.upper() not in valid_types:
+            return f"Error: type must be one of {valid_types}"
+        txn.type = type.upper()
+    if category_name is not None and category_name != "":
+        category = Category.objects.filter(user=txn.user, name__iexact=category_name).first()
+        if not category:
+            available = list(Category.objects.filter(user=txn.user).values_list('name', flat=True))
+            return f"Error: Category '{category_name}' not found. Available: {available}"
+        txn.category = category
+    elif category_name == "":
+        txn.category = None
+    if remarks is not None:
+        txn.remarks = remarks
+
+    txn.save()
+    log_update(txn, old_data, 'update_transaction')
+    return _to_json({'status': 'updated', 'id': txn.id, 'summary': str(txn)})
+
+
+@mcp.tool()
 def add_hra_entry(
     date: str,
     amount: str,
@@ -961,6 +1012,48 @@ def add_hra_entry(
         'id': entry.id,
         'summary': str(entry),
     })
+
+
+@mcp.tool()
+def update_hra_entry(
+    entry_id: int,
+    amount: str = "",
+    date: str = "",
+    expense_type: str = "",
+    mode_of_payment: str = "",
+    remarks: str = "",
+) -> str:
+    """Update an existing HRA rent or expense entry.
+
+    Args:
+        entry_id: ID of the HRA entry to update
+        amount: New amount (optional)
+        date: New date in YYYY-MM-DD format (optional)
+        expense_type: Description/type (optional)
+        mode_of_payment: Payment method (optional)
+        remarks: Updated remarks (optional)
+    """
+    user = _get_primary_user()
+    try:
+        entry = HRAExpense.objects.get(pk=entry_id, user=user) if user else HRAExpense.objects.get(pk=entry_id)
+    except HRAExpense.DoesNotExist:
+        return f"Error: HRA expense #{entry_id} not found."
+
+    old_data = serialize_instance(entry)
+    if amount:
+        entry.amount = _parse_decimal(amount)
+    if date:
+        entry.date = _parse_date(date)
+    if expense_type:
+        entry.expense_type = expense_type
+    if mode_of_payment:
+        entry.mode_of_payment = mode_of_payment
+    if remarks:
+        entry.remarks = remarks
+
+    entry.save()
+    log_update(entry, old_data, 'update_hra_entry')
+    return _to_json({'status': 'updated', 'id': entry.id, 'summary': str(entry)})
 
 
 @mcp.tool()
@@ -1081,6 +1174,46 @@ def add_epf_entry(
 
 
 @mcp.tool()
+def update_epf_entry(
+    entry_id: int,
+    amount: str = "",
+    date: str = "",
+    entry_type: str = "",
+    remarks: str = "",
+) -> str:
+    """Update an existing EPF contribution or interest entry.
+
+    Args:
+        entry_id: ID of the EPF entry
+        amount: New amount in INR (optional)
+        date: New date in YYYY-MM-DD format (optional)
+        entry_type: CONTRIBUTION or INTEREST (optional)
+        remarks: Updated remarks (optional)
+    """
+    group = _get_group()
+    try:
+        entry = EPFEntry.objects.get(pk=entry_id, group=group) if group else EPFEntry.objects.get(pk=entry_id)
+    except EPFEntry.DoesNotExist:
+        return f"Error: EPF entry #{entry_id} not found."
+
+    old_data = serialize_instance(entry)
+    if amount:
+        entry.amount = _parse_decimal(amount)
+    if date:
+        entry.date = _parse_date(date)
+    if entry_type:
+        if entry_type.upper() not in ('CONTRIBUTION', 'INTEREST'):
+            return "Error: entry_type must be CONTRIBUTION or INTEREST"
+        entry.entry_type = entry_type.upper()
+    if remarks:
+        entry.remarks = remarks
+
+    entry.save()
+    log_update(entry, old_data, 'update_epf_entry')
+    return _to_json({'status': 'updated', 'id': entry.id, 'summary': str(entry)})
+
+
+@mcp.tool()
 def add_nps_entry(
     date: str,
     contribution: str,
@@ -1109,6 +1242,48 @@ def add_nps_entry(
     entry.save()
     log_create(entry, 'add_nps_entry')
     return _to_json({'status': 'created', 'id': entry.id, 'summary': str(entry)})
+
+
+@mcp.tool()
+def update_nps_entry(
+    entry_id: int,
+    date: str = "",
+    contribution: str = "",
+    interest_earned: str = "",
+    total_balance: str = "",
+    remarks: str = "",
+) -> str:
+    """Update an existing NPS snapshot entry.
+
+    Args:
+        entry_id: ID of the NPS entry
+        date: New date in YYYY-MM-DD format (optional)
+        contribution: Updated contribution amount (optional)
+        interest_earned: Updated returns/interest credited (optional)
+        total_balance: Updated total running balance (optional)
+        remarks: Updated remarks (optional)
+    """
+    group = _get_group()
+    try:
+        entry = NPSEntry.objects.get(pk=entry_id, group=group) if group else NPSEntry.objects.get(pk=entry_id)
+    except NPSEntry.DoesNotExist:
+        return f"Error: NPS entry #{entry_id} not found."
+
+    old_data = serialize_instance(entry)
+    if date:
+        entry.date = _parse_date(date)
+    if contribution:
+        entry.contribution = _parse_decimal(contribution)
+    if interest_earned:
+        entry.interest_earned = _parse_decimal(interest_earned)
+    if total_balance:
+        entry.total_balance = _parse_decimal(total_balance)
+    if remarks:
+        entry.remarks = remarks
+
+    entry.save()
+    log_update(entry, old_data, 'update_nps_entry')
+    return _to_json({'status': 'updated', 'id': entry.id, 'summary': str(entry)})
 
 
 @mcp.tool()
@@ -1409,6 +1584,51 @@ def add_commodity_holding(
 
 
 @mcp.tool()
+def update_commodity_holding(
+    holding_id: int,
+    description: str = "",
+    weight_grams: str = "",
+    purchase_price_per_gram: str = "",
+    purity: str = "",
+    is_baby: bool = None,
+) -> str:
+    """Update an existing gold or silver commodity holding.
+
+    Args:
+        holding_id: ID of the commodity holding
+        description: Updated description (optional)
+        weight_grams: Updated weight in grams (optional)
+        purchase_price_per_gram: Updated purchase price per gram in INR (optional)
+        purity: Updated purity (24k, 22k, 18k, 14k, 999, 925, etc.) (optional)
+        is_baby: Track in Advay portfolio vs Master portfolio (optional)
+    """
+    group = _get_group()
+    try:
+        holding = CommodityHolding.objects.get(pk=holding_id, group=group) if group else CommodityHolding.objects.get(pk=holding_id)
+    except CommodityHolding.DoesNotExist:
+        return f"Error: Commodity holding #{holding_id} not found."
+
+    old_data = serialize_instance(holding)
+    if description:
+        holding.description = description
+    if weight_grams:
+        holding.weight_grams = _parse_decimal(weight_grams)
+    if purchase_price_per_gram:
+        holding.purchase_price_per_gram = _parse_decimal(purchase_price_per_gram)
+    if purity:
+        holding.purity = purity
+    if is_baby is not None:
+        holding.is_baby = is_baby
+
+    holding.save()
+    log_update(holding, old_data, 'update_commodity_holding')
+    return _to_json({
+        'status': 'updated', 'id': holding.id, 'summary': str(holding),
+        'purchase_value': str(holding.purchase_value),
+    })
+
+
+@mcp.tool()
 def add_us_stock(
     symbol: str,
     units: str,
@@ -1444,6 +1664,51 @@ def add_us_stock(
     log_create(holding, 'add_us_stock')
     return _to_json({
         'status': 'created', 'id': holding.id, 'summary': str(holding),
+        'purchase_value': str(holding.purchase_value),
+    })
+
+
+@mcp.tool()
+def update_us_stock(
+    holding_id: int,
+    symbol: str = "",
+    units: str = "",
+    purchase_value: str = "",
+    remarks: str = "",
+    is_baby: bool = None,
+) -> str:
+    """Update an existing US stock (RSU) holding.
+
+    Args:
+        holding_id: ID of the US stock holding
+        symbol: Updated symbol (optional)
+        units: Updated share units (optional)
+        purchase_value: Updated purchase value in INR (optional)
+        remarks: Updated remarks (optional)
+        is_baby: Track in Advay portfolio vs Master portfolio (optional)
+    """
+    group = _get_group()
+    try:
+        holding = USStockHolding.objects.get(pk=holding_id, group=group) if group else USStockHolding.objects.get(pk=holding_id)
+    except USStockHolding.DoesNotExist:
+        return f"Error: US stock holding #{holding_id} not found."
+
+    old_data = serialize_instance(holding)
+    if symbol:
+        holding.symbol = symbol.upper()
+    if units:
+        holding.units = _parse_decimal(units)
+    if purchase_value:
+        holding.purchase_value = _parse_decimal(purchase_value)
+    if remarks:
+        holding.remarks = remarks
+    if is_baby is not None:
+        holding.is_baby = is_baby
+
+    holding.save()
+    log_update(holding, old_data, 'update_us_stock')
+    return _to_json({
+        'status': 'updated', 'id': holding.id, 'summary': str(holding),
         'purchase_value': str(holding.purchase_value),
     })
 
@@ -1669,6 +1934,56 @@ def add_portfolio_goal(
 
 
 @mcp.tool()
+def update_portfolio_goal(
+    goal_id: int,
+    label: str = None,
+    target_amount: str = None,
+    achieved_date: str = None,
+    is_achieved: bool = None,
+    notes: str = None,
+) -> str:
+    """Update a portfolio financial milestone goal (e.g. 50L, 1Cr, 2Cr).
+
+    Args:
+        goal_id: ID of the PortfolioGoal
+        label: Updated milestone label (e.g. '50L', '1Cr') (optional)
+        target_amount: Updated target amount in INR (optional)
+        achieved_date: Achievement date in YYYY-MM-DD format (optional)
+        is_achieved: Mark as achieved (sets today's date) or unachieved (clears date) (optional)
+        notes: Updated notes (optional)
+    """
+    group = _get_group()
+    try:
+        goal = PortfolioGoal.objects.get(pk=goal_id, group=group) if group else PortfolioGoal.objects.get(pk=goal_id)
+    except PortfolioGoal.DoesNotExist:
+        return f"Error: PortfolioGoal #{goal_id} not found."
+
+    old_data = serialize_instance(goal)
+    if label is not None and label != "":
+        goal.label = label
+    if target_amount is not None and target_amount != "":
+        goal.target_amount = _parse_decimal(target_amount)
+    if notes is not None:
+        goal.notes = notes
+    if achieved_date is not None and achieved_date != "":
+        goal.achieved_at = _parse_date(achieved_date)
+    elif is_achieved is not None:
+        goal.achieved_at = datetime.date.today() if is_achieved else None
+
+    goal.save()
+    log_update(goal, old_data, 'update_portfolio_goal')
+    return _to_json({
+        'status': 'updated',
+        'id': goal.id,
+        'summary': str(goal),
+        'label': goal.label,
+        'target_amount': str(goal.target_amount),
+        'achieved_at': str(goal.achieved_at) if goal.achieved_at else None,
+        'notes': goal.notes,
+    })
+
+
+@mcp.tool()
 def add_jewellery_item(
     category: str,
     metal_type: str,
@@ -1713,6 +2028,69 @@ def add_jewellery_item(
     log_create(item, 'add_jewellery_item')
     return _to_json({
         'status': 'created', 'id': item.id,
+        'label': item.display_label,
+        'estimated_value': str(item.estimated_value),
+    })
+
+
+@mcp.tool()
+def update_jewellery_item(
+    item_id: int,
+    category: str = "",
+    metal_type: str = "",
+    weight_grams: str = "",
+    location: str = "",
+    purity: str = "",
+    purchase_price: str = "",
+    purchase_date: str = "",
+    notes: str = "",
+) -> str:
+    """Update an existing jewellery item.
+
+    Args:
+        item_id: ID of the jewellery item
+        category: CHAIN, LOCKET, NECKLACE, RING, BANGLE, BRACELET, EARRINGS, COIN, or OTHER (optional)
+        metal_type: GOLD, SILVER, PLATINUM, or DIAMOND_OTHER (optional)
+        weight_grams: Weight in grams (optional)
+        location: BANK_LOCKER or HOME_SAFE (optional)
+        purity: Gold/Silver purity tag (optional)
+        purchase_price: Total purchase price in INR (optional)
+        purchase_date: Purchase date in YYYY-MM-DD format (optional)
+        notes: Updated notes (optional)
+    """
+    group = _get_group()
+    try:
+        item = JewelleryItem.objects.get(pk=item_id, group=group) if group else JewelleryItem.objects.get(pk=item_id)
+    except JewelleryItem.DoesNotExist:
+        return f"Error: Jewellery item #{item_id} not found."
+
+    old_data = serialize_instance(item)
+    if category:
+        valid_cats = ['CHAIN', 'LOCKET', 'NECKLACE', 'RING', 'BANGLE',
+                      'BRACELET', 'EARRINGS', 'COIN', 'OTHER']
+        if category.upper() not in valid_cats:
+            return f"Error: category must be one of {valid_cats}"
+        item.category = category.upper()
+    if metal_type:
+        item.metal_type = metal_type.upper()
+    if weight_grams:
+        item.weight_grams = _parse_decimal(weight_grams)
+    if location:
+        item.location = location.upper()
+    if purity:
+        item.purity = purity
+    if purchase_price:
+        item.purchase_price = _parse_decimal(purchase_price)
+    if purchase_date:
+        item.purchase_date = _parse_date(purchase_date)
+    if notes:
+        item.notes = notes
+
+    item.save()
+    log_update(item, old_data, 'update_jewellery_item')
+    return _to_json({
+        'status': 'updated',
+        'id': item.id,
         'label': item.display_label,
         'estimated_value': str(item.estimated_value),
     })
