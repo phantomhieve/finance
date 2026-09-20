@@ -20,8 +20,17 @@ def oauth_discovery(request):
         "grant_types_supported": ["authorization_code", "client_credentials", "refresh_token"]
     })
 
+def oauth_protected_resource(request):
+    base = request.build_absolute_uri('/')[:-1]
+    return JsonResponse({
+        "resource": base,
+        "authorization_servers": [base]
+    })
+
 
 urlpatterns = [
+    path('.well-known/oauth-authorization-server', oauth_discovery),
+    path('.well-known/oauth-protected-resource', oauth_protected_resource),
     path('sw.js', RedirectView.as_view(url='/static/sw.js', permanent=True)),
     path('vault-manage/', admin.site.urls),
     # Block allauth endpoints we don't use (must come before the allauth include)
