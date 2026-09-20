@@ -12,13 +12,15 @@ def _blocked(request, *args, **kwargs):
 
 def oauth_discovery(request):
     base = request.build_absolute_uri('/')[:-1]
-    return JsonResponse({
+    response = JsonResponse({
         "issuer": base,
         "authorization_endpoint": f"{base}/o/authorize/",
         "token_endpoint": f"{base}/o/token/",
         "response_types_supported": ["code", "token"],
         "grant_types_supported": ["authorization_code", "client_credentials", "refresh_token"]
     })
+    response["Access-Control-Allow-Origin"] = "*"
+    return response
 
 
 urlpatterns = [
