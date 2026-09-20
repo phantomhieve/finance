@@ -135,6 +135,13 @@ UNFOLD = {
                     {"title": "Audit Log", "icon": "history", "link": f"{_ADMIN_PREFIX}/mcp_server/mcpauditlog/"},
                 ],
             },
+            {
+                "title": "OAuth Integrations",
+                "items": [
+                    {"title": "Applications", "icon": "apps", "link": f"{_ADMIN_PREFIX}/oauth2_provider/application/"},
+                    {"title": "Access Tokens", "icon": "key", "link": f"{_ADMIN_PREFIX}/oauth2_provider/accesstoken/"},
+                ],
+            },
         ],
     },
 }
