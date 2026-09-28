@@ -178,6 +178,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'pftracker.context_processors.household_config',
             ],
             'loaders': [('django.template.loaders.cached.Loader', _TEMPLATE_LOADERS)]
             if not DEBUG else _TEMPLATE_LOADERS,

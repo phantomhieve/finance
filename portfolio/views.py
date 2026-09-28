@@ -57,12 +57,47 @@ logger = logging.getLogger(__name__)
 
 _PORTFOLIO_UNLOCK_TTL = 1800  # 30 minutes
 
+
+def _require_feature(feature_name):
+    """Decorator to gate a view behind a HouseholdConfig feature toggle.
+
+    Usage:  @_require_feature('jewellery')
+    """
+    from django.http import Http404
+
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            group = getattr(request.user, 'group', None)
+            if group:
+                try:
+                    config = group.config
+                    if not getattr(config, f'feature_{feature_name}', True):
+                        raise Http404
+                except group.config.RelatedObjectDoesNotExist:
+                    pass  # no config → allow (defaults are True)
+                except Exception:
+                    pass
+            return view_func(request, *args, **kwargs)
+        return wrapper
+    return decorator
+
+
 def _require_portfolio(view_func):
     """Only PRIMARY users can access portfolio views; always gate behind group password."""
     @wraps(view_func)
     def _wrapped(request, *args, **kwargs):
         if not request.user.can_view_portfolio:
             return HttpResponseForbidden('You do not have permission to view this page.')
+        # Feature toggle check
+        group = getattr(request.user, 'group', None)
+        if group:
+            try:
+                if not group.config.feature_portfolio:
+                    from django.http import Http404
+                    raise Http404
+            except Exception:
+                pass
         unlocked_at = request.session.get('portfolio_unlocked_at')
         if not unlocked_at or (time.time() - unlocked_at) > _PORTFOLIO_UNLOCK_TTL:
             request.session.pop('portfolio_unlocked_at', None)
@@ -77,6 +112,15 @@ def _require_jewellery(view_func):
     def _wrapped(request, *args, **kwargs):
         if not getattr(request.user, 'can_view_jewellery', False):
             return HttpResponseForbidden('You do not have permission to view this page.')
+        # Feature toggle check
+        group = getattr(request.user, 'group', None)
+        if group:
+            try:
+                if not group.config.feature_jewellery:
+                    from django.http import Http404
+                    raise Http404
+            except Exception:
+                pass
         unlocked_at = request.session.get('portfolio_unlocked_at')
         if not unlocked_at or (time.time() - unlocked_at) > _PORTFOLIO_UNLOCK_TTL:
             request.session.pop('portfolio_unlocked_at', None)
@@ -357,18 +401,32 @@ def delete_us_stock(request, pk):
 # Page views
 # ---------------------------------------------------------------------------
 
-def _insight_cooldown_timedelta():
-    """Production uses DB-backed cooldown; DEBUG disables cooldown."""
+def _insight_cooldown_timedelta(group=None):
+    """Per-household cooldown; falls back to global InsightGenerationSettings; DEBUG disables."""
     if settings.DEBUG:
         return datetime.timedelta(0)
+    # Per-household override
+    if group:
+        try:
+            days = group.config.ai_cooldown_days
+            days = max(0, min(int(days), 366))
+            return datetime.timedelta(days=days)
+        except Exception:
+            pass
+    # Global fallback
     days = InsightGenerationSettings.get_solo().cooldown_days
     days = max(0, min(int(days), 366))
     return datetime.timedelta(days=days)
 
 
-def _insight_cooldown_hint():
+def _insight_cooldown_hint(group=None):
     if settings.DEBUG:
         return None
+    if group:
+        try:
+            return group.config.ai_cooldown_days
+        except Exception:
+            pass
     return InsightGenerationSettings.get_solo().cooldown_days
 
 
@@ -379,7 +437,7 @@ def _insight_can_generate(group):
     latest = qs.first()
     if not latest:
         return latest, True
-    cooldown = _insight_cooldown_timedelta()
+    cooldown = _insight_cooldown_timedelta(group)
     can = (_tz.now() - latest.generated_at) >= cooldown
     return latest, can
 
@@ -406,7 +464,7 @@ def master_portfolio(request):
         **summary,
         'latest_insight': latest_insight,
         'can_generate_insight': can_generate,
-        'insight_cooldown_days_hint': _insight_cooldown_hint(),
+        'insight_cooldown_days_hint': _insight_cooldown_hint(group),
         'epf_form': EPFEntryForm(),
         'nps_form': NPSEntryForm(group=group),
         'fd_form': FixedDepositForm(),
@@ -848,11 +906,12 @@ def generate_insights(request):
     from django.utils import timezone as _tz
     last, can = _insight_can_generate(group)
     if last and not can:
-        remaining = cooldown_td - (_tz.now() - last.generated_at)
+        cooldown = _insight_cooldown_timedelta(group)
+        remaining = cooldown - (_tz.now() - last.generated_at)
         secs = max(0, int(remaining.total_seconds()))
         days = secs // 86400
         hours = (secs % 86400) // 3600
-        cfg_days = InsightGenerationSettings.get_solo().cooldown_days
+        cfg_days = _insight_cooldown_hint(group) or InsightGenerationSettings.get_solo().cooldown_days
         messages.warning(
             request,
             f"AI insights cooldown is {cfg_days} day(s). Try again in {days}d {hours}h.",
@@ -862,7 +921,7 @@ def generate_insights(request):
         summary = get_portfolio_summary(group)
         growth = get_growth_data(group=group)
         prompt_data = build_prompt_data(summary, growth, group)
-        result = call_gemini(prompt_data)
+        result = call_gemini(prompt_data, group=group)
         PortfolioInsight.objects.create(
             group=group,
             model_used=result.model,

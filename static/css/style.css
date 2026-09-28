@@ -204,6 +204,22 @@ dialog textarea:focus {
     radial-gradient(ellipse at 50% 50%, oklch(var(--s) / 0.05) 0%, transparent 70%),
     oklch(var(--b2) / 1);
   border: 1px solid oklch(var(--p) / 0.14);
+  position: relative;
+  overflow: hidden;
+}
+.hero-gradient-portfolio::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, oklch(var(--p) / 0.5), transparent);
+  animation: hero-shimmer 6s ease-in-out infinite;
+}
+@keyframes hero-shimmer {
+  0%, 100% { left: -50%; opacity: 0; }
+  50% { left: 100%; opacity: 1; }
 }
 
 /* ── Card hover lift ───────────────────────────────────────────────── */
@@ -211,7 +227,7 @@ dialog textarea:focus {
 .card-hover {
   transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1),
               box-shadow 0.25s cubic-bezier(0.4, 0, 0.2, 1),
-              border-color 0.25s;
+              border-color 0.3s;
 }
 
 .card-hover:hover {
@@ -219,9 +235,11 @@ dialog textarea:focus {
   box-shadow:
     0 8px 30px oklch(var(--bc) / 0.07),
     0 2px 8px oklch(var(--bc) / 0.04);
+  border-color: oklch(var(--p) / 0.08);
 }
 
 @media (hover: none) {
+  .card-hover:hover { transform: none; box-shadow: none; border-color: inherit; }
   .card-hover:active {
     transform: scale(0.985);
     transition-duration: 0.1s;
@@ -1006,3 +1024,160 @@ progress {
   border: 1px solid hsl(var(--h) 55% 55% / 0.28);
   background: hsl(var(--h) 55% 48% / 0.12);
 }
+
+/* ── Sticky section nav (portfolio page) ──────────────────────────── */
+
+.section-nav {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: oklch(var(--b1) / 0.85);
+  backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  border-bottom: 1px solid oklch(var(--bc) / 0.06);
+  transition: box-shadow 0.25s ease, background 0.25s;
+}
+.section-nav.scrolled {
+  box-shadow:
+    0 4px 20px oklch(var(--bc) / 0.08),
+    0 1px 3px oklch(var(--bc) / 0.04);
+  background: oklch(var(--b1) / 0.92);
+}
+
+.section-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.875rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  border-radius: 9999px;
+  color: oklch(var(--bc) / 0.45);
+  transition: color 0.2s, background 0.2s, box-shadow 0.2s, transform 0.12s;
+  text-decoration: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  letter-spacing: 0.01em;
+}
+.section-tab:hover {
+  color: oklch(var(--bc) / 0.8);
+  background: oklch(var(--bc) / 0.06);
+}
+.section-tab:active {
+  transform: scale(0.95);
+}
+.section-tab.active {
+  color: oklch(var(--p) / 1);
+  background: oklch(var(--p) / 0.12);
+  box-shadow: 0 1px 6px oklch(var(--p) / 0.10);
+}
+.section-tab .material-symbols-outlined {
+  font-size: 0.9375rem;
+  opacity: 0.7;
+}
+.section-tab.active .material-symbols-outlined {
+  opacity: 1;
+}
+
+/* ── Section group headers ─────────────────────────────────────────── */
+
+.section-group-header {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 1rem 0 0.5rem 0;
+  margin-top: 0.75rem;
+  margin-bottom: 0.25rem;
+  border-bottom: 1px solid oklch(var(--bc) / 0.06);
+  position: relative;
+}
+.section-group-header::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -1px;
+  width: 2.5rem;
+  height: 2px;
+  border-radius: 1px;
+  background: oklch(var(--p) / 0.5);
+}
+.section-group-header .section-icon {
+  font-size: 1.125rem;
+  opacity: 0.6;
+}
+.section-group-header h2 {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  opacity: 0.45;
+  margin: 0;
+  flex: 1;
+}
+
+/* ── Mobile quick stats scroll ─────────────────────────────────────── */
+
+.quick-stats-scroll {
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 0 0.25rem 0.5rem;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+}
+.quick-stats-scroll::-webkit-scrollbar { display: none; }
+
+.quick-stat-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.75rem;
+  background: oklch(var(--b2) / 1);
+  border: 1px solid oklch(var(--bc) / 0.06);
+  white-space: nowrap;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  color: inherit;
+  scroll-snap-align: start;
+}
+.quick-stat-chip:hover {
+  border-color: oklch(var(--p) / 0.3);
+  background: oklch(var(--p) / 0.06);
+  transform: translateY(-1px);
+}
+.quick-stat-chip:active {
+  transform: scale(0.97);
+}
+.quick-stat-chip .qs-icon {
+  font-size: 1rem;
+  opacity: 0.5;
+}
+.quick-stat-chip .qs-label {
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  opacity: 0.4;
+}
+.quick-stat-chip .qs-value {
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+/* ── Mobile card spacing & responsive tweaks ──────────────────────── */
+
+@media (max-width: 767px) {
+  .card-body { padding: 0.875rem !important; }
+  .card-body .card-title { font-size: 0.9375rem; }
+  .section-group-header { margin-top: 0.5rem; padding: 0.75rem 0 0.375rem 0; }
+  .stat-card { padding: 0.625rem 0.75rem; }
+}
+
+/* ── Scrollbar hide utility ────────────────────────────────────────── */
+.scrollbar-hide { scrollbar-width: none; }
+.scrollbar-hide::-webkit-scrollbar { display: none; }

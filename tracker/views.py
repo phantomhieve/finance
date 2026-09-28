@@ -65,6 +65,24 @@ def _safe_redirect(request, fallback='dashboard'):
     return safe_redirect(request, fallback)
 
 
+def _require_feature(feature_name):
+    """Decorator to gate a view behind a HouseholdConfig feature toggle."""
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            group = getattr(request.user, 'group', None)
+            if group:
+                try:
+                    config = group.config
+                    if not getattr(config, f'feature_{feature_name}', True):
+                        raise Http404
+                except Exception:
+                    pass
+            return view_func(request, *args, **kwargs)
+        return wrapper
+    return decorator
+
+
 def _fy_context(request):
     """Parse FY from query params and return common FY context values."""
     today = timezone.now().date()
@@ -117,6 +135,7 @@ def _fy_context(request):
 # ---------------------------------------------------------------------------
 
 @login_required
+@_require_feature('savings')
 def dashboard(request):
     if not request.user.can_view_savings:
         return redirect('hra_tracker')
@@ -515,6 +534,7 @@ def save_month_comment(request):
 # ---------------------------------------------------------------------------
 
 @login_required
+@_require_feature('hra')
 def hra_tracker(request):
     fc = _fy_context(request)
     gf = group_user_filter(request.user)
@@ -797,6 +817,7 @@ def server_metrics(request):
 # ---------------------------------------------------------------------------
 
 @login_required
+@_require_feature('notes')
 def notes_list(request):
     """Display all notes for the current user, with section and FY filter."""
     fc = _fy_context(request)

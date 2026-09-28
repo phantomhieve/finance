@@ -72,7 +72,7 @@
   {# Nav links #}
   <nav class="flex-1 px-2 pt-4 overflow-y-auto overflow-x-hidden">
     <p class="sidebar-section-title sidebar-label">Navigation</p>
-    {% if user.can_view_savings %}
+    {% if user.can_view_savings and household_config.feature_savings %}
     <div class="tooltip tooltip-right sidebar-tip" data-tip="Monthly Savings">
       <a href="{% url 'dashboard' %}" class="sidebar-link {% if request.resolver_match.url_name == 'dashboard' %}sidebar-active{% endif %}">
         <span class="icon-filled material-symbols-outlined text-lg text-emerald-400 flex-shrink-0">monitoring</span>
@@ -80,14 +80,14 @@
       </a>
     </div>
     {% endif %}
-    {% if user.can_view_portfolio %}
+    {% if user.can_view_portfolio and household_config.feature_portfolio %}
     <div class="tooltip tooltip-right sidebar-tip" data-tip="Portfolio">
       <a href="{% url 'portfolio_tracker' %}" class="sidebar-link {% if request.resolver_match.url_name == 'portfolio_tracker' or 'portfolio' in request.resolver_match.url_name %}sidebar-active{% endif %}">
         <span class="icon-filled material-symbols-outlined text-[20px] text-blue-400 flex-shrink-0">cases</span>
         <span class="sidebar-label">Portfolio</span>
       </a>
     </div>
-    {% elif user.user_type == 'ACCOUNT_HOLDER' %}
+    {% elif user.user_type == 'ACCOUNT_HOLDER' and household_config.feature_portfolio %}
     <div class="tooltip tooltip-right sidebar-tip" data-tip="Portfolio">
       <a class="sidebar-link opacity-30 pointer-events-none">
         <span class="material-symbols-outlined text-lg flex-shrink-0">query_stats</span>
@@ -96,7 +96,7 @@
     </div>
     {% endif %}
 
-    {% if user.can_view_jewellery %}
+    {% if user.can_view_jewellery and household_config.feature_jewellery %}
     <div class="tooltip tooltip-right sidebar-tip" data-tip="Jewellery">
       <a href="{% url 'jewellery_dashboard' %}" class="sidebar-link {% if 'jewellery' in request.resolver_match.url_name %}sidebar-active{% endif %}">
         <span class="icon-filled material-symbols-outlined text-[20px] text-pink-400 flex-shrink-0">diamond</span>
@@ -104,18 +104,22 @@
       </a>
     </div>
     {% endif %}
+    {% if household_config.feature_hra %}
     <div class="tooltip tooltip-right sidebar-tip" data-tip="HRA &amp; Rent">
       <a href="{% url 'hra_tracker' %}" class="sidebar-link {% if request.resolver_match.url_name == 'hra_tracker' %}sidebar-active{% endif %}">
         <span class="icon-filled material-symbols-outlined text-lg text-amber-400 flex-shrink-0">home_work</span>
         <span class="sidebar-label">HRA &amp; Rent</span>
       </a>
     </div>
+    {% endif %}
+    {% if household_config.feature_notes %}
     <div class="tooltip tooltip-right sidebar-tip" data-tip="Notes">
       <a href="{% url 'notes_list' %}" class="sidebar-link {% if request.resolver_match.url_name == 'notes_list' %}sidebar-active{% endif %}">
         <span class="icon-filled material-symbols-outlined text-lg text-violet-400 flex-shrink-0">sticky_note_2</span>
         <span class="sidebar-label">Notes</span>
       </a>
     </div>
+    {% endif %}
     {% if user.is_superuser %}
     <p class="sidebar-section-title sidebar-label mt-5">Admin</p>
     <div class="tooltip tooltip-right sidebar-tip" data-tip="Server Monitor">

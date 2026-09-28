@@ -350,7 +350,16 @@ def _investor_profile_path() -> Path:
     return Path(__file__).resolve().parent / 'investor_profile.md'
 
 
-def _load_investor_profile() -> str:
+def _load_investor_profile(group=None) -> str:
+    # Per-household: check group.config.investor_profile first
+    if group:
+        try:
+            config = group.config
+            if config.investor_profile and config.investor_profile.strip():
+                return config.investor_profile.strip()
+        except Exception:
+            pass  # fall through to file-based
+
     path = _investor_profile_path()
     if path.is_file():
         return path.read_text(encoding='utf-8').strip()
@@ -363,8 +372,8 @@ def _load_investor_profile() -> str:
     )
 
 
-def get_system_instruction() -> str:
-    return SYSTEM_INSTRUCTION.replace('{{INVESTOR_PROFILE}}', _load_investor_profile())
+def get_system_instruction(group=None) -> str:
+    return SYSTEM_INSTRUCTION.replace('{{INVESTOR_PROFILE}}', _load_investor_profile(group))
 
 
 # ---------------------------------------------------------------------------
@@ -760,11 +769,15 @@ def _fetch_macro_context(client) -> dict | None:
         return None
 
 
-def call_gemini(prompt_data: dict) -> GeminiResult:
+def call_gemini(prompt_data: dict, group=None) -> GeminiResult:
     """Call Gemini with portfolio data and return structured insights.
 
     Step 1: Fetch live macro data via Google Search grounding (cheap model).
     Step 2: Run full portfolio analysis with structured output (main model).
+
+    Args:
+        prompt_data: Portfolio data dict from build_prompt_data.
+        group: Optional AccountGroup for per-household AI config.
     """
     api_key = os.environ.get('GEMINI_API_KEY', '')
     if not api_key:
@@ -791,7 +804,7 @@ def call_gemini(prompt_data: dict) -> GeminiResult:
         model=model,
         contents=user_message,
         config=genai.types.GenerateContentConfig(
-            system_instruction=get_system_instruction(),
+            system_instruction=get_system_instruction(group),
             response_mime_type='application/json',
             response_schema=PortfolioInsightsResponse,
             temperature=0.3,

@@ -57,3 +57,25 @@ def get_google_credentials_path():
             'to the path of your service account JSON file.'
         )
     return str(path)
+
+
+def get_google_credentials(group=None):
+    """Resolve Google service account credentials for a household group.
+
+    Resolution order:
+    1. group.config.google_credentials_json (if group has per-household creds)
+    2. Global GOOGLE_SHEETS_CREDENTIALS env var (fallback)
+
+    Returns:
+        dict or str: parsed JSON dict if from DB, file path string if from env.
+    """
+    if group:
+        try:
+            config = group.config
+            if config.google_credentials_json and config.google_credentials_json.strip():
+                import json as _json
+                return _json.loads(config.google_credentials_json)
+        except Exception:
+            pass  # fall through to global
+    return get_google_credentials_path()
+
