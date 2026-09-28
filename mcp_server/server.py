@@ -787,9 +787,17 @@ def get_ai_insight_status() -> str:
     from django.conf import settings as _settings
 
     group = _get_group()
-    settings_obj = InsightGenerationSettings.get_solo()
-    cooldown_days = settings_obj.cooldown_days
     is_debug = _settings.DEBUG
+
+    # Per-household cooldown; fall back to global
+    cooldown_days = 30
+    if group:
+        try:
+            cooldown_days = group.config.ai_cooldown_days
+        except Exception:
+            pass
+    else:
+        cooldown_days = InsightGenerationSettings.get_solo().cooldown_days
 
     qs = PortfolioInsight.objects.filter(group=group) if group else PortfolioInsight.objects.all()
     latest = qs.order_by('-generated_at').first()
@@ -860,11 +868,17 @@ def trigger_ai_insights(force: bool = False) -> str:
 
     group = _get_group()
 
-    # ── Cooldown check ──
+    # ── Cooldown check (per-household) ──
     if not force:
-        settings_obj = InsightGenerationSettings.get_solo()
-        cooldown_days = settings_obj.cooldown_days
         is_debug = _settings.DEBUG
+        cooldown_days = 30
+        if group:
+            try:
+                cooldown_days = group.config.ai_cooldown_days
+            except Exception:
+                cooldown_days = InsightGenerationSettings.get_solo().cooldown_days
+        else:
+            cooldown_days = InsightGenerationSettings.get_solo().cooldown_days
 
         latest = PortfolioInsight.objects.filter(group=group).order_by('-generated_at').first() if group \
             else PortfolioInsight.objects.order_by('-generated_at').first()
@@ -890,7 +904,7 @@ def trigger_ai_insights(force: bool = False) -> str:
         summary = _fetch_portfolio_summary(group)
         growth = _fetch_growth_data(group=group)
         prompt_data = build_prompt_data(summary, growth, group)
-        result = call_gemini(prompt_data)
+        result = call_gemini(prompt_data, group=group)
         insight = PortfolioInsight.objects.create(
             group=group,
             model_used=result.model,

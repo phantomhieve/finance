@@ -1,5 +1,7 @@
 from django.db import models
 from django.db.models import Index
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.hashers import check_password, make_password
 
@@ -314,4 +316,82 @@ class MonthlySavingsComment(models.Model):
 
     def __str__(self):
         return f"{self.user.username}: {self.month.strftime('%b %Y')} — {self.comment[:50]}"
+
+
+class HouseholdConfig(models.Model):
+    """Per-household configuration: feature toggles, credentials, AI profile."""
+
+    group = models.OneToOneField(
+        AccountGroup, on_delete=models.CASCADE,
+        related_name='config', primary_key=True,
+    )
+
+    # Feature toggles — which modules this household uses
+    feature_savings = models.BooleanField(
+        default=True, help_text="Monthly Savings tracker",
+    )
+    feature_portfolio = models.BooleanField(
+        default=True, help_text="Portfolio & investments",
+    )
+    feature_jewellery = models.BooleanField(
+        default=False, help_text="Jewellery vault",
+    )
+    feature_hra = models.BooleanField(
+        default=True, help_text="HRA & rent tracking",
+    )
+    feature_notes = models.BooleanField(
+        default=True, help_text="Personal notes",
+    )
+    feature_real_estate = models.BooleanField(
+        default=True, help_text="Real estate holdings",
+    )
+    feature_ai_insights = models.BooleanField(
+        default=True, help_text="AI portfolio analysis",
+    )
+
+    # Google Sheets — per-household service account
+    google_credentials_json = models.TextField(
+        blank=True,
+        help_text=(
+            "Google service account JSON (paste full JSON content). "
+            "Falls back to global GOOGLE_SHEETS_CREDENTIALS env if blank."
+        ),
+    )
+
+    # AI — per-household investor profile
+    investor_profile = models.TextField(
+        blank=True,
+        help_text=(
+            "Investor context markdown for AI analysis "
+            "(replaces global investor_profile.md). "
+            "Falls back to global file if blank."
+        ),
+    )
+
+    # AI — per-household cooldown
+    ai_cooldown_days = models.PositiveSmallIntegerField(
+        default=30,
+        help_text="Minimum days between AI insight generations (0 = no cooldown).",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Household Config"
+        verbose_name_plural = "Household Configs"
+
+    def __str__(self):
+        return f"{self.group.name} config"
+
+    def has_feature(self, name: str) -> bool:
+        """Check if a feature is enabled: has_feature('savings'), has_feature('portfolio'), etc."""
+        return getattr(self, f'feature_{name}', True)
+
+
+@receiver(post_save, sender=AccountGroup)
+def ensure_household_config(sender, instance, created, **kwargs):
+    """Auto-create HouseholdConfig for every new AccountGroup."""
+    if created:
+        HouseholdConfig.objects.get_or_create(group=instance)
 

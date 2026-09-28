@@ -11,7 +11,7 @@ from django.utils import timezone
 
 from pftracker.utils import (
     ZERO as _ZERO, ROUND2 as _ROUND2, pct as _pct,
-    fy_start_year, fy_label, get_google_credentials_path,
+    fy_start_year, fy_label, get_google_credentials_path, get_google_credentials,
 )
 from .models import (
     ZerodhaAccount, StockHolding, MutualFundHolding,
@@ -374,7 +374,12 @@ def sync_zerodha_from_sheets(account=None, group=None):
     except ImportError:
         raise RuntimeError("gspread is not installed. Run: pip install gspread google-auth")
 
-    gc = gspread.service_account(filename=get_google_credentials_path())
+    # Per-household credential resolution
+    creds = get_google_credentials(group)
+    if isinstance(creds, dict):
+        gc = gspread.service_account_from_dict(creds)
+    else:
+        gc = gspread.service_account(filename=creds)
     if account:
         accounts = [account]
     else:

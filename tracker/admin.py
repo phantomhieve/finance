@@ -5,6 +5,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import (
     User,
     AccountGroup,
+    HouseholdConfig,
     Category,
     Transaction,
     HRAExpense,
@@ -38,9 +39,31 @@ class AccountGroupForm(forms.ModelForm):
         return instance
 
 
+class HouseholdConfigInline(admin.StackedInline):
+    model = HouseholdConfig
+    can_delete = False
+    fieldsets = (
+        ('Feature Toggles', {
+            'fields': (
+                'feature_savings', 'feature_portfolio', 'feature_jewellery',
+                'feature_hra', 'feature_notes', 'feature_real_estate',
+                'feature_ai_insights',
+            ),
+        }),
+        ('Google Sheets Credentials', {
+            'classes': ('collapse',),
+            'fields': ('google_credentials_json',),
+        }),
+        ('AI Configuration', {
+            'fields': ('investor_profile', 'ai_cooldown_days'),
+        }),
+    )
+
+
 @admin.register(AccountGroup)
 class AccountGroupAdmin(ModelAdmin):
     form = AccountGroupForm
+    inlines = [HouseholdConfigInline]
     list_display = ('name', 'member_count', 'has_portfolio_password', 'created_at')
     search_fields = ('name',)
 
