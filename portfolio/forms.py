@@ -183,10 +183,11 @@ class USStockHoldingForm(forms.ModelForm):
 class FinancialGoalForm(forms.ModelForm):
     class Meta:
         model = FinancialGoal
-        fields = ['label', 'target_amount', 'notes']
+        fields = ['label', 'target_amount', 'target_date', 'notes']
         widgets = {
-            'label': forms.TextInput(attrs={'placeholder': 'e.g. 50L, 1Cr'}),
+            'label': forms.TextInput(attrs={'placeholder': 'e.g. FY26 Target, 50L'}),
             'target_amount': forms.NumberInput(attrs={'step': '1', 'placeholder': '5000000'}),
+            'target_date': forms.DateInput(attrs={'type': 'date'}),
             'notes': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Optional notes…'}),
         }
 
