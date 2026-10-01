@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monthly AI Portfolio Summary</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background-color: #f4f6f8;
+            color: #333333;
+            margin: 0;
+            padding: 0;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+        .header {
+            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+            color: #ffffff;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        .content {
+            padding: 30px;
+        }
+        .score-card {
+            background-color: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        .score-card h2 {
+            margin: 0 0 10px 0;
+            color: #166534;
+            font-size: 36px;
+        }
+        .score-card p {
+            margin: 0;
+            color: #15803d;
+            font-size: 14px;
+            text-transform: uppercase;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        h3 {
+            color: #1e40af;
+            font-size: 18px;
+            margin-top: 25px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #e5e7eb;
+            padding-bottom: 8px;
+        }
+        p {
+            margin: 0 0 15px 0;
+        }
+        ul {
+            padding-left: 20px;
+            margin: 0 0 20px 0;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        .action-item {
+            background-color: #fffbeb;
+            border-left: 4px solid #f59e0b;
+            padding: 12px 15px;
+            margin-bottom: 10px;
+            border-radius: 0 4px 4px 0;
+        }
+        .footer {
+            background-color: #f9fafb;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #6b7280;
+            border-top: 1px solid #e5e7eb;
+        }
+        .highlight {
+            font-weight: bold;
+            color: #111827;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Monthly Portfolio AI Summary</h1>
+        </div>
+        <div class="content">
+            <p>Hello,</p>
+            <p>Here is your automated monthly AI summary of your portfolio for <strong>{{ month }}</strong>.</p>
+            
+            {% if insights %}
+            <div class="score-card">
+                <h2>{{ insights.score }}/100</h2>
+                <p>Overall Portfolio Health Score</p>
+            </div>
+            
+            <h3>Executive Summary</h3>
+            <p>{{ insights.summary }}</p>
+
+            <h3>Detailed Insights</h3>
+            {% for insight in insights.insights %}
+            <div style="margin-bottom: 20px;">
+                <h4 style="margin: 0 0 5px 0; color: #111827;">
+                    {% if insight.severity == 'HIGH' %}🔴{% elif insight.severity == 'MEDIUM' %}🟡{% else %}🟢{% endif %} 
+                    {{ insight.title }}
+                </h4>
+                <p style="margin: 0 0 8px 0; font-size: 14px; color: #4b5563;">{{ insight.detail }}</p>
+                {% if insight.action %}
+                <div class="action-item"><strong>Action:</strong> {{ insight.action }}</div>
+                {% endif %}
+            </div>
+            {% endfor %}
+
+            <h3>Market Context & Outlook</h3>
+            <p><strong>Context:</strong> {{ insights.market_context }}</p>
+            <p><strong>Outlook:</strong> {{ insights.outlook }}</p>
+            
+            {% else %}
+            <p>No recent AI insights are available for your portfolio. The system attempted to generate them but failed or is in cooldown.</p>
+            {% endif %}
+            
+            <p style="margin-top: 30px;">Keep up the great work in managing your wealth!</p>
+        </div>
+        <div class="footer">
+            <p>This is an automated email from your Vault Portfolio Tracker.</p>
+        </div>
+    </div>
+</body>
+</html>
