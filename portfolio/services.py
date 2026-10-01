@@ -270,11 +270,18 @@ def get_portfolio_summary(group=None, is_baby=False):
             g.achieved_at = None
             g.save(update_fields=['achieved_at'])
 
+        if g.target_date:
+            fy_year = g.target_date.year + 1 if g.target_date.month > 3 else g.target_date.year
+            fy_str = f"FY{str(fy_year)[-2:]}"
+        else:
+            fy_str = "Long Term"
+            
         goals.append({
             'id': g.id,
             'label': g.label,
             'target': target,
             'target_date': g.target_date,
+            'fy': fy_str,
             'pct': round(pct, 1),
             'achieved': achieved,
             'achieved_at': g.achieved_at,
@@ -285,7 +292,7 @@ def get_portfolio_summary(group=None, is_baby=False):
     achieved_goals = [g for g in goals if g['achieved']]
     pending_goals = [g for g in goals if not g['achieved']]
     current_goal = pending_goals[0] if pending_goals else None
-    upcoming_goals = pending_goals[1:] if len(pending_goals) > 1 else []
+    other_goals = [g for g in goals if g != current_goal]
 
     # Zerodha account summaries (prefetch totals to avoid N+1)
     z_accounts = _gf(ZerodhaAccount.objects, group).all() if group else ZerodhaAccount.objects.all()
@@ -321,8 +328,7 @@ def get_portfolio_summary(group=None, is_baby=False):
         'consolidated': consolidated,
         'goals': goals,
         'current_goal': current_goal,
-        'upcoming_goals': upcoming_goals,
-        'achieved_goals': achieved_goals,
+        'other_goals': other_goals,
         'accounts': accounts,
         'epf_balance': epf_balance,
         'epf_total_contrib': epf_total_contrib,
