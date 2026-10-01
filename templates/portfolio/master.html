@@ -135,7 +135,7 @@
 {# ——— MOBILE QUICK STATS ——— #}
 <div class="md:hidden quick-stats-scroll mb-3">
   {% for a in assets %}
-  <a href="#{% if a.name == 'Equity' %}equity{% elif a.name == 'Real Estate' or a.name == 'Gold' or a.name == 'Silver' or a.name == 'Crypto' %}alternates{% elif a.name == 'EPF' or a.name == 'Fixed Deposits' or a.name == 'NPS' or a.name == 'Bonds' %}fixed-income{% elif a.name == 'Cash' %}liquidity{% else %}allocation{% endif %}" class="quick-stat-chip">
+  <a href="#{% if a.name == 'Equity' %}equity{% elif a.name == 'Real Estate' or a.name == 'Gold' or a.name == 'Silver' or a.name == 'Crypto' %}alternates{% elif a.name == 'EPF' or a.name == 'NPS' or a.name == 'Bonds' %}fixed-income{% elif a.name == 'Cash' or a.name == 'Fixed Deposits' %}liquidity{% else %}allocation{% endif %}" class="quick-stat-chip">
     <span class="material-symbols-outlined qs-icon">{{ a.icon }}</span>
     <div>
       <div class="qs-label">{{ a.name }}</div>
@@ -148,51 +148,56 @@
 
 {# Goals moved to bottom of page #}
 
-{# ——— ASSET BREAKDOWN + ALLOCATION (always visible) ——— #}
-<div id="allocation" class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.1s">
-  <div class="card-body p-4">
-    <div class="flex items-center justify-between mb-3">
-      <h2 class="card-title text-base m-0">Portfolio Breakdown & Allocation</h2>
+{# ——— ASSET BREAKDOWN + ALLOCATION (collapsed by default) ——— #}
+<div id="allocation" class="card bg-base-200 shadow-sm animate-up mb-4 card-hover scroll-mt-24" style="animation-delay:0.1s">
+  <div class="collapse collapse-arrow">
+    <input type="checkbox" />
+    <div class="collapse-title p-4 min-h-0">
+      <div class="flex items-center justify-between">
+        <h2 class="card-title text-base m-0 flex items-center gap-1.5"><span class="material-symbols-outlined text-primary text-lg">pie_chart</span>Portfolio Breakdown & Allocation</h2>
+      </div>
     </div>
-    <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 mt-2">
-      <!-- Breakdown Table (lg:col-span-3) -->
-      <div class="card bg-base-300/40 shadow-sm lg:col-span-3">
-        <div class="card-body p-4">
-          <h3 class="card-title text-sm mb-2 opacity-70">Asset Class Details</h3>
-          <div class="hidden md:block overflow-x-auto"><table class="table table-sm">
-            <thead><tr><th></th><th>Asset Class</th><th class="text-right">Value</th><th class="text-right">Allocation</th></tr></thead>
-            <tbody>
-            {% for a in assets %}
-            <tr class="hover"><td><span class="material-symbols-outlined text-base opacity-50">{{ a.icon }}</span></td><td class="font-semibold">{{ a.name }}</td><td class="text-right font-semibold">₹{{ a.value|floatformat:0|indian_number }}</td><td class="text-right"><span class="badge badge-ghost badge-sm">{{ a.pct }}%</span></td></tr>
-            {% endfor %}
-            <tr class="border-t-2 border-base-300"><td></td><td class="font-bold text-primary">Total</td><td class="text-right font-bold text-primary">₹{{ total_value|floatformat:0|indian_number }}</td><td class="text-right"><span class="badge badge-primary badge-sm">100%</span></td></tr>
-            </tbody>
-          </table></div>
-          <div class="md:hidden">
-            {% for a in assets %}
-            <div class="flex items-center gap-3 py-2.5">
-              <span class="material-symbols-outlined text-lg opacity-30">{{ a.icon }}</span>
-              <span class="flex-1 font-medium text-sm">{{ a.name }}</span>
-              <span class="text-sm tabular-nums opacity-80">₹{{ a.value|floatformat:0|indian_number }}</span>
-              <span class="text-xs tabular-nums opacity-40 w-11 text-right">{{ a.pct }}%</span>
-            </div>
-            {% if not forloop.last %}<div class="divider-fade"></div>{% endif %}
-            {% endfor %}
-            <div class="divider-fade"></div>
-            <div class="flex items-center gap-3 pt-2.5">
-              <span class="material-symbols-outlined text-lg opacity-0">add</span>
-              <span class="flex-1 font-bold text-sm text-primary">Total</span>
-              <span class="text-sm font-bold text-primary tabular-nums">₹{{ total_value|floatformat:0|indian_number }}</span>
-              <span class="text-xs font-bold text-primary tabular-nums w-11 text-right">100%</span>
+    <div class="collapse-content px-4 pb-4">
+      <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 mt-2">
+        <!-- Breakdown Table (lg:col-span-3) -->
+        <div class="card bg-base-300/40 shadow-sm lg:col-span-3">
+          <div class="card-body p-4">
+            <h3 class="card-title text-sm mb-2 opacity-70">Asset Class Details</h3>
+            <div class="hidden md:block overflow-x-auto"><table class="table table-sm">
+              <thead><tr><th></th><th>Asset Class</th><th class="text-right">Value</th><th class="text-right">Allocation</th></tr></thead>
+              <tbody>
+              {% for a in assets %}
+              <tr class="hover"><td><span class="material-symbols-outlined text-base opacity-50">{{ a.icon }}</span></td><td class="font-semibold">{{ a.name }}</td><td class="text-right font-semibold">₹{{ a.value|floatformat:0|indian_number }}</td><td class="text-right"><span class="badge badge-ghost badge-sm">{{ a.pct }}%</span></td></tr>
+              {% endfor %}
+              <tr class="border-t-2 border-base-300"><td></td><td class="font-bold text-primary">Total</td><td class="text-right font-bold text-primary">₹{{ total_value|floatformat:0|indian_number }}</td><td class="text-right"><span class="badge badge-primary badge-sm">100%</span></td></tr>
+              </tbody>
+            </table></div>
+            <div class="md:hidden">
+              {% for a in assets %}
+              <div class="flex items-center gap-3 py-2.5">
+                <span class="material-symbols-outlined text-lg opacity-30">{{ a.icon }}</span>
+                <span class="flex-1 font-medium text-sm">{{ a.name }}</span>
+                <span class="text-sm tabular-nums opacity-80">₹{{ a.value|floatformat:0|indian_number }}</span>
+                <span class="text-xs tabular-nums opacity-40 w-11 text-right">{{ a.pct }}%</span>
+              </div>
+              {% if not forloop.last %}<div class="divider-fade"></div>{% endif %}
+              {% endfor %}
+              <div class="divider-fade"></div>
+              <div class="flex items-center gap-3 pt-2.5">
+                <span class="material-symbols-outlined text-lg opacity-0">add</span>
+                <span class="flex-1 font-bold text-sm text-primary">Total</span>
+                <span class="text-sm font-bold text-primary tabular-nums">₹{{ total_value|floatformat:0|indian_number }}</span>
+                <span class="text-xs font-bold text-primary tabular-nums w-11 text-right">100%</span>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      <!-- Allocation Chart (lg:col-span-2) -->
-      <div class="card bg-base-300/40 shadow-sm lg:col-span-2">
-        <div class="card-body p-4">
-          <h3 class="card-title text-sm mb-2 opacity-70">Allocation Breakdown</h3>
-          <div class="chart-wrap" style="height:280px"><canvas id="allocationChart"></canvas></div>
+        <!-- Allocation Chart (lg:col-span-2) -->
+        <div class="card bg-base-300/40 shadow-sm lg:col-span-2">
+          <div class="card-body p-4">
+            <h3 class="card-title text-sm mb-2 opacity-70">Allocation Breakdown</h3>
+            <div class="chart-wrap" style="height:280px"><canvas id="allocationChart"></canvas></div>
+          </div>
         </div>
       </div>
     </div>
@@ -545,42 +550,6 @@
   </div>
 </div>
 
-{# ——— FIXED DEPOSITS ——— #}
-<div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.4s">
-  <div class="card-body p-4">
-    <div class="flex flex-wrap items-center justify-between gap-2 mb-3"><h2 class="card-title text-base flex items-center gap-1.5"><span class="material-symbols-outlined text-emerald-400 text-lg">account_balance_wallet</span>Fixed Deposits</h2>
-      <div class="flex flex-wrap items-center gap-1.5"><span class="badge badge-primary badge-sm">₹{{ fd_current|floatformat:0|indian_number }}</span><a href="{% url 'fd_detail' %}" class="btn btn-outline btn-primary btn-xs gap-1">View All<span class="material-symbols-outlined text-sm">arrow_forward</span></a><button class="btn btn-ghost btn-sm gap-1" onclick="openModal('addFdModal')"><span class="material-symbols-outlined text-base">add</span>Add FD</button></div>
-    </div>
-    {% if active_fds %}
-    <div class="hidden md:block overflow-x-auto max-h-72"><table class="table table-sm"><thead><tr><th>Name</th><th>Account</th><th class="text-right">Principal</th><th class="text-right">Rate</th><th>Compounding</th><th class="text-right">Current Value</th><th>Maturity</th><th class="w-10"></th></tr></thead><tbody>
-    {% for fd in active_fds %}<tr class="hover"><td class="font-semibold">{{ fd.name }}</td><td class="opacity-60 text-sm">{{ fd.account_name }}</td><td class="text-right">₹{{ fd.principal|floatformat:0|indian_number }}</td><td class="text-right">{{ fd.interest_rate }}%</td><td><span class="badge badge-ghost badge-sm">{{ fd.get_compounding_display }}</span></td><td class="text-right font-semibold text-success">₹{{ fd.current_value|floatformat:0|indian_number }}</td><td class="opacity-60 text-sm">{{ fd.maturity_date|date:"d M Y" }}{% if fd.days_remaining > 0 %} <span class="text-xs">({{ fd.days_remaining }}d)</span>{% endif %}</td><td><button class="btn btn-ghost btn-xs btn-square" data-edit-fd data-id="{{ fd.id }}" data-name="{{ fd.name }}" data-account="{{ fd.account_name }}" data-principal="{{ fd.principal }}" data-rate="{{ fd.interest_rate }}" data-compounding="{{ fd.compounding }}" data-start="{{ fd.start_date|date:'Y-m-d' }}" data-maturity="{{ fd.maturity_date|date:'Y-m-d' }}" data-active="{{ fd.is_active|yesno:'true,false' }}" data-remarks="{{ fd.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button></td></tr>
-    {% endfor %}</tbody></table></div>
-    <div class="md:hidden space-y-2">
-      {% for fd in active_fds %}
-      <div class="table-card">
-        <div class="flex items-center justify-between gap-2">
-          <div class="min-w-0">
-            <div class="font-semibold text-sm truncate">{{ fd.name }}</div>
-            <span class="text-xs opacity-40">{{ fd.account_name }}</span>
-          </div>
-          <button class="btn btn-ghost btn-xs btn-square shrink-0" data-edit-fd data-id="{{ fd.id }}" data-name="{{ fd.name }}" data-account="{{ fd.account_name }}" data-principal="{{ fd.principal }}" data-rate="{{ fd.interest_rate }}" data-compounding="{{ fd.compounding }}" data-start="{{ fd.start_date|date:'Y-m-d' }}" data-maturity="{{ fd.maturity_date|date:'Y-m-d' }}" data-active="{{ fd.is_active|yesno:'true,false' }}" data-remarks="{{ fd.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button>
-        </div>
-        <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
-          <div><span class="opacity-50">Principal</span><div class="font-semibold mt-0.5">₹{{ fd.principal|floatformat:0|indian_number }}</div></div>
-          <div><span class="opacity-50">Rate</span><div class="font-semibold mt-0.5">{{ fd.interest_rate }}%</div></div>
-          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5 text-success">₹{{ fd.current_value|floatformat:0|indian_number }}</div></div>
-        </div>
-        <div class="flex items-center justify-between mt-1.5 text-xs">
-          <span class="badge badge-ghost badge-xs">{{ fd.get_compounding_display }}</span>
-          <span class="opacity-40">{{ fd.maturity_date|date:"d M Y" }}{% if fd.days_remaining > 0 %} ({{ fd.days_remaining }}d){% endif %}</span>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}<p class="text-sm opacity-40">No fixed deposits.</p>{% endif %}
-  </div>
-</div>
-
 {# ——— NPS + BONDS (paired) ——— #}
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-up mb-4" style="animation-delay:0.45s">
   <div class="card bg-base-200 shadow-sm card-hover">
@@ -668,6 +637,41 @@
   </div>
 </div>
 
+{# ——— FIXED DEPOSITS ——— #}
+<div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.4s">
+  <div class="card-body p-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3"><h2 class="card-title text-base flex items-center gap-1.5"><span class="material-symbols-outlined text-cyan-400 text-lg">account_balance_wallet</span>Fixed Deposits</h2>
+      <div class="flex flex-wrap items-center gap-1.5"><span class="badge badge-primary badge-sm">₹{{ fd_current|floatformat:0|indian_number }}</span><a href="{% url 'fd_detail' %}" class="btn btn-outline btn-primary btn-xs gap-1">View All<span class="material-symbols-outlined text-sm">arrow_forward</span></a><button class="btn btn-ghost btn-sm gap-1" onclick="openModal('addFdModal')"><span class="material-symbols-outlined text-base">add</span>Add FD</button></div>
+    </div>
+    {% if active_fds %}
+    <div class="hidden md:block overflow-x-auto max-h-72"><table class="table table-sm"><thead><tr><th>Name</th><th>Account</th><th class="text-right">Principal</th><th class="text-right">Rate</th><th>Compounding</th><th class="text-right">Current Value</th><th>Maturity</th><th class="w-10"></th></tr></thead><tbody>
+    {% for fd in active_fds %}<tr class="hover"><td class="font-semibold">{{ fd.name }}</td><td class="opacity-60 text-sm">{{ fd.account_name }}</td><td class="text-right">₹{{ fd.principal|floatformat:0|indian_number }}</td><td class="text-right">{{ fd.interest_rate }}%</td><td><span class="badge badge-ghost badge-sm">{{ fd.get_compounding_display }}</span></td><td class="text-right font-semibold text-success">₹{{ fd.current_value|floatformat:0|indian_number }}</td><td class="opacity-60 text-sm">{{ fd.maturity_date|date:"d M Y" }}{% if fd.days_remaining > 0 %} <span class="text-xs">({{ fd.days_remaining }}d)</span>{% endif %}</td><td><button class="btn btn-ghost btn-xs btn-square" data-edit-fd data-id="{{ fd.id }}" data-name="{{ fd.name }}" data-account="{{ fd.account_name }}" data-principal="{{ fd.principal }}" data-rate="{{ fd.interest_rate }}" data-compounding="{{ fd.compounding }}" data-start="{{ fd.start_date|date:'Y-m-d' }}" data-maturity="{{ fd.maturity_date|date:'Y-m-d' }}" data-active="{{ fd.is_active|yesno:'true,false' }}" data-remarks="{{ fd.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button></td></tr>
+    {% endfor %}</tbody></table></div>
+    <div class="md:hidden space-y-2">
+      {% for fd in active_fds %}
+      <div class="table-card">
+        <div class="flex items-center justify-between gap-2">
+          <div class="min-w-0">
+            <div class="font-semibold text-sm truncate">{{ fd.name }}</div>
+            <span class="text-xs opacity-40">{{ fd.account_name }}</span>
+          </div>
+          <button class="btn btn-ghost btn-xs btn-square shrink-0" data-edit-fd data-id="{{ fd.id }}" data-name="{{ fd.name }}" data-account="{{ fd.account_name }}" data-principal="{{ fd.principal }}" data-rate="{{ fd.interest_rate }}" data-compounding="{{ fd.compounding }}" data-start="{{ fd.start_date|date:'Y-m-d' }}" data-maturity="{{ fd.maturity_date|date:'Y-m-d' }}" data-active="{{ fd.is_active|yesno:'true,false' }}" data-remarks="{{ fd.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button>
+        </div>
+        <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
+          <div><span class="opacity-50">Principal</span><div class="font-semibold mt-0.5">₹{{ fd.principal|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">Rate</span><div class="font-semibold mt-0.5">{{ fd.interest_rate }}%</div></div>
+          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5 text-success">₹{{ fd.current_value|floatformat:0|indian_number }}</div></div>
+        </div>
+        <div class="flex items-center justify-between mt-1.5 text-xs">
+          <span class="badge badge-ghost badge-xs">{{ fd.get_compounding_display }}</span>
+          <span class="opacity-40">{{ fd.maturity_date|date:"d M Y" }}{% if fd.days_remaining > 0 %} ({{ fd.days_remaining }}d){% endif %}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}<p class="text-sm opacity-40">No fixed deposits.</p>{% endif %}
+  </div>
+</div>
 {# ——— SECTION: GOALS & INSIGHTS ——— #}
 <div class="section-group-header" id="goals-section">
   <span class="material-symbols-outlined section-icon text-violet-400">flag</span>
@@ -731,7 +735,7 @@
 {# ——— AI INSIGHTS (moved to bottom) ——— #}
 {% if latest_insight %}
 {% with ins=latest_insight.insights %}
-<div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" id="ai-insights">
+<div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover scroll-mt-24" id="ai-insights">
   <div class="card-body p-4 lg:p-6">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
       <h2 class="card-title text-base gap-2"><span class="material-symbols-outlined text-warning text-lg">auto_awesome</span>AI Analysis</h2>

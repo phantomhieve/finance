@@ -1029,8 +1029,8 @@ progress {
 
 .section-nav {
   position: sticky;
-  top: 0;
-  z-index: 30;
+  top: 3.5rem;
+  z-index: 20;
   background: oklch(var(--b1) / 0.85);
   backdrop-filter: blur(20px) saturate(1.8);
   -webkit-backdrop-filter: blur(20px) saturate(1.8);
@@ -1091,6 +1091,7 @@ progress {
   margin-bottom: 0.25rem;
   border-bottom: 1px solid oklch(var(--bc) / 0.06);
   position: relative;
+  scroll-margin-top: 6rem;
 }
 .section-group-header::before {
   content: '';
@@ -1181,3 +1182,4 @@ progress {
 /* ── Scrollbar hide utility ────────────────────────────────────────── */
 .scrollbar-hide { scrollbar-width: none; }
 .scrollbar-hide::-webkit-scrollbar { display: none; }
+html { scroll-behavior: smooth; }
