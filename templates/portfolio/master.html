@@ -686,46 +686,64 @@
       <button class="btn btn-ghost btn-sm gap-1" onclick="openGoalModal()"><span class="material-symbols-outlined text-base">add</span>Add</button>
     </div>
     {% if goals %}
-    <div class="hidden md:grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-      {% for g in goals %}
-      <div class="p-3 rounded-lg border cursor-pointer hover:bg-base-300/80 transition-colors {% if g.achieved %}border-success/30 bg-success/5{% else %}border-base-content/8 bg-base-300/30{% endif %}" data-edit-goal data-id="{{ g.id }}" data-label="{{ g.label }}" data-target="{{ g.target|floatformat:0 }}" data-date="{{ g.target_date|date:'Y-m-d'|default:'' }}" data-notes="{{ g.notes }}">
-        <div class="flex items-center justify-between mb-1">
-          <div class="text-sm font-semibold truncate">{{ g.label }} {% if g.target_date and not g.achieved %}<span class="text-[10px] font-normal opacity-50 ml-1">Due {{ g.target_date|date:"d M y" }}</span>{% endif %}</div>
-          {% if g.achieved %}<span class="material-symbols-outlined text-success text-base">check_circle</span>{% endif %}
+    {% if current_goal %}
+    <!-- Unified Current Goal Card -->
+    <div class="mb-5 p-4 md:p-5 rounded-2xl border-2 border-primary/30 bg-primary/5 relative overflow-hidden flex items-center gap-4 cursor-pointer hover:bg-primary/10 transition-colors" data-edit-goal data-id="{{ current_goal.id }}" data-label="{{ current_goal.label }}" data-target="{{ current_goal.target|floatformat:0 }}" data-date="{{ current_goal.target_date|date:'Y-m-d'|default:'' }}" data-notes="{{ current_goal.notes }}">
+      <div class="absolute -right-4 -top-4 md:-right-8 md:-top-8 opacity-[0.04]"><span class="material-symbols-outlined" style="font-size:140px">flag</span></div>
+      <div class="relative z-10 flex-1 w-full">
+        <div class="flex items-center gap-2 mb-1.5 md:mb-2">
+          <div class="text-[10px] md:text-xs font-bold uppercase tracking-widest text-primary/70">Current Target</div>
+          {% if current_goal.target_date %}<div class="badge badge-primary badge-outline badge-xs md:badge-sm border-primary/30">Due {{ current_goal.target_date|date:"d M Y" }}</div>{% endif %}
         </div>
-        <progress class="progress w-full my-1.5 {% if g.achieved %}progress-success{% else %}progress-primary{% endif %}" value="{{ g.pct }}" max="100"></progress>
-        <div class="flex items-center justify-between">
-          <div class="text-xs font-bold {% if g.achieved %}text-success{% endif %}">{{ g.pct }}%</div>
-          {% if g.achieved and g.achieved_at %}
-          <div class="text-[10px] opacity-50">Achieved {{ g.achieved_at|date:"d M Y" }}</div>
-          {% endif %}
+        <div class="flex items-end justify-between mb-2.5 md:mb-3 gap-2">
+          <div class="min-w-0 flex-1">
+            <div class="text-lg md:text-2xl font-extrabold truncate">{{ current_goal.label }}</div>
+            <div class="text-xs md:text-sm font-semibold opacity-60">₹{{ current_goal.target|floatformat:0|indian_number }} target</div>
+          </div>
+          <div class="text-2xl md:text-3xl font-black text-primary shrink-0">{{ current_goal.pct }}%</div>
         </div>
-        {% if g.notes %}<div class="mt-1.5 text-[10px] opacity-40 italic truncate">{{ g.notes }}</div>{% endif %}
+        <progress class="progress progress-primary w-full h-2.5 md:h-3" value="{{ current_goal.pct }}" max="100"></progress>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if other_goals %}
+    {% regroup other_goals|dictsort:"fy" by fy as grouped_other_goals %}
+    
+    <!-- Desktop: FY Grids -->
+    <div class="hidden md:flex flex-col gap-6">
+      {% for group in grouped_other_goals %}
+      <div>
+        <h4 class="text-xs font-bold text-base-content/50 uppercase tracking-widest mb-3">{{ group.grouper }} Goals</h4>
+        <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {% for g in group.list %}
+          <div class="p-3 rounded-lg border cursor-pointer hover:bg-base-300/80 transition-colors {% if g.achieved %}border-success/30 bg-success/5{% else %}border-base-content/8 bg-base-300/30{% endif %}" data-edit-goal data-id="{{ g.id }}" data-label="{{ g.label }}" data-target="{{ g.target|floatformat:0 }}" data-date="{{ g.target_date|date:'Y-m-d'|default:'' }}" data-notes="{{ g.notes }}">
+            <div class="flex items-center justify-between mb-1">
+              <div class="text-sm font-semibold truncate">{{ g.label }} {% if g.target_date and not g.achieved %}<span class="text-[10px] font-normal opacity-50 ml-1">Due {{ g.target_date|date:"d M y" }}</span>{% endif %}</div>
+              {% if g.achieved %}<span class="material-symbols-outlined text-success text-base">check_circle</span>{% endif %}
+            </div>
+            <progress class="progress w-full my-1.5 {% if g.achieved %}progress-success{% else %}progress-primary{% endif %}" value="{{ g.pct }}" max="100"></progress>
+            <div class="flex items-center justify-between">
+              <div class="text-xs font-bold {% if g.achieved %}text-success{% endif %}">{{ g.pct }}%</div>
+              {% if g.achieved and g.achieved_at %}
+              <div class="text-[10px] opacity-50">Achieved {{ g.achieved_at|date:"d M Y" }}</div>
+              {% endif %}
+            </div>
+            {% if g.notes %}<div class="mt-1.5 text-[10px] opacity-40 italic truncate">{{ g.notes }}</div>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
       </div>
       {% endfor %}
     </div>
+
+    <!-- Mobile: FY Accordions -->
     <div class="md:hidden space-y-3">
-      {% if current_goal %}
-      <div class="p-4 rounded-xl border-2 border-primary/30 bg-primary/5 relative overflow-hidden" data-edit-goal data-id="{{ current_goal.id }}" data-label="{{ current_goal.label }}" data-target="{{ current_goal.target|floatformat:0 }}" data-date="{{ current_goal.target_date|date:'Y-m-d'|default:'' }}" data-notes="{{ current_goal.notes }}">
-        <div class="absolute -right-4 -top-4 opacity-[0.04]"><span class="material-symbols-outlined" style="font-size:120px">flag</span></div>
-        <div class="relative z-10">
-          <div class="text-[10px] font-bold uppercase tracking-widest text-primary/70 mb-1">Current Target</div>
-          <div class="text-lg font-extrabold">{{ current_goal.label }}</div>
-          <div class="flex items-center gap-3 mt-2"><div class="flex-1"><progress class="progress progress-primary w-full h-3" value="{{ current_goal.pct }}" max="100"></progress></div><div class="text-sm font-bold text-primary shrink-0">{{ current_goal.pct }}%</div></div>
-          <div class="flex items-center justify-between mt-1.5">
-            <div class="text-xs opacity-50">₹{{ current_goal.target|floatformat:0|indian_number }} target{% if current_goal.target_date %} • Due {{ current_goal.target_date|date:"d M Y" }}{% endif %}</div>
-            {% if current_goal.notes %}<button class="btn btn-ghost btn-xs btn-circle opacity-60 hover:opacity-100" onclick="event.stopPropagation(); showNoteModal('{{ current_goal.label|escapejs }}', '{{ current_goal.notes|escapejs }}')"><span class="material-symbols-outlined text-base">description</span></button>{% endif %}
-          </div>
-        </div>
-      </div>
-      {% endif %}
-      {% if upcoming_goals %}
-      <div class="collapse collapse-arrow bg-error/5 border border-error/20 rounded-xl"><input type="checkbox" /><div class="collapse-title min-h-0 py-2.5 px-3 text-sm font-semibold text-error flex items-center gap-1.5"><span class="material-symbols-outlined text-base">flag</span>Upcoming Goals<span class="badge badge-error badge-xs ml-1">{{ upcoming_goals|length }}</span></div><div class="collapse-content px-3 pb-3"><div class="space-y-2">{% for g in upcoming_goals %}<div class="flex items-center gap-3 p-2.5 rounded-lg bg-base-100/40" data-edit-goal data-id="{{ g.id }}" data-label="{{ g.label }}" data-target="{{ g.target|floatformat:0 }}" data-date="{{ g.target_date|date:'Y-m-d'|default:'' }}" data-notes="{{ g.notes }}"><div class="flex-1 min-w-0"><div class="text-sm font-semibold truncate">{{ g.label }}</div><div class="text-xs opacity-50">₹{{ g.target|floatformat:0|indian_number }}</div>{% if g.notes %}<div class="text-[10px] opacity-40 italic mt-0.5 truncate">{{ g.notes }}</div>{% endif %}</div><div class="text-xs font-bold">{{ g.pct }}%</div></div>{% endfor %}</div></div></div>
-      {% endif %}
-      {% if achieved_goals %}
-      <div class="collapse collapse-arrow bg-success/5 border border-success/20 rounded-xl"><input type="checkbox" /><div class="collapse-title min-h-0 py-2.5 px-3 text-sm font-semibold text-success flex items-center gap-1.5"><span class="material-symbols-outlined text-base">emoji_events</span>Achieved Goals<span class="badge badge-success badge-xs ml-1">{{ achieved_goals|length }}</span></div><div class="collapse-content px-3 pb-3"><div class="space-y-2">{% for g in achieved_goals %}<div class="flex items-center gap-2.5 p-2 rounded-lg bg-base-100/50" data-edit-goal data-id="{{ g.id }}" data-label="{{ g.label }}" data-target="{{ g.target|floatformat:0 }}" data-date="{{ g.target_date|date:'Y-m-d'|default:'' }}" data-notes="{{ g.notes }}"><span class="material-symbols-outlined text-success text-base">check_circle</span><div class="flex-1 min-w-0"><div class="text-sm font-semibold truncate">{{ g.label }}</div>{% if g.achieved_at %}<div class="text-[10px] opacity-50">{{ g.achieved_at|date:"d M Y" }}</div>{% endif %}</div><div class="text-xs font-bold text-success">100%</div></div>{% endfor %}</div></div></div>
-      {% endif %}
+      {% for group in grouped_other_goals %}
+      <div class="collapse collapse-arrow bg-base-200/50 rounded-xl"><input type="checkbox" /><div class="collapse-title min-h-0 py-2.5 px-3 text-sm font-semibold flex items-center gap-1.5"><span class="material-symbols-outlined text-base">calendar_month</span>{{ group.grouper }} Goals<span class="badge badge-neutral badge-xs ml-1">{{ group.list|length }}</span></div><div class="collapse-content px-3 pb-3"><div class="space-y-2">{% for g in group.list %}<div class="flex items-center gap-3 p-2.5 rounded-lg border {% if g.achieved %}bg-success/5 border-success/30{% else %}bg-base-100/40 border-base-content/10{% endif %}" data-edit-goal data-id="{{ g.id }}" data-label="{{ g.label }}" data-target="{{ g.target|floatformat:0 }}" data-date="{{ g.target_date|date:'Y-m-d'|default:'' }}" data-notes="{{ g.notes }}">{% if g.achieved %}<span class="material-symbols-outlined text-success text-base">check_circle</span>{% endif %}<div class="flex-1 min-w-0"><div class="text-sm font-semibold truncate">{{ g.label }} {% if g.target_date and not g.achieved %}<span class="text-[10px] font-normal opacity-50 ml-1">Due {{ g.target_date|date:"d M y" }}</span>{% endif %}</div><div class="text-xs opacity-50">₹{{ g.target|floatformat:0|indian_number }}</div>{% if g.notes %}<div class="text-[10px] opacity-40 italic mt-0.5 truncate">{{ g.notes }}</div>{% endif %}</div><div class="text-xs font-bold {% if g.achieved %}text-success{% endif %}">{% if g.achieved %}100%{% else %}{{ g.pct }}%{% endif %}</div></div>{% endfor %}</div></div></div>
+      {% endfor %}
     </div>
+    {% endif %}
     {% else %}
     <p class="text-sm opacity-40">No goals set. Add your first target!</p>
     {% endif %}
