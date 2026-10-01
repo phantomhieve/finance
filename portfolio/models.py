@@ -124,6 +124,7 @@ class FinancialGoal(models.Model):
     )
     label = models.CharField(max_length=50, help_text="e.g. 50L, 1Cr")
     target_amount = models.DecimalField(max_digits=14, decimal_places=0)
+    target_date = models.DateField(null=True, blank=True, help_text="Target date to achieve this goal (e.g. FY End: 2026-03-31)")
     achieved_at = models.DateField(null=True, blank=True,
                                    help_text="Auto-set when portfolio value first reaches the target")
     notes = models.TextField(blank=True, help_text="Optional notes or comments for this goal")

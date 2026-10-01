@@ -274,6 +274,7 @@ def get_portfolio_summary(group=None, is_baby=False):
             'id': g.id,
             'label': g.label,
             'target': target,
+            'target_date': g.target_date,
             'pct': round(pct, 1),
             'achieved': achieved,
             'achieved_at': g.achieved_at,
