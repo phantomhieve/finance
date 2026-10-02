@@ -1,146 +1,184 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monthly AI Portfolio Summary</title>
-    <style>
-        body {
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            background-color: #f4f6f8;
-            color: #333333;
-            margin: 0;
-            padding: 0;
-            line-height: 1.6;
-        }
-        .container {
-            max-width: 600px;
-            margin: 40px auto;
-            background-color: #ffffff;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-        }
-        .header {
-            background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
-            color: #ffffff;
-            padding: 30px;
-            text-align: center;
-        }
-        .header h1 {
-            margin: 0;
-            font-size: 24px;
-            font-weight: 600;
-            letter-spacing: 0.5px;
-        }
-        .content {
-            padding: 30px;
-        }
-        .score-card {
-            background-color: #f0fdf4;
-            border: 1px solid #bbf7d0;
-            border-radius: 8px;
-            padding: 20px;
-            text-align: center;
-            margin-bottom: 25px;
-        }
-        .score-card h2 {
-            margin: 0 0 10px 0;
-            color: #166534;
-            font-size: 36px;
-        }
-        .score-card p {
-            margin: 0;
-            color: #15803d;
-            font-size: 14px;
-            text-transform: uppercase;
-            font-weight: bold;
-            letter-spacing: 1px;
-        }
-        h3 {
-            color: #1e40af;
-            font-size: 18px;
-            margin-top: 25px;
-            margin-bottom: 15px;
-            border-bottom: 2px solid #e5e7eb;
-            padding-bottom: 8px;
-        }
-        p {
-            margin: 0 0 15px 0;
-        }
-        ul {
-            padding-left: 20px;
-            margin: 0 0 20px 0;
-        }
-        li {
-            margin-bottom: 8px;
-        }
-        .action-item {
-            background-color: #fffbeb;
-            border-left: 4px solid #f59e0b;
-            padding: 12px 15px;
-            margin-bottom: 10px;
-            border-radius: 0 4px 4px 0;
-        }
-        .footer {
-            background-color: #f9fafb;
-            padding: 20px;
-            text-align: center;
-            font-size: 12px;
-            color: #6b7280;
-            border-top: 1px solid #e5e7eb;
-        }
-        .highlight {
-            font-weight: bold;
-            color: #111827;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>Monthly Portfolio AI Summary</h1>
-        </div>
-        <div class="content">
-            <p>Hello,</p>
-            <p>Here is your automated monthly AI summary of your portfolio for <strong>{{ month }}</strong>.</p>
-            
-            {% if insights %}
-            <div class="score-card">
-                <h2>{{ insights.score }}/100</h2>
-                <p>Overall Portfolio Health Score</p>
-            </div>
-            
-            <h3>Executive Summary</h3>
-            <p>{{ insights.summary }}</p>
+{% extends "emails/_base.html" %}
+{% load indian_format %}
 
-            <h3>Detailed Insights</h3>
-            {% for insight in insights.insights %}
-            <div style="margin-bottom: 20px;">
-                <h4 style="margin: 0 0 5px 0; color: #111827;">
-                    {% if insight.severity == 'HIGH' %}🔴{% elif insight.severity == 'MEDIUM' %}🟡{% else %}🟢{% endif %} 
-                    {{ insight.title }}
-                </h4>
-                <p style="margin: 0 0 8px 0; font-size: 14px; color: #4b5563;">{{ insight.detail }}</p>
-                {% if insight.action %}
-                <div class="action-item"><strong>Action:</strong> {{ insight.action }}</div>
-                {% endif %}
-            </div>
-            {% endfor %}
+{% block title %}Vault monthly review · {{ month }}{% endblock %}
 
-            <h3>Market Context & Outlook</h3>
-            <p><strong>Context:</strong> {{ insights.market_context }}</p>
-            <p><strong>Outlook:</strong> {{ insights.outlook }}</p>
-            
-            {% else %}
-            <p>No recent AI insights are available for your portfolio. The system attempted to generate them but failed or is in cooldown.</p>
-            {% endif %}
-            
-            <p style="margin-top: 30px;">Keep up the great work in managing your wealth!</p>
-        </div>
-        <div class="footer">
-            <p>This is an automated email from your Vault Portfolio Tracker.</p>
-        </div>
-    </div>
-</body>
-</html>
+{% block preheader %}Net worth {{ total_value|inr_short }}{% if since %} · {% if since.change >= 0 %}+{% endif %}{{ since.change_pct|floatformat:1 }}% since {{ since.month|date:"M" }}{% endif %}{% if goal %} · {{ goal_fy }} target {{ goal.fy_progress_pct|floatformat:0 }}% there{% endif %}{% if insights.score %} · Health {{ insights.score }}/100{% endif %}{% endblock %}
+
+{% block eyebrow %}Monthly review · {{ month }}{% endblock %}
+
+{% block content %}
+
+{# ── Headline: net worth ───────────────────────────────────────── #}
+<p class="em-muted" style="margin:0 0 6px 0; font-size:13px; color:#64748b;">Household net worth · as of {{ as_of }}</p>
+<p class="em-hero em-text num" style="margin:0; font-size:40px; line-height:46px; font-weight:800; color:#0f172a; letter-spacing:-0.5px;">{{ total_value|inr }}</p>
+{% if since %}
+<p style="margin:10px 0 0 0; font-size:14px; line-height:20px;">
+  <span class="num" style="display:inline-block; padding:3px 10px; border-radius:999px; font-weight:700; {% if since.change >= 0 %}background-color:#ecfdf5; color:#047857;{% else %}background-color:#fef2f2; color:#b91c1c;{% endif %}">{% if since.change >= 0 %}&#9650; +{% else %}&#9660; {% endif %}{{ since.change|inr_short }} ({% if since.change >= 0 %}+{% endif %}{{ since.change_pct|floatformat:1 }}%)</span>
+  <span class="em-muted" style="color:#64748b;">&nbsp;since {{ since.month|date:"j M Y" }}</span>
+</p>
+{% endif %}
+
+{# ── KPI strip ─────────────────────────────────────────────────── #}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;">
+<tr>
+  <td class="em-stack" width="33%" valign="top" style="padding-right:6px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="em-soft" style="background-color:#f8fafc; border-radius:10px; padding:14px;">
+      <p class="em-muted" style="margin:0; font-size:11px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; color:#64748b;">Invested</p>
+      <p class="em-text num" style="margin:4px 0 0 0; font-size:18px; font-weight:700; color:#0f172a;">{{ total_invested|inr_short }}</p>
+    </td></tr></table>
+  </td>
+  <td class="em-stack" width="34%" valign="top" style="padding:0 3px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="em-soft" style="background-color:#f8fafc; border-radius:10px; padding:14px;">
+      <p class="em-muted" style="margin:0; font-size:11px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; color:#64748b;">Total returns</p>
+      <p class="num" style="margin:4px 0 0 0; font-size:18px; font-weight:700; color:{% if total_returns >= 0 %}#047857{% else %}#b91c1c{% endif %};">{{ total_returns|inr_short }} <span style="font-size:12px; font-weight:600;">({{ return_pct|floatformat:1 }}%)</span></p>
+    </td></tr></table>
+  </td>
+  <td class="em-stack" width="33%" valign="top" style="padding-left:6px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="em-soft" style="background-color:#f8fafc; border-radius:10px; padding:14px;">
+      <p class="em-muted" style="margin:0; font-size:11px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; color:#64748b;">{% if fy %}{{ fy.label }} so far{% else %}This FY{% endif %}</p>
+      {% if fy %}
+      <p class="num" style="margin:4px 0 0 0; font-size:18px; font-weight:700; color:{% if fy.change >= 0 %}#047857{% else %}#b91c1c{% endif %};">{% if fy.change >= 0 %}+{% endif %}{{ fy.change_pct|floatformat:1 }}%</p>
+      {% else %}
+      <p class="em-muted" style="margin:4px 0 0 0; font-size:13px; color:#94a3b8;">Needs an opening snapshot</p>
+      {% endif %}
+    </td></tr></table>
+  </td>
+</tr>
+</table>
+
+{# ── What moved it ─────────────────────────────────────────────── #}
+{% if since %}
+{% include "emails/_section.html" with title="What moved your net worth" %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr>
+    <td class="em-text em-line" style="padding:10px 0; font-size:14px; color:#0f172a; border-bottom:1px solid #e2e8f0;">Fresh money added</td>
+    <td class="em-line num" align="right" style="padding:10px 0; font-size:14px; font-weight:600; border-bottom:1px solid #e2e8f0; color:{% if since.money_added >= 0 %}#0f172a{% else %}#b91c1c{% endif %};">{% if since.money_added >= 0 %}+{% endif %}{{ since.money_added|inr }}</td>
+  </tr>
+  <tr>
+    <td class="em-text em-line" style="padding:10px 0; font-size:14px; color:#0f172a; border-bottom:1px solid #e2e8f0;">Market movement</td>
+    <td class="em-line num" align="right" style="padding:10px 0; font-size:14px; font-weight:600; border-bottom:1px solid #e2e8f0; color:{% if since.market >= 0 %}#047857{% else %}#b91c1c{% endif %};">{% if since.market >= 0 %}+{% endif %}{{ since.market|inr }}</td>
+  </tr>
+  <tr>
+    <td class="em-text" style="padding:10px 0; font-size:14px; font-weight:700; color:#0f172a;">Net change</td>
+    <td class="num" align="right" style="padding:10px 0; font-size:14px; font-weight:700; color:{% if since.change >= 0 %}#047857{% else %}#b91c1c{% endif %};">{% if since.change >= 0 %}+{% endif %}{{ since.change|inr }}</td>
+  </tr>
+</table>
+{% endif %}
+
+{# ── FY target ─────────────────────────────────────────────────── #}
+{% if goal %}
+{% include "emails/_section.html" with title=goal_fy|add:" target" %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+<tr><td class="em-soft" style="background-color:#f8fafc; border-radius:12px; padding:20px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+    <td>
+      <p class="em-text num" style="margin:0; font-size:22px; font-weight:800; color:#0f172a;">{{ goal.target|inr_short }} <span class="em-muted" style="font-size:13px; font-weight:500; color:#64748b;">· {{ goal.label }}</span></p>
+    </td>
+    <td align="right" valign="top">
+      {% if goal.achieved %}<span style="display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:700; background-color:#ecfdf5; color:#047857;">Achieved</span>
+      {% elif goal.status == 'ahead' %}<span style="display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:700; background-color:#ecfdf5; color:#047857;">Ahead</span>
+      {% elif goal.status == 'behind' %}<span style="display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:700; background-color:#fffbeb; color:#b45309;">Behind pace</span>
+      {% else %}<span style="display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:700; background-color:#eff6ff; color:#1d4ed8;">On track</span>{% endif %}
+    </td>
+  </tr></table>
+
+  <div style="height:14px; line-height:14px; font-size:0;">&nbsp;</div>
+  {% if goal.achieved %}
+    {% include "emails/_bar.html" with pct=100 color="#10b981" %}
+  {% elif goal.status == 'behind' %}
+    {% include "emails/_bar.html" with pct=goal.fy_progress_pct color="#f59e0b" %}
+  {% else %}
+    {% include "emails/_bar.html" with pct=goal.fy_progress_pct color="#4f46e5" %}
+  {% endif %}
+  <p class="em-muted" style="margin:8px 0 0 0; font-size:12px; color:#64748b;">
+    {% if goal.achieved %}Target reached with {{ goal.surplus|inr_short }} to spare.{% else %}<strong class="em-text" style="color:#0f172a;">{{ goal.fy_progress_pct|floatformat:0 }}%</strong> of this year's climb done · {{ goal.time_pct|floatformat:0 }}% of the year gone{% endif %}
+  </p>
+
+  {% if not goal.achieved %}
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:16px;"><tr>
+    <td width="34%" valign="top">
+      <p class="em-muted" style="margin:0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#64748b;">Gap</p>
+      <p class="em-text num" style="margin:2px 0 0 0; font-size:15px; font-weight:700; color:#0f172a;">{{ goal.remaining|inr_short }}</p>
+    </td>
+    <td width="33%" valign="top">
+      <p class="em-muted" style="margin:0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#64748b;">Needed / month</p>
+      <p class="em-text num" style="margin:2px 0 0 0; font-size:15px; font-weight:700; color:#0f172a;">{{ goal.monthly_needed|default:0|inr_short }}</p>
+    </td>
+    <td width="33%" valign="top">
+      <p class="em-muted" style="margin:0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#64748b;">Days left</p>
+      <p class="em-text num" style="margin:2px 0 0 0; font-size:15px; font-weight:700; color:#0f172a;">{{ goal.days_left }}</p>
+    </td>
+  </tr></table>
+  {% endif %}
+</td></tr>
+</table>
+{% endif %}
+
+{# ── Allocation ────────────────────────────────────────────────── #}
+{% if allocation %}
+{% include "emails/_section.html" with title="Where your money sits" %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+  {% for a in allocation %}
+  <tr>
+    <td width="38%" style="padding:7px 10px 7px 0;">
+      <span class="em-text" style="font-size:14px; font-weight:600; color:#0f172a;">{{ a.name }}</span><br>
+      <span class="em-muted num" style="font-size:12px; color:#64748b;">{{ a.value|inr_short }}</span>
+    </td>
+    <td class="em-hide-sm" width="47%" style="padding:7px 10px 7px 0;">{% include "emails/_bar.html" with pct=a.pct color="#6366f1" height=6 %}</td>
+    <td width="15%" align="right" class="em-text num" style="padding:7px 0; font-size:14px; font-weight:700; color:#0f172a;">{% if a.pct < 1 %}&lt;1{% else %}{{ a.pct|floatformat:0 }}{% endif %}%</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+{# ── AI review ─────────────────────────────────────────────────── #}
+{% if insights %}
+{% include "emails/_section.html" with title="AI portfolio review" %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+  {% if insights.score %}
+  <td width="88" valign="top" style="padding-right:16px;">
+    <table role="presentation" width="72" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td align="center" style="width:72px; height:72px; border-radius:36px; {% if insights.score >= 75 %}background-color:#ecfdf5; color:#047857;{% elif insights.score >= 50 %}background-color:#fffbeb; color:#b45309;{% else %}background-color:#fef2f2; color:#b91c1c;{% endif %}">
+        <span class="num" style="font-size:24px; font-weight:800; line-height:26px;">{{ insights.score }}</span><br>
+        <span style="font-size:10px; font-weight:600; letter-spacing:0.5px;">/ 100</span>
+      </td>
+    </tr></table>
+  </td>
+  {% endif %}
+  <td valign="top">
+    <p class="em-muted" style="margin:0 0 4px 0; font-size:11px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; color:#64748b;">Health score</p>
+    <p class="em-text" style="margin:0; font-size:15px; line-height:23px; color:#0f172a;">{{ insights.summary }}</p>
+  </td>
+</tr></table>
+
+{% for i in insights.insights %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:14px;"><tr>
+  <td width="4" style="width:4px; border-radius:2px; background-color:{% if i.severity == 'HIGH' %}#ef4444{% elif i.severity == 'MEDIUM' %}#f59e0b{% else %}#10b981{% endif %};">&nbsp;</td>
+  <td style="padding:2px 0 2px 14px;">
+    <p style="margin:0 0 4px 0; font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:{% if i.severity == 'HIGH' %}#b91c1c{% elif i.severity == 'MEDIUM' %}#b45309{% else %}#047857{% endif %};">{% if i.severity == 'HIGH' %}Act now{% elif i.severity == 'MEDIUM' %}Worth a look{% else %}Healthy{% endif %}</p>
+    <p class="em-text" style="margin:0 0 4px 0; font-size:15px; font-weight:700; color:#0f172a;">{{ i.title }}</p>
+    <p class="em-muted" style="margin:0; font-size:14px; line-height:21px; color:#475569;">{{ i.detail }}</p>
+    {% if i.action %}<p class="em-text" style="margin:8px 0 0 0; font-size:14px; line-height:21px; color:#0f172a;"><strong style="color:#4f46e5;">&rarr; Next step:</strong> {{ i.action }}</p>{% endif %}
+  </td>
+</tr></table>
+{% endfor %}
+
+{% if insights.market_context or insights.outlook %}
+{% include "emails/_section.html" with title="Markets & outlook" %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="em-soft" style="background-color:#f8fafc; border-radius:12px; padding:18px;">
+  {% if insights.market_context %}<p class="em-text" style="margin:0; font-size:14px; line-height:21px; color:#0f172a;"><strong>Context.</strong> {{ insights.market_context }}</p>{% endif %}
+  {% if insights.outlook %}<p class="em-text" style="margin:{% if insights.market_context %}12px{% else %}0{% endif %} 0 0 0; font-size:14px; line-height:21px; color:#0f172a;"><strong>Outlook.</strong> {{ insights.outlook }}</p>{% endif %}
+</td></tr></table>
+{% endif %}
+
+{% else %}
+{% include "emails/_section.html" with title="AI portfolio review" %}
+<p class="em-muted" style="margin:0; font-size:14px; line-height:21px; color:#64748b;">No AI review this month — generation failed or is in cooldown. Your numbers above are still current.</p>
+{% endif %}
+
+<div style="height:16px; line-height:16px; font-size:0;">&nbsp;</div>
+{% endblock %}
+
+{% block cta_label %}Open your portfolio{% endblock %}
+{% block footer_note %}Monthly review generated on {{ as_of }}.{% endblock %}

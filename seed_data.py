@@ -20,10 +20,9 @@ All operations use get_or_create — safe to re-run.
 """
 
 import os
-import sys
 import django
 from decimal import Decimal
-from datetime import date, datetime
+from datetime import date
 
 # ── Bootstrap Django ──────────────────────────────────────────────────────────
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "pftracker.settings")
@@ -44,8 +43,7 @@ django.setup()
 # ── Imports after setup ───────────────────────────────────────────────────────
 from tracker.models import (
     AccountGroup, User, Category, Transaction,
-    HRAExpense, FinancialGoal as TrackerFinancialGoal,
-    GoalIncrement, MonthlyGoalAdjustment,
+    HRAExpense, GoalIncrement, MonthlyGoalAdjustment,
 )
 from portfolio.models import (
     ZerodhaAccount, StockHolding, MutualFundHolding,

@@ -51,24 +51,6 @@ class ZerodhaAccount(models.Model):
     def __str__(self):
         return self.name
 
-    @property
-    def total_stocks_value(self):
-        return self.stock_holdings.aggregate(t=models.Sum('current_value'))['t'] or Decimal('0')
-
-    @property
-    def total_index_mf_value(self):
-        return self.mf_holdings.filter(fund_type='INDEX').aggregate(
-            t=models.Sum('current_value'))['t'] or Decimal('0')
-
-    @property
-    def total_other_mf_value(self):
-        return self.mf_holdings.filter(fund_type='OTHER').aggregate(
-            t=models.Sum('current_value'))['t'] or Decimal('0')
-
-    @property
-    def total_value(self):
-        return self.total_stocks_value + self.total_index_mf_value + self.total_other_mf_value
-
 
 class StockHolding(PnlMixin, models.Model):
     account = models.ForeignKey(
@@ -117,7 +99,14 @@ class MutualFundHolding(PnlMixin, models.Model):
 
 
 class FinancialGoal(models.Model):
-    """Portfolio milestone goal (e.g. 50L, 1Cr). Distinct from tracker.FinancialGoal which tracks monthly savings."""
+    """Portfolio net-worth target for an Indian FY (or long term).
+
+    Distinct from tracker.FinancialGoal which tracks monthly savings.
+    Once the FY closes, the goal is judged on ``closing_value`` (portfolio value
+    in the March snapshot) so the achieved / missed verdict is frozen.
+    """
+    LONG_TERM = 'Long Term'
+
     group = models.ForeignKey(
         'tracker.AccountGroup', on_delete=models.CASCADE,
         related_name='portfolio_goals', null=True, blank=True,
@@ -127,13 +116,41 @@ class FinancialGoal(models.Model):
     target_date = models.DateField(null=True, blank=True, help_text="Target date to achieve this goal (e.g. FY End: 2026-03-31)")
     achieved_at = models.DateField(null=True, blank=True,
                                    help_text="Auto-set when portfolio value first reaches the target")
+    financial_year = models.CharField(
+        max_length=30, blank=True,
+        help_text="e.g. FY 2026-27 or Long Term",
+    )
+    closing_value = models.DecimalField(
+        max_digits=14, decimal_places=0, null=True, blank=True,
+        help_text="Portfolio value at FY close (from the March snapshot); locks the achieved/missed verdict",
+    )
     notes = models.TextField(blank=True, help_text="Optional notes or comments for this goal")
 
     class Meta:
-        ordering = ['target_amount']
+        ordering = ['target_date', 'target_amount']
+
+    @property
+    def fy_start(self):
+        """FY start year (2026 for 'FY 2026-27'), or None for long-term goals."""
+        from pftracker.utils import fy_start_from_label
+        return fy_start_from_label(self.financial_year)
+
+    @property
+    def fy_end_date(self):
+        start = self.fy_start
+        return date(start + 1, 3, 31) if start is not None else None
+
+    def save(self, *args, **kwargs):
+        from pftracker.utils import fy_label, fy_start_year
+        if not self.financial_year and self.target_date:
+            self.financial_year = fy_label(fy_start_year(self.target_date))
+        elif not self.target_date and self.fy_end_date:
+            self.target_date = self.fy_end_date
+        super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.label} — ₹{self.target_amount:,.0f}"
+        fy_suffix = f" ({self.financial_year})" if self.financial_year else ""
+        return f"{self.label}{fy_suffix} — ₹{self.target_amount:,.0f}"
 
 
 class EPFEntry(models.Model):
@@ -454,15 +471,6 @@ class USStockHolding(models.Model):
             return (self.pnl / self.purchase_value * 100).quantize(Decimal('0.01'))
         return Decimal('0')
 
-    @property
-    def current_price_inr(self):
-        return (self.current_price_usd * self.current_usd_inr).quantize(Decimal('0.01'))
-
-    @property
-    def purchase_price_inr(self):
-        return (self.purchase_price_usd * self.purchase_usd_inr).quantize(Decimal('0.01'))
-
-
 class CommodityPrice(models.Model):
     """Cached commodity price — one row per commodity type, updated on refresh."""
     COMMODITY_CHOICES = (
@@ -688,6 +696,10 @@ class RealEstateHolding(PnlMixin, models.Model):
         max_digits=12, decimal_places=2, default=0,
         help_text="Monthly rental revenue in INR if rented out",
     )
+    last_appreciated_fy = models.CharField(
+        max_length=12, blank=True,
+        help_text="FY whose year-end land appreciation has been applied (e.g. 'FY 2025-26')",
+    )
 
     is_baby = models.BooleanField(
         default=False, help_text="Track in Child portfolio instead of master portfolio",
@@ -776,20 +788,6 @@ class RealEstateHolding(PnlMixin, models.Model):
         gaj = self.area_in_gaj
         if gaj and gaj > 0:
             return (self.current_valuation / gaj).quantize(Decimal('0.01'))
-        return Decimal('0')
-
-    @property
-    def purchase_rate_per_sqft(self) -> Decimal:
-        sqft = self.area_in_sqft
-        if sqft and sqft > 0:
-            return (self.purchase_price / sqft).quantize(Decimal('0.01'))
-        return Decimal('0')
-
-    @property
-    def current_rate_per_sqft(self) -> Decimal:
-        sqft = self.area_in_sqft
-        if sqft and sqft > 0:
-            return (self.current_valuation / sqft).quantize(Decimal('0.01'))
         return Decimal('0')
 
     @property

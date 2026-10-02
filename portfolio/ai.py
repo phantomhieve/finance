@@ -20,8 +20,7 @@ from django.conf import settings
 from google import genai
 from pydantic import BaseModel
 
-from .models import StockHolding, MutualFundHolding, USStockHolding, RealEstateHolding
-from .services import get_portfolio_summary, get_growth_data
+from .models import StockHolding, MutualFundHolding
 
 logger = logging.getLogger(__name__)
 
@@ -642,8 +641,9 @@ def build_prompt_data(summary, growth, group):
         real_estate['holdings'].append(re_entry)
 
     goals = [
-        {'label': g['label'], 'target': g['target'],
-         'progress_pct': g['pct'], 'achieved': g['achieved']}
+        {'financial_year': g['fy'], 'label': g['label'], 'target': g['target'],
+         'progress_pct': g['pct'], 'status': g['status'],
+         'monthly_needed': g.get('monthly_needed')}
         for g in summary['goals']
     ]
 

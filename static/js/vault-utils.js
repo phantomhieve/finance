@@ -1,3 +1,8 @@
+function escapeHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
+    return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c];
+  });
+}
 function openModal(id) {
   var el = document.getElementById(id);
   if (el && el.tagName === 'DIALOG') el.showModal();

@@ -136,6 +136,20 @@ class JewelleryItem(models.Model):
         ]
         return ' '.join(b for b in bits if b).lower()
 
+    @staticmethod
+    def current_rates():
+        """{'GOLD': rate, 'SILVER': rate} per gram — one query."""
+        return dict(CommodityPrice.objects.filter(commodity_type__in=('GOLD', 'SILVER'))
+                    .values_list('commodity_type', 'rate_per_gram'))
+
+    @classmethod
+    def attach_rates(cls, items, rates=None):
+        """Share one rate lookup across many items so ``estimated_value`` doesn't query per item."""
+        rates = cls.current_rates() if rates is None else rates
+        for item in items:
+            item._rates = rates
+        return rates
+
     @property
     def estimated_value(self):
         if self.metal_type in ['GOLD', 'DIAMOND_OTHER']:
@@ -148,12 +162,15 @@ class JewelleryItem(models.Model):
         if not self.weight_grams:
             return Decimal('0.00')
 
-        price_obj = CommodityPrice.objects.filter(commodity_type=price_type).first()
-        if not price_obj:
+        rates = getattr(self, '_rates', None)
+        if rates is None:
+            rates = self.current_rates()
+        rate = rates.get(price_type)
+        if not rate:
             return Decimal('0.00')
 
         purity_factor = self.PURITY_FACTORS.get(self.purity, Decimal('1.0'))
-        return (self.weight_grams * price_obj.rate_per_gram * purity_factor).quantize(Decimal('0.01'))
+        return (self.weight_grams * rate * purity_factor).quantize(Decimal('0.01'))
 
     @property
     def pnl(self):

@@ -3,6 +3,8 @@ from decimal import Decimal
 
 from django import forms
 
+from pftracker.utils import fy_label, fy_start_from_label, fy_start_year
+
 from .models import (
     EPFEntry, NPSEntry, FixedDeposit, CashPosition,
     BondHolding, CryptoHolding, CommodityHolding, FinancialGoal,
@@ -180,15 +182,49 @@ class USStockHoldingForm(forms.ModelForm):
         return val
 
 
+def _fy_choices(today=None):
+    """Rolling FY dropdown: two closed years for back-filling, current, five ahead, long term."""
+    cur = fy_start_year(today)
+    choices = [('', '— Select financial year —')]
+    for start in range(cur - 2, cur + 6):
+        label = fy_label(start)
+        if start < cur:
+            hint = 'closed'
+        elif start == cur:
+            hint = f'current · ends 31 Mar {start + 1}'
+        else:
+            hint = f'ends 31 Mar {start + 1}'
+        choices.append((label, f'{label} ({hint})'))
+    choices.append((FinancialGoal.LONG_TERM, 'Long term / custom horizon'))
+    return choices
+
+
 class FinancialGoalForm(forms.ModelForm):
+    financial_year = forms.CharField(max_length=30, required=False, widget=forms.Select())
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['financial_year'].widget.choices = _fy_choices()
+
+    def clean_financial_year(self):
+        value = (self.cleaned_data.get('financial_year') or '').strip()
+        if value and value != FinancialGoal.LONG_TERM and fy_start_from_label(value) is None:
+            raise forms.ValidationError('Use the format "FY 2026-27" or "Long Term".')
+        return value
+
+    def save(self, commit=True):
+        if {'financial_year', 'target_date'} & set(self.changed_data):
+            self.instance.closing_value = None
+        return super().save(commit=commit)
+
     class Meta:
         model = FinancialGoal
-        fields = ['label', 'target_amount', 'target_date', 'notes']
+        fields = ['financial_year', 'label', 'target_amount', 'target_date', 'notes']
         widgets = {
-            'label': forms.TextInput(attrs={'placeholder': 'e.g. FY26 Target, 50L'}),
-            'target_amount': forms.NumberInput(attrs={'step': '1', 'placeholder': '5000000'}),
+            'label': forms.TextInput(attrs={'placeholder': 'e.g. FY 2026-27 Target'}),
+            'target_amount': forms.NumberInput(attrs={'step': '1', 'placeholder': '45000000'}),
             'target_date': forms.DateInput(attrs={'type': 'date'}),
-            'notes': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Optional notes…'}),
+            'notes': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Strategic plan, allocation notes…'}),
         }
 
 

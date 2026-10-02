@@ -108,7 +108,7 @@ class MonthlySnapshotAdmin(ModelAdmin):
 
 @admin.register(FinancialGoal)
 class FinancialGoalAdmin(ModelAdmin):
-    list_display = ('label', 'group', 'target_amount', 'achieved_at')
+    list_display = ('label', 'financial_year', 'group', 'target_amount', 'achieved_at', 'closing_value')
     list_filter = ('group',)
     list_select_related = ('group',)
     ordering = ('target_amount',)
