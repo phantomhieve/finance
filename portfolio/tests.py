@@ -261,3 +261,349 @@ class RealEstateMcpServerTests(TestCase):
         ))
         self.assertEqual(del_res['status'], 'deleted')
         self.assertEqual(RealEstateHolding.objects.count(), 0)
+
+
+class FinancialGoalRoadmapTests(TestCase):
+    """FY-wise goals: closed years freeze on the March snapshot, open years track live value."""
+
+    def setUp(self):
+        from portfolio.models import CashPosition, FinancialGoal
+        self.FinancialGoal = FinancialGoal
+        self.group = AccountGroup.objects.create(name="Goal Family")
+        CashPosition.objects.create(group=self.group, name="Bank", amount=Decimal("6000000"))
+        self.today = datetime.date(2026, 10, 2)  # FY 2026-27, ~50% elapsed
+
+    def _roadmap(self):
+        from portfolio.services import build_goal_roadmap
+        return build_goal_roadmap(self.group, Decimal("6000000"), today=self.today)
+
+    def test_save_derives_fy_and_target_date(self):
+        g = self.FinancialGoal.objects.create(group=self.group, label="A", target_amount=1, financial_year="FY 2027-28")
+        self.assertEqual(g.target_date, datetime.date(2028, 3, 31))
+        g2 = self.FinancialGoal.objects.create(group=self.group, label="B", target_amount=1, target_date=datetime.date(2026, 2, 1))
+        self.assertEqual(g2.financial_year, "FY 2025-26")
+        g3 = self.FinancialGoal.objects.create(group=self.group, label="C", target_amount=1, financial_year="Long Term")
+        self.assertIsNone(g3.fy_start)
+        self.assertIsNone(g3.target_date)
+
+    def test_closed_year_uses_march_snapshot_not_live_value(self):
+        MonthlySnapshot.objects.create(group=self.group, month=datetime.date(2026, 3, 1),
+                                       total_current_value=Decimal("4000000"))
+        self.FinancialGoal.objects.create(group=self.group, label="Missed", target_amount=5000000, financial_year="FY 2025-26")
+        self.FinancialGoal.objects.create(group=self.group, label="Hit", target_amount=3500000, financial_year="FY 2025-26")
+        rm = self._roadmap()
+        closed = {g['label']: g for g in rm['goals'] if g['state'] == 'closed'}
+        # Live value (60L) exceeds 50L but the FY closed at 40L → still missed.
+        self.assertEqual(closed['Missed']['status'], 'missed')
+        self.assertEqual(closed['Hit']['status'], 'achieved')
+        self.assertEqual(rm['closed'][0]['verdict'], 'partial')
+        self.assertIsNone(self.FinancialGoal.objects.get(label="Missed").achieved_at)
+
+    def test_current_year_pace_from_fy_opening(self):
+        MonthlySnapshot.objects.create(group=self.group, month=datetime.date(2026, 3, 1),
+                                       total_current_value=Decimal("5000000"))
+        self.FinancialGoal.objects.create(group=self.group, label="FY27", target_amount=8000000, financial_year="FY 2026-27")
+        rm = self._roadmap()
+        s = rm['spotlight']
+        # 10L of the 30L climb done (33%) vs ~50% of the year gone → behind.
+        self.assertAlmostEqual(s['fy_progress_pct'], 33.3, places=1)
+        self.assertEqual(s['status'], 'behind')
+        self.assertEqual(s['remaining'], 2000000.0)
+        self.assertGreater(s['monthly_needed'], 0)
+
+    def test_open_goal_stamps_achieved_at(self):
+        g = self.FinancialGoal.objects.create(group=self.group, label="Next", target_amount=5000000, financial_year="FY 2027-28")
+        rm = self._roadmap()
+        self.assertEqual(rm['upcoming'][0]['goals'][0]['status'], 'achieved')
+        g.refresh_from_db()
+        self.assertEqual(g.achieved_at, self.today)
+
+    def test_march_snapshot_locks_closing_value(self):
+        g = self.FinancialGoal.objects.create(group=self.group, label="FY26", target_amount=1, financial_year="FY 2025-26")
+        take_monthly_snapshot(month=datetime.date(2026, 3, 1), group=self.group)
+        g.refresh_from_db()
+        self.assertEqual(g.closing_value, Decimal("6000000"))
+
+    def test_baby_summary_ignores_goals(self):
+        g = self.FinancialGoal.objects.create(group=self.group, label="X", target_amount=1, financial_year="FY 2027-28")
+        summary = get_portfolio_summary(self.group, is_baby=True)
+        self.assertEqual(summary['goals'], [])
+        g.refresh_from_db()
+        self.assertIsNone(g.achieved_at)
+
+    def test_form_rejects_bad_fy(self):
+        from portfolio.forms import FinancialGoalForm
+        form = FinancialGoalForm(data={'financial_year': 'FY26', 'label': 'x', 'target_amount': '1'})
+        self.assertFalse(form.is_valid())
+        self.assertIn('financial_year', form.errors)
+
+
+class EmailRenderingTests(TestCase):
+    """Scheduled emails render with and without data and use the previous month's snapshot."""
+
+    def setUp(self):
+        from portfolio.models import CashPosition
+        self.group = AccountGroup.objects.create(name="Mail Family")
+        CashPosition.objects.create(group=self.group, name="Bank", amount=Decimal("700000"))
+
+    def test_inr_filters(self):
+        from portfolio.templatetags.indian_format import inr, inr_short
+        self.assertEqual(inr(Decimal("12079850.4")), "₹1,20,79,850")
+        self.assertEqual(inr(-1500), "−₹1,500")
+        self.assertEqual(inr_short(12400000), "₹1.24 Cr")
+        self.assertEqual(inr_short(850000), "₹8.5 L")
+        self.assertEqual(inr_short(-42000), "−₹42K")
+
+    def test_monthly_renders_without_insights_or_snapshots(self):
+        from django.template.loader import render_to_string
+        from portfolio.emails import build_monthly_context
+        ctx = build_monthly_context(self.group, None)
+        self.assertIsNone(ctx['since'])
+        html = render_to_string('emails/monthly_summary.html', ctx)
+        self.assertIn('₹7,00,000', html)
+        self.assertIn('No AI review this month', html)
+
+    def test_monthly_compares_against_previous_month_snapshot(self):
+        from django.utils import timezone
+        from portfolio.emails import build_monthly_context
+        this_month = timezone.localdate().replace(day=1)
+        prev = (this_month - datetime.timedelta(days=1)).replace(day=1)
+        MonthlySnapshot.objects.create(group=self.group, month=prev,
+                                       total_current_value=Decimal("600000"), total_invested=Decimal("650000"))
+        MonthlySnapshot.objects.create(group=self.group, month=this_month,
+                                       total_current_value=Decimal("700000"), total_invested=Decimal("700000"))
+        since = build_monthly_context(self.group, {'score': 80, 'insights': []})['since']
+        self.assertEqual(since['month'], prev)
+        self.assertEqual(since['change'], Decimal("100000"))
+        self.assertEqual(since['money_added'], Decimal("50000"))
+        self.assertEqual(since['market'], Decimal("50000"))
+
+    def test_weekly_floor_and_render(self):
+        from django.template.loader import render_to_string
+        from portfolio.emails import apply_floor, build_weekly_context
+        ctx = apply_floor(build_weekly_context(self.group), 1000000.0)
+        self.assertEqual(ctx['deficit'], 300000.0)
+        self.assertEqual(ctx['coverage_pct'], 70)
+        html = render_to_string('emails/weekly_brief.html', ctx)
+        self.assertIn('Hold &amp; rebuild', html)
+        self.assertNotIn('<details', html)
+
+
+class FyEndAutomationTests(TestCase):
+    """1 April jobs: land appreciation (once per FY) and the FY review email."""
+
+    def setUp(self):
+        self.group = AccountGroup.objects.create(name="FY Family")
+        base = dict(group=self.group, area_value=Decimal("200"), locality="Sector 1",
+                    purchase_date=datetime.date(2020, 1, 1), purchase_price=Decimal("1000000"))
+        self.plot = RealEstateHolding.objects.create(name="Plot", property_type="PLOT_LAND",
+                                                     current_valuation=Decimal("1000000"), **base)
+        self.flat = RealEstateHolding.objects.create(name="Flat", property_type="APARTMENT_FLAT",
+                                                     current_valuation=Decimal("5000000"), **base)
+        self.apr1 = datetime.date(2026, 4, 1)
+
+    def test_land_appreciates_once_per_fy_and_skips_buildings(self):
+        from portfolio.services import apply_annual_land_appreciation
+        fy, results = apply_annual_land_appreciation(today=self.apr1)
+        self.assertEqual(fy, "FY 2025-26")
+        self.assertEqual([r['holding'].name for r in results], ["Plot"])
+        self.plot.refresh_from_db()
+        self.flat.refresh_from_db()
+        self.assertEqual(self.plot.current_valuation, Decimal("1060000"))
+        self.assertEqual(self.plot.last_valuation_date, self.apr1)
+        self.assertEqual(self.flat.current_valuation, Decimal("5000000"))
+        _, again = apply_annual_land_appreciation(today=self.apr1 + datetime.timedelta(days=3))
+        self.assertEqual(again, [])
+        self.plot.refresh_from_db()
+        self.assertEqual(self.plot.current_valuation, Decimal("1060000"))
+
+    def test_recent_manual_revaluation_is_not_marked_up(self):
+        from portfolio.services import apply_annual_land_appreciation
+        self.plot.last_valuation_date = datetime.date(2026, 3, 20)
+        self.plot.save()
+        _, results = apply_annual_land_appreciation(today=self.apr1)
+        self.assertTrue(results[0]['skipped'])
+        self.plot.refresh_from_db()
+        self.assertEqual(self.plot.current_valuation, Decimal("1000000"))
+        self.assertEqual(self.plot.last_appreciated_fy, "FY 2025-26")
+
+    def test_fy_review_verdict_and_next_year(self):
+        from django.template.loader import render_to_string
+        from portfolio.emails import build_fy_review_context
+        from portfolio.models import FinancialGoal
+        MonthlySnapshot.objects.create(group=self.group, month=datetime.date(2025, 3, 1),
+                                       total_current_value=Decimal("5000000"), total_invested=Decimal("4000000"))
+        MonthlySnapshot.objects.create(group=self.group, month=datetime.date(2026, 3, 1),
+                                       total_current_value=Decimal("6200000"), total_invested=Decimal("4500000"))
+        FinancialGoal.objects.create(group=self.group, label="Hit", target_amount=6000000, financial_year="FY 2025-26")
+        FinancialGoal.objects.create(group=self.group, label="Stretch", target_amount=7000000, financial_year="FY 2025-26")
+        FinancialGoal.objects.create(group=self.group, label="Next", target_amount=7400000, financial_year="FY 2026-27")
+
+        ctx = build_fy_review_context(self.group, 2025)
+        self.assertEqual(ctx['verdict'], 'partial')
+        self.assertEqual(ctx['goals_hit'], 1)
+        self.assertEqual(ctx['year']['money_added'], Decimal("500000"))
+        self.assertEqual(ctx['year']['market'], Decimal("700000"))
+        self.assertEqual(ctx['next_goals'][0]['gap'], Decimal("1200000"))
+        self.assertEqual(ctx['next_goals'][0]['monthly'], Decimal("100000"))
+        html = render_to_string('emails/fy_review.html', ctx)
+        self.assertIn('You hit 1 of 2 targets in FY 2025-26', html)
+
+
+class WebAuthnFlowTests(TestCase):
+    """Biometric unlock: CSRF on the setup prompt, single-use expiring challenges, per-user credentials."""
+
+    def setUp(self):
+        from tracker.models import WebAuthnCredential
+        self.group = AccountGroup.objects.create(name="Home")
+        self.group.set_portfolio_password("pass123")
+        self.group.save()
+        self.user = User.objects.create_user(username="me", password="pw", user_type="PRIMARY", group=self.group)
+        self.spouse = User.objects.create_user(username="sp", password="pw", user_type="ACCOUNT_HOLDER", group=self.group)
+        self.other_cred = WebAuthnCredential.objects.create(user=self.spouse, credential_id=b'spouse-cred', public_key=b'pk')
+        self.client = Client(enforce_csrf_checks=True)
+        self.client.force_login(self.user)
+
+    def _csrf(self, resp):
+        import re
+        m = re.search(rb'name="csrfmiddlewaretoken" value="([^"]+)"', resp.content)
+        self.assertIsNotNone(m, "page must carry a CSRF token (CSRF cookie is HttpOnly)")
+        return m.group(1).decode()
+
+    def _password_unlock(self):
+        page = self.client.get('/portfolio/unlock/')
+        return self.client.post('/portfolio/unlock/', {'password': 'pass123', 'csrfmiddlewaretoken': self._csrf(page)})
+
+    def _post(self, name, token, body=None):
+        return self.client.post(reverse(name), data=json.dumps(body or {}), content_type='application/json',
+                                HTTP_X_CSRFTOKEN=token)
+
+    def test_setup_prompt_after_password_unlock_can_start_registration(self):
+        resp = self._password_unlock()
+        self.assertContains(resp, 'registerBiometricBtn')
+        begin = self._post('webauthn_register_begin', self._csrf(resp))
+        self.assertEqual(begin.status_code, 200)
+        self.assertIn('challenge', begin.json())
+
+    def test_register_begin_requires_unlocked_vault(self):
+        page = self.client.get('/portfolio/unlock/')
+        self.assertEqual(self._post('webauthn_register_begin', self._csrf(page)).status_code, 403)
+
+    def test_auth_complete_unlocks_and_challenge_is_single_use(self):
+        from unittest import mock
+        from tracker.models import WebAuthnCredential
+        WebAuthnCredential.objects.create(user=self.user, credential_id=b'my-cred', public_key=b'pk')
+        token = self._csrf(self.client.get('/portfolio/unlock/'))
+        self.assertEqual(self._post('webauthn_auth_begin', token).status_code, 200)
+        body = {'rawId': 'bXktY3JlZA', 'id': 'bXktY3JlZA'}  # base64url(b'my-cred')
+        with mock.patch('webauthn.verify_authentication_response', return_value=mock.Mock(new_sign_count=3)):
+            self.assertEqual(self._post('webauthn_auth_complete', token, body).status_code, 200)
+            self.assertIn('portfolio_unlocked_at', self.client.session)
+            self.assertEqual(self._post('webauthn_auth_complete', token, body).status_code, 400)
+
+    def test_expired_challenge_is_rejected(self):
+        from unittest import mock
+        from tracker.models import WebAuthnCredential
+        WebAuthnCredential.objects.create(user=self.user, credential_id=b'my-cred', public_key=b'pk')
+        token = self._csrf(self.client.get('/portfolio/unlock/'))
+        self._post('webauthn_auth_begin', token)
+        s = self.client.session
+        s['webauthn_auth_challenge']['t'] -= 3600
+        s.save()
+        with mock.patch('webauthn.verify_authentication_response', return_value=mock.Mock(new_sign_count=3)):
+            resp = self._post('webauthn_auth_complete', token, {'rawId': 'bXktY3JlZA'})
+        self.assertEqual(resp.status_code, 400)
+        self.assertNotIn('portfolio_unlocked_at', self.client.session)
+
+    def test_cannot_use_another_users_credential(self):
+        from unittest import mock
+        from tracker.models import WebAuthnCredential
+        WebAuthnCredential.objects.create(user=self.user, credential_id=b'my-cred', public_key=b'pk')
+        token = self._csrf(self.client.get('/portfolio/unlock/'))
+        self._post('webauthn_auth_begin', token)
+        with mock.patch('webauthn.verify_authentication_response', return_value=mock.Mock(new_sign_count=1)):
+            resp = self._post('webauthn_auth_complete', token, {'rawId': 'c3BvdXNlLWNyZWQ'})  # b'spouse-cred'
+        self.assertEqual(resp.status_code, 400)
+
+    def test_malformed_auth_body_is_400_not_500(self):
+        from tracker.models import WebAuthnCredential
+        WebAuthnCredential.objects.create(user=self.user, credential_id=b'my-cred', public_key=b'pk')
+        token = self._csrf(self.client.get('/portfolio/unlock/'))
+        self._post('webauthn_auth_begin', token)
+        resp = self.client.post(reverse('webauthn_auth_complete'), data='not json', content_type='application/json',
+                                HTTP_X_CSRFTOKEN=token)
+        self.assertEqual(resp.status_code, 400)
+
+    def test_account_holder_can_remove_own_device_only(self):
+        from tracker.models import WebAuthnCredential
+        mine = WebAuthnCredential.objects.create(user=self.user, credential_id=b'my-cred', public_key=b'pk')
+        c = Client()
+        c.force_login(self.spouse)
+        s = c.session
+        s['portfolio_unlocked_at'] = time.time()
+        s.save()
+        c.post(reverse('webauthn_remove'), data=json.dumps({'id': mine.pk}), content_type='application/json')
+        self.assertTrue(WebAuthnCredential.objects.filter(pk=mine.pk).exists())
+        resp = c.post(reverse('webauthn_remove'), data=json.dumps({'id': self.other_cred.pk}),
+                      content_type='application/json')
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(WebAuthnCredential.objects.filter(pk=self.other_cred.pk).exists())
+
+    def test_biometric_still_offered_during_password_lockout(self):
+        from tracker.models import WebAuthnCredential
+        WebAuthnCredential.objects.create(user=self.user, credential_id=b'my-cred', public_key=b'pk')
+        s = self.client.session
+        s['_portfolio_unlock_lockout'] = time.time() + 300
+        s.save()
+        self.assertContains(self.client.get('/portfolio/unlock/'), 'biometricBtn')
+
+
+class ExcludeRealEstateToggleTests(TestCase):
+    def setUp(self):
+        from portfolio.models import CashPosition
+        self.group = AccountGroup.objects.create(name="Home")
+        self.user = User.objects.create_user(username="me", password="pw", user_type="PRIMARY", group=self.group)
+        RealEstateHolding.objects.create(
+            group=self.group, name="Plot", property_type="PLOT_LAND", area_value=Decimal("200"), area_unit="GAJ",
+            purchase_price=Decimal("4000000"), current_valuation=Decimal("6000000"),
+            purchase_date=datetime.date(2020, 1, 1))
+        CashPosition.objects.create(group=self.group, name="Bank", amount=Decimal("1000000"))
+        self.client.force_login(self.user)
+        s = self.client.session
+        s['portfolio_unlocked_at'] = time.time()
+        s.save()
+
+    def test_toggle_rebases_totals_and_persists(self):
+        full = self.client.get('/portfolio/')
+        self.assertContains(full, 'Include real estate')
+        self.assertFalse(full.context['exclude_re'])
+
+        ex = self.client.get('/portfolio/?ex_re=1')
+        ctx = ex.context
+        self.assertTrue(ctx['exclude_re'])
+        self.assertEqual(ctx['total_value'], full.context['total_value'] - Decimal("6000000"))
+        self.assertEqual(ctx['total_invested'], full.context['total_invested'] - ctx['real_estate_invested'])
+        self.assertNotIn('Real Estate', [a['name'] for a in ctx['assets']])
+        self.assertNotIn('Real Estate', [c['name'] for c in ctx['consolidated']])
+        self.assertNotIn('Real Estate', ctx['pf_chart_data']['labels'])
+        self.assertContains(ex, 'excl. Real Estate')
+
+        self.assertTrue(self.client.get('/portfolio/').context['exclude_re'])
+        self.assertFalse(self.client.get('/portfolio/?ex_re=0').context['exclude_re'])
+
+    def test_fy_performance_excludes_real_estate_only_when_snapshot_has_breakdown(self):
+        from portfolio.services import get_fy_performance
+        today = datetime.date(2026, 10, 1)
+        snap = MonthlySnapshot.objects.create(
+            group=self.group, month=datetime.date(2026, 3, 1),
+            total_current_value=Decimal("6500000"), total_invested=Decimal("4800000"), total_returns=Decimal("1700000"),
+            data={'real_estate': {'current': 5500000.0, 'invested': 4000000.0}})
+        perf = get_fy_performance(self.group, Decimal("1100000"), Decimal("900000"), today=today, exclude_real_estate=True)
+        self.assertEqual(perf['opening_value'], Decimal("1000000"))
+        self.assertEqual(perf['change'], Decimal("100000"))
+        self.assertEqual(perf['money_added'], Decimal("100000"))
+
+        snap.data = {}
+        snap.save()
+        self.assertIsNone(get_fy_performance(self.group, Decimal("1100000"), Decimal("900000"),
+                                             today=today, exclude_real_estate=True))

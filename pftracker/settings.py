@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 import dj_database_url
 from django.utils.csp import CSP
@@ -245,7 +246,7 @@ ACCOUNT_LOGIN_METHODS = {'username', 'email'}
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'username*', 'password1*', 'password2*']
 ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'http' if DEBUG else 'https'
 SOCIALACCOUNT_ADAPTER = 'pftracker.adapters.PreExistingEmailAdapter'
-SOCIALACCOUNT_LOGIN_ON_GET = True
+SOCIALACCOUNT_LOGIN_ON_GET = False  # login button POSTs with CSRF token (prevents login CSRF)
 SOCIALACCOUNT_STORE_TOKENS = False
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
@@ -288,12 +289,13 @@ SECURE_CSP = {
 }
 
 # WebAuthn (FaceID / biometric unlock)
-WEBAUTHN_RP_ID = os.environ.get('WEBAUTHN_RP_ID', 'localhost')
 WEBAUTHN_RP_NAME = os.environ.get('WEBAUTHN_RP_NAME', 'Vault')
 WEBAUTHN_ORIGIN = os.environ.get(
     'WEBAUTHN_ORIGIN',
     os.environ.get('VAULT_PUBLIC_URL', 'http://localhost:8000'),
-)
+).rstrip('/')
+# Must equal (or be a registrable suffix of) the origin's host, or every ceremony fails.
+WEBAUTHN_RP_ID = os.environ.get('WEBAUTHN_RP_ID') or urlparse(WEBAUTHN_ORIGIN).hostname or 'localhost'
 
 # Google Sheets / GCS service account JSON (never commit the file)
 GOOGLE_SHEETS_CREDENTIALS = os.environ.get(
@@ -374,10 +376,11 @@ LOGGING = {
 OAUTH2_PROVIDER = {
     'SCOPES': {'read': 'Read scope', 'write': 'Write scope'},
     'ACCESS_TOKEN_EXPIRE_SECONDS': 36000,
-    'PKCE_REQUIRED': False,
+    'PKCE_REQUIRED': True,  # MCP authorization spec mandates PKCE for all clients
+    'OAUTH2_VALIDATOR_CLASS': 'mcp_server.oauth.UserBoundGrantValidator',
     'DCR_ENABLED': True,
     'DCR_REGISTRATION_PERMISSION_CLASSES': (
-        'oauth2_provider.dcr.AllowAllDCRPermission',
+        'mcp_server.oauth.AuthorizationCodeOnlyDCRPermission',
     ),
     'CIMD_ENABLED': True,
 }

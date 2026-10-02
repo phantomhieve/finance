@@ -12,13 +12,13 @@ from django.conf import settings
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import HttpResponseForbidden, JsonResponse
+from django.http import Http404, HttpResponseForbidden, JsonResponse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from tracker.models import WebAuthnCredential
 
-from pftracker.utils import ZERO as _ZERO, safe_redirect, pnl_pct as _pnl_pct
+from pftracker.utils import ZERO as _ZERO, feature_enabled, safe_redirect, pnl_pct as _pnl_pct
 
 from .models import (
     ZerodhaAccount, StockHolding, MutualFundHolding,
@@ -38,6 +38,7 @@ from .forms import (
 from tracker.services import parse_fy_param
 from .services import (
     get_portfolio_summary,
+    without_real_estate,
     get_commodity_summary,
     sync_zerodha_from_sheets,
     refresh_commodity_prices,
@@ -58,76 +59,27 @@ logger = logging.getLogger(__name__)
 _PORTFOLIO_UNLOCK_TTL = 1800  # 30 minutes
 
 
-def _require_feature(feature_name):
-    """Decorator to gate a view behind a HouseholdConfig feature toggle.
-
-    Usage:  @_require_feature('jewellery')
-    """
-    from django.http import Http404
-
+def _vault_gate(permission_attr, feature_name):
+    """Role check + household feature toggle + unlocked-session TTL shared by portfolio and jewellery."""
     def decorator(view_func):
         @wraps(view_func)
-        def wrapper(request, *args, **kwargs):
-            group = getattr(request.user, 'group', None)
-            if group:
-                try:
-                    config = group.config
-                    if not getattr(config, f'feature_{feature_name}', True):
-                        raise Http404
-                except group.config.RelatedObjectDoesNotExist:
-                    pass  # no config → allow (defaults are True)
-                except Exception:
-                    pass
+        def _wrapped(request, *args, **kwargs):
+            if not getattr(request.user, permission_attr, False):
+                return HttpResponseForbidden('You do not have permission to view this page.')
+            if request.user.group is None or not feature_enabled(request.user, feature_name):
+                raise Http404
+            unlocked_at = request.session.get('portfolio_unlocked_at')
+            if not unlocked_at or (time.time() - unlocked_at) > _PORTFOLIO_UNLOCK_TTL:
+                request.session.pop('portfolio_unlocked_at', None)
+                return redirect('/portfolio/unlock/?next=' + quote(request.get_full_path()))
+            request.portfolio_expires_at = int(unlocked_at + _PORTFOLIO_UNLOCK_TTL)
             return view_func(request, *args, **kwargs)
-        return wrapper
+        return _wrapped
     return decorator
 
 
-def _require_portfolio(view_func):
-    """Only PRIMARY users can access portfolio views; always gate behind group password."""
-    @wraps(view_func)
-    def _wrapped(request, *args, **kwargs):
-        if not request.user.can_view_portfolio:
-            return HttpResponseForbidden('You do not have permission to view this page.')
-        # Feature toggle check
-        group = getattr(request.user, 'group', None)
-        if group:
-            try:
-                if not group.config.feature_portfolio:
-                    from django.http import Http404
-                    raise Http404
-            except Exception:
-                pass
-        unlocked_at = request.session.get('portfolio_unlocked_at')
-        if not unlocked_at or (time.time() - unlocked_at) > _PORTFOLIO_UNLOCK_TTL:
-            request.session.pop('portfolio_unlocked_at', None)
-            return redirect('/portfolio/unlock/?next=' + quote(request.get_full_path()))
-        request.portfolio_expires_at = int(unlocked_at + _PORTFOLIO_UNLOCK_TTL)
-        return view_func(request, *args, **kwargs)
-    return _wrapped
-
-def _require_jewellery(view_func):
-    """PRIMARY and ACCOUNT_HOLDER can access jewellery; gate behind group password."""
-    @wraps(view_func)
-    def _wrapped(request, *args, **kwargs):
-        if not getattr(request.user, 'can_view_jewellery', False):
-            return HttpResponseForbidden('You do not have permission to view this page.')
-        # Feature toggle check
-        group = getattr(request.user, 'group', None)
-        if group:
-            try:
-                if not group.config.feature_jewellery:
-                    from django.http import Http404
-                    raise Http404
-            except Exception:
-                pass
-        unlocked_at = request.session.get('portfolio_unlocked_at')
-        if not unlocked_at or (time.time() - unlocked_at) > _PORTFOLIO_UNLOCK_TTL:
-            request.session.pop('portfolio_unlocked_at', None)
-            return redirect('/portfolio/unlock/?next=' + quote(request.get_full_path()))
-        request.portfolio_expires_at = int(unlocked_at + _PORTFOLIO_UNLOCK_TTL)
-        return view_func(request, *args, **kwargs)
-    return _wrapped
+_require_portfolio = _vault_gate('can_view_portfolio', 'portfolio')
+_require_jewellery = _vault_gate('can_view_jewellery', 'jewellery')
 
 
 _UNLOCK_ATTEMPT_KEY = '_portfolio_unlock_attempts'
@@ -148,7 +100,8 @@ def portfolio_unlock(request):
         remaining = int(lockout_until - time.time())
         messages.error(request, f'Too many failed attempts. Try again in {remaining // 60}m {remaining % 60}s.')
         return render(request, 'portfolio/unlock.html', {
-            'next': next_url, 'has_password': True, 'has_webauthn': False,
+            'next': next_url, 'has_password': True,
+            'has_webauthn': WebAuthnCredential.objects.filter(user=request.user).exists(),
         })
 
     group = request.user.group
@@ -448,6 +401,12 @@ def master_portfolio(request):
     group = _user_group(request)
     _auto_snapshot(group)
     summary = get_portfolio_summary(group)
+    if request.GET.get('ex_re') in ('0', '1'):
+        request.session['pf_exclude_re'] = request.GET['ex_re'] == '1'
+    has_real_estate = summary['real_estate_current'] > 0
+    exclude_re = has_real_estate and request.session.get('pf_exclude_re', False)
+    if exclude_re:
+        summary = without_real_estate(summary, group)
     latest_insight, can_generate = _insight_can_generate(group)
     if latest_insight and latest_insight.insights.get('insights'):
         sev_order = {'critical': 0, 'warning': 1, 'info': 2, 'positive': 3}
@@ -476,6 +435,8 @@ def master_portfolio(request):
         'real_estate_form': RealEstateHoldingForm(),
         'goal_form': FinancialGoalForm(),
         'pf_chart_data': pf_chart_data,
+        'has_real_estate': has_real_estate,
+        'exclude_re': exclude_re,
         'webauthn_credentials': WebAuthnCredential.objects.filter(user=request.user),
     }
     return render(request, 'portfolio/master.html', ctx)
@@ -940,6 +901,19 @@ def generate_insights(request):
 # ---------------------------------------------------------------------------
 
 _MAX_WEBAUTHN_CREDENTIALS = 5
+_WEBAUTHN_CHALLENGE_TTL = 300
+
+
+def _store_challenge(request, key, challenge):
+    request.session[key] = {'c': challenge.hex(), 't': time.time()}
+
+
+def _pop_challenge(request, key):
+    """Single-use challenge from the session, or None if missing or older than the TTL."""
+    data = request.session.pop(key, None)
+    if not isinstance(data, dict) or time.time() - data.get('t', 0) > _WEBAUTHN_CHALLENGE_TTL:
+        return None
+    return bytes.fromhex(data['c'])
 
 
 @login_required
@@ -986,7 +960,7 @@ def webauthn_register_begin(request):
         exclude_credentials=exclude_creds,
     )
 
-    request.session['webauthn_reg_challenge'] = options.challenge.hex()
+    _store_challenge(request, 'webauthn_reg_challenge', options.challenge)
     return JsonResponse(json.loads(options_to_json(options)))
 
 
@@ -996,9 +970,12 @@ def webauthn_register_complete(request):
     """Complete biometric registration and store the credential."""
     if not getattr(request.user, 'can_view_jewellery', False):
         return JsonResponse({'error': 'Forbidden.'}, status=403)
-    challenge_hex = request.session.pop('webauthn_reg_challenge', None)
-    if not challenge_hex:
-        return JsonResponse({'error': 'No registration in progress.'}, status=400)
+    unlocked_at = request.session.get('portfolio_unlocked_at')
+    if not unlocked_at or (time.time() - unlocked_at) > _PORTFOLIO_UNLOCK_TTL:
+        return JsonResponse({'error': 'Vault must be unlocked first.'}, status=403)
+    challenge = _pop_challenge(request, 'webauthn_reg_challenge')
+    if not challenge:
+        return JsonResponse({'error': 'Registration expired. Please try again.'}, status=400)
 
     from webauthn import verify_registration_response
 
@@ -1006,7 +983,7 @@ def webauthn_register_complete(request):
         body = json.loads(request.body)
         verification = verify_registration_response(
             credential=body,
-            expected_challenge=bytes.fromhex(challenge_hex),
+            expected_challenge=challenge,
             expected_origin=settings.WEBAUTHN_ORIGIN,
             expected_rp_id=settings.WEBAUTHN_RP_ID,
             require_user_verification=True,
@@ -1054,7 +1031,7 @@ def webauthn_auth_begin(request):
         user_verification=UserVerificationRequirement.REQUIRED,
     )
 
-    request.session['webauthn_auth_challenge'] = options.challenge.hex()
+    _store_challenge(request, 'webauthn_auth_challenge', options.challenge)
     return JsonResponse(json.loads(options_to_json(options)))
 
 
@@ -1064,9 +1041,9 @@ def webauthn_auth_complete(request):
     """Verify biometric authentication and unlock the portfolio/jewellery."""
     if not getattr(request.user, 'can_view_jewellery', False):
         return JsonResponse({'error': 'Forbidden.'}, status=403)
-    challenge_hex = request.session.pop('webauthn_auth_challenge', None)
-    if not challenge_hex:
-        return JsonResponse({'error': 'No authentication in progress.'}, status=400)
+    challenge = _pop_challenge(request, 'webauthn_auth_challenge')
+    if not challenge:
+        return JsonResponse({'error': 'Authentication expired. Please try again.'}, status=400)
 
     from webauthn import verify_authentication_response, base64url_to_bytes
 
@@ -1074,13 +1051,13 @@ def webauthn_auth_complete(request):
         body = json.loads(request.body)
         raw_id = base64url_to_bytes(body['rawId'])
         cred = WebAuthnCredential.objects.get(credential_id=raw_id, user=request.user)
-    except (WebAuthnCredential.DoesNotExist, KeyError):
+    except (WebAuthnCredential.DoesNotExist, KeyError, TypeError, ValueError):
         return JsonResponse({'error': 'Authentication failed.'}, status=400)
 
     try:
         verification = verify_authentication_response(
             credential=body,
-            expected_challenge=bytes.fromhex(challenge_hex),
+            expected_challenge=challenge,
             expected_origin=settings.WEBAUTHN_ORIGIN,
             expected_rp_id=settings.WEBAUTHN_RP_ID,
             credential_public_key=bytes(cred.public_key),
@@ -1104,7 +1081,7 @@ def webauthn_auth_complete(request):
 @require_POST
 def webauthn_remove(request):
     """Remove a registered biometric credential."""
-    if not request.user.can_view_portfolio:
+    if not getattr(request.user, 'can_view_jewellery', False):
         return JsonResponse({'error': 'Forbidden.'}, status=403)
     unlocked_at = request.session.get('portfolio_unlocked_at')
     if not unlocked_at or (time.time() - unlocked_at) > _PORTFOLIO_UNLOCK_TTL:

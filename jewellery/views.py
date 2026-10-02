@@ -8,6 +8,7 @@ from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.http import FileResponse, Http404, JsonResponse, HttpResponseForbidden
 
+from pftracker.utils import safe_redirect
 from portfolio.views import _require_jewellery, _user_group
 from .models import JewelleryItem
 from .forms import JewelleryItemForm
@@ -26,14 +27,9 @@ def jewellery_dashboard(request):
     filter_category = request.GET.get('category', '')
     filter_search = request.GET.get('search', '')
 
-    # Calculate global counts before filtering
     all_category_counts = defaultdict(int)
-    all_location_counts = defaultdict(int)
-    all_metal_counts = defaultdict(int)
     for i in items:
         all_category_counts[i.category] += 1
-        all_location_counts[i.location] += 1
-        all_metal_counts[i.metal_type] += 1
 
     # Type chips with icon + colour + count (only types that have items)
     category_meta = []
@@ -56,24 +52,24 @@ def jewellery_dashboard(request):
         q = filter_search.lower()
         filtered_items = [i for i in filtered_items if q in i.search_blob]
 
-    gold_price = CommodityPrice.objects.filter(commodity_type='GOLD').first()
-    silver_price = CommodityPrice.objects.filter(commodity_type='SILVER').first()
-    gold_rate = gold_price.rate_per_gram if gold_price else Decimal('0.00')
-    silver_rate = silver_price.rate_per_gram if silver_price else Decimal('0.00')
+    prices = {p.commodity_type: p for p in CommodityPrice.objects.filter(commodity_type__in=('GOLD', 'SILVER'))}
+    gold_price, silver_price = prices.get('GOLD'), prices.get('SILVER')
+    JewelleryItem.attach_rates(filtered_items, {k: p.rate_per_gram for k, p in prices.items()})
 
     total_weight_gold = sum((i.weight_grams for i in filtered_items if i.metal_type in ['GOLD', 'DIAMOND_OTHER']), Decimal('0.00'))
     total_weight_silver = sum((i.weight_grams for i in filtered_items if i.metal_type == 'SILVER'), Decimal('0.00'))
     total_estimated_value = sum((i.estimated_value for i in filtered_items), Decimal('0.00'))
 
-    # Group by location for summary
-    location_counts = defaultdict(int)
-    for i in filtered_items:
-        location_counts[i.get_location_display()] += 1
-
-    # Category breakdown
-    category_counts = defaultdict(int)
-    for i in filtered_items:
-        category_counts[i.get_category_display()] += 1
+    value_by_location = []
+    for val, label in JewelleryItem.LOCATION_CHOICES:
+        loc_items = [i for i in filtered_items if i.location == val]
+        if not loc_items:
+            continue
+        value = sum((i.estimated_value for i in loc_items), Decimal('0.00'))
+        value_by_location.append({
+            'value': val, 'label': label, 'count': len(loc_items), 'amount': value,
+            'pct': round(value / total_estimated_value * 100) if total_estimated_value else 0,
+        })
 
     context = {
         'items': filtered_items,
@@ -81,27 +77,19 @@ def jewellery_dashboard(request):
         'total_weight_gold': total_weight_gold,
         'total_weight_silver': total_weight_silver,
         'total_estimated_value': total_estimated_value,
-        'gold_rate': gold_rate,
-        'silver_rate': silver_rate,
-        'gold_price_obj': gold_price,
-        'silver_price_obj': silver_price,
-        'location_counts': dict(location_counts),
-        'category_counts': dict(category_counts),
+        'value_by_location': value_by_location,
+        'gold_rate': gold_price.rate_per_gram if gold_price else Decimal('0.00'),
+        'silver_rate': silver_price.rate_per_gram if silver_price else Decimal('0.00'),
+        'rates_as_of': gold_price.fetched_at if gold_price else None,
         'form': JewelleryItemForm(),
-        # Filter state
         'filter_metal': filter_metal,
         'filter_location': filter_location,
         'filter_category': filter_category,
         'filter_search': filter_search,
-        # Global counts for filters
-        'all_category_counts': dict(all_category_counts),
-        'all_location_counts': dict(all_location_counts),
-        'all_metal_counts': dict(all_metal_counts),
+        'is_filtered': bool(filter_metal or filter_location or filter_category or filter_search),
         'category_meta': category_meta,
-        # Choices for filter dropdowns
         'metal_choices': JewelleryItem.METAL_CHOICES,
         'location_choices': JewelleryItem.LOCATION_CHOICES,
-        'category_choices': JewelleryItem.CATEGORY_CHOICES,
         'is_primary': getattr(request.user, 'is_primary', False),
     }
     return render(request, 'jewellery/dashboard.html', context)
@@ -111,6 +99,8 @@ def jewellery_dashboard(request):
 @_require_jewellery
 @require_POST
 def add_item(request):
+    if not getattr(request.user, 'is_primary', False):
+        return HttpResponseForbidden("You do not have permission to add jewellery items.")
     form = JewelleryItemForm(request.POST, request.FILES)
     if form.is_valid():
         obj = form.save(commit=False)
@@ -130,6 +120,8 @@ def add_item(request):
 @_require_jewellery
 @require_POST
 def edit_item(request, pk):
+    if not getattr(request.user, 'is_primary', False):
+        return HttpResponseForbidden("You do not have permission to edit jewellery items.")
     obj = get_object_or_404(JewelleryItem, pk=pk, group=_user_group(request))
     form = JewelleryItemForm(request.POST, request.FILES, instance=obj)
     if form.is_valid():
@@ -141,10 +133,7 @@ def edit_item(request, pk):
             field_label = form.fields[field].label or field.replace('_', ' ').capitalize()
             err_list.append(f"{field_label}: {', '.join(errors)}")
         messages.error(request, 'Failed to update item: ' + '; '.join(err_list))
-    next_url = request.GET.get('next')
-    if next_url and next_url.startswith('/') and not next_url.startswith('//'):
-        return redirect(next_url)
-    return redirect('jewellery_dashboard')
+    return safe_redirect(request, 'jewellery_dashboard')
 
 
 @login_required
@@ -158,27 +147,20 @@ def delete_item(request, pk):
     label = obj.display_label
     obj.delete()
     messages.success(request, f'Deleted {label}.')
-    next_url = request.GET.get('next')
-    if next_url and next_url.startswith('/') and not next_url.startswith('//'):
-        return redirect(next_url)
-    return redirect('jewellery_dashboard')
+    return safe_redirect(request, 'jewellery_dashboard')
 
 @login_required
 @_require_jewellery
 def detail_item(request, pk):
     obj = get_object_or_404(JewelleryItem, pk=pk, group=_user_group(request))
-    
-    gold_price = CommodityPrice.objects.filter(commodity_type='GOLD').first()
-    silver_price = CommodityPrice.objects.filter(commodity_type='SILVER').first()
-    gold_rate = gold_price.rate_per_gram if gold_price else Decimal('0.00')
-    silver_rate = silver_price.rate_per_gram if silver_price else Decimal('0.00')
-    
+    rates = JewelleryItem.attach_rates([obj])
+
     context = {
         'item': obj,
         'form': JewelleryItemForm(instance=obj),
         'is_primary': getattr(request.user, 'is_primary', False),
-        'gold_rate': gold_rate,
-        'silver_rate': silver_rate,
+        'gold_rate': rates.get('GOLD', Decimal('0.00')),
+        'silver_rate': rates.get('SILVER', Decimal('0.00')),
     }
     return render(request, 'jewellery/detail.html', context)
 
@@ -252,5 +234,5 @@ def serve_photo(request, pk):
         f'inline; filename="{os.path.basename(obj.photo.name)}"'
     )
     response['X-Content-Type-Options'] = 'nosniff'
-    response['Cache-Control'] = 'public, max-age=31536000, immutable'
+    response['Cache-Control'] = 'private, max-age=86400'
     return response

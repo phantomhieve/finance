@@ -1,0 +1,206 @@
+{% load indian_format %}
+{# FY goals: current-year pacing, upcoming targets, closed-year track record. Expects `goal_roadmap`, `fy_performance`, `total_value`. #}
+{% with rm=goal_roadmap %}
+<div class="section-group-header" id="goals-section">
+  <span class="material-symbols-outlined section-icon text-violet-400">flag</span>
+  <h2>Financial Year Goals</h2>
+</div>
+
+{% if rm and rm.goals %}
+
+{# ——— CURRENT FY ——— #}
+<div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.52s">
+  <div class="card-body p-4 lg:p-6">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
+      <h2 class="card-title text-base flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-violet-400 text-lg">flag</span>{{ rm.cur_fy_label }}
+        <span class="text-xs font-normal opacity-50">· {{ rm.time_pct }}% of year elapsed</span>
+      </h2>
+      <button class="btn btn-ghost btn-sm gap-1" onclick="openGoalModal('{{ rm.cur_fy_label }}')"><span class="material-symbols-outlined text-base">add</span>Add Goal</button>
+    </div>
+
+    {% with s=rm.spotlight %}
+    {% if s %}
+    <div class="grid grid-cols-1 lg:grid-cols-5 gap-4">
+      <div class="lg:col-span-3">
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-[10px] font-bold uppercase tracking-widest opacity-40">{{ s.label }}</p>
+            <p class="text-3xl font-extrabold mt-1 text-primary tabular-nums">₹{{ s.target|floatformat:0|indian_number }}</p>
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            {% if s.status == 'achieved' %}<span class="badge badge-success badge-soft badge-sm gap-1.5 font-semibold"><span class="material-symbols-outlined text-sm">emoji_events</span>Achieved</span>
+            {% elif s.status == 'ahead' %}<span class="badge badge-success badge-soft badge-sm gap-1.5 font-semibold" title="{{ s.fy_progress_pct }}% of the climb done vs {{ rm.time_pct }}% of the year gone"><span class="w-1.5 h-1.5 rounded-full bg-success"></span>Ahead of pace</span>
+            {% elif s.status == 'behind' %}<span class="badge badge-warning badge-soft badge-sm gap-1.5 font-semibold" title="{{ s.fy_progress_pct }}% of the climb done vs {{ rm.time_pct }}% of the year gone"><span class="w-1.5 h-1.5 rounded-full bg-warning"></span>Behind pace</span>
+            {% else %}<span class="badge badge-info badge-soft badge-sm gap-1.5 font-semibold"><span class="w-1.5 h-1.5 rounded-full bg-info"></span>On track</span>{% endif %}
+            <button class="btn btn-ghost btn-xs btn-square" {% include 'portfolio/_goal_edit_attrs.html' with g=s %} title="Edit goal"><span class="material-symbols-outlined text-base">edit</span></button>
+          </div>
+        </div>
+
+        <div class="mt-4">
+          <div class="relative h-2.5 rounded-full bg-base-content/10 overflow-visible">
+            <div class="absolute inset-y-0 left-0 rounded-full {% if s.achieved %}bg-success{% else %}bg-primary{% endif %}" style="width: {{ s.fy_progress_pct }}%"></div>
+            {% if not s.achieved %}<div class="absolute -top-1 -bottom-1 w-0.5 rounded bg-warning" style="left: {{ rm.time_pct }}%" title="{{ rm.time_pct }}% of the FY elapsed"></div>{% endif %}
+          </div>
+          <div class="flex justify-between text-[11px] opacity-50 mt-1.5">
+            <span>{{ s.fy_progress_pct }}% of the way{% if rm.opening_value %} since FY open{% endif %}</span>
+            <span class="flex items-center gap-1"><span class="inline-block w-2 h-0.5 bg-warning"></span>time elapsed</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
+          <div class="stat-card stat-card-primary">
+            <div class="text-[10px] uppercase tracking-wider opacity-50">Portfolio now</div>
+            <div class="text-base font-bold mt-0.5 tabular-nums">₹{{ total_value|floatformat:0|indian_number }}</div>
+          </div>
+          <div class="stat-card {% if s.achieved %}stat-card-success{% endif %}">
+            <div class="text-[10px] uppercase tracking-wider opacity-50">{% if s.achieved %}Surplus{% else %}Gap to target{% endif %}</div>
+            <div class="text-base font-bold mt-0.5 tabular-nums {% if s.achieved %}text-success{% endif %}">₹{% if s.achieved %}{{ s.surplus|floatformat:0|indian_number }}{% else %}{{ s.remaining|floatformat:0|indian_number }}{% endif %}</div>
+          </div>
+          <div class="stat-card">
+            <div class="text-[10px] uppercase tracking-wider opacity-50">Needed / month</div>
+            <div class="text-base font-bold mt-0.5 tabular-nums">{% if s.monthly_needed %}₹{{ s.monthly_needed|floatformat:0|indian_number }}{% else %}—{% endif %}</div>
+          </div>
+          <div class="stat-card">
+            <div class="text-[10px] uppercase tracking-wider opacity-50">Days left</div>
+            <div class="text-base font-bold mt-0.5 tabular-nums">{{ rm.days_left }}</div>
+          </div>
+        </div>
+
+        {% if s.vs_expected is not None and not s.achieved %}
+        <p class="text-xs mt-3 flex items-center gap-1 {% if s.vs_expected >= 0 %}text-success{% else %}text-warning{% endif %}">
+          <span class="material-symbols-outlined text-sm">{% if s.vs_expected >= 0 %}trending_up{% else %}trending_down{% endif %}</span>
+          <span><strong class="tabular-nums">₹{% if s.vs_expected >= 0 %}{{ s.vs_expected|floatformat:0|indian_number }}</strong> ahead of{% else %}{{ s.vs_expected|floatformat:0|cut:'-'|indian_number }}</strong> behind{% endif %} where a steady climb would be today<span class="opacity-60"> · {{ s.fy_progress_pct|floatformat:0 }}% done, {{ rm.time_pct|floatformat:0 }}% of year gone</span></span>
+        </p>
+        {% endif %}
+        {% if s.notes %}<p class="text-xs opacity-50 mt-2 whitespace-pre-line">{{ s.notes }}</p>{% endif %}
+      </div>
+
+      <div class="lg:col-span-2 space-y-3">
+        {% if fy_performance %}
+        <div class="p-4 rounded-lg bg-base-300/50">
+          <p class="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-2">This FY so far</p>
+          <div class="flex items-baseline justify-between">
+            <span class="text-sm opacity-60">Net worth change</span>
+            <span class="font-bold tabular-nums {% if fy_performance.change >= 0 %}text-success{% else %}text-error{% endif %}">{% if fy_performance.change >= 0 %}+₹{{ fy_performance.change|floatformat:0|indian_number }}{% else %}−₹{{ fy_performance.change|floatformat:0|cut:'-'|indian_number }}{% endif %} <span class="text-xs opacity-70">({{ fy_performance.change_pct }}%)</span></span>
+          </div>
+          <div class="divider-fade my-2"></div>
+          <div class="flex items-center justify-between text-sm py-1">
+            <span class="flex items-center gap-1.5 opacity-60"><span class="material-symbols-outlined text-sm">savings</span>Fresh money added</span>
+            <span class="tabular-nums font-semibold">{% if fy_performance.money_added < 0 %}−₹{{ fy_performance.money_added|floatformat:0|cut:'-'|indian_number }}{% else %}₹{{ fy_performance.money_added|floatformat:0|indian_number }}{% endif %}</span>
+          </div>
+          <div class="flex items-center justify-between text-sm py-1">
+            <span class="flex items-center gap-1.5 opacity-60"><span class="material-symbols-outlined text-sm">show_chart</span>Market gains</span>
+            <span class="tabular-nums font-semibold {% if fy_performance.market_gain >= 0 %}text-success{% else %}text-error{% endif %}">{% if fy_performance.market_gain >= 0 %}+₹{{ fy_performance.market_gain|floatformat:0|indian_number }}{% else %}−₹{{ fy_performance.market_gain|floatformat:0|cut:'-'|indian_number }}{% endif %}</span>
+          </div>
+          <p class="text-[10px] opacity-30 mt-2">Since {{ fy_performance.opening_month|date:"M Y" }} snapshot · ₹{{ fy_performance.opening_value|floatformat:0|indian_number }}</p>
+        </div>
+        {% endif %}
+
+        {% if rm.current_year.total > 1 %}
+        <div class="p-4 rounded-lg bg-base-300/50">
+          <p class="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-2">Milestones this year · {{ rm.current_year.achieved }}/{{ rm.current_year.total }}</p>
+          {% for g in rm.current_year.goals %}
+          <div class="flex items-center gap-2 py-1.5 cursor-pointer" {% include 'portfolio/_goal_edit_attrs.html' %}>
+            <span class="material-symbols-outlined text-base {% if g.achieved %}text-success{% else %}opacity-30{% endif %}">{% if g.achieved %}check_circle{% else %}radio_button_unchecked{% endif %}</span>
+            <span class="flex-1 text-sm truncate">{{ g.label }}</span>
+            <span class="text-sm tabular-nums opacity-70">₹{{ g.target|floatformat:0|indian_number }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-lg bg-base-300/40">
+      <p class="text-sm opacity-60">No target set for {{ rm.cur_fy_label }} yet. Set one to track pace through the year.</p>
+      <button class="btn btn-primary btn-sm gap-1" onclick="openGoalModal('{{ rm.cur_fy_label }}')"><span class="material-symbols-outlined text-base">flag</span>Set {{ rm.cur_fy_label }} target</button>
+    </div>
+    {% endif %}
+    {% endwith %}
+  </div>
+</div>
+
+{# ——— UPCOMING + TRACK RECORD ——— #}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-up mb-4" style="animation-delay:0.55s">
+  <div class="card bg-base-200 shadow-sm card-hover">
+    <div class="card-body p-4">
+      <h2 class="card-title text-base mb-2 flex items-center gap-1.5"><span class="material-symbols-outlined text-primary text-lg">route</span>Upcoming</h2>
+      {% if rm.upcoming %}
+      <div class="space-y-2">
+        {% for y in rm.upcoming %}{% for g in y.goals %}
+        <div class="table-card cursor-pointer" {% include 'portfolio/_goal_edit_attrs.html' %}>
+          <div class="flex items-center justify-between gap-2">
+            <div class="min-w-0">
+              <span class="badge badge-ghost badge-xs">{{ g.fy }}</span>
+              <span class="font-semibold text-sm ml-1">{{ g.label }}</span>
+            </div>
+            <span class="font-semibold text-sm tabular-nums shrink-0">₹{{ g.target|floatformat:0|indian_number }}</span>
+          </div>
+          <div class="flex items-center gap-3 mt-2">
+            <progress class="progress {% if g.achieved %}progress-success{% else %}progress-primary{% endif %} h-1.5 flex-1" value="{{ g.pct|floatformat:0 }}" max="100"></progress>
+            <span class="text-xs tabular-nums opacity-50 w-11 text-right">{{ g.pct }}%</span>
+          </div>
+          <div class="text-[11px] opacity-50 mt-1">
+            {% if g.achieved %}<span class="text-success">Already reached{% if g.achieved_at %} on {{ g.achieved_at|date:"d M Y" }}{% endif %}</span>
+            {% elif g.monthly_needed %}Needs ₹{{ g.monthly_needed|floatformat:0|indian_number }}/mo over {{ g.months_left }} months
+            {% else %}₹{{ g.remaining|floatformat:0|indian_number }} to go{% endif %}
+          </div>
+        </div>
+        {% endfor %}{% endfor %}
+      </div>
+      {% else %}
+      <p class="text-sm opacity-40">No future targets. Plan the next FY to see the monthly growth it needs.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card bg-base-200 shadow-sm card-hover">
+    <div class="card-body p-4">
+      <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+        <h2 class="card-title text-base flex items-center gap-1.5"><span class="material-symbols-outlined text-success text-lg">military_tech</span>Track Record</h2>
+        {% if rm.track_record.total %}<span class="badge badge-ghost badge-sm">{{ rm.track_record.hit }}/{{ rm.track_record.total }} targets hit</span>{% endif %}
+      </div>
+      {% if rm.closed %}
+      <div class="hidden md:block overflow-x-auto"><table class="table table-sm">
+        <thead><tr><th>FY</th><th class="text-right">Target</th><th class="text-right">Closed at</th><th class="text-right">Result</th></tr></thead>
+        <tbody>
+        {% for y in rm.closed %}{% for g in y.goals %}
+        <tr class="hover cursor-pointer" {% include 'portfolio/_goal_edit_attrs.html' %}>
+          <td class="font-semibold whitespace-nowrap">{{ g.fy }}<div class="text-xs opacity-40 font-normal">{{ g.label }}</div></td>
+          <td class="text-right tabular-nums">₹{{ g.target|floatformat:0|indian_number }}</td>
+          <td class="text-right tabular-nums">{% if g.closing_value is not None %}₹{{ g.closing_value|floatformat:0|indian_number }}{% else %}<span class="opacity-30">—</span>{% endif %}</td>
+          <td class="text-right">{% if g.achieved %}<span class="badge badge-success badge-sm">Achieved</span>{% else %}<span class="badge badge-error badge-soft badge-sm">Missed{% if g.closing_value is not None %} · {{ g.pct }}%{% endif %}</span>{% endif %}</td>
+        </tr>
+        {% endfor %}{% endfor %}
+        </tbody>
+      </table></div>
+      <div class="md:hidden space-y-2">
+        {% for y in rm.closed %}{% for g in y.goals %}
+        <div class="table-card flex items-center justify-between gap-3" {% include 'portfolio/_goal_edit_attrs.html' %}>
+          <div class="min-w-0">
+            <div class="font-semibold text-sm">{{ g.fy }} <span class="opacity-40 font-normal">· {{ g.label }}</span></div>
+            <span class="text-xs opacity-50 tabular-nums">₹{{ g.target|floatformat:0|indian_number }}{% if g.closing_value is not None %} · closed ₹{{ g.closing_value|floatformat:0|indian_number }}{% endif %}</span>
+          </div>
+          {% if g.achieved %}<span class="badge badge-success badge-sm shrink-0">Achieved</span>{% else %}<span class="badge badge-error badge-soft badge-sm shrink-0">Missed</span>{% endif %}
+        </div>
+        {% endfor %}{% endfor %}
+      </div>
+      {% else %}
+      <p class="text-sm opacity-40">Closed financial years appear here with an achieved or missed verdict, locked at the March snapshot.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% else %}
+<div class="card bg-base-200 shadow-sm animate-up mb-4">
+  <div class="card-body p-6 items-center text-center">
+    <span class="material-symbols-outlined text-4xl text-violet-400">flag</span>
+    <p class="font-semibold mt-1">No financial year goals yet</p>
+    <p class="text-sm opacity-50 max-w-md">Set a net-worth target for {{ rm.cur_fy_label|default:"this financial year" }}. Vault tracks your pace through the year and records whether you hit it when the year closes.</p>
+    <button class="btn btn-primary btn-sm gap-1 mt-2" onclick="openGoalModal('{{ rm.cur_fy_label }}')"><span class="material-symbols-outlined text-base">add</span>Set first goal</button>
+  </div>
+</div>
+{% endif %}
+{% endwith %}

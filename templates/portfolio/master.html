@@ -83,25 +83,53 @@
   <div class="card-body p-4 lg:p-6">
     <div class="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-8">
       <div class="flex-1 min-w-0">
-        <p class="text-[10px] font-bold uppercase tracking-widest opacity-40">Total Portfolio Value</p>
+        <div class="flex flex-wrap items-center justify-between gap-2">
+          <p class="text-[10px] font-bold uppercase tracking-widest opacity-40">{% if exclude_re %}Portfolio Value · excl. Real Estate{% else %}Total Portfolio Value{% endif %}</p>
+          {% if has_real_estate %}
+          <label class="flex items-center gap-2 cursor-pointer text-xs" title="Real estate is usually the largest and least liquid holding; hide it to see how the rest of the portfolio is doing">
+            <span class="opacity-60">Include real estate</span>
+            <input type="checkbox" class="toggle toggle-primary toggle-sm" {% if not exclude_re %}checked{% endif %}
+                   onchange="window.location.search = 'ex_re=' + (this.checked ? '0' : '1')" aria-label="Include real estate in portfolio totals">
+          </label>
+          {% endif %}
+        </div>
         <p class="text-3xl lg:text-4xl font-extrabold mt-1 text-primary">₹{{ total_value|floatformat:0|indian_number }}</p>
         <div class="mt-2 flex flex-wrap items-center gap-2">
           <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold {% if total_returns >= 0 %}bg-success/15 text-success border border-success/25{% else %}bg-error/15 text-error border border-error/25{% endif %}">
             <span class="material-symbols-outlined text-sm">{% if total_returns >= 0 %}trending_up{% else %}trending_down{% endif %}</span>
             {% if total_returns >= 0 %}+{% endif %}₹{{ total_returns|floatformat:0|indian_number }} ({{ return_pct }}%)
           </span>
+          {% if exclude_re %}
+          <a href="#real-estate" class="inline-flex items-center gap-1 text-xs opacity-60 hover:opacity-100 no-underline text-inherit">
+            <span class="material-symbols-outlined text-sm">domain</span>₹{{ real_estate_current|floatformat:0|indian_number }} in real estate set aside
+          </a>
+          {% endif %}
         </div>
       </div>
       <div class="flex flex-col gap-3">
-        <div class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-2 {% if fy_performance or goal_roadmap.spotlight %}sm:grid-cols-4{% endif %} gap-3">
           <div class="stat-card stat-card-primary">
             <div class="text-[10px] uppercase tracking-wider opacity-50">Invested</div>
-            <div class="text-base font-bold mt-0.5">₹{{ total_invested|floatformat:0|indian_number }}</div>
+            <div class="text-base font-bold mt-0.5 tabular-nums">₹{{ total_invested|floatformat:0|indian_number }}</div>
           </div>
           <div class="stat-card {% if total_returns >= 0 %}stat-card-success{% else %}stat-card-error{% endif %}">
             <div class="text-[10px] uppercase tracking-wider opacity-50">Returns</div>
-            <div class="text-base font-bold mt-0.5 {% if total_returns >= 0 %}text-success{% else %}text-error{% endif %}">₹{{ total_returns|floatformat:0|indian_number }}</div>
+            <div class="text-base font-bold mt-0.5 tabular-nums {% if total_returns >= 0 %}text-success{% else %}text-error{% endif %}">₹{{ total_returns|floatformat:0|indian_number }}</div>
           </div>
+          {% if fy_performance %}
+          <div class="stat-card" title="Net worth change since {{ fy_performance.opening_month|date:'M Y' }}: ₹{{ fy_performance.money_added|floatformat:0|indian_number }} added, ₹{{ fy_performance.market_gain|floatformat:0|indian_number }} from markets">
+            <div class="text-[10px] uppercase tracking-wider opacity-50">{{ fy_performance.label }} so far</div>
+            <div class="text-base font-bold mt-0.5 tabular-nums {% if fy_performance.change >= 0 %}text-success{% else %}text-error{% endif %}">{% if fy_performance.change >= 0 %}+{% endif %}{{ fy_performance.change_pct }}%</div>
+          </div>
+          {% endif %}
+          {% with s=goal_roadmap.spotlight %}{% if s %}
+          <a href="#goals-section" class="stat-card stat-card-accent no-underline text-inherit"{% if exclude_re %} title="Goals always track the full portfolio, including real estate"{% endif %}>
+            <div class="text-[10px] uppercase tracking-wider opacity-50">FY target</div>
+            <div class="text-base font-bold mt-0.5 tabular-nums">{{ s.fy_progress_pct }}%
+              <span class="text-[10px] font-semibold {% if s.status == 'behind' %}text-warning{% else %}text-success{% endif %}">{% if s.achieved %}hit{% elif s.status == 'ahead' %}ahead{% elif s.status == 'behind' %}behind{% else %}on track{% endif %}</span>
+            </div>
+          </a>
+          {% endif %}{% endwith %}
         </div>
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs opacity-50">
           <span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm text-warning">diamond</span>₹{{ gold_rate|floatformat:0|indian_number }}/g</span>
@@ -126,7 +154,7 @@
     <a href="#allocation" class="section-tab active" data-section="allocation"><span class="material-symbols-outlined text-sm">pie_chart</span>Overview</a>
     <a href="#equity" class="section-tab" data-section="equity"><span class="material-symbols-outlined text-sm">trending_up</span>Market</a>
     <a href="#alternates" class="section-tab" data-section="alternates"><span class="material-symbols-outlined text-sm">domain</span>Alternates</a>
-    <a href="#fixed-income" class="section-tab" data-section="fixed-income"><span class="material-symbols-outlined text-sm">account_balance</span>Fixed</a>
+    <a href="#debt" class="section-tab" data-section="debt"><span class="material-symbols-outlined text-sm">account_balance</span>Debt</a>
     <a href="#liquidity" class="section-tab" data-section="liquidity"><span class="material-symbols-outlined text-sm">payments</span>Cash</a>
     <a href="#goals-section" class="section-tab" data-section="goals-section"><span class="material-symbols-outlined text-sm">flag</span>Goals</a>
   </div>
@@ -135,7 +163,7 @@
 {# ——— MOBILE QUICK STATS ——— #}
 <div class="md:hidden quick-stats-scroll mb-3">
   {% for a in assets %}
-  <a href="#{% if a.name == 'Equity' %}equity{% elif a.name == 'Real Estate' or a.name == 'Gold' or a.name == 'Silver' or a.name == 'Crypto' %}alternates{% elif a.name == 'EPF' or a.name == 'NPS' or a.name == 'Bonds' %}fixed-income{% elif a.name == 'Cash' or a.name == 'Fixed Deposits' %}liquidity{% else %}allocation{% endif %}" class="quick-stat-chip">
+  <a href="#{% if a.name == 'Real Estate' or a.name == 'Gold' or a.name == 'Silver' or a.name == 'Crypto' %}alternates{% elif a.name == 'EPF' or a.name == 'Bonds' %}debt{% elif a.name == 'Cash' or a.name == 'FD' %}liquidity{% else %}equity{% endif %}" class="quick-stat-chip">
     <span class="material-symbols-outlined qs-icon">{{ a.icon }}</span>
     <div>
       <div class="qs-label">{{ a.name }}</div>
@@ -144,10 +172,6 @@
   </a>
   {% endfor %}
 </div>
-{# AI Insights moved to bottom of page #}
-
-{# Goals moved to bottom of page #}
-
 {# ——— ASSET BREAKDOWN + ALLOCATION (collapsed by default) ——— #}
 <div id="allocation" class="card bg-base-200 shadow-sm animate-up mb-4 card-hover scroll-mt-24" style="animation-delay:0.1s">
   <div class="collapse collapse-arrow">
@@ -350,6 +374,34 @@
   </div>
 </div>
 
+{# ——— NPS ——— #}
+<div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.29s">
+  <div class="card-body p-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3"><h2 class="card-title text-base flex items-center gap-1.5"><span class="material-symbols-outlined text-blue-400 text-lg">shield</span>NPS</h2>
+      <div class="flex flex-wrap items-center gap-1.5">{% if nps_latest %}<span class="badge badge-primary badge-sm">₹{{ nps_latest.total_balance|floatformat:0|indian_number }}</span>{% endif %}<a href="{% url 'nps_detail' %}" class="btn btn-outline btn-primary btn-xs gap-1">View All<span class="material-symbols-outlined text-sm">arrow_forward</span></a><button class="btn btn-ghost btn-sm gap-1" onclick="openNpsAddModal()"><span class="material-symbols-outlined text-base">add</span>Add</button></div>
+    </div>
+    {% if nps_entries %}
+    <div class="hidden md:block overflow-x-auto max-h-60"><table class="table table-sm"><thead><tr><th>Date</th><th class="text-right">Total (Entry)</th><th class="text-right">Returns</th><th class="w-10"></th></tr></thead><tbody>
+    {% for e in nps_entries %}<tr class="hover"><td class="opacity-60 text-sm">{{ e.date|date:"d M Y" }}</td><td class="text-right whitespace-nowrap font-semibold">₹{{ e.contribution|add:e.interest_earned|floatformat:0|indian_number }}</td><td class="text-right whitespace-nowrap"><span class="text-success">+₹{{ e.interest_earned|floatformat:0|indian_number }}</span></td><td><button class="btn btn-ghost btn-xs btn-square" data-edit-nps data-id="{{ e.id }}" data-date="{{ e.date|date:'Y-m-d' }}" data-contrib="{{ e.contribution }}" data-interest="{{ e.interest_earned }}" data-balance="{{ e.total_balance }}" data-remarks="{{ e.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button></td></tr>
+    {% endfor %}</tbody></table></div>
+    <div class="md:hidden space-y-2 max-h-60 overflow-y-auto">
+      {% for e in nps_entries %}
+      <div class="table-card">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-xs opacity-50">{{ e.date|date:"d M Y" }}</span>
+          <button class="btn btn-ghost btn-xs btn-square shrink-0" data-edit-nps data-id="{{ e.id }}" data-date="{{ e.date|date:'Y-m-d' }}" data-contrib="{{ e.contribution }}" data-interest="{{ e.interest_earned }}" data-balance="{{ e.total_balance }}" data-remarks="{{ e.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button>
+        </div>
+        <div class="grid grid-cols-2 gap-2 mt-1.5 text-xs">
+          <div><span class="opacity-50">Total</span><div class="font-semibold mt-0.5 tabular-nums">₹{{ e.contribution|add:e.interest_earned|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">Returns</span><div class="font-semibold mt-0.5 text-success tabular-nums">+₹{{ e.interest_earned|floatformat:0|indian_number }}</div></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}<p class="text-sm opacity-40">No NPS entries yet.</p>{% endif %}
+  </div>
+</div>
+
 {# ——— SECTION: ALTERNATES ——— #}
 <div class="section-group-header" id="alternates">
   <span class="material-symbols-outlined section-icon text-amber-400">domain</span>
@@ -357,7 +409,7 @@
 </div>
 
 {# ——— REAL ESTATE INVESTMENTS ——— #}
-<div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.29s">
+<div id="real-estate" class="card bg-base-200 shadow-sm animate-up mb-4 card-hover scroll-mt-20" style="animation-delay:0.29s">
   <div class="card-body p-4">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
       <h2 class="card-title text-base flex items-center gap-1.5">
@@ -512,10 +564,10 @@
   </div>
 </div>
 
-{# ——— SECTION: FIXED INCOME ——— #}
-<div class="section-group-header" id="fixed-income">
+{# ——— SECTION: DEBT INSTRUMENTS ——— #}
+<div class="section-group-header" id="debt">
   <span class="material-symbols-outlined section-icon text-emerald-400">account_balance</span>
-  <h2>Fixed Income</h2>
+  <h2>Debt Instruments</h2>
 </div>
 
 {# ——— EPF ——— #}
@@ -550,56 +602,28 @@
   </div>
 </div>
 
-{# ——— NPS + BONDS (paired) ——— #}
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-up mb-4" style="animation-delay:0.45s">
-  <div class="card bg-base-200 shadow-sm card-hover">
-    <div class="card-body p-4">
-      <div class="flex flex-wrap items-center justify-between gap-2 mb-3"><h2 class="card-title text-base flex items-center gap-1.5"><span class="material-symbols-outlined text-emerald-400 text-lg">shield</span>NPS</h2>
-        <div class="flex flex-wrap items-center gap-1.5">{% if nps_latest %}<span class="badge badge-primary badge-sm">₹{{ nps_latest.total_balance|floatformat:0|indian_number }}</span>{% endif %}<a href="{% url 'nps_detail' %}" class="btn btn-outline btn-primary btn-xs gap-1">View All<span class="material-symbols-outlined text-sm">arrow_forward</span></a><button class="btn btn-ghost btn-sm gap-1" onclick="openNpsAddModal()"><span class="material-symbols-outlined text-base">add</span>Add</button></div>
-      </div>
-      {% if nps_entries %}
-      <div class="hidden md:block overflow-x-auto max-h-60"><table class="table table-sm"><thead><tr><th>Date</th><th class="text-right">Total (Entry)</th><th class="text-right">Returns</th><th class="w-10"></th></tr></thead><tbody>
-      {% for e in nps_entries %}<tr class="hover"><td class="opacity-60 text-sm">{{ e.date|date:"d M Y" }}</td><td class="text-right whitespace-nowrap font-semibold">₹{{ e.contribution|add:e.interest_earned|floatformat:0|indian_number }}</td><td class="text-right whitespace-nowrap"><span class="text-success">+₹{{ e.interest_earned|floatformat:0|indian_number }}</span></td><td><button class="btn btn-ghost btn-xs btn-square" data-edit-nps data-id="{{ e.id }}" data-date="{{ e.date|date:'Y-m-d' }}" data-contrib="{{ e.contribution }}" data-interest="{{ e.interest_earned }}" data-balance="{{ e.total_balance }}" data-remarks="{{ e.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button></td></tr>
-      {% endfor %}</tbody></table></div>
-      <div class="md:hidden space-y-2 max-h-60 overflow-y-auto">
-        {% for e in nps_entries %}
-        <div class="table-card">
-          <div class="flex items-center justify-between gap-2">
-            <span class="text-xs opacity-50">{{ e.date|date:"d M Y" }}</span>
-            <button class="btn btn-ghost btn-xs btn-square shrink-0" data-edit-nps data-id="{{ e.id }}" data-date="{{ e.date|date:'Y-m-d' }}" data-contrib="{{ e.contribution }}" data-interest="{{ e.interest_earned }}" data-balance="{{ e.total_balance }}" data-remarks="{{ e.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button>
-          </div>
-          <div class="grid grid-cols-2 gap-2 mt-1.5 text-xs">
-            <div><span class="opacity-50">Total</span><div class="font-semibold mt-0.5 tabular-nums">₹{{ e.contribution|add:e.interest_earned|floatformat:0|indian_number }}</div></div>
-            <div><span class="opacity-50">Returns</span><div class="font-semibold mt-0.5 text-success tabular-nums">+₹{{ e.interest_earned|floatformat:0|indian_number }}</div></div>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
-      {% else %}<p class="text-sm opacity-40">No NPS entries yet.</p>{% endif %}
+{# ——— BONDS ——— #}
+<div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.45s">
+  <div class="card-body p-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-3"><h2 class="card-title text-base flex items-center gap-1.5"><span class="material-symbols-outlined text-emerald-400 text-lg">toll</span>Bonds</h2>
+      <div class="flex flex-wrap items-center gap-1.5"><span class="badge badge-primary badge-sm">₹{{ bonds_total|floatformat:0|indian_number }}</span><a href="{% url 'bonds_detail' %}" class="btn btn-outline btn-primary btn-xs gap-1">View All<span class="material-symbols-outlined text-sm">arrow_forward</span></a><button class="btn btn-ghost btn-sm gap-1" onclick="openModal('addBondModal')"><span class="material-symbols-outlined text-base">add</span>Add</button></div>
     </div>
-  </div>
-  <div class="card bg-base-200 shadow-sm card-hover">
-    <div class="card-body p-4">
-      <div class="flex flex-wrap items-center justify-between gap-2 mb-3"><h2 class="card-title text-base flex items-center gap-1.5"><span class="material-symbols-outlined text-emerald-400 text-lg">toll</span>Bonds</h2>
-        <div class="flex flex-wrap items-center gap-1.5"><span class="badge badge-primary badge-sm">₹{{ bonds_total|floatformat:0|indian_number }}</span><a href="{% url 'bonds_detail' %}" class="btn btn-outline btn-primary btn-xs gap-1">View All<span class="material-symbols-outlined text-sm">arrow_forward</span></a><button class="btn btn-ghost btn-sm gap-1" onclick="openModal('addBondModal')"><span class="material-symbols-outlined text-base">add</span>Add</button></div>
-      </div>
-      {% if bonds %}
-      <div class="hidden md:block overflow-x-auto max-h-60"><table class="table table-sm"><thead><tr><th>Account</th><th class="text-right">Amount</th><th class="w-10"></th></tr></thead><tbody>
-      {% for b in bonds %}<tr class="hover"><td class="font-semibold">{{ b.account_name }}</td><td class="text-right">₹{{ b.amount|floatformat:0|indian_number }}</td><td><button class="btn btn-ghost btn-xs btn-square" data-edit-bond data-id="{{ b.id }}" data-account="{{ b.account_name }}" data-amount="{{ b.amount }}" data-remarks="{{ b.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button></td></tr>
-      {% endfor %}</tbody></table></div>
-      <div class="md:hidden space-y-2 max-h-60 overflow-y-auto">
-        {% for b in bonds %}
-        <div class="table-card flex items-center justify-between gap-3">
-          <span class="font-semibold text-sm">{{ b.account_name }}</span>
-          <div class="flex items-center gap-2 shrink-0">
-            <span class="font-semibold text-sm tabular-nums">₹{{ b.amount|floatformat:0|indian_number }}</span>
-            <button class="btn btn-ghost btn-xs btn-square" data-edit-bond data-id="{{ b.id }}" data-account="{{ b.account_name }}" data-amount="{{ b.amount }}" data-remarks="{{ b.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button>
-          </div>
+    {% if bonds %}
+    <div class="hidden md:block overflow-x-auto max-h-60"><table class="table table-sm"><thead><tr><th>Account</th><th class="text-right">Amount</th><th class="w-10"></th></tr></thead><tbody>
+    {% for b in bonds %}<tr class="hover"><td class="font-semibold">{{ b.account_name }}</td><td class="text-right">₹{{ b.amount|floatformat:0|indian_number }}</td><td><button class="btn btn-ghost btn-xs btn-square" data-edit-bond data-id="{{ b.id }}" data-account="{{ b.account_name }}" data-amount="{{ b.amount }}" data-remarks="{{ b.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button></td></tr>
+    {% endfor %}</tbody></table></div>
+    <div class="md:hidden space-y-2 max-h-60 overflow-y-auto">
+      {% for b in bonds %}
+      <div class="table-card flex items-center justify-between gap-3">
+        <span class="font-semibold text-sm">{{ b.account_name }}</span>
+        <div class="flex items-center gap-2 shrink-0">
+          <span class="font-semibold text-sm tabular-nums">₹{{ b.amount|floatformat:0|indian_number }}</span>
+          <button class="btn btn-ghost btn-xs btn-square" data-edit-bond data-id="{{ b.id }}" data-account="{{ b.account_name }}" data-amount="{{ b.amount }}" data-remarks="{{ b.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button>
         </div>
-        {% endfor %}
       </div>
-      {% else %}<p class="text-sm opacity-40">No bonds.</p>{% endif %}
+      {% endfor %}
     </div>
+    {% else %}<p class="text-sm opacity-40">No bonds.</p>{% endif %}
   </div>
 </div>
 
@@ -672,83 +696,7 @@
     {% else %}<p class="text-sm opacity-40">No fixed deposits.</p>{% endif %}
   </div>
 </div>
-{# ——— SECTION: GOALS & INSIGHTS ——— #}
-<div class="section-group-header" id="goals-section">
-  <span class="material-symbols-outlined section-icon text-violet-400">flag</span>
-  <h2>Goals & AI Insights</h2>
-</div>
-
-{# ——— FINANCIAL GOALS ——— #}
-<div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover">
-  <div class="card-body p-4">
-    <div class="flex items-center justify-between mb-3">
-      <h2 class="card-title text-base">Financial Goals</h2>
-      <button class="btn btn-ghost btn-sm gap-1" onclick="openGoalModal()"><span class="material-symbols-outlined text-base">add</span>Add</button>
-    </div>
-    {% if goals %}
-    {% if current_goal %}
-    <!-- Unified Current Goal Card -->
-    <div class="mb-5 p-4 md:p-5 rounded-2xl border-2 border-primary/30 bg-primary/5 relative overflow-hidden flex items-center gap-4 cursor-pointer hover:bg-primary/10 transition-colors" data-edit-goal data-id="{{ current_goal.id }}" data-label="{{ current_goal.label }}" data-target="{{ current_goal.target|floatformat:0 }}" data-date="{{ current_goal.target_date|date:'Y-m-d'|default:'' }}" data-notes="{{ current_goal.notes }}">
-      <div class="absolute -right-4 -top-4 md:-right-8 md:-top-8 opacity-[0.04]"><span class="material-symbols-outlined" style="font-size:140px">flag</span></div>
-      <div class="relative z-10 flex-1 w-full">
-        <div class="flex items-center gap-2 mb-1.5 md:mb-2">
-          <div class="text-[10px] md:text-xs font-bold uppercase tracking-widest text-primary/70">Current Target</div>
-          {% if current_goal.target_date %}<div class="badge badge-primary badge-outline badge-xs md:badge-sm border-primary/30">Due {{ current_goal.target_date|date:"d M Y" }}</div>{% endif %}
-        </div>
-        <div class="flex items-end justify-between mb-2.5 md:mb-3 gap-2">
-          <div class="min-w-0 flex-1">
-            <div class="text-lg md:text-2xl font-extrabold truncate">{{ current_goal.label }}</div>
-            <div class="text-xs md:text-sm font-semibold opacity-60">₹{{ current_goal.target|floatformat:0|indian_number }} target</div>
-          </div>
-          <div class="text-2xl md:text-3xl font-black text-primary shrink-0">{{ current_goal.pct }}%</div>
-        </div>
-        <progress class="progress progress-primary w-full h-2.5 md:h-3" value="{{ current_goal.pct }}" max="100"></progress>
-      </div>
-    </div>
-    {% endif %}
-
-    {% if other_goals %}
-    {% regroup other_goals|dictsort:"fy" by fy as grouped_other_goals %}
-    
-    <!-- Desktop: FY Grids -->
-    <div class="hidden md:flex flex-col gap-6">
-      {% for group in grouped_other_goals %}
-      <div>
-        <h4 class="text-xs font-bold text-base-content/50 uppercase tracking-widest mb-3">{{ group.grouper }} Goals</h4>
-        <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {% for g in group.list %}
-          <div class="p-3 rounded-lg border cursor-pointer hover:bg-base-300/80 transition-colors {% if g.achieved %}border-success/30 bg-success/5{% else %}border-base-content/8 bg-base-300/30{% endif %}" data-edit-goal data-id="{{ g.id }}" data-label="{{ g.label }}" data-target="{{ g.target|floatformat:0 }}" data-date="{{ g.target_date|date:'Y-m-d'|default:'' }}" data-notes="{{ g.notes }}">
-            <div class="flex items-center justify-between mb-1">
-              <div class="text-sm font-semibold truncate">{{ g.label }} {% if g.target_date and not g.achieved %}<span class="text-[10px] font-normal opacity-50 ml-1">Due {{ g.target_date|date:"d M y" }}</span>{% endif %}</div>
-              {% if g.achieved %}<span class="material-symbols-outlined text-success text-base">check_circle</span>{% endif %}
-            </div>
-            <progress class="progress w-full my-1.5 {% if g.achieved %}progress-success{% else %}progress-primary{% endif %}" value="{{ g.pct }}" max="100"></progress>
-            <div class="flex items-center justify-between">
-              <div class="text-xs font-bold {% if g.achieved %}text-success{% endif %}">{{ g.pct }}%</div>
-              {% if g.achieved and g.achieved_at %}
-              <div class="text-[10px] opacity-50">Achieved {{ g.achieved_at|date:"d M Y" }}</div>
-              {% endif %}
-            </div>
-            {% if g.notes %}<div class="mt-1.5 text-[10px] opacity-40 italic truncate">{{ g.notes }}</div>{% endif %}
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-
-    <!-- Mobile: FY Accordions -->
-    <div class="md:hidden space-y-3">
-      {% for group in grouped_other_goals %}
-      <div class="collapse collapse-arrow bg-base-200/50 rounded-xl"><input type="checkbox" /><div class="collapse-title min-h-0 py-2.5 px-3 text-sm font-semibold flex items-center gap-1.5"><span class="material-symbols-outlined text-base">calendar_month</span>{{ group.grouper }} Goals<span class="badge badge-neutral badge-xs ml-1">{{ group.list|length }}</span></div><div class="collapse-content px-3 pb-3"><div class="space-y-2">{% for g in group.list %}<div class="flex items-center gap-3 p-2.5 rounded-lg border {% if g.achieved %}bg-success/5 border-success/30{% else %}bg-base-100/40 border-base-content/10{% endif %}" data-edit-goal data-id="{{ g.id }}" data-label="{{ g.label }}" data-target="{{ g.target|floatformat:0 }}" data-date="{{ g.target_date|date:'Y-m-d'|default:'' }}" data-notes="{{ g.notes }}">{% if g.achieved %}<span class="material-symbols-outlined text-success text-base">check_circle</span>{% endif %}<div class="flex-1 min-w-0"><div class="text-sm font-semibold truncate">{{ g.label }} {% if g.target_date and not g.achieved %}<span class="text-[10px] font-normal opacity-50 ml-1">Due {{ g.target_date|date:"d M y" }}</span>{% endif %}</div><div class="text-xs opacity-50">₹{{ g.target|floatformat:0|indian_number }}</div>{% if g.notes %}<div class="text-[10px] opacity-40 italic mt-0.5 truncate">{{ g.notes }}</div>{% endif %}</div><div class="text-xs font-bold {% if g.achieved %}text-success{% endif %}">{% if g.achieved %}100%{% else %}{{ g.pct }}%{% endif %}</div></div>{% endfor %}</div></div></div>
-      {% endfor %}
-    </div>
-    {% endif %}
-    {% else %}
-    <p class="text-sm opacity-40">No goals set. Add your first target!</p>
-    {% endif %}
-  </div>
-</div>
+{% include 'portfolio/_goals_section.html' %}
 
 {# ——— AI INSIGHTS (moved to bottom) ——— #}
 {% if latest_insight %}
@@ -785,7 +733,57 @@
 {% include 'portfolio/_epf_form_modal.html' with form_obj=epf_form %}
 
 {# Goal Modal #}
-<dialog class="modal" id="addGoalModal"><div class="modal-box"><h3 class="font-bold text-lg flex items-center gap-2" id="goalModalTitle"><span class="material-symbols-outlined text-primary">add_circle</span>Add Goal</h3><form id="goalForm" method="post" action="{% url 'add_goal' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><div class="grid grid-cols-2 gap-4 mt-4"><div class="form-field"><label class="label text-xs font-semibold">Label</label>{{ goal_form.label }}</div><div class="form-field"><label class="label text-xs font-semibold">Target Amount (₹)</label>{{ goal_form.target_amount }}</div></div><div class="form-field mt-3"><label class="label text-xs font-semibold">Target Date</label>{{ goal_form.target_date }}</div><div class="form-field mt-3"><label class="label text-xs font-semibold">Notes</label>{{ goal_form.notes }}</div><div class="modal-action"><button type="button" id="goalDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteGoalForm')"><span class="material-symbols-outlined text-base">delete</span>Delete</button><button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addGoalModal')">Cancel</button><button type="submit" class="btn btn-primary btn-sm">Save</button></div></form><form id="deleteGoalForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form></div><form method="dialog" class="modal-backdrop"><button>close</button></form></dialog>
+<dialog class="modal" id="addGoalModal">
+  <div class="modal-box">
+    <h3 class="font-bold text-lg flex items-center gap-2" id="goalModalTitle">
+      <span class="material-symbols-outlined text-primary">add_circle</span>Plan Financial Year Goal
+    </h3>
+    <form id="goalForm" method="post" action="{% url 'add_goal' %}">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      
+      <div class="form-field mt-4">
+        <label class="label text-xs font-semibold">Financial Year</label>
+        {{ goal_form.financial_year }}
+        <span class="text-[10px] opacity-40 mt-1">Select an Indian FY cycle (Apr 1 – Mar 31) to auto-fill target end date.</span>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4 mt-3">
+        <div class="form-field">
+          <label class="label text-xs font-semibold">Goal Label</label>
+          {{ goal_form.label }}
+        </div>
+        <div class="form-field">
+          <label class="label text-xs font-semibold">Target Corpus (₹)</label>
+          {{ goal_form.target_amount }}
+        </div>
+      </div>
+
+      <div class="form-field mt-3">
+        <label class="label text-xs font-semibold">Target Date</label>
+        {{ goal_form.target_date }}
+      </div>
+
+      <div class="form-field mt-3">
+        <label class="label text-xs font-semibold">Strategic Notes / Plan</label>
+        {{ goal_form.notes }}
+      </div>
+
+      <div class="modal-action">
+        <button type="button" id="goalDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteGoalForm')">
+          <span class="material-symbols-outlined text-base">delete</span>Delete
+        </button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addGoalModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm">Save Goal</button>
+      </div>
+    </form>
+    <form id="deleteGoalForm" method="post" action="" style="display:none">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    </form>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
 
 {# NPS Modal #}
 {% include 'portfolio/_nps_form_modal.html' with form_obj=nps_form nps_latest=nps_latest %}
@@ -853,21 +851,6 @@
   <form method="dialog" class="modal-backdrop"><button>close</button></form>
 </dialog>
 
-<!-- Note Viewer Modal -->
-<dialog class="modal" id="viewNoteModal">
-  <div class="modal-box">
-    <h3 class="font-bold text-lg flex items-center gap-2" id="viewNoteTitle">
-      <span class="material-symbols-outlined text-info">description</span>
-      <span id="viewNoteTitleText">Note</span>
-    </h3>
-    <div class="py-4 whitespace-pre-wrap italic opacity-80" id="viewNoteContent"></div>
-    <div class="modal-action">
-      <button class="btn btn-ghost btn-sm" onclick="closeModal('viewNoteModal')">Close</button>
-    </div>
-  </div>
-  <form method="dialog" class="modal-backdrop"><button>close</button></form>
-</dialog>
-
 {{ pf_chart_data|json_script:"pf-chart-data" }}
 {% endblock %}
 
@@ -926,25 +909,51 @@
 
     updateActive();
   })();
-
-  function showNoteModal(title, content) {
-    document.getElementById('viewNoteTitleText').textContent = title + " Notes";
-    document.getElementById('viewNoteContent').textContent = content;
-    document.getElementById('viewNoteModal').showModal();
-  }
 </script>
 <script src="{% static 'js/commodity_purity.js' %}"></script>
 <script src="{% static 'js/nps_modal.js' %}"></script>
 
 <script>
-function openGoalModal() {
+function openGoalModal(defaultFy) {
   var form = document.getElementById('goalForm');
   form.action = "{% url 'add_goal' %}";
   form.reset();
   document.getElementById('goalDeleteBtn').style.display = 'none';
-  document.getElementById('goalModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span> Add Goal';
+  document.getElementById('goalModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span> Plan Financial Year Target';
+  var fySel = form.querySelector('[name=financial_year]');
+  if (defaultFy && fySel) {
+    fySel.value = defaultFy;
+    _handleFyChange(fySel);
+  }
   openModal('addGoalModal');
 }
+
+function _handleFyChange(selectEl) {
+  var fy = selectEl.value;
+  var form = selectEl.closest('form');
+  if (!form) return;
+  var dateInput = form.querySelector('[name=target_date]');
+  var labelInput = form.querySelector('[name=label]');
+  if (fy && fy.startsWith('FY ')) {
+    var parts = fy.replace('FY ', '').split('-');
+    if (parts.length > 0) {
+      var startYr = parseInt(parts[0], 10);
+      if (!isNaN(startYr) && dateInput) {
+        var endYr = startYr + 1;
+        dateInput.value = endYr + '-03-31';
+      }
+    }
+    if (labelInput && (!labelInput.value || labelInput.value.startsWith('FY '))) {
+      labelInput.value = fy + ' Target';
+    }
+  }
+}
+
+document.addEventListener('change', function(e) {
+  if (e.target.name === 'financial_year') {
+    _handleFyChange(e.target);
+  }
+});
 
 function openAddCommodityModal() {
   var form = document.getElementById('commodityForm');
@@ -1088,8 +1097,8 @@ document.addEventListener('click', function(e) {
   var btn;
   if ((btn = e.target.closest('[data-edit-goal]'))) {
     _editSetup('goalForm','deleteGoalForm','goalDeleteBtn','goalModalTitle',
-      "{% url 'edit_goal' pk=0 %}","{% url 'delete_goal' pk=0 %}",'Edit Goal','addGoalModal',btn.dataset,
-      {label:btn.dataset.label,target_amount:btn.dataset.target,target_date:btn.dataset.date,notes:btn.dataset.notes});
+      "{% url 'edit_goal' pk=0 %}","{% url 'delete_goal' pk=0 %}",'Edit Financial Year Goal','addGoalModal',btn.dataset,
+      {financial_year:btn.dataset.fy,label:btn.dataset.label,target_amount:btn.dataset.target,target_date:btn.dataset.date,notes:btn.dataset.notes});
   } else if ((btn = e.target.closest('[data-edit-epf]'))) {
     _editSetup('epfForm','deleteEpfForm','epfDeleteBtn','epfModalTitle',
       "{% url 'edit_epf_entry' pk=0 %}","{% url 'delete_epf_entry' pk=0 %}",'Edit EPF Entry','addEpfModal',btn.dataset,

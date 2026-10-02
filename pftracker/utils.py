@@ -3,9 +3,11 @@ Shared utilities used by both tracker and portfolio apps.
 """
 import datetime
 import os
+import re
 from decimal import Decimal
 
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 from django.shortcuts import redirect
 from django.utils.http import url_has_allowed_host_and_scheme
 
@@ -22,6 +24,18 @@ def safe_redirect(request, fallback='dashboard'):
 
 
 
+def feature_enabled(user, feature_name):
+    """HouseholdConfig toggle for the user's household; True when there is no group or config."""
+    group = getattr(user, 'group', None)
+    if group is None:
+        return True
+    try:
+        config = group.config
+    except ObjectDoesNotExist:
+        return True
+    return getattr(config, f'feature_{feature_name}', True)
+
+
 def fy_start_year(today=None):
     """Return the FY start-year for a date (Apr-Mar cycle)."""
     if today is None:
@@ -32,6 +46,20 @@ def fy_start_year(today=None):
 def fy_label(fy_start):
     """Format a FY label like 'FY 2025-26'."""
     return f"FY {fy_start}-{str(fy_start + 1)[-2:]}"
+
+
+_FY_LABEL_RE = re.compile(r'^FY\s*(\d{4})-(\d{2})$')
+
+
+def fy_start_from_label(label):
+    """Inverse of fy_label: 'FY 2025-26' → 2025. Returns None for blank / 'Long Term' / malformed."""
+    m = _FY_LABEL_RE.match((label or '').strip())
+    if not m:
+        return None
+    start = int(m.group(1))
+    if (start + 1) % 100 != int(m.group(2)):
+        return None
+    return start
 
 
 def pct(part, total):

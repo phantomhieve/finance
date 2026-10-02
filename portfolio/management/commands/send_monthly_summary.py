@@ -1,40 +1,39 @@
 import datetime
+import os
+
 from django.core.management.base import BaseCommand
-from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.utils import timezone as _tz
-from django.conf import settings
 
 from tracker.models import AccountGroup
 from portfolio.models import PortfolioInsight, InsightGenerationSettings
 from portfolio.services import get_portfolio_summary, get_growth_data
 from portfolio.ai import build_prompt_data, call_gemini
+from portfolio.emails import build_monthly_context, send_html_email
+from portfolio.templatetags.indian_format import inr
+
 
 class Command(BaseCommand):
     help = 'Sends the monthly AI portfolio summary to the household head.'
 
+    def add_arguments(self, parser):
+        parser.add_argument('--preview', metavar='PATH',
+                            help='Write the rendered HTML to PATH instead of sending (skips AI generation).')
+
     def handle(self, *args, **options):
-        # We want to send it to the household head only for now
-        target_email = 'khetanatulz@gmail.com'
-        
-        # Get the household group (assuming first one for now)
+        target_email = os.environ.get('VAULT_REPORT_EMAIL', 'khetanatulz@gmail.com')
+        preview = options.get('preview')
+
         group = AccountGroup.objects.first()
         if not group:
             self.stdout.write(self.style.ERROR('No household group found.'))
             return
-            
-        # 1. Sync AI service if not in cooldown
-        qs = PortfolioInsight.objects.filter(group=group).order_by('-generated_at')
-        latest = qs.first()
-        
-        # Get cooldown settings
-        cooldown_days = InsightGenerationSettings.get_solo().cooldown_days
-        cooldown = datetime.timedelta(days=cooldown_days)
-        
-        can_generate = True
-        if latest:
-            can_generate = (_tz.now() - latest.generated_at) >= cooldown
-            
+
+        # 1. Refresh AI insights if the cooldown has passed
+        latest = PortfolioInsight.objects.filter(group=group).order_by('-generated_at').first()
+        cooldown = datetime.timedelta(days=InsightGenerationSettings.get_solo().cooldown_days)
+        can_generate = not preview and (latest is None or (_tz.now() - latest.generated_at) >= cooldown)
+
         if can_generate:
             self.stdout.write('AI insight cooldown has passed. Generating new insights...')
             try:
@@ -52,34 +51,33 @@ class Command(BaseCommand):
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f'Failed to generate AI insights: {e}'))
         else:
-            self.stdout.write('AI insight generation is on cooldown. Using the latest available insights.')
-            
-        # 2. Prepare and send the email
-        if not latest:
-            self.stdout.write(self.style.WARNING('No AI insights available to send.'))
+            self.stdout.write('Using the latest available AI insights.')
+
+        # 2. Render and send
+        ctx = build_monthly_context(group, latest.insights if latest else None)
+        html = render_to_string('emails/monthly_summary.html', ctx)
+
+        if preview:
+            with open(preview, 'w') as f:
+                f.write(html)
+            self.stdout.write(self.style.SUCCESS(f'Preview written to {preview}'))
             return
-            
-        context = {
-            'month': _tz.now().strftime('%B %Y'),
-            'insights': latest.insights,
-        }
-        
-        html_content = render_to_string('emails/monthly_summary.html', context)
-        
-        # Fallback text content just in case
-        text_content = f"Monthly Portfolio AI Summary for {_tz.now().strftime('%B %Y')}\n\n"
-        if latest.insights:
-            text_content += f"Score: {latest.insights.get('score')}/100\n\n"
-            text_content += f"Summary: {latest.insights.get('summary')}\n"
-            
-        subject = f"Your Vault Monthly AI Summary - {_tz.now().strftime('%b %Y')}"
-        from_email = getattr(settings, 'EMAIL_HOST_USER', 'vault@example.com') or 'vault@example.com'
-        
-        msg = EmailMultiAlternatives(subject, text_content, from_email, [target_email])
-        msg.attach_alternative(html_content, "text/html")
-        
+
+        lines = [f"Vault monthly review — {ctx['month']}", '',
+                 f"Net worth: {inr(ctx['total_value'])}"]
+        if ctx['since']:
+            lines.append(f"Change since {ctx['since']['month']:%b %Y}: {inr(ctx['since']['change'])} "
+                         f"({ctx['since']['change_pct']}%) — fresh money {inr(ctx['since']['money_added'])}, "
+                         f"market {inr(ctx['since']['market'])}")
+        if ctx['goal']:
+            g = ctx['goal']
+            lines.append(f"{ctx['goal_fy']} target {inr(g['target'])}: {g.get('fy_progress_pct', g['pct'])}% there")
+        if ctx['insights']:
+            lines += ['', f"Health score: {ctx['insights'].get('score')}/100",
+                      ctx['insights'].get('summary', '')]
+
         try:
-            msg.send()
+            send_html_email(f"Vault monthly review · {_tz.now():%b %Y}", '\n'.join(lines), html, [target_email])
             self.stdout.write(self.style.SUCCESS(f'Successfully sent monthly summary to {target_email}'))
         except Exception as e:
             self.stdout.write(self.style.ERROR(f'Failed to send email: {e}'))

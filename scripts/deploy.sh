@@ -95,8 +95,17 @@ else
 fi
 
 if [[ -n "${DEPLOY_HEALTHCHECK_URL:-}" ]] && command -v curl >/dev/null; then
-  code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 -L "${DEPLOY_HEALTHCHECK_URL}" || echo "000")
+  code="000"
+  for attempt in 1 2 3; do
+    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 -L "${DEPLOY_HEALTHCHECK_URL}" || echo "000")
+    [[ "$code" =~ ^[23] ]] && break
+    sleep 5
+  done
   echo "==> Health check HTTP ${code}"
+  if [[ ! "$code" =~ ^[23] ]]; then
+    echo "Health check failed" >&2
+    exit 1
+  fi
 fi
 
 echo "==> Deploy complete"

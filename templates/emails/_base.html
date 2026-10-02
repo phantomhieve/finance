@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="X-UA-Compatible" content="IE=edge">
+<meta name="x-apple-disable-message-reformatting">
+<meta name="format-detection" content="telephone=no, date=no, address=no, email=no">
+<meta name="color-scheme" content="light dark">
+<meta name="supported-color-schemes" content="light dark">
+<title>{% block title %}Vault{% endblock %}</title>
+<!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->
+<style>
+  body, table, td { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+  table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; border-collapse: collapse; }
+  a { color: #4f46e5; }
+  .num { font-variant-numeric: tabular-nums; }
+  @media only screen and (max-width: 620px) {
+    .em-container { width: 100% !important; }
+    .em-pad { padding-left: 20px !important; padding-right: 20px !important; }
+    .em-stack { display: block !important; width: 100% !important; box-sizing: border-box; padding: 0 0 10px 0 !important; }
+    .em-hide-sm { display: none !important; }
+    .em-hero { font-size: 34px !important; line-height: 40px !important; }
+  }
+  @media (prefers-color-scheme: dark) {
+    .em-body { background-color: #0b1120 !important; }
+    .em-card { background-color: #111827 !important; }
+    .em-soft { background-color: #1f2937 !important; }
+    .em-line { border-color: #1f2937 !important; }
+    .em-text { color: #e5e7eb !important; }
+    .em-muted { color: #9ca3af !important; }
+    .em-track { background-color: #374151 !important; }
+  }
+  [data-ogsc] .em-body { background-color: #0b1120 !important; }
+  [data-ogsc] .em-card { background-color: #111827 !important; }
+  [data-ogsc] .em-soft { background-color: #1f2937 !important; }
+  [data-ogsc] .em-text { color: #e5e7eb !important; }
+  [data-ogsc] .em-muted { color: #9ca3af !important; }
+</style>
+</head>
+<body class="em-body" style="margin:0; padding:0; width:100%; background-color:#eef1f5;">
+<div style="display:none; max-height:0; max-width:0; overflow:hidden; mso-hide:all; visibility:hidden; opacity:0; color:transparent; font-size:1px; line-height:1px;">{% block preheader %}{% endblock %}&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;</div>
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="em-body" style="background-color:#eef1f5;">
+<tr><td align="center" style="padding:28px 12px;">
+
+  <!--[if mso]><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
+  <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="em-container" style="width:600px; max-width:600px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+
+    {# Header band #}
+    <tr><td class="em-pad" style="background-color:#0f172a; padding:22px 32px; border-radius:14px 14px 0 0;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+        <td style="font-size:14px; font-weight:800; letter-spacing:4px; color:#ffffff; text-transform:uppercase;">Vault</td>
+        <td align="right" style="font-size:11px; font-weight:600; letter-spacing:1.5px; color:#a5b4fc; text-transform:uppercase;">{% block eyebrow %}{% endblock %}</td>
+      </tr></table>
+    </td></tr>
+
+    {# Body #}
+    <tr><td class="em-card em-pad" style="background-color:#ffffff; padding:32px 32px 8px 32px;">
+      {% block content %}{% endblock %}
+    </td></tr>
+
+    {# CTA #}
+    {% if app_url %}
+    <tr><td class="em-card em-pad" align="center" style="background-color:#ffffff; padding:8px 32px 32px 32px;">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
+        <td align="center" bgcolor="#4f46e5" style="border-radius:10px;">
+          <a href="{{ app_url }}" style="display:inline-block; padding:13px 28px; font-size:15px; font-weight:600; color:#ffffff; text-decoration:none; border-radius:10px;">{% block cta_label %}Open Vault{% endblock %} &rarr;</a>
+        </td>
+      </tr></table>
+    </td></tr>
+    {% else %}
+    <tr><td class="em-card" style="background-color:#ffffff; font-size:0; line-height:0; height:24px;">&nbsp;</td></tr>
+    {% endif %}
+
+    {# Footer #}
+    <tr><td class="em-soft em-pad" style="background-color:#f8fafc; padding:20px 32px; border-radius:0 0 14px 14px;">
+      <p class="em-muted" style="margin:0; font-size:12px; line-height:18px; color:#64748b;">
+        {% block footer_note %}{% endblock %}
+        Figures are from your Vault records and may lag live market prices. AI commentary is for personal planning only, not investment advice &mdash; verify before acting.
+      </p>
+    </td></tr>
+
+  </table>
+  <!--[if mso]></td></tr></table><![endif]-->
+
+</td></tr>
+</table>
+</body>
+</html>

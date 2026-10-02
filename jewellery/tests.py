@@ -24,6 +24,8 @@ class JewelleryTrackerTests(TestCase):
         self.group = AccountGroup.objects.create(name="Test Group")
         self.group.set_portfolio_password("portfolio123")
         self.group.save()
+        self.group.config.feature_jewellery = True
+        self.group.config.save()
 
         # Create a user
         self.user = User.objects.create_user(
@@ -56,6 +58,27 @@ class JewelleryTrackerTests(TestCase):
         response = self.client.get(reverse('jewellery_dashboard'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "No jewellery items found")
+
+    def _count_dashboard_queries(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+        with CaptureQueriesContext(connection) as ctx:
+            self.client.get(reverse('jewellery_dashboard'))
+        return len(ctx.captured_queries)
+
+    def test_dashboard_queries_do_not_grow_with_items(self):
+        def add(n, location):
+            for _ in range(n):
+                JewelleryItem.objects.create(group=self.group, category='RING', metal_type='GOLD',
+                                             purity='22k', weight_grams=Decimal('5'), location=location)
+        add(2, 'BANK_LOCKER')
+        few = self._count_dashboard_queries()
+        add(10, 'HOME_SAFE')
+        response = self.client.get(reverse('jewellery_dashboard'))
+        self.assertEqual(self._count_dashboard_queries(), few)
+        # 12 × 5g × ₹6000 × 0.916, split 2:10 between locker and home
+        self.assertEqual(response.context['total_estimated_value'], Decimal('329760.00'))
+        self.assertEqual([loc['pct'] for loc in response.context['value_by_location']], [17, 83])
         self.assertContains(response, "Jewellery Collection")
 
     def test_add_item_and_calculations(self):
@@ -167,13 +190,15 @@ class JewelleryTrackerTests(TestCase):
 
         # Log in as a different user in a different group to check secure access control
         other_group = AccountGroup.objects.create(name="Other Group")
+        other_group.config.feature_jewellery = True
+        other_group.config.save()
         other_user = User.objects.create_user(
             username="otheruser",
             password="password123",
             user_type="PRIMARY",
             group=other_group
         )
-        self.client.login(username="otheruser", password="password123")
+        self.client.force_login(other_user)
         session = self.client.session
         session['portfolio_unlocked_at'] = time.time()
         session.save()
@@ -209,3 +234,31 @@ class JewelleryTrackerTests(TestCase):
         item = JewelleryItem.objects.latest('created_at')
         self.assertTrue(item.photo.name.endswith('.jpg'))
         self.assertFalse(item.photo.name.endswith('.heic'))
+
+
+class JewelleryAccessControlTests(TestCase):
+    def setUp(self):
+        self.group = AccountGroup.objects.create(name="Household")
+        self.group.config.feature_jewellery = True
+        self.group.config.save()
+        self.spouse = User.objects.create_user(
+            username="spouse", password="pw-123456", user_type="ACCOUNT_HOLDER", group=self.group)
+        self.client = Client()
+        self.client.force_login(self.spouse)
+        session = self.client.session
+        session['portfolio_unlocked_at'] = time.time()
+        session.save()
+
+    def test_account_holder_cannot_add_or_edit(self):
+        item = JewelleryItem.objects.create(
+            group=self.group, category="RING", metal_type="GOLD", purity="22K", weight_grams=Decimal("5"))
+        add = self.client.post(reverse('add_jewellery'), {'category': 'RING'})
+        edit = self.client.post(reverse('edit_jewellery', args=[item.pk]), {'category': 'RING'})
+        self.assertEqual(add.status_code, 403)
+        self.assertEqual(edit.status_code, 403)
+
+    def test_disabled_feature_returns_404(self):
+        config = self.group.config
+        config.feature_jewellery = False
+        config.save()
+        self.assertEqual(self.client.get(reverse('jewellery_dashboard')).status_code, 404)

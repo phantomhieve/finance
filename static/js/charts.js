@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', function() {
     bodyColor: '#aaa',
     padding: 12,
     cornerRadius: 8,
-    callbacks: { label: function (c) { return ' \u20b9' + c.raw.toLocaleString('en-IN'); } }
+    callbacks: { label: function (c) { return ' \u20b9' + Math.round(c.raw).toLocaleString('en-IN'); } }
   };
 
   var legendDefault = {
@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
   var scaleOpts = {
     x: { grid: { display: false }, ticks: { color: 'rgba(128,128,128,0.45)' }, border: { display: false } },
-    y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: 'rgba(128,128,128,0.45)', callback: function (v) { return v >= 1e7 ? '\u20b9' + (v / 1e7).toFixed(1) + 'Cr' : v >= 1e5 ? '\u20b9' + (v / 1e5).toFixed(1) + 'L' : '\u20b9' + v.toLocaleString('en-IN'); } }, border: { display: false } }
+    y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: 'rgba(128,128,128,0.45)', callback: function (v) { return v >= 1e7 ? '\u20b9' + (v / 1e7).toFixed(1) + 'Cr' : v >= 1e5 ? '\u20b9' + (v / 1e5).toFixed(1) + 'L' : v >= 1e3 ? '\u20b9' + Math.round(v / 1e3) + 'K' : '\u20b9' + v.toLocaleString('en-IN'); } }, border: { display: false } }
   };
 
   // 1. Master/Baby Portfolio Doughnut

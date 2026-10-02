@@ -58,10 +58,6 @@ class User(AbstractUser):
         return self.user_type == 'PRIMARY'
 
     @property
-    def can_view_hra(self):
-        return True
-
-    @property
     def can_view_portfolio(self):
         return self.user_type == 'PRIMARY'
 

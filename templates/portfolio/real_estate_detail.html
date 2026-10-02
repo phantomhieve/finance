@@ -333,7 +333,7 @@ function openAddRealEstateModal() {
 function openValuationModal(id, name, valuation, vdate, rent, remarks) {
   var form = document.getElementById('valUpdateForm');
   form.action = "{% url 'update_real_estate_valuation' pk=0 %}".replace('/0/', '/' + id + '/');
-  document.getElementById('valModalTitle').innerHTML = '<span class="material-symbols-outlined text-success">price_change</span> Valuation — ' + name;
+  document.getElementById('valModalTitle').innerHTML = '<span class="material-symbols-outlined text-success">price_change</span> Valuation — ' + escapeHtml(name);
   form.querySelector('[name=current_valuation]').value = valuation || '';
   form.querySelector('[name=last_valuation_date]').value = vdate || new Date().toISOString().split('T')[0];
   form.querySelector('[name=monthly_rental_income]').value = rent || '0';
@@ -342,7 +342,7 @@ function openValuationModal(id, name, valuation, vdate, rent, remarks) {
 }
 
 function openLlmPromptModal(id, name) {
-  document.getElementById('llmPromptTitle').innerHTML = '<span class="material-symbols-outlined">psychology</span> AI Market Research — ' + name;
+  document.getElementById('llmPromptTitle').innerHTML = '<span class="material-symbols-outlined">psychology</span> AI Market Research — ' + escapeHtml(name);
   document.getElementById('llmPromptText').value = 'Loading prompt data...';
   document.getElementById('copyBtnText').textContent = 'Copy Prompt';
   openModal('llmPromptModal');

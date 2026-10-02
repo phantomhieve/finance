@@ -44,7 +44,7 @@ django.setup()
 # Now safe to import Django models and app code
 # ---------------------------------------------------------------------------
 from django.apps import apps as django_apps  # noqa: E402
-from django.db.models import Sum, Case, When  # noqa: E402
+from django.db.models import Sum  # noqa: E402
 
 from mcp.server import MCPServer  # noqa: E402
 from mcp.types import Icon  # noqa: E402
@@ -56,8 +56,7 @@ from tracker.models import (  # noqa: E402
     MonthlySavingsComment,
 )
 from portfolio.models import (  # noqa: E402
-    ZerodhaAccount, StockHolding, MutualFundHolding,
-    EPFEntry, NPSEntry, FixedDeposit, CashPosition,
+    ZerodhaAccount, EPFEntry, NPSEntry, FixedDeposit, CashPosition,
     BondHolding, CryptoHolding, CommodityHolding,
     CommodityPrice, MonthlySnapshot,
     FinancialGoal as PortfolioGoal, USStockHolding,
@@ -71,6 +70,7 @@ from portfolio.services import (  # noqa: E402
     get_growth_data as _fetch_growth_data,
 )
 from portfolio.ai import build_prompt_data, call_gemini  # noqa: E402
+from pftracker.utils import fy_start_from_label  # noqa: E402
 from mcp_server.models import MCPAuditLog  # noqa: E402
 from mcp_server.audit import (  # noqa: E402
     log_create, log_update, log_delete,
@@ -131,11 +131,6 @@ def _parse_decimal(value) -> Decimal:
         return Decimal(str(value))
     except (InvalidOperation, ValueError):
         return _ZERO
-
-
-def _qs_to_dicts(qs, fields):
-    """Convert a queryset to a list of dicts with specified fields."""
-    return list(qs.values(*fields))
 
 
 def _model_to_dict(instance, exclude=None):
@@ -507,6 +502,8 @@ def jewellery_items() -> str:
     """All jewellery items with estimated values."""
     group = _get_group()
     qs = JewelleryItem.objects.filter(group=group) if group else JewelleryItem.objects.all()
+    qs = list(qs)
+    JewelleryItem.attach_rates(qs)
     result = []
     for item in qs:
         d = _model_to_dict(item, exclude={'photo'})
@@ -1049,6 +1046,8 @@ def get_jewellery_items(
         qs = qs.filter(metal_type=metal_type.upper())
     if location:
         qs = qs.filter(location=location.upper())
+    qs = list(qs)
+    JewelleryItem.attach_rates(qs)
     result = []
     for item in qs:
         d = _model_to_dict(item, exclude={'photo'})
@@ -2115,20 +2114,25 @@ def update_real_estate_valuation(
 def add_portfolio_goal(
     label: str,
     target_amount: str,
+    financial_year: str = "",
     notes: str = "",
 ) -> str:
-    """Add a portfolio financial goal (milestone).
+    """Add a portfolio net-worth goal for an Indian financial year.
 
     Args:
-        label: Goal label (e.g. '50L', '1Cr')
+        label: Goal label (e.g. 'FY 2026-27 Target', '1Cr')
         target_amount: Target portfolio value in INR
+        financial_year: 'FY 2026-27' style label, or 'Long Term' (optional; blank = long term)
         notes: Optional notes
     """
+    if financial_year and financial_year != PortfolioGoal.LONG_TERM and fy_start_from_label(financial_year) is None:
+        return "Error: financial_year must look like 'FY 2026-27' or 'Long Term'."
     group = _get_group()
     goal = PortfolioGoal(
         group=group,
         label=label,
         target_amount=_parse_decimal(target_amount),
+        financial_year=financial_year,
         notes=notes,
     )
     goal.save()
@@ -2144,13 +2148,15 @@ def update_portfolio_goal(
     achieved_date: str = None,
     is_achieved: bool = None,
     notes: str = None,
+    financial_year: str = None,
 ) -> str:
-    """Update a portfolio financial milestone goal (e.g. 50L, 1Cr, 2Cr).
+    """Update a portfolio net-worth goal.
 
     Args:
         goal_id: ID of the PortfolioGoal
         label: Updated milestone label (e.g. '50L', '1Cr') (optional)
         target_amount: Updated target amount in INR (optional)
+        financial_year: 'FY 2026-27' style label or 'Long Term' (optional)
         achieved_date: Achievement date in YYYY-MM-DD format (optional)
         is_achieved: Mark as achieved (sets today's date) or unachieved (clears date) (optional)
         notes: Updated notes (optional)
@@ -2168,6 +2174,13 @@ def update_portfolio_goal(
         goal.target_amount = _parse_decimal(target_amount)
     if notes is not None:
         goal.notes = notes
+    if financial_year is not None:
+        if financial_year and financial_year != PortfolioGoal.LONG_TERM and fy_start_from_label(financial_year) is None:
+            return "Error: financial_year must look like 'FY 2026-27' or 'Long Term'."
+        if financial_year != goal.financial_year:
+            goal.financial_year = financial_year
+            goal.target_date = None
+            goal.closing_value = None
     if achieved_date is not None and achieved_date != "":
         goal.achieved_at = _parse_date(achieved_date)
     elif is_achieved is not None:
@@ -2328,8 +2341,16 @@ def delete_record(
     except (LookupError, ValueError) as exc:
         return f"Error: Cannot resolve model '{model_name}': {exc}"
 
+    group = _get_group()
+    field_names = {f.name for f in Model._meta.get_fields()}
+    if 'group' in field_names:
+        scope = {'group': group}
+    elif 'user' in field_names:
+        scope = {'user__group': group}
+    else:
+        return f"Error: '{model_name}' has no household scope."
     try:
-        obj = Model.objects.get(pk=record_id)
+        obj = Model.objects.get(pk=record_id, **scope)
     except Model.DoesNotExist:
         return f"Error: {model_name}#{record_id} not found."
 

@@ -1,3 +1,4 @@
+import calendar
 import datetime
 import logging
 from functools import wraps
@@ -13,7 +14,7 @@ from django.http import Http404, HttpResponseForbidden, JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from pftracker.utils import safe_redirect
+from pftracker.utils import feature_enabled, safe_redirect
 
 from .models import Transaction, HRAExpense, FinancialGoal, GoalIncrement, MonthlyGoalAdjustment, Note, MonthlySavingsComment
 from .forms import (
@@ -34,12 +35,12 @@ from .services import (
     current_fy_start_year,
     parse_fy_param,
     fy_label,
-    get_base_goal,
+    get_base_monthly_goal,
     get_fy_increments,
     get_fy_adjustments,
     apply_carry_forward,
     apply_monthly_adjustments,
-    aggregate_hra,
+    hra_spent as get_hra_spent,
     aggregate_transactions,
     group_user_filter,
 )
@@ -70,14 +71,8 @@ def _require_feature(feature_name):
     def decorator(view_func):
         @wraps(view_func)
         def wrapper(request, *args, **kwargs):
-            group = getattr(request.user, 'group', None)
-            if group:
-                try:
-                    config = group.config
-                    if not getattr(config, f'feature_{feature_name}', True):
-                        raise Http404
-                except Exception:
-                    pass
+            if not feature_enabled(request.user, feature_name):
+                raise Http404
             return view_func(request, *args, **kwargs)
         return wrapper
     return decorator
@@ -152,12 +147,9 @@ def dashboard(request):
 
     fy_goal_obj = FinancialGoal.objects.filter(gf, month=fc['fy_start_date']).first()
     if fy_goal_obj:
-        goal_obj = fy_goal_obj
-        total_goal = float(goal_obj.total_goal)
-        base_monthly = float(goal_obj.monthly_goal)
+        base_monthly = float(fy_goal_obj.monthly_goal)
     else:
-        goal_obj, total_goal, base_monthly = get_base_goal(request.user)
-        base_monthly = apply_carry_forward(request.user, fc['fy_start_date'], base_monthly)
+        base_monthly = apply_carry_forward(request.user, fc['fy_start_date'], get_base_monthly_goal(request.user))
 
     increments = get_fy_increments(request.user, fc['fy_start_date'], fc['fy_end_date'])
     adjustments = get_fy_adjustments(request.user, fc['fy_start_date'], fc['fy_end_date'])
@@ -167,19 +159,18 @@ def dashboard(request):
     total_goal = sum(per_month_goals.values())
 
     total_savings, total_transfers, total_income, total_expense = aggregate_transactions(transactions)
-    hra_spent, hra_additions, hra_net = aggregate_hra(
-        request.user, fc['fy_start_date'], fc['fy_end_date']
-    )
+    hra_spent = get_hra_spent(request.user, fc['fy_start_date'], fc['fy_end_date'])
 
     goal_achieved = total_savings + total_income + (total_transfers - hra_spent)
     goal_remaining = total_goal - goal_achieved
-    goal_pct = min(100, int((goal_achieved / total_goal) * 100)) if total_goal else 0
+    goal_pct = max(0, min(100, int((goal_achieved / total_goal) * 100))) if total_goal else 0
 
     monthly_data = _build_monthly_data(
         transactions, request.user, fy_start, today, per_month_goals
     )
+    pace = _savings_pace(monthly_data, goal_achieved, total_goal, today, fc['fy_start_date'], fc['fy_end_date'])
 
-    recent_transactions = transactions.order_by('-date')[:50]
+    fy_transactions = transactions.order_by('-date', '-id')
 
     txn_form = TransactionForm(initial={'date': today})
     goal_form = GoalIncrementForm()
@@ -192,15 +183,15 @@ def dashboard(request):
 
     dashboard_chart_data = {
         'months': [m['short'] for m in monthly_data],
-        'totals': [float(m['total']) if m.get('total') else 0 for m in monthly_data],
-        'goals': [float(m['goal']) for m in monthly_data],
-        'cumulative': [float(m['cumulative']) if m.get('cumulative') else 0 for m in monthly_data],
-        'cumulative_goals': [float(m['cumulative_goal']) if m.get('cumulative_goal') else 0 for m in monthly_data],
+        'totals': [m['total'] for m in monthly_data],
+        'goals': [m['goal'] for m in monthly_data],
+        # None stops the "saved" line at the current month instead of running flat to March
+        'cumulative': [m['cumulative'] if m['started'] else None for m in monthly_data],
+        'cumulative_goals': [m['cumulative_goal'] for m in monthly_data],
     }
 
     context = {
         **fc,
-        'current_fy_start': fc['current_fy'],
         'total_savings': total_savings,
         'total_transfers': total_transfers,
         'total_income': total_income,
@@ -209,13 +200,12 @@ def dashboard(request):
         'monthly_goal': base_monthly,
         'goal_achieved': goal_achieved,
         'goal_remaining': goal_remaining,
+        'goal_surplus': max(0.0, -goal_remaining),
         'goal_pct': goal_pct,
-        'hra_additions': hra_additions,
-        'hra_spent': hra_spent,
-        'hra_net': hra_net,
+        'pace': pace,
         'hra_balance': total_transfers - hra_spent,
         'monthly_data': monthly_data,
-        'recent_transactions': recent_transactions,
+        'transactions': fy_transactions,
         'txn_form': txn_form,
         'goal_form': goal_form,
         'adjust_form': adjust_form,
@@ -223,10 +213,34 @@ def dashboard(request):
         'fy_goal_form': fy_goal_form,
         'increments': increments,
         'adjustments': adjustments,
-        'goal_obj': goal_obj,
         'dashboard_chart_data': dashboard_chart_data,
     }
     return render(request, 'tracker/dashboard.html', context)
+
+
+def _savings_pace(monthly_data, achieved, total_goal, today, fy_start_date, fy_end_date):
+    """Where the FY stands against a steady month-by-month climb to the annual goal.
+
+    Open FY: gap vs the goal expected by today (current month pro-rated) and the monthly
+    amount still needed. Closed FY: final verdict. Future FY: None.
+    """
+    if today < fy_start_date:
+        return None
+    if today > fy_end_date:
+        gap = achieved - total_goal
+        return {'state': 'closed', 'hit': gap >= 0, 'gap': gap, 'gap_abs': abs(gap)}
+    idx = (today.month - 4) % 12
+    days_in_month = calendar.monthrange(today.year, today.month)[1]
+    expected = sum(m['goal'] for m in monthly_data[:idx]) + monthly_data[idx]['goal'] * today.day / days_in_month
+    months_left = 12 - idx
+    still_needed = max(0.0, total_goal - achieved)
+    return {
+        'state': 'open',
+        'gap': achieved - expected,
+        'gap_abs': abs(achieved - expected),
+        'months_left': months_left,
+        'need_per_month': still_needed / months_left,
+    }
 
 
 def _build_monthly_data(transactions, user, fy_start, today, per_month_goals):
@@ -238,18 +252,15 @@ def _build_monthly_data(transactions, user, fy_start, today, per_month_goals):
         .values('_y', '_m')
         .annotate(
             savings=Sum(Case(When(type='SAVINGS', then='amount'), default=Value(0), output_field=DecimalField())),
-            transfers=Sum(Case(When(type='TRANSFER', then='amount'), default=Value(0), output_field=DecimalField())),
             income=Sum(Case(When(type='EXTRA_INCOME', then='amount'), default=Value(0), output_field=DecimalField())),
             expense=Sum(Case(When(type='EXPENSE', then='amount'), default=Value(0), output_field=DecimalField())),
         )
     )
     agg_map = {(r['_y'], r['_m']): r for r in monthly_agg}
 
-    # Fetch all month comments for this user in this FY
-    fy_start_date = datetime.date(fy_start, 4, 1)
-    fy_end_date = datetime.date(fy_start + 1, 3, 31)
+    fy_start_date, fy_end_date = fy_date_range(fy_start)
     comments_qs = MonthlySavingsComment.objects.filter(
-        user=user, month__gte=fy_start_date, month__lte=fy_end_date,
+        group_user_filter(user), month__gte=fy_start_date, month__lte=fy_end_date,
     )
     comments_map = {(c.month.year, c.month.month): c for c in comments_qs}
 
@@ -265,7 +276,6 @@ def _build_monthly_data(transactions, user, fy_start, today, per_month_goals):
 
         row = agg_map.get((m_year, m_num), {})
         savings = float(row.get('savings') or 0)
-        transfers = float(row.get('transfers') or 0)
         income = float(row.get('income') or 0)
         expense = float(row.get('expense') or 0)
 
@@ -290,10 +300,6 @@ def _build_monthly_data(transactions, user, fy_start, today, per_month_goals):
         monthly_data.append({
             'name': month_name,
             'short': month_name[:3],
-            'savings': savings,
-            'transfers': transfers,
-            'income': income,
-            'expense': expense,
             'total': total_put,
             'cumulative': cumulative,
             'cumulative_goal': cumulative_goal,
@@ -303,7 +309,6 @@ def _build_monthly_data(transactions, user, fy_start, today, per_month_goals):
             'started': started,
             'pct': pct,
             'comment': comment_obj.comment if comment_obj else '',
-            'comment_id': comment_obj.id if comment_obj else None,
             'month_date': m_date.isoformat(),
         })
 

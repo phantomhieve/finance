@@ -104,12 +104,22 @@ class MCPRouterApp:
         await self.streamable_app(new_scope, receive, send)
 
 
+# CORS is scoped to /mcp only. Bearer tokens travel in headers, so cookies are never
+# needed cross-origin; Django routes get CORS from django-cors-headers (CORS_URLS_REGEX).
 mcp_app = Starlette(
     routes=[
         Mount("/", app=MCPRouterApp(sse_app, streamable_app))
     ],
     middleware=[
-        Middleware(OAuthBearerMiddleware)
+        Middleware(
+            CORSMiddleware,
+            allow_origins=["*"],
+            allow_credentials=False,
+            allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+            allow_headers=["*"],
+            expose_headers=["Mcp-Session-Id", "WWW-Authenticate"],
+        ),
+        Middleware(OAuthBearerMiddleware),
     ]
 )
 
@@ -132,7 +142,7 @@ class NoBufferMiddleware:
         return await self.app(scope, receive, custom_send)
 
 
-# 4. Mount together with top-level CORS and Lifespan
+# 4. Mount together with Lifespan
 application = Starlette(
     routes=[
         Mount("/mcp", app=mcp_app),
@@ -140,14 +150,6 @@ application = Starlette(
     ],
     middleware=[
         Middleware(NoBufferMiddleware),
-        Middleware(
-            CORSMiddleware,
-            allow_origins=["*"],
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
-            expose_headers=["*"],
-        )
     ],
     lifespan=lifespan
 )
