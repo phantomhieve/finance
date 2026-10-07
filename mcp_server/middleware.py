@@ -2,7 +2,7 @@ import json
 import logging
 
 from asgiref.sync import sync_to_async
-from starlette.datastructures import Headers, QueryParams
+from starlette.datastructures import Headers
 from starlette.responses import JSONResponse, Response
 
 logger = logging.getLogger(__name__)
@@ -32,6 +32,10 @@ def get_token_scopes(token_string: str):
     served = AccountGroup.objects.first()  # mirrors server._get_group()
     if served is None or user.group_id != served.pk:
         logger.warning("MCP token rejected: user is outside the served household")
+        return None
+    # MCP tools expose the whole portfolio, which only the primary holder may see.
+    if not getattr(user, 'can_view_portfolio', False):
+        logger.warning("MCP token rejected: user is not the household's primary holder")
         return None
     return set((token.scope or '').split())
 
@@ -86,16 +90,12 @@ class OAuthBearerMiddleware:
             return
 
         headers = Headers(scope=scope)
-        query_params = QueryParams(scope.get("query_string", b"").decode("latin-1"))
 
+        # Header only: tokens in the query string end up in proxy and access logs.
         token_string = None
         auth_header = headers.get("authorization")
         if auth_header and auth_header.lower().startswith("bearer "):
             token_string = auth_header[7:].strip()
-        elif "token" in query_params:
-            token_string = query_params["token"]
-        elif "access_token" in query_params:
-            token_string = query_params["access_token"]
 
         server_host = headers.get("host", "localhost:8000")
         scheme = "https" if headers.get("x-forwarded-proto") == "https" else scope.get("scheme", "https")

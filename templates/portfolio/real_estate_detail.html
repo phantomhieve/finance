@@ -31,14 +31,14 @@
     <div class="flex flex-wrap items-center justify-between gap-6">
       <div>
         <p class="text-[10px] font-bold uppercase tracking-widest opacity-40">Total Real Estate Valuation</p>
-        <p class="text-3xl lg:text-4xl font-extrabold mt-1 text-base-content">₹{{ total_current|floatformat:0|indian_number }}</p>
+        <p class="text-3xl lg:text-4xl font-extrabold mt-1 text-base-content">{{ total_current|inr }}</p>
         <div class="mt-2 flex flex-wrap items-center gap-2">
           <span class="badge {% if total_pnl >= 0 %}badge-success{% else %}badge-error{% endif %} badge-sm gap-1">
-            {% if total_pnl >= 0 %}+{% endif %}₹{{ total_pnl|floatformat:0|indian_number }} ({{ pnl_pct }}%) Total P&amp;L
+            {% if total_pnl >= 0 %}+{% endif %}{{ total_pnl|inr }} ({{ pnl_pct }}%) Total P&amp;L
           </span>
           {% if annual_rental > 0 %}
           <span class="badge badge-info badge-sm gap-1">
-            <span class="material-symbols-outlined text-xs">key</span> ₹{{ total_rental|floatformat:0|indian_number }}/mo ({{ portfolio_yield }}% Yield)
+            <span class="material-symbols-outlined text-xs">key</span> {{ total_rental|inr }}/mo ({{ portfolio_yield }}% Yield)
           </span>
           {% endif %}
         </div>
@@ -46,17 +46,17 @@
       <div class="flex flex-wrap gap-3">
         <div class="stat-card">
           <div class="text-[10px] uppercase tracking-wider opacity-50">Total Cost Basis</div>
-          <div class="text-base font-bold mt-0.5">₹{{ total_invested|floatformat:0|indian_number }}</div>
+          <div class="text-base font-bold mt-0.5">{{ total_invested|inr }}</div>
         </div>
         <div class="stat-card stat-card-success">
           <div class="text-[10px] uppercase tracking-wider opacity-50">Unrealized Gain</div>
           <div class="text-base font-bold mt-0.5 {% if total_pnl >= 0 %}text-success{% else %}text-error{% endif %}">
-            {% if total_pnl >= 0 %}+{% endif %}₹{{ total_pnl|floatformat:0|indian_number }}
+            {% if total_pnl >= 0 %}+{% endif %}{{ total_pnl|inr }}
           </div>
         </div>
         <div class="stat-card">
           <div class="text-[10px] uppercase tracking-wider opacity-50">Annual Rental</div>
-          <div class="text-base font-bold mt-0.5 text-primary">₹{{ annual_rental|floatformat:0|indian_number }}</div>
+          <div class="text-base font-bold mt-0.5 text-primary">{{ annual_rental|inr }}</div>
         </div>
       </div>
     </div>
@@ -119,22 +119,22 @@
               <div class="text-xs opacity-50">{{ p.area_in_sqft|floatformat:0|indian_number }} sq.ft</div>
             </td>
             <td class="text-right" data-val="{{ p.total_cost_basis }}">
-              <div class="font-semibold">₹{{ p.total_cost_basis|floatformat:0|indian_number }}</div>
+              <div class="font-semibold">{{ p.total_cost_basis|inr }}</div>
               <div class="text-[11px] opacity-40">{{ p.purchase_date|date:"M Y" }}</div>
             </td>
             <td class="text-right font-bold" data-val="{{ p.current_valuation }}">
-              <div class="text-primary font-bold">₹{{ p.current_valuation|floatformat:0|indian_number }}</div>
+              <div class="text-primary font-bold">{{ p.current_valuation|inr }}</div>
               {% if p.monthly_rental_income > 0 %}
-              <div class="text-[11px] text-info">₹{{ p.monthly_rental_income|floatformat:0|indian_number }}/mo ({{ p.rental_yield_pct }}%)</div>
+              <div class="text-[11px] text-info">{{ p.monthly_rental_income|inr }}/mo ({{ p.rental_yield_pct }}%)</div>
               {% endif %}
             </td>
             <td class="text-right font-semibold" data-val="{{ p.current_rate_per_gaj }}">
-              ₹{{ p.current_rate_per_gaj|floatformat:0|indian_number }}/Gaj
-              <div class="text-[11px] opacity-40">Bought: ₹{{ p.purchase_rate_per_gaj|floatformat:0|indian_number }}</div>
+              {{ p.current_rate_per_gaj|inr }}/Gaj
+              <div class="text-[11px] opacity-40">Bought: {{ p.purchase_rate_per_gaj|inr }}</div>
             </td>
             <td class="text-right font-semibold" data-val="{{ p.pnl }}">
               <span class="{% if p.pnl >= 0 %}text-success{% else %}text-error{% endif %}">
-                {% if p.pnl >= 0 %}+{% endif %}₹{{ p.pnl|floatformat:0|indian_number }}
+                {% if p.pnl >= 0 %}+{% endif %}{{ p.pnl|inr }}
               </span>
               <div class="text-[11px] {% if p.pnl >= 0 %}text-success{% else %}text-error{% endif %}">
                 {% if p.pnl >= 0 %}+{% endif %}{{ p.pnl_pct }}%
@@ -165,11 +165,11 @@
           <tr class="total-row border-t-2 border-base-300">
             <td class="font-bold text-primary">Total ({{ holdings|length }} properties)</td>
             <td colspan="2"></td>
-            <td class="text-right font-bold text-primary" data-val="{{ total_invested }}">₹{{ total_invested|floatformat:0|indian_number }}</td>
-            <td class="text-right font-bold text-primary" data-val="{{ total_current }}">₹{{ total_current|floatformat:0|indian_number }}</td>
+            <td class="text-right font-bold text-primary" data-val="{{ total_invested }}">{{ total_invested|inr }}</td>
+            <td class="text-right font-bold text-primary" data-val="{{ total_current }}">{{ total_current|inr }}</td>
             <td></td>
             <td class="text-right font-bold {% if total_pnl >= 0 %}text-success{% else %}text-error{% endif %}" data-val="{{ total_pnl }}">
-              {% if total_pnl >= 0 %}+{% endif %}₹{{ total_pnl|floatformat:0|indian_number }}
+              {% if total_pnl >= 0 %}+{% endif %}{{ total_pnl|inr }}
             </td>
             <td colspan="2"></td>
           </tr>
@@ -217,16 +217,16 @@
         <div class="grid grid-cols-3 gap-2 text-xs pt-1 border-t border-base-content/5">
           <div>
             <span class="opacity-50 text-[10px] uppercase">Cost Basis</span>
-            <div class="font-semibold">₹{{ p.total_cost_basis|floatformat:0|indian_number }}</div>
+            <div class="font-semibold">{{ p.total_cost_basis|inr }}</div>
           </div>
           <div>
             <span class="opacity-50 text-[10px] uppercase">Current Val</span>
-            <div class="font-bold text-primary">₹{{ p.current_valuation|floatformat:0|indian_number }}</div>
+            <div class="font-bold text-primary">{{ p.current_valuation|inr }}</div>
           </div>
           <div>
             <span class="opacity-50 text-[10px] uppercase">Returns</span>
             <div class="font-semibold {% if p.pnl >= 0 %}text-success{% else %}text-error{% endif %}">
-              {% if p.pnl >= 0 %}+{% endif %}₹{{ p.pnl|floatformat:0|indian_number }}
+              {% if p.pnl >= 0 %}+{% endif %}{{ p.pnl|inr }}
             </div>
           </div>
         </div>

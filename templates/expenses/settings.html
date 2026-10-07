@@ -1,0 +1,189 @@
+{% extends 'base.html' %}
+
+{% block title %}Expense settings — Vault{% endblock %}
+
+{% block page_header %}
+<div class="flex items-start justify-between gap-3">
+  <div>
+    <p class="text-xs font-bold tracking-widest uppercase text-orange-400">Expenses</p>
+    <h1 class="text-xl lg:text-2xl font-extrabold">Settings</h1>
+  </div>
+  <a href="{% url 'expenses_home' %}" class="btn btn-ghost btn-sm gap-1"><span class="material-symbols-outlined text-base">arrow_back</span>Expenses</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="flex gap-2 overflow-x-auto scrollbar-hide pb-1 mb-4">
+  <a href="#gmail" class="filter-pill"><span class="material-symbols-outlined text-sm">mail</span>Gmail</a>
+  <a href="#cards" class="filter-pill"><span class="material-symbols-outlined text-sm">credit_card</span>Cards &amp; accounts</a>
+  <a href="#categories" class="filter-pill"><span class="material-symbols-outlined text-sm">category</span>Categories</a>
+  <a href="#rules" class="filter-pill"><span class="material-symbols-outlined text-sm">auto_awesome</span>Learned rules</a>
+</div>
+
+<div class="flex flex-col gap-6 max-w-3xl">
+
+{# ——— Gmail ——— #}
+<section id="gmail" class="scroll-mt-20 animate-up">
+  <div class="flex items-center justify-between mb-2">
+    <h2 class="section-group-header !mb-0">Connected inboxes</h2>
+    {% if gmail_configured %}
+    <a href="{% url 'expenses_gmail_connect' %}" class="btn btn-primary btn-sm gap-1"><span class="material-symbols-outlined text-base">add</span>{% if accounts %}Add another inbox{% else %}Connect Gmail{% endif %}</a>
+    {% endif %}
+  </div>
+  {% if gmail_configured %}
+  <p class="text-xs opacity-50 mb-2">Connect as many inboxes as you like — yours, your partner's, an old address your bank still emails. Tap the button once per inbox and pick the account in Google's chooser; each one syncs on its own and all their spends roll into one household view.</p>
+  {% endif %}
+
+  {% if not gmail_configured %}
+  <div class="alert alert-warning alert-soft text-sm items-start mb-2">
+    <span class="material-symbols-outlined">key_off</span>
+    <div>
+      <p class="font-semibold">Gmail isn't configured on this server yet</p>
+      <p class="text-xs opacity-80 mt-1">Enable the Gmail API in the same Google Cloud project used for sign-in, add the <code>gmail.readonly</code> scope to the consent screen, publish it "In production", and add this redirect URI to the OAuth client:</p>
+      <code class="text-[11px] break-all block mt-1 opacity-90">{{ redirect_uri }}</code>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="flex flex-col gap-2">
+    {% for a in accounts %}
+    <div class="table-card">
+      <div class="flex items-center gap-3">
+        <span class="jw-type-avatar" style="--h:{% if a.needs_reconnect %}0{% else %}265{% endif %}"><span class="icon-filled material-symbols-outlined">{% if a.needs_reconnect %}sync_problem{% else %}mail{% endif %}</span></span>
+        <div class="flex-1 min-w-0">
+          <p class="font-semibold text-sm truncate">{{ a.email }}</p>
+          <p class="text-[11px] opacity-55 truncate">
+            {{ a.user.first_name|default:a.user.username }} ·
+            {% if a.needs_reconnect %}<span class="text-error">needs reconnecting</span>
+            {% elif a.last_synced_at %}synced {{ a.last_synced_at|timesince }} ago{% if a.last_sync_new %} · {{ a.last_sync_new }} new{% endif %}
+            {% else %}first import pending{% endif %}
+          </p>
+        </div>
+        <div class="flex items-center gap-1 shrink-0">
+          {% if a.needs_reconnect %}
+          <a href="{% url 'expenses_gmail_connect' %}?hint={{ a.email|urlencode }}" class="btn btn-error btn-xs">Reconnect</a>
+          {% else %}
+          <form method="post" action="{% url 'expenses_gmail_sync' a.pk %}">{% csrf_token %}
+            <button class="btn btn-ghost btn-xs gap-1" title="Sync now" aria-label="Sync {{ a.email }} now"><span class="material-symbols-outlined text-sm">sync</span><span class="hidden sm:inline">Sync</span></button>
+          </form>
+          {% endif %}
+          {% if a.user_id == user.pk or user.is_primary %}
+          <form method="post" action="{% url 'expenses_gmail_disconnect' a.pk %}" id="gmailDisc{{ a.pk }}">{% csrf_token %}</form>
+          <button type="button" class="btn btn-ghost btn-xs text-error" title="Disconnect" aria-label="Disconnect {{ a.email }}" onclick="confirmDelete('gmailDisc{{ a.pk }}', 'Disconnect {{ a.email|escapejs }}? Vault will stop reading it and revoke access. Imported expenses are kept.')">
+            <span class="material-symbols-outlined text-sm">link_off</span>
+          </button>
+          {% endif %}
+        </div>
+      </div>
+      {% if a.last_error and not a.needs_reconnect %}<p class="text-[11px] text-warning mt-2">Last sync: {{ a.last_error|truncatechars:140 }}</p>{% endif %}
+    </div>
+    {% empty %}
+    <div class="table-card text-sm opacity-70">
+      <p class="font-semibold mb-1">No inboxes connected</p>
+      <p class="text-xs opacity-80">Each household member can connect their own Gmail. Vault asks for <strong>read-only</strong> access, only looks at bank &amp; card emails, and never stores the email itself — just the parsed transaction.</p>
+    </div>
+    {% endfor %}
+  </div>
+</section>
+
+{# ——— Cards ——— #}
+<section id="cards" class="scroll-mt-20 animate-up" style="animation-delay:.05s">
+  <h2 class="section-group-header">Cards &amp; accounts</h2>
+  <p class="text-xs opacity-50 -mt-1 mb-2">Detected automatically from alerts. Save a card's statement password so PDF statements can be matched against your expenses.</p>
+  <div class="flex flex-col gap-2">
+    {% for s in sources %}
+    <details class="table-card group">
+      <summary class="flex items-center gap-3 cursor-pointer list-none">
+        <span class="jw-type-avatar" style="--h:{% if s.kind == 'CREDIT_CARD' %}210{% elif s.kind == 'BANK_ACCOUNT' %}150{% else %}40{% endif %}"><span class="icon-filled material-symbols-outlined">{{ s.icon }}</span></span>
+        <div class="flex-1 min-w-0">
+          <p class="font-semibold text-sm truncate">{{ s.display_name }}</p>
+          <p class="text-[11px] opacity-55 truncate">{{ s.get_kind_display }}{% if s.owner %} · {{ s.owner.first_name|default:s.owner.username }}{% endif %} · {{ s.n }} txn{{ s.n|pluralize }}</p>
+        </div>
+        {% if s.kind == 'CREDIT_CARD' %}
+        <span class="badge badge-xs {% if s.statement_password_enc %}badge-success{% else %}badge-ghost{% endif %} badge-soft gap-1"><span class="material-symbols-outlined text-[12px]">{% if s.statement_password_enc %}lock_open{% else %}lock{% endif %}</span>PDF</span>
+        {% endif %}
+        <span class="material-symbols-outlined opacity-40 group-open:rotate-180 transition-transform">expand_more</span>
+      </summary>
+      <form method="post" action="{% url 'expenses_source_edit' s.pk %}" class="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-base-content/5">
+        {% csrf_token %}
+        {% include 'expenses/_source_fields.html' with s=s %}
+        <div class="col-span-2 flex justify-end"><button class="btn btn-primary btn-sm">Save</button></div>
+      </form>
+    </details>
+    {% endfor %}
+    <details class="table-card group">
+      <summary class="flex items-center gap-2 cursor-pointer list-none text-sm font-semibold text-primary">
+        <span class="material-symbols-outlined">add</span>Add a card or account
+      </summary>
+      <form method="post" action="{% url 'expenses_source_add' %}" class="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-base-content/5">
+        {% csrf_token %}
+        {% include 'expenses/_source_fields.html' with s=None %}
+        <div class="col-span-2 flex justify-end"><button class="btn btn-primary btn-sm">Add</button></div>
+      </form>
+    </details>
+  </div>
+</section>
+
+{# ——— Categories ——— #}
+<section id="categories" class="scroll-mt-20 animate-up" style="animation-delay:.1s">
+  <h2 class="section-group-header">Categories</h2>
+  <p class="text-xs opacity-50 -mt-1 mb-2"><strong>Transfer</strong> categories (investments, card bill payments) are tracked but never counted as spend, so nothing is double-counted.</p>
+  <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+    {% for c in categories %}
+    <details class="table-card group">
+      <summary class="flex items-center gap-3 cursor-pointer list-none">
+        <span class="jw-type-avatar" style="--h:{{ c.hue }};width:2.25rem;height:2.25rem;border-radius:.7rem"><span class="icon-filled material-symbols-outlined text-lg">{{ c.icon }}</span></span>
+        <div class="flex-1 min-w-0">
+          <p class="font-semibold text-sm truncate">{{ c.name }}</p>
+          <p class="text-[11px] opacity-55">{{ c.get_kind_display }} · {{ c.n }} txn{{ c.n|pluralize }}</p>
+        </div>
+        <span class="material-symbols-outlined opacity-40 group-open:rotate-180 transition-transform">expand_more</span>
+      </summary>
+      <form method="post" action="{% url 'expenses_category_edit' c.pk %}" class="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-base-content/5">
+        {% csrf_token %}
+        {% include 'expenses/_category_fields.html' with c=c %}
+        <div class="col-span-2 flex justify-between">
+          <button type="button" class="btn btn-ghost btn-sm text-error" onclick="confirmDelete('catDel{{ c.pk }}', 'Delete {{ c.name|escapejs }}? Its {{ c.n }} transaction{{ c.n|pluralize }} will become uncategorised.')">Delete</button>
+          <button class="btn btn-primary btn-sm">Save</button>
+        </div>
+      </form>
+      <form method="post" action="{% url 'expenses_category_delete' c.pk %}" id="catDel{{ c.pk }}" class="hidden">{% csrf_token %}</form>
+    </details>
+    {% endfor %}
+    <details class="table-card group">
+      <summary class="flex items-center gap-2 cursor-pointer list-none text-sm font-semibold text-primary">
+        <span class="material-symbols-outlined">add</span>New category
+      </summary>
+      <form method="post" action="{% url 'expenses_category_add' %}" class="grid grid-cols-2 gap-3 mt-3 pt-3 border-t border-base-content/5">
+        {% csrf_token %}
+        {% include 'expenses/_category_fields.html' with c=None %}
+        <div class="col-span-2 flex justify-end"><button class="btn btn-primary btn-sm">Add</button></div>
+      </form>
+    </details>
+  </div>
+</section>
+
+{# ——— Rules ——— #}
+<section id="rules" class="scroll-mt-20 animate-up" style="animation-delay:.15s">
+  <h2 class="section-group-header">Learned rules</h2>
+  <p class="text-xs opacity-50 -mt-1 mb-2">When you change a transaction's category, Vault remembers it for that merchant. <span class="badge badge-xs badge-primary badge-soft">You</span> rules always win; <span class="badge badge-xs badge-ghost">AI</span> rules are cached guesses.</p>
+  {% if rules %}
+  <div class="flex flex-col gap-1.5">
+    {% for r in rules %}
+    <div class="table-card flex items-center gap-3 !py-2.5">
+      <span class="badge badge-xs {% if r.source == 'USER' %}badge-primary badge-soft{% else %}badge-ghost{% endif %} w-9 justify-center">{% if r.source == 'USER' %}You{% else %}AI{% endif %}</span>
+      <span class="text-sm font-semibold truncate flex-1 min-w-0">{{ r.merchant_label|default:r.merchant_key }}</span>
+      <span class="material-symbols-outlined text-sm opacity-30">arrow_forward</span>
+      <span class="text-sm truncate max-w-[40%]">{{ r.category.name }}</span>
+      <form method="post" action="{% url 'expenses_rule_delete' r.pk %}">{% csrf_token %}
+        <button class="btn btn-ghost btn-xs btn-square" title="Forget" aria-label="Forget rule"><span class="material-symbols-outlined text-sm">close</span></button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-sm opacity-50">Nothing learned yet — edit a transaction's category to teach Vault.</p>
+  {% endif %}
+</section>
+</div>
+{% endblock %}

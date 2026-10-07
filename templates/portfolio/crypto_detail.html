@@ -24,21 +24,21 @@
     <div class="flex flex-wrap items-center gap-8">
       <div>
         <p class="text-[10px] font-bold uppercase tracking-widest opacity-40">Total Current Value</p>
-        <p class="text-3xl lg:text-4xl font-extrabold mt-1">₹{{ total_current|floatformat:0|indian_number }}</p>
+        <p class="text-3xl lg:text-4xl font-extrabold mt-1">{{ total_current|inr }}</p>
         <div class="mt-2">
           <span class="badge {% if total_pnl >= 0 %}badge-success{% else %}badge-error{% endif %} badge-sm gap-1">
-            {% if total_pnl >= 0 %}+{% endif %}₹{{ total_pnl|floatformat:0|indian_number }} total P&amp;L
+            {% if total_pnl >= 0 %}+{% endif %}{{ total_pnl|inr }} total P&amp;L
           </span>
         </div>
       </div>
       <div class="flex flex-wrap gap-4">
         <div class="stat-card">
           <div class="text-[10px] uppercase tracking-wider opacity-50">Total Invested</div>
-          <div class="text-base font-bold mt-0.5">₹{{ total_invested|floatformat:0|indian_number }}</div>
+          <div class="text-base font-bold mt-0.5">{{ total_invested|inr }}</div>
         </div>
         <div class="stat-card stat-card-success">
           <div class="text-[10px] uppercase tracking-wider opacity-50">Total P&amp;L</div>
-          <div class="text-base font-bold mt-0.5 font-semibold {% if total_pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if total_pnl >= 0 %}+{% endif %}₹{{ total_pnl|floatformat:0|indian_number }}</div>
+          <div class="text-base font-bold mt-0.5 font-semibold {% if total_pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if total_pnl >= 0 %}+{% endif %}{{ total_pnl|inr }}</div>
         </div>
       </div>
     </div>
@@ -66,9 +66,9 @@
           {% for c in holdings %}
           <tr class="hover">
             <td class="font-semibold">{{ c.name }}</td>
-            <td class="text-right" data-val="{{ c.amount_invested }}">₹{{ c.amount_invested|floatformat:0|indian_number }}</td>
-            <td class="text-right font-semibold" data-val="{{ c.current_value }}">₹{{ c.current_value|floatformat:0|indian_number }}</td>
-            <td class="text-right font-semibold" data-val="{{ c.pnl }}"><span class="{% if c.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if c.pnl >= 0 %}+{% endif %}₹{{ c.pnl|floatformat:0|indian_number }}</span></td>
+            <td class="text-right" data-val="{{ c.amount_invested }}">{{ c.amount_invested|inr }}</td>
+            <td class="text-right font-semibold" data-val="{{ c.current_value }}">{{ c.current_value|inr }}</td>
+            <td class="text-right font-semibold" data-val="{{ c.pnl }}"><span class="{% if c.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if c.pnl >= 0 %}+{% endif %}{{ c.pnl|inr }}</span></td>
             <td class="opacity-60 text-sm">{{ c.remarks|default:"—" }}</td>
             <td class="text-right">
               <button type="button" class="btn btn-ghost btn-xs btn-square" data-edit-crypto data-id="{{ c.id }}" data-name="{{ c.name }}" data-invested="{{ c.amount_invested }}" data-current="{{ c.current_value }}" data-remarks="{{ c.remarks|default:'' }}"><span class="material-symbols-outlined text-base">edit</span></button>
@@ -77,9 +77,9 @@
           {% endfor %}
           <tr class="total-row border-t-2 border-base-300">
             <td class="font-bold text-primary">Total</td>
-            <td class="text-right font-bold text-primary" data-val="{{ total_invested }}">₹{{ total_invested|floatformat:0|indian_number }}</td>
-            <td class="text-right font-bold text-primary" data-val="{{ total_current }}">₹{{ total_current|floatformat:0|indian_number }}</td>
-            <td class="text-right font-bold {% if total_pnl >= 0 %}text-success{% else %}text-error{% endif %}" data-val="{{ total_pnl }}">{% if total_pnl >= 0 %}+{% endif %}₹{{ total_pnl|floatformat:0|indian_number }}</td>
+            <td class="text-right font-bold text-primary" data-val="{{ total_invested }}">{{ total_invested|inr }}</td>
+            <td class="text-right font-bold text-primary" data-val="{{ total_current }}">{{ total_current|inr }}</td>
+            <td class="text-right font-bold {% if total_pnl >= 0 %}text-success{% else %}text-error{% endif %}" data-val="{{ total_pnl }}">{% if total_pnl >= 0 %}+{% endif %}{{ total_pnl|inr }}</td>
             <td colspan="2"></td>
           </tr>
         </tbody>
@@ -94,15 +94,15 @@
           <button type="button" class="btn btn-ghost btn-xs btn-square shrink-0" data-edit-crypto data-id="{{ c.id }}" data-name="{{ c.name }}" data-invested="{{ c.amount_invested }}" data-current="{{ c.current_value }}" data-remarks="{{ c.remarks|default:'' }}"><span class="material-symbols-outlined text-base">edit</span></button>
         </div>
         <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
-          <div><span class="opacity-50">Invested</span><div class="font-semibold mt-0.5">₹{{ c.amount_invested|floatformat:0|indian_number }}</div></div>
-          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5">₹{{ c.current_value|floatformat:0|indian_number }}</div></div>
-          <div><span class="opacity-50">P&L</span><div class="font-semibold mt-0.5 {% if c.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if c.pnl >= 0 %}+{% endif %}₹{{ c.pnl|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">Invested</span><div class="font-semibold mt-0.5">{{ c.amount_invested|inr }}</div></div>
+          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5">{{ c.current_value|inr }}</div></div>
+          <div><span class="opacity-50">P&L</span><div class="font-semibold mt-0.5 {% if c.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if c.pnl >= 0 %}+{% endif %}{{ c.pnl|inr }}</div></div>
         </div>
       </div>
       {% endfor %}
       <div class="flex items-center justify-between px-1 pt-2 border-t border-base-300 text-sm">
         <span class="font-bold text-primary">Total</span>
-        <span class="font-bold">₹{{ total_invested|floatformat:0|indian_number }} → <span class="text-primary">₹{{ total_current|floatformat:0|indian_number }}</span></span>
+        <span class="font-bold">{{ total_invested|inr }} → <span class="text-primary">{{ total_current|inr }}</span></span>
       </div>
     </div>
     {% else %}

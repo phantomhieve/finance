@@ -9,7 +9,9 @@ def household_config(request):
         return {}
     group = getattr(request.user, 'group', None)
     if not group:
-        return {}
+        # Unsaved defaults, matching feature_enabled() which allows everything without a group.
+        from tracker.models import HouseholdConfig
+        return {'household_config': HouseholdConfig()}
     try:
         config = group.config
     except Exception:

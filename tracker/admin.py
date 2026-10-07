@@ -47,7 +47,7 @@ class HouseholdConfigInline(admin.StackedInline):
             'fields': (
                 'feature_savings', 'feature_portfolio', 'feature_jewellery',
                 'feature_hra', 'feature_notes', 'feature_real_estate',
-                'feature_ai_insights',
+                'feature_ai_insights', 'feature_expenses',
             ),
         }),
         ('Google Sheets Credentials', {

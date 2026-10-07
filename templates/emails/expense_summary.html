@@ -1,0 +1,139 @@
+{% extends "emails/_base.html" %}
+{% load indian_format %}
+
+{% block title %}Household spend · {{ month }}{% endblock %}
+
+{% block preheader %}{{ summary.total|inr }} spent in {{ month }}{% if summary.delta_pct is not None %} · {% if summary.delta > 0 %}+{% endif %}{{ summary.delta_pct }}% vs last month{% endif %}{% if flagged %} · {{ flagged|length }} to review{% endif %}{% endblock %}
+
+{% block eyebrow %}Spend · {{ month }}{% endblock %}
+
+{% block content %}
+
+<p class="em-muted" style="margin:0 0 6px 0; font-size:13px; color:#64748b;">Household spend detected from bank &amp; card emails</p>
+<p class="em-hero em-text num" style="margin:0; font-size:40px; line-height:46px; font-weight:800; color:#0f172a; letter-spacing:-0.5px;">{{ summary.total|inr }}</p>
+{% if summary.delta_pct is not None %}
+<p style="margin:10px 0 0 0; font-size:14px; line-height:20px;">
+  <span class="num" style="display:inline-block; padding:3px 10px; border-radius:999px; font-weight:700; {% if summary.delta > 0 %}background-color:#fef2f2; color:#b91c1c;{% else %}background-color:#ecfdf5; color:#047857;{% endif %}">{% if summary.delta > 0 %}&#9650; +{% else %}&#9660; {% endif %}{{ summary.delta|inr_short }} ({% if summary.delta > 0 %}+{% endif %}{{ summary.delta_pct }}%)</span>
+  <span class="em-muted" style="color:#64748b;">&nbsp;vs {{ summary.prev_total|inr_short }} last month</span>
+</p>
+{% endif %}
+
+{# ── KPI strip ── #}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:24px;">
+<tr>
+  <td class="em-stack" width="33%" valign="top" style="padding-right:6px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="em-soft" style="background-color:#f8fafc; border-radius:10px; padding:14px;">
+      <p class="em-muted" style="margin:0; font-size:11px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; color:#64748b;">Transactions</p>
+      <p class="em-text num" style="margin:4px 0 0 0; font-size:18px; font-weight:700; color:#0f172a;">{{ summary.count }}</p>
+    </td></tr></table>
+  </td>
+  <td class="em-stack" width="34%" valign="top" style="padding:0 3px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="em-soft" style="background-color:#f8fafc; border-radius:10px; padding:14px;">
+      <p class="em-muted" style="margin:0; font-size:11px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; color:#64748b;">Money in</p>
+      <p class="num" style="margin:4px 0 0 0; font-size:18px; font-weight:700; color:#047857;">{{ summary.income|inr_short }}</p>
+    </td></tr></table>
+  </td>
+  <td class="em-stack" width="33%" valign="top" style="padding-left:6px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="em-soft" style="background-color:#f8fafc; border-radius:10px; padding:14px;">
+      <p class="em-muted" style="margin:0; font-size:11px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; color:#64748b;">Invested / moved</p>
+      <p class="em-text num" style="margin:4px 0 0 0; font-size:18px; font-weight:700; color:#0f172a;">{{ summary.transfers|inr_short }}</p>
+    </td></tr></table>
+  </td>
+</tr>
+</table>
+
+{# ── Suspicious ── #}
+{% if flagged %}
+{% include "emails/_section.html" with title="Worth a second look" %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td style="background-color:#fffbeb; border-radius:12px; padding:6px 16px;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+  {% for e in flagged %}
+  <tr>
+    <td style="padding:10px 0;{% if not forloop.last %} border-bottom:1px solid #fde68a;{% endif %}">
+      <p style="margin:0; font-size:14px; font-weight:700; color:#0f172a;">{{ e.merchant|default:"Unknown" }}</p>
+      <p style="margin:2px 0 0 0; font-size:12px; line-height:17px; color:#92400e;">{{ e.txn_date|date:"j M" }}{% if e.payment_source %} · {{ e.payment_source.display_name }}{% endif %} — {{ e.flag_reasons|join:"; " }}</p>
+    </td>
+    <td align="right" valign="top" class="num" style="padding:10px 0 10px 12px; font-size:14px; font-weight:700; color:#0f172a; white-space:nowrap;{% if not forloop.last %} border-bottom:1px solid #fde68a;{% endif %}">{% if e.currency != 'INR' %}{{ e.currency }} {{ e.amount|floatformat:2 }}{% else %}{{ e.amount|inr }}{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </table>
+</td></tr></table>
+<p class="em-muted" style="margin:8px 0 0 0; font-size:12px; color:#64748b;">{% if flagged_more %}And {{ flagged_more }} more. {% endif %}Don't recognise one? Call your bank right away.{% if flagged_url %} <a href="{{ flagged_url }}">Review in Vault</a>{% endif %}</p>
+{% endif %}
+
+{# ── Categories ── #}
+{% if summary.categories %}
+{% include "emails/_section.html" with title="Where it went" %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+  {% for c in summary.categories|slice:":10" %}
+  <tr>
+    <td width="38%" style="padding:7px 10px 7px 0;">
+      <span class="em-text" style="font-size:14px; font-weight:600; color:#0f172a;">{{ c.name }}</span><br>
+      <span class="em-muted" style="font-size:12px; color:#64748b;">{{ c.count }} txn{{ c.count|pluralize }}{% if c.prev %} · last month {{ c.prev|inr_short }}{% endif %}</span>
+    </td>
+    <td class="em-hide-sm" width="40%" style="padding:7px 10px 7px 0;">{% include "emails/_bar.html" with pct=c.bar color="#f97316" height=6 %}</td>
+    <td width="22%" align="right" class="em-text num" style="padding:7px 0; font-size:14px; font-weight:700; color:#0f172a;">{{ c.total|inr }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+{# ── Members ── #}
+{% if summary.members|length > 1 %}
+{% include "emails/_section.html" with title="By person" %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+  {% for m in summary.members %}
+  <tr>
+    <td class="em-text em-line" style="padding:9px 0; font-size:14px; color:#0f172a;{% if not forloop.last %} border-bottom:1px solid #e2e8f0;{% endif %}">{{ m.name }} <span class="em-muted" style="font-size:12px; color:#64748b;">· {{ m.pct }}%</span></td>
+    <td class="em-text em-line num" align="right" style="padding:9px 0; font-size:14px; font-weight:700; color:#0f172a;{% if not forloop.last %} border-bottom:1px solid #e2e8f0;{% endif %}">{{ m.total|inr }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+{# ── Top merchants ── #}
+{% if summary.merchants %}
+{% include "emails/_section.html" with title="Top merchants" %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+  {% for m in summary.merchants|slice:":6" %}
+  <tr>
+    <td class="em-text em-line" style="padding:8px 0; font-size:14px; color:#0f172a;{% if not forloop.last %} border-bottom:1px solid #e2e8f0;{% endif %}">{{ m.merchant }} <span class="em-muted" style="font-size:12px; color:#64748b;">× {{ m.count }}</span></td>
+    <td class="em-text em-line num" align="right" style="padding:8px 0; font-size:14px; font-weight:600; color:#0f172a;{% if not forloop.last %} border-bottom:1px solid #e2e8f0;{% endif %}">{{ m.total|inr }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+{# ── AI note ── #}
+{% if commentary %}
+{% include "emails/_section.html" with title="The month in a nutshell" %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="em-soft" style="background-color:#f8fafc; border-radius:12px; padding:18px;">
+  <p class="em-text" style="margin:0; font-size:15px; line-height:22px; font-weight:700; color:#0f172a;">{{ commentary.headline }}</p>
+  {% for o in commentary.observations %}
+  <p class="em-text" style="margin:10px 0 0 0; font-size:14px; line-height:21px; color:#334155;">&bull;&nbsp; {{ o }}</p>
+  {% endfor %}
+</td></tr></table>
+{% elif movers %}
+{% include "emails/_section.html" with title="Biggest changes" %}
+{% for c in movers %}
+<p class="em-text" style="margin:0 0 6px 0; font-size:14px; color:#0f172a;">{{ c.name }}: <strong class="num" style="color:{% if c.delta > 0 %}#b91c1c{% else %}#047857{% endif %};">{% if c.delta > 0 %}+{% endif %}{{ c.delta|inr_short }}</strong> vs last month</p>
+{% endfor %}
+{% endif %}
+
+{# ── Upcoming bills / statement findings ── #}
+{% if dues or summary.from_statements %}
+{% include "emails/_section.html" with title="Cards" %}
+{% for st in dues %}
+<p class="em-text" style="margin:0 0 6px 0; font-size:14px; color:#0f172a;">{{ st.payment_source.display_name }} — {% if st.total_due %}<strong class="num">{{ st.total_due|inr }}</strong> {% endif %}due {{ st.due_date|date:"j M" }}</p>
+{% endfor %}
+{% if summary.from_statements %}
+<p class="em-muted" style="margin:6px 0 0 0; font-size:13px; color:#64748b;">{{ summary.from_statements }} transaction{{ summary.from_statements|pluralize }} this month came only from a card statement — your bank sent no alert for {{ summary.from_statements|pluralize:"it,them" }}.</p>
+{% endif %}
+{% endif %}
+
+<div style="height:16px; line-height:16px; font-size:0;">&nbsp;</div>
+{% endblock %}
+
+{% block cta_label %}Open expenses{% endblock %}
+{% block footer_note %}Sent {{ as_of }}. Includes only transactions detected from connected mailboxes; manual entries are excluded.{% endblock %}
+{% block disclaimer %}Categories are auto-assigned and may be imperfect — fix one in Vault and it's remembered for next time.{% endblock %}

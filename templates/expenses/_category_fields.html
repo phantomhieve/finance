@@ -1,0 +1,18 @@
+<label class="flex flex-col gap-1 col-span-2">
+  <span class="text-xs font-bold uppercase tracking-wider opacity-50">Name</span>
+  <input type="text" name="name" required maxlength="50" value="{{ c.name|default:'' }}" class="input input-bordered input-sm w-full">
+</label>
+<label class="flex flex-col gap-1">
+  <span class="text-xs font-bold uppercase tracking-wider opacity-50">Counts as</span>
+  <select name="kind" class="select select-bordered select-sm w-full">
+    {% for value, label in category_kinds %}<option value="{{ value }}" {% if c.kind == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+</label>
+<label class="flex flex-col gap-1">
+  <span class="text-xs font-bold uppercase tracking-wider opacity-50">Colour (hue)</span>
+  <input type="range" name="hue" min="0" max="360" value="{% if c %}{{ c.hue }}{% else %}230{% endif %}" class="range range-xs mt-2">
+</label>
+<label class="flex flex-col gap-1 col-span-2">
+  <span class="text-xs font-bold uppercase tracking-wider opacity-50">Icon</span>
+  <input type="text" name="icon" maxlength="40" value="{{ c.icon|default:'category' }}" placeholder="Material symbol, e.g. local_cafe" class="input input-bordered input-sm w-full">
+</label>

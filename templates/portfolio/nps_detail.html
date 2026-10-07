@@ -28,7 +28,7 @@
     <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
       <div>
         <div class="text-[10px] font-bold uppercase tracking-widest opacity-40">NPS Balance</div>
-        <div class="text-3xl font-bold mt-1">₹{{ balance|floatformat:0|indian_number }}</div>
+        <div class="text-3xl font-bold mt-1">{{ balance|inr }}</div>
       </div>
       <div class="flex flex-wrap gap-3">
         <div class="stat-card">
@@ -64,8 +64,8 @@
           {% for e in entries %}
           <tr class="hover">
             <td class="opacity-60 text-sm whitespace-nowrap" data-val="{{ e.date|date:'Ymd' }}">{{ e.date|date:"d M Y" }}</td>
-            <td class="text-right whitespace-nowrap font-semibold text-success" data-val="{{ e.contribution }}">+₹{{ e.contribution|floatformat:0|indian_number }}</td>
-            <td class="text-right whitespace-nowrap font-semibold text-success" data-val="{{ e.interest_earned }}">+₹{{ e.interest_earned|floatformat:0|indian_number }}</td>
+            <td class="text-right whitespace-nowrap font-semibold text-success" data-val="{{ e.contribution }}">+{{ e.contribution|inr }}</td>
+            <td class="text-right whitespace-nowrap font-semibold text-success" data-val="{{ e.interest_earned }}">+{{ e.interest_earned|inr }}</td>
             <td class="text-right whitespace-nowrap font-semibold" data-val="{{ e.contribution|add:e.interest_earned }}">₹{{ e.contribution|add:e.interest_earned|floatformat:0|indian_number }}</td>
             <td class="opacity-60 text-sm">{{ e.remarks|default:"—" }}</td>
             <td class="text-right">
@@ -85,7 +85,7 @@
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 flex-wrap">
             <span class="font-semibold text-sm">₹{{ e.contribution|add:e.interest_earned|floatformat:0|indian_number }}</span>
-            <span class="badge badge-success badge-xs">+₹{{ e.interest_earned|floatformat:0|indian_number }} returns</span>
+            <span class="badge badge-success badge-xs">+{{ e.interest_earned|inr }} returns</span>
           </div>
           <div class="text-xs opacity-50 mt-0.5 truncate">{{ e.date|date:"d M Y" }}{% if e.remarks %} · {{ e.remarks }}{% endif %}</div>
         </div>

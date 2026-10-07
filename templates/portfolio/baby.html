@@ -103,11 +103,11 @@
     <div class="card-body p-4 lg:p-6 justify-between">
       <div>
         <p class="text-[10px] font-bold uppercase tracking-widest opacity-40">Child Portfolio Value</p>
-        <p class="text-3xl lg:text-4xl font-extrabold mt-1 text-primary">₹{{ total_value|floatformat:0|indian_number }}</p>
+        <p class="text-3xl lg:text-4xl font-extrabold mt-1 text-primary">{{ total_value|inr }}</p>
         <div class="mt-2">
           <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold {% if total_returns >= 0 %}bg-success/15 text-success border border-success/25{% else %}bg-error/15 text-error border border-error/25{% endif %}">
             <span class="material-symbols-outlined text-sm">{% if total_returns >= 0 %}trending_up{% else %}trending_down{% endif %}</span>
-            {% if total_returns >= 0 %}+{% endif %}₹{{ total_returns|floatformat:0|indian_number }} ({{ return_pct }}%)
+            {% if total_returns >= 0 %}+{% endif %}{{ total_returns|inr }} ({{ return_pct }}%)
           </span>
         </div>
       </div>
@@ -115,12 +115,12 @@
       <div class="grid grid-cols-2 gap-4 mt-6 pt-4 border-t border-white/5 text-sm">
         <div>
           <span class="opacity-50">Total Invested</span>
-          <div class="text-lg font-bold mt-0.5">₹{{ total_invested|floatformat:0|indian_number }}</div>
+          <div class="text-lg font-bold mt-0.5">{{ total_invested|inr }}</div>
         </div>
         <div>
           <span class="opacity-50">Total Returns</span>
           <div class="text-lg font-bold mt-0.5 {% if total_returns >= 0 %}text-success{% else %}text-error{% endif %}">
-            {% if total_returns >= 0 %}+{% endif %}₹{{ total_returns|floatformat:0|indian_number }}
+            {% if total_returns >= 0 %}+{% endif %}{{ total_returns|inr }}
           </div>
         </div>
       </div>
@@ -208,9 +208,9 @@
           </div>
         </div>
         <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
-          <div><span class="opacity-50">Bought</span><div class="font-semibold mt-0.5">₹{{ s.purchase_value|floatformat:0|indian_number }}</div></div>
-          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5">₹{{ s.current_value|floatformat:0|indian_number }}</div></div>
-          <div><span class="opacity-50">P&amp;L</span><div class="font-semibold mt-0.5 {% if s.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if s.pnl >= 0 %}+{% endif %}₹{{ s.pnl|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">Bought</span><div class="font-semibold mt-0.5">{{ s.purchase_value|inr }}</div></div>
+          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5">{{ s.current_value|inr }}</div></div>
+          <div><span class="opacity-50">P&amp;L</span><div class="font-semibold mt-0.5 {% if s.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if s.pnl >= 0 %}+{% endif %}{{ s.pnl|inr }}</div></div>
         </div>
       </div>
       {% endfor %}
@@ -287,9 +287,9 @@
           </div>
         </div>
         <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
-          <div><span class="opacity-50">Bought</span><div class="font-semibold mt-0.5">₹{{ m.purchase_value|floatformat:0|indian_number }}</div></div>
-          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5">₹{{ m.current_value|floatformat:0|indian_number }}</div></div>
-          <div><span class="opacity-50">P&amp;L</span><div class="font-semibold mt-0.5 {% if m.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if m.pnl >= 0 %}+{% endif %}₹{{ m.pnl|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">Bought</span><div class="font-semibold mt-0.5">{{ m.purchase_value|inr }}</div></div>
+          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5">{{ m.current_value|inr }}</div></div>
+          <div><span class="opacity-50">P&amp;L</span><div class="font-semibold mt-0.5 {% if m.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if m.pnl >= 0 %}+{% endif %}{{ m.pnl|inr }}</div></div>
         </div>
       </div>
       {% endfor %}
@@ -366,9 +366,9 @@
           </div>
         </div>
         <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
-          <div><span class="opacity-50">Bought</span><div class="font-semibold mt-0.5">₹{{ m.purchase_value|floatformat:0|indian_number }}</div></div>
-          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5">₹{{ m.current_value|floatformat:0|indian_number }}</div></div>
-          <div><span class="opacity-50">P&amp;L</span><div class="font-semibold mt-0.5 {% if m.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if m.pnl >= 0 %}+{% endif %}₹{{ m.pnl|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">Bought</span><div class="font-semibold mt-0.5">{{ m.purchase_value|inr }}</div></div>
+          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5">{{ m.current_value|inr }}</div></div>
+          <div><span class="opacity-50">P&amp;L</span><div class="font-semibold mt-0.5 {% if m.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if m.pnl >= 0 %}+{% endif %}{{ m.pnl|inr }}</div></div>
         </div>
       </div>
       {% endfor %}
@@ -383,21 +383,21 @@
     <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
       <h2 class="card-title text-base">Commodities</h2>
       <div class="flex flex-wrap items-center gap-1.5">
-        <span class="badge badge-ghost badge-sm">₹{{ commodity_total|floatformat:0|indian_number }}</span>
+        <span class="badge badge-ghost badge-sm">{{ commodity_total|inr }}</span>
         <button class="btn btn-ghost btn-sm gap-1" onclick="openAddBabyCommodityModal()"><span class="material-symbols-outlined text-base">add</span>Add</button>
       </div>
     </div>
     <div class="flex gap-4 text-xs opacity-60 mb-3">
-      <span>Invested: <strong class="text-success">₹{{ commodity_invested|floatformat:0|indian_number }}</strong></span>
-      <span>Returns: <strong class="{% if commodity_returns >= 0 %}text-success{% else %}text-error{% endif %}">{% if commodity_returns >= 0 %}+{% endif %}₹{{ commodity_returns|floatformat:0|indian_number }}</strong></span>
+      <span>Invested: <strong class="text-success">{{ commodity_invested|inr }}</strong></span>
+      <span>Returns: <strong class="{% if commodity_returns >= 0 %}text-success{% else %}text-error{% endif %}">{% if commodity_returns >= 0 %}+{% endif %}{{ commodity_returns|inr }}</strong></span>
     </div>
     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
       {# Gold #}
       <div class="p-4 rounded-lg bg-base-300/50">
         <div class="flex items-center gap-3 mb-3">
           <span class="material-symbols-outlined text-2xl text-warning">diamond</span>
-          <div class="flex-1"><div class="font-semibold">Gold</div><div class="text-xs opacity-50">₹{{ gold_rate|floatformat:0|indian_number }}/g &middot; {{ gold_weight|floatformat:0 }}g</div></div>
-          <div class="font-bold">₹{{ gold_value|floatformat:0|indian_number }}</div>
+          <div class="flex-1"><div class="font-semibold">Gold</div><div class="text-xs opacity-50">{{ gold_rate|inr }}/g &middot; {{ gold_weight|floatformat:0 }}g</div></div>
+          <div class="font-bold">{{ gold_value|inr }}</div>
         </div>
         {% if gold_holdings %}
         <div class="space-y-1 max-h-44 overflow-y-auto text-sm">
@@ -419,8 +419,8 @@
       <div class="p-4 rounded-lg bg-base-300/50">
         <div class="flex items-center gap-3 mb-3">
           <span class="material-symbols-outlined text-2xl opacity-50">toll</span>
-          <div class="flex-1"><div class="font-semibold">Silver</div><div class="text-xs opacity-50">₹{{ silver_rate|floatformat:0|indian_number }}/g &middot; {{ silver_weight|floatformat:0|indian_number }}g</div></div>
-          <div class="font-bold">₹{{ silver_value|floatformat:0|indian_number }}</div>
+          <div class="flex-1"><div class="font-semibold">Silver</div><div class="text-xs opacity-50">{{ silver_rate|inr }}/g &middot; {{ silver_weight|floatformat:0|indian_number }}g</div></div>
+          <div class="font-bold">{{ silver_value|inr }}</div>
         </div>
         {% if silver_holdings %}
         <div class="space-y-1 max-h-44 overflow-y-auto text-sm">
@@ -475,7 +475,7 @@
               {% endif %}
               <div class="min-w-0">
                 <div class="font-semibold text-sm">{{ s.symbol }}</div>
-                <div class="text-xs opacity-50">{{ s.account.name }} · {{ s.quantity }} qty · ₹{{ s.current_value|floatformat:0|indian_number }}</div>
+                <div class="text-xs opacity-50">{{ s.account.name }} · {{ s.quantity }} qty · {{ s.current_value|inr }}</div>
               </div>
             </div>
             <a href="{% url 'toggle_baby' 'stockholding' s.id %}?next={% url 'baby_portfolio' %}"
@@ -504,7 +504,7 @@
               {% endif %}
               <div class="min-w-0">
                 <div class="font-semibold text-sm truncate max-w-xs" title="{{ m.fund_name }}">{{ m.fund_name }}</div>
-                <div class="text-xs opacity-50">{{ m.account.name }} · {{ m.units|floatformat:2 }} units · ₹{{ m.current_value|floatformat:0|indian_number }}</div>
+                <div class="text-xs opacity-50">{{ m.account.name }} · {{ m.units|floatformat:2 }} units · {{ m.current_value|inr }}</div>
               </div>
             </div>
             <a href="{% url 'toggle_baby' 'mutualfundholding' m.id %}?next={% url 'baby_portfolio' %}"
@@ -533,7 +533,7 @@
               {% endif %}
               <div class="min-w-0">
                 <div class="font-semibold text-sm truncate max-w-xs" title="{{ m.fund_name }}">{{ m.fund_name }}</div>
-                <div class="text-xs opacity-50">{{ m.account.name }} · {{ m.units|floatformat:2 }} units · ₹{{ m.current_value|floatformat:0|indian_number }}</div>
+                <div class="text-xs opacity-50">{{ m.account.name }} · {{ m.units|floatformat:2 }} units · {{ m.current_value|inr }}</div>
               </div>
             </div>
             <a href="{% url 'toggle_baby' 'mutualfundholding' m.id %}?next={% url 'baby_portfolio' %}"

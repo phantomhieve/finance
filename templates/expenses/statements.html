@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+{% load indian_format %}
+
+{% block title %}Card statements — Vault{% endblock %}
+
+{% block page_header %}
+<div class="flex items-start justify-between gap-3">
+  <div>
+    <p class="text-xs font-bold tracking-widest uppercase text-orange-400">Expenses</p>
+    <h1 class="text-xl lg:text-2xl font-extrabold">Card statements</h1>
+  </div>
+  <div class="flex items-center gap-1.5">
+    <a href="{% url 'expenses_home' %}" class="btn btn-ghost btn-sm gap-1"><span class="material-symbols-outlined text-base">arrow_back</span><span class="hidden sm:inline">Expenses</span></a>
+    {% if cards %}
+    <button type="button" class="btn btn-primary btn-sm gap-1" onclick="openModal('uploadModal')"><span class="material-symbols-outlined text-base">upload_file</span>Upload</button>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<p class="text-xs opacity-55 mb-4 max-w-2xl">Statements arriving in a connected inbox are picked up automatically. Vault matches each line against your email alerts, adds anything that never triggered an alert, and reminds you before the due date.</p>
+
+<div class="flex flex-col gap-2 max-w-3xl">
+  {% for st in statements %}
+  <a href="{% url 'expenses_statement_detail' st.pk %}" class="table-card card-hover flex items-center gap-3">
+    <span class="jw-type-avatar" style="--h:{% if st.is_paid %}150{% elif st.due_date and st.due_date < today %}0{% else %}210{% endif %}">
+      <span class="icon-filled material-symbols-outlined">{% if st.is_paid %}task_alt{% elif st.status == 'NEEDS_PASSWORD' %}lock{% else %}credit_card{% endif %}</span>
+    </span>
+    <div class="flex-1 min-w-0">
+      <p class="font-semibold text-sm truncate">{{ st.payment_source.display_name }}</p>
+      <p class="text-[11px] opacity-55 truncate">
+        {% if st.statement_date %}{{ st.statement_date|date:"j M Y" }}{% else %}Received {{ st.created_at|date:"j M Y" }}{% endif %}
+        {% if st.status == 'PARSED' %} · {{ st.matched_count }} matched{% if st.added_count %} · <span class="text-info">{{ st.added_count }} added</span>{% endif %}
+        {% elif st.status == 'NEEDS_PASSWORD' %} · <span class="text-warning">needs password</span>
+        {% elif st.status == 'FAILED' %} · <span class="text-error">couldn't read PDF</span>
+        {% else %} · totals only{% endif %}
+      </p>
+    </div>
+    <div class="text-right shrink-0">
+      <p class="text-sm font-bold tabular-nums">{% if st.total_due is not None %}{{ st.total_due|inr }}{% else %}—{% endif %}</p>
+      {% if st.is_paid %}<p class="text-[10px] text-success">Paid</p>
+      {% elif st.due_date %}<p class="text-[10px] {% if st.due_date < today %}text-error{% else %}opacity-50{% endif %}">Due {{ st.due_date|date:"j M" }}</p>{% endif %}
+    </div>
+  </a>
+  {% empty %}
+  <div class="flex flex-col items-center justify-center py-16 gap-3 text-center">
+    <div class="w-16 h-16 rounded-2xl bg-sky-400/10 border border-sky-400/20 flex items-center justify-center">
+      <span class="icon-filled material-symbols-outlined text-3xl text-sky-400">request_quote</span>
+    </div>
+    <p class="font-semibold opacity-60">No statements yet</p>
+    <p class="text-xs opacity-40 max-w-xs">{% if cards %}They'll appear here when your bank emails them, or upload a PDF.{% else %}Cards appear once a credit card alert is detected, or add one in settings.{% endif %}</p>
+  </div>
+  {% endfor %}
+</div>
+
+{% if cards %}
+<dialog id="uploadModal" class="modal modal-bottom sm:modal-middle">
+  <div class="modal-box max-w-md">
+    <h3 class="font-bold text-lg mb-3">Upload a statement</h3>
+    <form method="post" action="{% url 'expenses_statement_upload' %}" enctype="multipart/form-data" class="flex flex-col gap-3">
+      {% csrf_token %}
+      <label class="flex flex-col gap-1">
+        <span class="text-xs font-bold uppercase tracking-wider opacity-50">Card</span>
+        <select name="payment_source" required class="select select-bordered w-full">
+          {% for c in cards %}<option value="{{ c.pk }}">{{ c.display_name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label class="flex flex-col gap-1">
+        <span class="text-xs font-bold uppercase tracking-wider opacity-50">PDF</span>
+        <input type="file" name="pdf" accept="application/pdf" required class="file-input file-input-bordered w-full">
+      </label>
+      <label class="flex flex-col gap-1">
+        <span class="text-xs font-bold uppercase tracking-wider opacity-50">Password (if protected)</span>
+        <input type="password" name="password" autocomplete="off" class="input input-bordered w-full" placeholder="Leave blank to use the saved one">
+      </label>
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" name="save_password" checked class="checkbox checkbox-sm checkbox-primary"><span class="text-xs opacity-75">Remember password for this card</span>
+      </label>
+      <div class="modal-action mt-1">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('uploadModal')">Cancel</button>
+        <button class="btn btn-primary btn-sm">Upload &amp; match</button>
+      </div>
+    </form>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% load indian_format %}
+
+{% block title %}{{ statement.payment_source.display_name }} statement — Vault{% endblock %}
+
+{% block page_header %}
+<div class="flex items-start justify-between gap-3">
+  <div class="min-w-0">
+    <p class="text-xs font-bold tracking-widest uppercase text-orange-400">Card statement</p>
+    <h1 class="text-xl lg:text-2xl font-extrabold truncate">{{ statement.payment_source.display_name }}</h1>
+    {% if statement.statement_date %}<p class="text-xs opacity-50">{% if statement.period_start %}{{ statement.period_start|date:"j M" }} → {% endif %}{{ statement.statement_date|date:"j M Y" }}</p>{% endif %}
+  </div>
+  <a href="{% url 'expenses_statements' %}" class="btn btn-ghost btn-sm gap-1 shrink-0"><span class="material-symbols-outlined text-base">arrow_back</span><span class="hidden sm:inline">Statements</span></a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl flex flex-col gap-4">
+
+  <div class="card hero-gradient-portfolio shadow-sm animate-up">
+    <div class="card-body p-4 lg:p-5">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <p class="text-[10px] font-bold uppercase tracking-widest opacity-40">Total due</p>
+          <p class="text-3xl font-extrabold tabular-nums mt-1">{% if statement.total_due is not None %}{{ statement.total_due|inr }}{% else %}—{% endif %}</p>
+          <p class="text-xs mt-1 {% if not statement.is_paid and statement.due_date and statement.due_date < today %}text-error{% else %}opacity-55{% endif %}">
+            {% if statement.is_paid %}Paid{% if statement.paid_at %} on {{ statement.paid_at|date:"j M" }}{% endif %}{% if statement.paid_amount %} · {{ statement.paid_amount|inr }}{% endif %}
+            {% elif statement.due_date %}Due {{ statement.due_date|date:"D, j M Y" }}{% endif %}
+            {% if statement.min_due %} · Minimum {{ statement.min_due|inr }}{% endif %}
+          </p>
+        </div>
+        <form method="post" action="{% url 'expenses_statement_paid' statement.pk %}" class="shrink-0">{% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <button class="btn btn-sm {% if statement.is_paid %}btn-ghost{% else %}btn-success{% endif %} gap-1 whitespace-nowrap">
+            <span class="material-symbols-outlined text-base">{% if statement.is_paid %}undo{% else %}task_alt{% endif %}</span>{% if statement.is_paid %}Mark unpaid{% else %}Mark paid{% endif %}
+          </button>
+        </form>
+      </div>
+
+      {% if statement.status == 'PARSED' %}
+      <div class="grid grid-cols-3 gap-2 mt-4">
+        <div class="stat-card"><div class="text-[10px] uppercase tracking-wider opacity-50">Lines</div><div class="text-base font-bold mt-0.5">{{ lines|length }}</div></div>
+        <div class="stat-card"><div class="text-[10px] uppercase tracking-wider opacity-50">Matched</div><div class="text-base font-bold mt-0.5 text-success">{{ statement.matched_count }}</div></div>
+        <div class="stat-card"><div class="text-[10px] uppercase tracking-wider opacity-50">Added</div><div class="text-base font-bold mt-0.5 text-info">{{ statement.added_count }}</div></div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if statement.status == 'NEEDS_PASSWORD' %}
+  <div class="card bg-base-200 shadow-sm animate-up">
+    <div class="card-body p-4">
+      <h2 class="font-semibold flex items-center gap-2"><span class="material-symbols-outlined text-warning">lock</span>This PDF is password-protected</h2>
+      <p class="text-xs opacity-60">Banks usually use the first 4 letters of your name + date of birth (DDMM), or digits from the card number. The statement email normally says which.</p>
+      <form method="post" action="{% url 'expenses_statement_unlock' statement.pk %}" class="flex flex-col sm:flex-row gap-2 mt-2">
+        {% csrf_token %}
+        <input type="password" name="password" required autocomplete="off" class="input input-bordered input-sm flex-1" placeholder="Statement password">
+        <label class="flex items-center gap-2 text-xs cursor-pointer"><input type="checkbox" name="save_password" checked class="checkbox checkbox-xs checkbox-primary">Remember for this card</label>
+        <button class="btn btn-primary btn-sm">Unlock &amp; match</button>
+      </form>
+    </div>
+  </div>
+  {% elif statement.status == 'BODY_ONLY' %}
+  <p class="text-sm opacity-55">Only the totals were in the email — there was no PDF to match line items against. You can upload the PDF from the statements page.</p>
+  {% elif statement.status == 'FAILED' %}
+  <p class="text-sm text-error/80">The PDF opened but no transaction lines could be read from it.</p>
+  {% endif %}
+
+  {% if lines %}
+  <div class="animate-up" style="animation-delay:.05s">
+    <div class="flex items-center justify-between mb-2">
+      <h2 class="section-group-header !mb-0">Transactions</h2>
+      <form method="post" action="{% url 'expenses_statement_reconcile' statement.pk %}">{% csrf_token %}
+        <button class="btn btn-ghost btn-xs gap-1"><span class="material-symbols-outlined text-sm">sync</span>Re-match</button>
+      </form>
+    </div>
+    <div class="flex flex-col gap-1.5">
+      {% for ln in lines %}
+      <div class="table-card flex items-center gap-3 !py-2.5">
+        <span class="material-symbols-outlined text-lg shrink-0 {% if ln.was_added %}text-info{% elif ln.matched_expense %}text-success{% else %}opacity-30{% endif %}"
+              title="{% if ln.was_added %}No email alert — added from statement{% elif ln.matched_expense %}Matched an email alert{% else %}Credit / not tracked{% endif %}">
+          {% if ln.was_added %}add_circle{% elif ln.matched_expense %}check_circle{% else %}remove{% endif %}
+        </span>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm truncate">{{ ln.description }}</p>
+          <p class="text-[11px] opacity-50">{{ ln.txn_date|date:"j M" }}{% if ln.matched_expense and ln.matched_expense.category %} · {{ ln.matched_expense.category.name }}{% endif %}{% if ln.was_added %} · <span class="text-info">added</span>{% endif %}</p>
+        </div>
+        <span class="text-sm font-bold tabular-nums shrink-0 {% if ln.is_credit %}text-success{% endif %}">{% if ln.is_credit %}+{% endif %}{{ ln.amount|inr }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

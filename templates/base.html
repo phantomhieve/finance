@@ -38,6 +38,13 @@
       s.id = 'bodyBgHint';
       s.textContent = 'body{background-color:' + tc + '}';
       document.head.appendChild(s);
+      try {
+        var sv = JSON.parse(sessionStorage.getItem('vault-scroll') || 'null');
+        if (sv && sv.path === location.pathname && !location.hash) {
+          document.documentElement.classList.add('vault-restoring');
+          if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+        }
+      } catch (e) {}
     })();
   </script>
   {% if request.portfolio_expires_at %}<meta name="portfolio-expires" content="{{ request.portfolio_expires_at }}">{% endif %}
@@ -87,15 +94,16 @@
         <span class="sidebar-label">Portfolio</span>
       </a>
     </div>
-    {% elif user.user_type == 'ACCOUNT_HOLDER' and household_config.feature_portfolio %}
-    <div class="tooltip tooltip-right sidebar-tip" data-tip="Portfolio">
-      <a class="sidebar-link opacity-30 pointer-events-none">
-        <span class="material-symbols-outlined text-lg flex-shrink-0">query_stats</span>
-        <span class="sidebar-label">Portfolio</span>
+    {% endif %}
+
+    {% if user.can_view_expenses and household_config.feature_expenses %}
+    <div class="tooltip tooltip-right sidebar-tip" data-tip="Expenses">
+      <a href="{% url 'expenses_home' %}" class="sidebar-link {% if 'expense' in request.resolver_match.url_name %}sidebar-active{% endif %}">
+        <span class="icon-filled material-symbols-outlined text-[20px] text-orange-400 flex-shrink-0">receipt_long</span>
+        <span class="sidebar-label">Expenses</span>
       </a>
     </div>
     {% endif %}
-
     {% if user.can_view_jewellery and household_config.feature_jewellery %}
     <div class="tooltip tooltip-right sidebar-tip" data-tip="Jewellery">
       <a href="{% url 'jewellery_dashboard' %}" class="sidebar-link {% if 'jewellery' in request.resolver_match.url_name %}sidebar-active{% endif %}">
@@ -221,32 +229,42 @@
 
 {# ——— Mobile Bottom Dock ——— #}
 <nav class="dock dock-sm fixed bottom-0 left-0 right-0 lg:hidden z-50">
-  {% if user.can_view_savings %}
+  {% if user.can_view_savings and household_config.feature_savings %}
   <a href="{% url 'dashboard' %}" {% if request.resolver_match.url_name == 'dashboard' %}class="dock-active"{% endif %}>
     <span class="icon-filled material-symbols-outlined text-xl">monitoring</span>
     <span class="dock-label">Savings</span>
   </a>
   {% endif %}
-  {% if user.can_view_portfolio %}
+  {% if user.can_view_expenses and household_config.feature_expenses %}
+  <a href="{% url 'expenses_home' %}" {% if 'expense' in request.resolver_match.url_name %}class="dock-active"{% endif %}>
+    <span class="icon-filled material-symbols-outlined text-xl">receipt_long</span>
+    <span class="dock-label">Spends</span>
+  </a>
+  {% endif %}
+  {% if user.can_view_portfolio and household_config.feature_portfolio %}
   <a href="{% url 'portfolio_tracker' %}" {% if 'portfolio' in request.resolver_match.url_name or request.resolver_match.url_name == 'portfolio_tracker' %}class="dock-active"{% endif %}>
     <span class="icon-filled material-symbols-outlined text-xl">query_stats</span>
     <span class="dock-label">Portfolio</span>
   </a>
   {% endif %}
-  {% if user.can_view_jewellery %}
+  {% if user.can_view_jewellery and household_config.feature_jewellery %}
   <a href="{% url 'jewellery_dashboard' %}" {% if 'jewellery' in request.resolver_match.url_name %}class="dock-active"{% endif %}>
     <span class="icon-filled material-symbols-outlined text-xl">diamond</span>
     <span class="dock-label">Jewellery</span>
   </a>
   {% endif %}
+  {% if household_config.feature_hra %}
   <a href="{% url 'hra_tracker' %}" {% if request.resolver_match.url_name == 'hra_tracker' %}class="dock-active"{% endif %}>
     <span class="icon-filled material-symbols-outlined text-xl">home_work</span>
     <span class="dock-label">HRA</span>
   </a>
+  {% endif %}
+  {% if household_config.feature_notes %}
   <a href="{% url 'notes_list' %}" {% if request.resolver_match.url_name == 'notes_list' %}class="dock-active"{% endif %}>
     <span class="icon-filled material-symbols-outlined text-xl">sticky_note_2</span>
     <span class="dock-label">Notes</span>
   </a>
+  {% endif %}
   <a href="javascript:void(0)" onclick="Vault.showLoader();Vault.afterPaint(function(){history.back()})">
     <span class="material-symbols-outlined text-xl">arrow_back</span>
     <span class="dock-label">Back</span>

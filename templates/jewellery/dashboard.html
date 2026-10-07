@@ -11,9 +11,9 @@
     <h1 class="text-xl lg:text-2xl font-extrabold">Jewellery Collection</h1>
     {% if is_primary %}
     <div class="flex flex-wrap items-center gap-3 mt-1 text-xs opacity-60">
-      {% if gold_rate %}<span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm text-warning">diamond</span>Gold ₹{{ gold_rate|floatformat:0|indian_number }}/g</span>{% endif %}
+      {% if gold_rate %}<span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm text-warning">diamond</span>Gold {{ gold_rate|inr }}/g</span>{% endif %}
       {% if gold_rate and silver_rate %}<span>&middot;</span>{% endif %}
-      {% if silver_rate %}<span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm opacity-60">toll</span>Silver ₹{{ silver_rate|floatformat:0|indian_number }}/g</span>{% endif %}
+      {% if silver_rate %}<span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm opacity-60">toll</span>Silver {{ silver_rate|inr }}/g</span>{% endif %}
       {% if rates_as_of %}<span class="opacity-70" title="{{ rates_as_of|date:'d M Y, H:i' }}">· updated {{ rates_as_of|timesince }} ago</span>{% endif %}
     </div>
     {% endif %}
@@ -38,7 +38,7 @@
     <div class="flex flex-col lg:flex-row lg:items-center gap-5 lg:gap-8">
       <div class="shrink-0">
         <p class="text-[10px] font-bold uppercase tracking-widest opacity-40">{% if is_filtered %}Estimated value · filtered{% else %}Estimated collection value{% endif %}</p>
-        <p class="text-3xl lg:text-4xl font-extrabold mt-1 tabular-nums">₹{{ total_estimated_value|floatformat:0|indian_number }}</p>
+        <p class="text-3xl lg:text-4xl font-extrabold mt-1 tabular-nums">{{ total_estimated_value|inr }}</p>
         <p class="text-[11px] opacity-40 mt-1">Metal value at today's rate, adjusted for purity</p>
       </div>
       <div class="grid grid-cols-3 gap-3 flex-1 w-full">
@@ -63,7 +63,7 @@
       </div>
       <div class="flex flex-wrap justify-between gap-x-4 gap-y-1 mt-1.5 text-[11px]">
         {% for loc in value_by_location %}
-        <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full {% if loc.value == 'BANK_LOCKER' %}bg-error/70{% else %}bg-warning/80{% endif %}"></span><span class="opacity-60">{{ loc.label }} · {{ loc.count }} item{{ loc.count|pluralize }}</span><span class="font-semibold tabular-nums">₹{{ loc.amount|floatformat:0|indian_number }}</span><span class="opacity-40">({{ loc.pct }}%)</span></span>
+        <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full {% if loc.value == 'BANK_LOCKER' %}bg-error/70{% else %}bg-warning/80{% endif %}"></span><span class="opacity-60">{{ loc.label }} · {{ loc.count }} item{{ loc.count|pluralize }}</span><span class="font-semibold tabular-nums">{{ loc.amount|inr }}</span><span class="opacity-40">({{ loc.pct }}%)</span></span>
         {% endfor %}
       </div>
     </div>
@@ -187,7 +187,7 @@
       {% if is_primary %}
       <div class="flex items-baseline justify-between pt-2 border-t border-base-content/5">
         <span class="text-[10px] uppercase tracking-wider opacity-40">Est. value</span>
-        <span class="text-sm font-bold text-primary tabular-nums">{% if item.estimated_value %}₹{{ item.estimated_value|floatformat:0|indian_number }}{% else %}—{% endif %}</span>
+        <span class="text-sm font-bold text-primary tabular-nums">{% if item.estimated_value %}{{ item.estimated_value|inr }}{% else %}—{% endif %}</span>
       </div>
       {% endif %}
     </div>
@@ -222,7 +222,7 @@
     </div>
     {% if is_primary %}
     <div class="text-right shrink-0">
-      <div class="text-sm font-bold text-primary tabular-nums">{% if item.estimated_value %}₹{{ item.estimated_value|floatformat:0|indian_number }}{% else %}—{% endif %}</div>
+      <div class="text-sm font-bold text-primary tabular-nums">{% if item.estimated_value %}{{ item.estimated_value|inr }}{% else %}—{% endif %}</div>
       <div class="text-[9px] opacity-35 uppercase tracking-wider">est.</div>
     </div>
     {% endif %}
