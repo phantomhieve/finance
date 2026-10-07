@@ -1,0 +1,34 @@
+{% extends 'public/base.html' %}
+{% block title %}Vault — Private Household Finance Dashboard{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1>Your household's money,<br><span>in one private vault.</span></h1>
+  <p>Vault is a private personal finance dashboard for a single family. It tracks savings, investments,
+     rent and jewellery, and automatically records card and bank spending from transaction alert emails,
+     so the household always knows where its money goes.</p>
+  <div class="actions">
+    <a href="{% url 'login' %}" class="btn btn-primary" id="hero-signin">Sign in with Google</a>
+    <a href="{% url 'privacy' %}" class="btn btn-ghost" id="hero-privacy">How we handle your data</a>
+  </div>
+</section>
+
+<section>
+  <h2>What Vault does</h2>
+  <div class="grid">
+    <div class="card"><div class="icon">📈</div><h3>Portfolio tracking</h3><p>Mutual funds, stocks and fixed deposits with returns, allocation and AI-generated insights.</p></div>
+    <div class="card"><div class="icon">💳</div><h3>Expense tracker</h3><p>Reads bank and credit card alert emails (read-only) to log spends, categorise them and flag unusual charges.</p></div>
+    <div class="card"><div class="icon">🧾</div><h3>Card statements</h3><p>Matches statement PDFs against alerts, adds missed transactions and reminds you before bills are due.</p></div>
+    <div class="card"><div class="icon">🏠</div><h3>Savings &amp; HRA</h3><p>Financial-year savings, rent paid and tax-relevant records in one place.</p></div>
+  </div>
+</section>
+
+<section>
+  <h2>How Vault uses Google data</h2>
+  <div class="grid">
+    <div class="card"><div class="icon">🔑</div><h3>Sign-in</h3><p>Google Sign-In is used only to verify your identity. Vault receives your name, email and profile picture.</p></div>
+    <div class="card"><div class="icon">✉️</div><h3>Gmail (read-only, optional)</h3><p>If you connect Gmail, Vault searches for transaction alerts and statements and stores only the parsed amount, merchant, card and date. Email bodies are never stored.</p></div>
+    <div class="card"><div class="icon">🛡️</div><h3>Never shared or sold</h3><p>Data stays on Vault's own server, access tokens are encrypted, and you can disconnect at any time.</p></div>
+  </div>
+  <p class="note">Vault is invite-only: access is limited to members of one household. Full details are in the <a href="{% url 'privacy' %}">Privacy Policy</a>.</p>
+</section>
+{% endblock %}
