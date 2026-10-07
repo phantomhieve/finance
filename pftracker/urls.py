@@ -7,6 +7,24 @@ from django.http import JsonResponse
 admin.site.site_header = 'Vault Administration'
 
 
+def _public_page(template, page):
+    """Login-free pages (home / privacy / terms) for Google OAuth brand verification."""
+    import os
+    from django.conf import settings as dj_settings
+    from django.shortcuts import render
+
+    def view(request):
+        site_url = (os.environ.get('VAULT_PUBLIC_URL', '').strip().rstrip('/')
+                    or request.build_absolute_uri('/').rstrip('/'))
+        contact = (os.environ.get('VAULT_CONTACT_EMAIL', '').strip()
+                   or getattr(dj_settings, 'EMAIL_HOST_USER', '') or 'admin@phantomhive.in')
+        return render(request, template, {
+            'page': page, 'site_url': site_url, 'contact_email': contact,
+            'updated': '7 October 2026',
+        })
+    return view
+
+
 def _blocked(request, *args, **kwargs):
     raise Http404
 
@@ -57,6 +75,9 @@ urlpatterns = [
     path('apple-touch-icon.png', RedirectView.as_view(url='/static/icons/icon-180.png', permanent=True)),
     path('apple-touch-icon-precomposed.png', RedirectView.as_view(url='/static/icons/icon-180.png', permanent=True)),
     path('sw.js', RedirectView.as_view(url='/static/sw.js', permanent=True)),
+    path('about/', _public_page('public/about.html', 'about'), name='about'),
+    path('privacy/', _public_page('public/privacy.html', 'privacy'), name='privacy'),
+    path('terms/', _public_page('public/terms.html', 'terms'), name='terms'),
     path('vault-manage/', admin.site.urls),
     # Block allauth endpoints we don't use (must come before the allauth include)
     path('accounts/signup/', _blocked),

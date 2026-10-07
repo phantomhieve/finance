@@ -55,7 +55,8 @@
     </div>
     {% endif %}
 
-    <p class="text-center text-[10px] opacity-15 mt-8 stagger-{% if dev_users %}6{% else %}5{% endif %}">Vault v1.0</p>
+    <p class="text-center text-xs opacity-40 mt-8"><a href="{% url 'about' %}" class="link-hover">About</a> · <a href="{% url 'privacy' %}" class="link-hover">Privacy</a> · <a href="{% url 'terms' %}" class="link-hover">Terms</a></p>
+    <p class="text-center text-[10px] opacity-15 mt-2 stagger-{% if dev_users %}6{% else %}5{% endif %}">Vault v1.0</p>
   </div>
 </div>
 {% endblock %}
