@@ -26,7 +26,7 @@
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
             <p class="text-[10px] font-bold uppercase tracking-widest opacity-40">{{ s.label }}</p>
-            <p class="text-3xl font-extrabold mt-1 text-primary tabular-nums">₹{{ s.target|floatformat:0|indian_number }}</p>
+            <p class="text-3xl font-extrabold mt-1 text-primary tabular-nums">{{ s.target|inr }}</p>
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
             {% if s.status == 'achieved' %}<span class="badge badge-success badge-soft badge-sm gap-1.5 font-semibold"><span class="material-symbols-outlined text-sm">emoji_events</span>Achieved</span>
@@ -51,7 +51,7 @@
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
           <div class="stat-card stat-card-primary">
             <div class="text-[10px] uppercase tracking-wider opacity-50">Portfolio now</div>
-            <div class="text-base font-bold mt-0.5 tabular-nums">₹{{ total_value|floatformat:0|indian_number }}</div>
+            <div class="text-base font-bold mt-0.5 tabular-nums">{{ total_value|inr }}</div>
           </div>
           <div class="stat-card {% if s.achieved %}stat-card-success{% endif %}">
             <div class="text-[10px] uppercase tracking-wider opacity-50">{% if s.achieved %}Surplus{% else %}Gap to target{% endif %}</div>
@@ -59,7 +59,7 @@
           </div>
           <div class="stat-card">
             <div class="text-[10px] uppercase tracking-wider opacity-50">Needed / month</div>
-            <div class="text-base font-bold mt-0.5 tabular-nums">{% if s.monthly_needed %}₹{{ s.monthly_needed|floatformat:0|indian_number }}{% else %}—{% endif %}</div>
+            <div class="text-base font-bold mt-0.5 tabular-nums">{% if s.monthly_needed %}{{ s.monthly_needed|inr }}{% else %}—{% endif %}</div>
           </div>
           <div class="stat-card">
             <div class="text-[10px] uppercase tracking-wider opacity-50">Days left</div>
@@ -82,18 +82,18 @@
           <p class="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-2">This FY so far</p>
           <div class="flex items-baseline justify-between">
             <span class="text-sm opacity-60">Net worth change</span>
-            <span class="font-bold tabular-nums {% if fy_performance.change >= 0 %}text-success{% else %}text-error{% endif %}">{% if fy_performance.change >= 0 %}+₹{{ fy_performance.change|floatformat:0|indian_number }}{% else %}−₹{{ fy_performance.change|floatformat:0|cut:'-'|indian_number }}{% endif %} <span class="text-xs opacity-70">({{ fy_performance.change_pct }}%)</span></span>
+            <span class="font-bold tabular-nums {% if fy_performance.change >= 0 %}text-success{% else %}text-error{% endif %}">{% if fy_performance.change >= 0 %}+{{ fy_performance.change|inr }}{% else %}−₹{{ fy_performance.change|floatformat:0|cut:'-'|indian_number }}{% endif %} <span class="text-xs opacity-70">({{ fy_performance.change_pct }}%)</span></span>
           </div>
           <div class="divider-fade my-2"></div>
           <div class="flex items-center justify-between text-sm py-1">
             <span class="flex items-center gap-1.5 opacity-60"><span class="material-symbols-outlined text-sm">savings</span>Fresh money added</span>
-            <span class="tabular-nums font-semibold">{% if fy_performance.money_added < 0 %}−₹{{ fy_performance.money_added|floatformat:0|cut:'-'|indian_number }}{% else %}₹{{ fy_performance.money_added|floatformat:0|indian_number }}{% endif %}</span>
+            <span class="tabular-nums font-semibold">{% if fy_performance.money_added < 0 %}−₹{{ fy_performance.money_added|floatformat:0|cut:'-'|indian_number }}{% else %}{{ fy_performance.money_added|inr }}{% endif %}</span>
           </div>
           <div class="flex items-center justify-between text-sm py-1">
             <span class="flex items-center gap-1.5 opacity-60"><span class="material-symbols-outlined text-sm">show_chart</span>Market gains</span>
-            <span class="tabular-nums font-semibold {% if fy_performance.market_gain >= 0 %}text-success{% else %}text-error{% endif %}">{% if fy_performance.market_gain >= 0 %}+₹{{ fy_performance.market_gain|floatformat:0|indian_number }}{% else %}−₹{{ fy_performance.market_gain|floatformat:0|cut:'-'|indian_number }}{% endif %}</span>
+            <span class="tabular-nums font-semibold {% if fy_performance.market_gain >= 0 %}text-success{% else %}text-error{% endif %}">{% if fy_performance.market_gain >= 0 %}+{{ fy_performance.market_gain|inr }}{% else %}−₹{{ fy_performance.market_gain|floatformat:0|cut:'-'|indian_number }}{% endif %}</span>
           </div>
-          <p class="text-[10px] opacity-30 mt-2">Since {{ fy_performance.opening_month|date:"M Y" }} snapshot · ₹{{ fy_performance.opening_value|floatformat:0|indian_number }}</p>
+          <p class="text-[10px] opacity-30 mt-2">Since {{ fy_performance.opening_month|date:"M Y" }} snapshot · {{ fy_performance.opening_value|inr }}</p>
         </div>
         {% endif %}
 
@@ -104,7 +104,7 @@
           <div class="flex items-center gap-2 py-1.5 cursor-pointer" {% include 'portfolio/_goal_edit_attrs.html' %}>
             <span class="material-symbols-outlined text-base {% if g.achieved %}text-success{% else %}opacity-30{% endif %}">{% if g.achieved %}check_circle{% else %}radio_button_unchecked{% endif %}</span>
             <span class="flex-1 text-sm truncate">{{ g.label }}</span>
-            <span class="text-sm tabular-nums opacity-70">₹{{ g.target|floatformat:0|indian_number }}</span>
+            <span class="text-sm tabular-nums opacity-70">{{ g.target|inr }}</span>
           </div>
           {% endfor %}
         </div>
@@ -125,7 +125,7 @@
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-up mb-4" style="animation-delay:0.55s">
   <div class="card bg-base-200 shadow-sm card-hover">
     <div class="card-body p-4">
-      <h2 class="card-title text-base mb-2 flex items-center gap-1.5"><span class="material-symbols-outlined text-primary text-lg">route</span>Upcoming</h2>
+      <h2 class="card-title text-base mb-2 flex items-center gap-1.5"><span class="material-symbols-outlined text-primary text-lg">route</span>Upcoming &amp; milestones</h2>
       {% if rm.upcoming %}
       <div class="space-y-2">
         {% for y in rm.upcoming %}{% for g in y.goals %}
@@ -135,7 +135,7 @@
               <span class="badge badge-ghost badge-xs">{{ g.fy }}</span>
               <span class="font-semibold text-sm ml-1">{{ g.label }}</span>
             </div>
-            <span class="font-semibold text-sm tabular-nums shrink-0">₹{{ g.target|floatformat:0|indian_number }}</span>
+            <span class="font-semibold text-sm tabular-nums shrink-0">{{ g.target|inr }}</span>
           </div>
           <div class="flex items-center gap-3 mt-2">
             <progress class="progress {% if g.achieved %}progress-success{% else %}progress-primary{% endif %} h-1.5 flex-1" value="{{ g.pct|floatformat:0 }}" max="100"></progress>
@@ -143,8 +143,8 @@
           </div>
           <div class="text-[11px] opacity-50 mt-1">
             {% if g.achieved %}<span class="text-success">Already reached{% if g.achieved_at %} on {{ g.achieved_at|date:"d M Y" }}{% endif %}</span>
-            {% elif g.monthly_needed %}Needs ₹{{ g.monthly_needed|floatformat:0|indian_number }}/mo over {{ g.months_left }} months
-            {% else %}₹{{ g.remaining|floatformat:0|indian_number }} to go{% endif %}
+            {% elif g.monthly_needed %}Needs {{ g.monthly_needed|inr }}/mo over {{ g.months_left }} months
+            {% else %}{{ g.remaining|inr }} to go{% endif %}
           </div>
         </div>
         {% endfor %}{% endfor %}
@@ -168,8 +168,8 @@
         {% for y in rm.closed %}{% for g in y.goals %}
         <tr class="hover cursor-pointer" {% include 'portfolio/_goal_edit_attrs.html' %}>
           <td class="font-semibold whitespace-nowrap">{{ g.fy }}<div class="text-xs opacity-40 font-normal">{{ g.label }}</div></td>
-          <td class="text-right tabular-nums">₹{{ g.target|floatformat:0|indian_number }}</td>
-          <td class="text-right tabular-nums">{% if g.closing_value is not None %}₹{{ g.closing_value|floatformat:0|indian_number }}{% else %}<span class="opacity-30">—</span>{% endif %}</td>
+          <td class="text-right tabular-nums">{{ g.target|inr }}</td>
+          <td class="text-right tabular-nums">{% if g.closing_value is not None %}{{ g.closing_value|inr }}{% else %}<span class="opacity-30">—</span>{% endif %}</td>
           <td class="text-right">{% if g.achieved %}<span class="badge badge-success badge-sm">Achieved</span>{% else %}<span class="badge badge-error badge-soft badge-sm">Missed{% if g.closing_value is not None %} · {{ g.pct }}%{% endif %}</span>{% endif %}</td>
         </tr>
         {% endfor %}{% endfor %}
@@ -180,7 +180,7 @@
         <div class="table-card flex items-center justify-between gap-3" {% include 'portfolio/_goal_edit_attrs.html' %}>
           <div class="min-w-0">
             <div class="font-semibold text-sm">{{ g.fy }} <span class="opacity-40 font-normal">· {{ g.label }}</span></div>
-            <span class="text-xs opacity-50 tabular-nums">₹{{ g.target|floatformat:0|indian_number }}{% if g.closing_value is not None %} · closed ₹{{ g.closing_value|floatformat:0|indian_number }}{% endif %}</span>
+            <span class="text-xs opacity-50 tabular-nums">{{ g.target|inr }}{% if g.closing_value is not None %} · closed {{ g.closing_value|inr }}{% endif %}</span>
           </div>
           {% if g.achieved %}<span class="badge badge-success badge-sm shrink-0">Achieved</span>{% else %}<span class="badge badge-error badge-soft badge-sm shrink-0">Missed</span>{% endif %}
         </div>

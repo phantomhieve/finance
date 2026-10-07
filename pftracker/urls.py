@@ -78,6 +78,7 @@ urlpatterns = [
     path('o/', include('oauth2_provider.urls', namespace='oauth2_provider')),
     path('portfolio/', include('portfolio.urls')),
     path('jewellery/', include('jewellery.urls')),
+    path('expenses/', include('expenses.urls')),
     path('', include('tracker.urls')),
 ]
 

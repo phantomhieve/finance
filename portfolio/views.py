@@ -769,9 +769,10 @@ def portfolio_growth(request):
     growth = get_growth_data(fy_year, group=group)
     growth['growth_chart_data'] = {
         'months': [m['name'] for m in growth['months']],
-        'values': [m['total_value'] for m in growth['months']],
-        'money_added': [m['money_added'] for m in growth['months']],
-        'returns_gained': [m['returns_gained'] for m in growth['months']],
+        # No snapshot → gap in the charts, not a plunge to ₹0.
+        'values': [m['total_value'] if m['snapshot'] else None for m in growth['months']],
+        'money_added': [m['money_added'] if m['snapshot'] else None for m in growth['months']],
+        'returns_gained': [m['returns_gained'] if m['snapshot'] else None for m in growth['months']],
         'yearly_labels': [y['label'] for y in growth['yearly']],
         'yearly_values': [y['total_value'] for y in growth['yearly']],
         'yearly_added': [y['money_added'] for y in growth['yearly']],

@@ -36,7 +36,7 @@
   {% if is_primary %}
   <div class="text-left md:text-right shrink-0">
     <p class="text-[10px] font-bold uppercase tracking-widest opacity-40">Current Est. Value</p>
-    <p class="text-2xl font-extrabold text-primary">₹{{ item.estimated_value|floatformat:0|indian_number }}</p>
+    <p class="text-2xl font-extrabold text-primary">{{ item.estimated_value|inr }}</p>
   </div>
   {% endif %}
 </div>

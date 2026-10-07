@@ -1,0 +1,25 @@
+{% extends "emails/_base.html" %}
+{% load indian_format %}
+
+{% block title %}{{ card }} bill {% if overdue %}overdue{% else %}due{% endif %}{% endblock %}
+
+{% block preheader %}{% if statement.total_due %}{{ statement.total_due|inr }} · {% endif %}{% if overdue %}was due {{ statement.due_date|date:"j M" }}{% elif days_left == 0 %}due today{% else %}due in {{ days_left }} day{{ days_left|pluralize }}{% endif %}{% endblock %}
+
+{% block eyebrow %}Bill reminder{% endblock %}
+
+{% block content %}
+<p class="em-muted" style="margin:0 0 6px 0; font-size:13px; color:#64748b;">{{ card }}</p>
+<p class="em-hero em-text num" style="margin:0; font-size:36px; line-height:42px; font-weight:800; color:#0f172a;">{% if statement.total_due %}{{ statement.total_due|inr }}{% else %}Payment due{% endif %}</p>
+<p style="margin:10px 0 0 0; font-size:14px;">
+  <span style="display:inline-block; padding:3px 10px; border-radius:999px; font-weight:700; {% if overdue %}background-color:#fef2f2; color:#b91c1c;{% elif days_left <= 1 %}background-color:#fffbeb; color:#b45309;{% else %}background-color:#eff6ff; color:#1d4ed8;{% endif %}">
+    {% if overdue %}Overdue since {{ statement.due_date|date:"j M" }}{% elif days_left == 0 %}Due today{% else %}Due {{ statement.due_date|date:"D, j M" }} · {{ days_left }} day{{ days_left|pluralize }}{% endif %}
+  </span>
+</p>
+{% if statement.min_due %}<p class="em-muted" style="margin:14px 0 0 0; font-size:13px; color:#64748b;">Minimum due {{ statement.min_due|inr }}. Paying only the minimum attracts interest on the rest.</p>{% endif %}
+{% if statement.added_count %}<p class="em-muted" style="margin:8px 0 0 0; font-size:13px; color:#64748b;">{{ statement.added_count }} charge{{ statement.added_count|pluralize }} on this statement had no email alert — worth a glance before paying.</p>{% endif %}
+<div style="height:20px; line-height:20px; font-size:0;">&nbsp;</div>
+{% endblock %}
+
+{% block cta_label %}View statement{% endblock %}
+{% block footer_note %}Already paid? Mark it paid in Vault and reminders stop — or they stop automatically once your bank emails a payment confirmation.{% endblock %}
+{% block disclaimer %}{% endblock %}

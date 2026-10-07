@@ -10,9 +10,9 @@
     <p class="text-xs font-bold tracking-widest uppercase text-primary">Portfolio</p>
     <h1 class="text-xl lg:text-2xl font-extrabold">Commodities</h1>
     <div class="flex flex-wrap items-center gap-3 mt-1 text-xs opacity-60">
-      <span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm text-warning">diamond</span>Gold ₹{{ gold_rate|floatformat:0|indian_number }}/g</span>
+      <span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm text-warning">diamond</span>Gold {{ gold_rate|inr }}/g</span>
       <span>&middot;</span>
-      <span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm opacity-60">toll</span>Silver ₹{{ silver_rate|floatformat:0|indian_number }}/g</span>
+      <span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm opacity-60">toll</span>Silver {{ silver_rate|inr }}/g</span>
     </div>
   </div>
   <div class="flex flex-wrap items-center gap-2">
@@ -28,29 +28,29 @@
     <div class="flex flex-wrap items-center gap-8">
       <div>
         <p class="text-[10px] font-bold uppercase tracking-widest opacity-40">Total Commodities Value</p>
-        <p class="text-3xl lg:text-4xl font-extrabold mt-1">₹{{ total|floatformat:0|indian_number }}</p>
+        <p class="text-3xl lg:text-4xl font-extrabold mt-1">{{ total|inr }}</p>
         <div class="mt-2">
           <span class="badge {% if total_returns >= 0 %}badge-success{% else %}badge-error{% endif %} badge-sm gap-1">
-            {% if total_returns >= 0 %}+{% endif %}₹{{ total_returns|floatformat:0|indian_number }} returns
+            {% if total_returns >= 0 %}+{% endif %}{{ total_returns|inr }} returns
           </span>
         </div>
       </div>
       <div class="flex flex-wrap gap-4">
         <div class="stat-card">
           <div class="text-[10px] uppercase tracking-wider opacity-50">Total Invested</div>
-          <div class="text-base font-bold mt-0.5">₹{{ total_invested|floatformat:0|indian_number }}</div>
+          <div class="text-base font-bold mt-0.5">{{ total_invested|inr }}</div>
         </div>
         <div class="stat-card stat-card-success">
           <div class="text-[10px] uppercase tracking-wider opacity-50">Returns</div>
-          <div class="text-base font-bold mt-0.5 {% if total_returns >= 0 %}text-success{% else %}text-error{% endif %}">{% if total_returns >= 0 %}+{% endif %}₹{{ total_returns|floatformat:0|indian_number }}</div>
+          <div class="text-base font-bold mt-0.5 {% if total_returns >= 0 %}text-success{% else %}text-error{% endif %}">{% if total_returns >= 0 %}+{% endif %}{{ total_returns|inr }}</div>
         </div>
         <div class="stat-card">
           <div class="text-[10px] uppercase tracking-wider opacity-50">Gold total</div>
-          <div class="text-base font-bold mt-0.5">₹{{ gold_value|floatformat:0|indian_number }}</div>
+          <div class="text-base font-bold mt-0.5">{{ gold_value|inr }}</div>
         </div>
         <div class="stat-card">
           <div class="text-[10px] uppercase tracking-wider opacity-50">Silver total</div>
-          <div class="text-base font-bold mt-0.5">₹{{ silver_value|floatformat:0|indian_number }}</div>
+          <div class="text-base font-bold mt-0.5">{{ silver_value|inr }}</div>
         </div>
       </div>
     </div>
@@ -63,8 +63,8 @@
     <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
       <h2 class="card-title text-base gap-2"><span class="material-symbols-outlined text-warning text-lg">diamond</span>Gold Holdings</h2>
       <div class="flex flex-wrap items-center gap-2">
-        <span class="badge badge-ghost badge-sm">{{ gold_weight|floatformat:0 }}g &middot; ₹{{ gold_rate|floatformat:0|indian_number }}/g</span>
-        <span class="badge badge-primary badge-sm">₹{{ gold_value|floatformat:0|indian_number }}</span>
+        <span class="badge badge-ghost badge-sm">{{ gold_weight|floatformat:0 }}g &middot; {{ gold_rate|inr }}/g</span>
+        <span class="badge badge-primary badge-sm">{{ gold_value|inr }}</span>
       </div>
     </div>
     {% if gold_holdings %}
@@ -91,9 +91,9 @@
             </td>
             <td class="opacity-60 text-sm">{{ h.purity }}</td>
             <td class="text-right" data-val="{{ h.weight_grams }}">{{ h.weight_grams|floatformat:2 }}g</td>
-            <td class="text-right opacity-60 text-sm whitespace-nowrap" data-val="{{ h.purchase_price_per_gram }}">₹{{ h.purchase_price_per_gram|floatformat:0|indian_number }}/g</td>
-            <td class="text-right font-semibold" data-val="{{ h.current_value }}">₹{{ h.current_value|floatformat:0|indian_number }}</td>
-            <td class="text-right font-semibold" data-val="{{ h.pnl }}"><span class="{% if h.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if h.pnl >= 0 %}+{% endif %}₹{{ h.pnl|floatformat:0|indian_number }}</span></td>
+            <td class="text-right opacity-60 text-sm whitespace-nowrap" data-val="{{ h.purchase_price_per_gram }}">{{ h.purchase_price_per_gram|inr }}/g</td>
+            <td class="text-right font-semibold" data-val="{{ h.current_value }}">{{ h.current_value|inr }}</td>
+            <td class="text-right font-semibold" data-val="{{ h.pnl }}"><span class="{% if h.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if h.pnl >= 0 %}+{% endif %}{{ h.pnl|inr }}</span></td>
             <td class="text-right">
               <div class="flex items-center justify-end gap-1">
                 <button type="button" class="btn btn-ghost btn-xs btn-square" data-edit-commodity data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}" data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}"><span class="material-symbols-outlined text-base">edit</span></button>
@@ -110,7 +110,7 @@
             <td colspan="2" class="font-bold text-primary">Total</td>
             <td class="text-right font-bold" data-val="{{ gold_weight }}">{{ gold_weight|floatformat:2 }}g</td>
             <td></td>
-            <td class="text-right font-bold text-primary" data-val="{{ gold_value }}">₹{{ gold_value|floatformat:0|indian_number }}</td>
+            <td class="text-right font-bold text-primary" data-val="{{ gold_value }}">{{ gold_value|inr }}</td>
             <td colspan="2"></td>
           </tr>
         </tbody>
@@ -138,15 +138,15 @@
           </div>
         </div>
         <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
-          <div><span class="opacity-50">Buy</span><div class="font-semibold mt-0.5">₹{{ h.purchase_price_per_gram|floatformat:0|indian_number }}/g</div></div>
-          <div><span class="opacity-50">Value</span><div class="font-semibold mt-0.5">₹{{ h.current_value|floatformat:0|indian_number }}</div></div>
-          <div><span class="opacity-50">P&L</span><div class="font-semibold mt-0.5 {% if h.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if h.pnl >= 0 %}+{% endif %}₹{{ h.pnl|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">Buy</span><div class="font-semibold mt-0.5">{{ h.purchase_price_per_gram|inr }}/g</div></div>
+          <div><span class="opacity-50">Value</span><div class="font-semibold mt-0.5">{{ h.current_value|inr }}</div></div>
+          <div><span class="opacity-50">P&L</span><div class="font-semibold mt-0.5 {% if h.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if h.pnl >= 0 %}+{% endif %}{{ h.pnl|inr }}</div></div>
         </div>
       </div>
       {% endfor %}
       <div class="flex items-center justify-between px-1 pt-2 border-t border-base-300 text-sm">
         <span class="font-bold text-primary">Total</span>
-        <span class="font-bold">{{ gold_weight|floatformat:2 }}g · <span class="text-primary">₹{{ gold_value|floatformat:0|indian_number }}</span></span>
+        <span class="font-bold">{{ gold_weight|floatformat:2 }}g · <span class="text-primary">{{ gold_value|inr }}</span></span>
       </div>
     </div>
     {% if gold_price_obj %}<p class="text-xs opacity-40 mt-2">Rate updated {{ gold_price_obj.fetched_at|timesince }} ago</p>{% endif %}
@@ -162,8 +162,8 @@
     <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
       <h2 class="card-title text-base gap-2"><span class="material-symbols-outlined text-lg opacity-60">toll</span>Silver Holdings</h2>
       <div class="flex flex-wrap items-center gap-2">
-        <span class="badge badge-ghost badge-sm">{{ silver_weight|floatformat:0|indian_number }}g &middot; ₹{{ silver_rate|floatformat:0|indian_number }}/g</span>
-        <span class="badge badge-primary badge-sm">₹{{ silver_value|floatformat:0|indian_number }}</span>
+        <span class="badge badge-ghost badge-sm">{{ silver_weight|floatformat:0|indian_number }}g &middot; {{ silver_rate|inr }}/g</span>
+        <span class="badge badge-primary badge-sm">{{ silver_value|inr }}</span>
       </div>
     </div>
     {% if silver_holdings %}
@@ -190,9 +190,9 @@
             </td>
             <td class="opacity-60 text-sm">{{ h.purity }}</td>
             <td class="text-right" data-val="{{ h.weight_grams }}">{{ h.weight_grams|floatformat:2 }}g</td>
-            <td class="text-right opacity-60 text-sm whitespace-nowrap" data-val="{{ h.purchase_price_per_gram }}">₹{{ h.purchase_price_per_gram|floatformat:0|indian_number }}/g</td>
-            <td class="text-right font-semibold" data-val="{{ h.current_value }}">₹{{ h.current_value|floatformat:0|indian_number }}</td>
-            <td class="text-right font-semibold" data-val="{{ h.pnl }}"><span class="{% if h.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if h.pnl >= 0 %}+{% endif %}₹{{ h.pnl|floatformat:0|indian_number }}</span></td>
+            <td class="text-right opacity-60 text-sm whitespace-nowrap" data-val="{{ h.purchase_price_per_gram }}">{{ h.purchase_price_per_gram|inr }}/g</td>
+            <td class="text-right font-semibold" data-val="{{ h.current_value }}">{{ h.current_value|inr }}</td>
+            <td class="text-right font-semibold" data-val="{{ h.pnl }}"><span class="{% if h.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if h.pnl >= 0 %}+{% endif %}{{ h.pnl|inr }}</span></td>
             <td class="text-right">
               <div class="flex items-center justify-end gap-1">
                 <button type="button" class="btn btn-ghost btn-xs btn-square" data-edit-commodity data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}" data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}"><span class="material-symbols-outlined text-base">edit</span></button>
@@ -209,7 +209,7 @@
             <td colspan="2" class="font-bold text-primary">Total</td>
             <td class="text-right font-bold" data-val="{{ silver_weight }}">{{ silver_weight|floatformat:2 }}g</td>
             <td></td>
-            <td class="text-right font-bold text-primary" data-val="{{ silver_value }}">₹{{ silver_value|floatformat:0|indian_number }}</td>
+            <td class="text-right font-bold text-primary" data-val="{{ silver_value }}">{{ silver_value|inr }}</td>
             <td colspan="2"></td>
           </tr>
         </tbody>
@@ -237,15 +237,15 @@
           </div>
         </div>
         <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
-          <div><span class="opacity-50">Buy</span><div class="font-semibold mt-0.5">₹{{ h.purchase_price_per_gram|floatformat:0|indian_number }}/g</div></div>
-          <div><span class="opacity-50">Value</span><div class="font-semibold mt-0.5">₹{{ h.current_value|floatformat:0|indian_number }}</div></div>
-          <div><span class="opacity-50">P&L</span><div class="font-semibold mt-0.5 {% if h.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if h.pnl >= 0 %}+{% endif %}₹{{ h.pnl|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">Buy</span><div class="font-semibold mt-0.5">{{ h.purchase_price_per_gram|inr }}/g</div></div>
+          <div><span class="opacity-50">Value</span><div class="font-semibold mt-0.5">{{ h.current_value|inr }}</div></div>
+          <div><span class="opacity-50">P&L</span><div class="font-semibold mt-0.5 {% if h.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if h.pnl >= 0 %}+{% endif %}{{ h.pnl|inr }}</div></div>
         </div>
       </div>
       {% endfor %}
       <div class="flex items-center justify-between px-1 pt-2 border-t border-base-300 text-sm">
         <span class="font-bold text-primary">Total</span>
-        <span class="font-bold">{{ silver_weight|floatformat:2 }}g · <span class="text-primary">₹{{ silver_value|floatformat:0|indian_number }}</span></span>
+        <span class="font-bold">{{ silver_weight|floatformat:2 }}g · <span class="text-primary">{{ silver_value|inr }}</span></span>
       </div>
     </div>
     {% if silver_price_obj %}<p class="text-xs opacity-40 mt-2">Rate updated {{ silver_price_obj.fetched_at|timesince }} ago</p>{% endif %}

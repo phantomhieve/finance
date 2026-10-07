@@ -7,7 +7,7 @@ from django.test import SimpleTestCase, TransactionTestCase
 from mcp_server import middleware as mw
 
 
-def _call(scopes, body, method='POST'):
+def _call(scopes, body, method='POST', headers=None, query=b''):
     """Run the middleware once against a stub app; return (status, downstream_body)."""
     seen = {}
 
@@ -26,8 +26,8 @@ def _call(scopes, body, method='POST'):
         return {'type': 'http.request', 'body': body, 'more_body': False}
 
     scope = {
-        'type': 'http', 'method': method, 'path': '/', 'query_string': b'',
-        'headers': [(b'authorization', b'Bearer abc')], 'scheme': 'https',
+        'type': 'http', 'method': method, 'path': '/', 'query_string': query,
+        'headers': [(b'authorization', b'Bearer abc')] if headers is None else headers, 'scheme': 'https',
     }
 
     async def run():
@@ -62,6 +62,11 @@ class OAuthScopeMiddlewareTests(SimpleTestCase):
         batch = json.dumps([json.loads(_rpc('get_notes')), json.loads(_rpc('update_note'))]).encode()
         status, _ = _call({'read'}, batch)
         self.assertEqual(status, 403)
+
+    def test_token_in_query_string_is_not_accepted(self):
+        status, downstream = _call({'read', 'write'}, _rpc('get_notes'), headers=[], query=b'access_token=abc')
+        self.assertEqual(status, 401)
+        self.assertIsNone(downstream)
 
     def test_write_scope_allows_write_tool(self):
         status, _ = _call({'read', 'write'}, _rpc('add_transaction'))
@@ -112,6 +117,12 @@ class OAuthTenancyTests(TransactionTestCase):
 
     def test_token_from_other_household_is_rejected(self):
         self.assertIsNone(self._scopes(self._token(self.outsider)))
+
+    def test_spouse_and_landlord_tokens_are_rejected(self):
+        from tracker.models import User
+        for kind in ('ACCOUNT_HOLDER', 'LANDLORD'):
+            member = User.objects.create_user(username=kind.lower(), password="x", user_type=kind, group=self.home)
+            self.assertIsNone(self._scopes(self._token(member)), kind)
 
     def test_token_from_served_household_is_accepted(self):
         self.assertEqual(self._scopes(self._token(self.owner)), {'read', 'write'})

@@ -1,0 +1,110 @@
+{# Add / edit bottom sheet. Populated by static/js/expenses.js from the #expense-data payload. #}
+<dialog id="expenseModal" class="modal modal-bottom sm:modal-middle">
+  <div class="modal-box max-w-lg p-0 max-h-[92vh] flex flex-col">
+    <div class="flex items-center justify-between px-5 pt-5 pb-3">
+      <h3 class="font-bold text-lg" id="expModalTitle">Add expense</h3>
+      <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="closeModal('expenseModal')" aria-label="Close">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+
+    <form method="post" id="expenseForm" action="{% url 'expense_add' %}" class="overflow-y-auto px-5 pb-5 flex flex-col gap-3">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+      <div id="expFlagBox" class="alert alert-warning alert-soft text-xs py-2.5 hidden items-start">
+        <span class="material-symbols-outlined text-lg">flag</span>
+        <div class="flex-1">
+          <p class="font-semibold mb-0.5">Looks unusual</p>
+          <ul id="expFlagReasons" class="list-disc pl-4 opacity-80"></ul>
+        </div>
+        <button type="submit" form="expReviewForm" class="btn btn-xs btn-warning" id="expReviewBtn">Looks fine</button>
+      </div>
+
+      <div class="join w-full">
+        <input type="radio" name="direction" value="DEBIT" aria-label="Spent" class="join-item btn btn-sm flex-1" checked id="expDirDebit">
+        <input type="radio" name="direction" value="CREDIT" aria-label="Received / refund" class="join-item btn btn-sm flex-1" id="expDirCredit">
+      </div>
+
+      <label class="flex flex-col gap-1">
+        <span class="text-xs font-bold uppercase tracking-wider opacity-50">Amount (₹)</span>
+        <input type="text" name="amount" id="expAmount" inputmode="decimal" required placeholder="0"
+               class="input input-bordered w-full exp-amount-input" autocomplete="off">
+      </label>
+
+      <label class="flex flex-col gap-1">
+        <span class="text-xs font-bold uppercase tracking-wider opacity-50">Merchant / description</span>
+        <input type="text" name="merchant" id="expMerchant" required maxlength="120" placeholder="e.g. Swiggy, Rent, Petrol"
+               class="input input-bordered w-full" autocomplete="off" list="expMerchantList">
+      </label>
+
+      <div class="grid grid-cols-2 gap-3">
+        <label class="flex flex-col gap-1">
+          <span class="text-xs font-bold uppercase tracking-wider opacity-50">Date</span>
+          <input type="date" name="txn_date" id="expDate" required class="input input-bordered w-full" value="{{ today|date:'Y-m-d' }}">
+        </label>
+        <label class="flex flex-col gap-1">
+          <span class="text-xs font-bold uppercase tracking-wider opacity-50">Category</span>
+          <select name="category" id="expCategory" class="select select-bordered w-full">
+            <option value="">Uncategorised</option>
+            {% for c in categories %}<option value="{{ c.pk }}">{{ c.name }}</option>{% endfor %}
+          </select>
+        </label>
+      </div>
+
+      <label class="flex items-start gap-2 cursor-pointer hidden" id="expRememberRow">
+        <input type="checkbox" name="remember" id="expRemember" class="checkbox checkbox-sm checkbox-primary mt-0.5" checked>
+        <span class="text-xs leading-snug opacity-75">Always file <strong id="expRememberName">this merchant</strong> under this category — and re-file its past transactions.</span>
+      </label>
+
+      <div class="grid grid-cols-2 gap-3">
+        <label class="flex flex-col gap-1">
+          <span class="text-xs font-bold uppercase tracking-wider opacity-50">Paid with</span>
+          <select name="payment_source" id="expSource" class="select select-bordered w-full">
+            <option value="">—</option>
+            {% for s in payment_sources %}<option value="{{ s.pk }}">{{ s.display_name }}</option>{% endfor %}
+          </select>
+        </label>
+        <label class="flex flex-col gap-1">
+          <span class="text-xs font-bold uppercase tracking-wider opacity-50">Spent by</span>
+          <select name="member" id="expMember" class="select select-bordered w-full">
+            <option value="">—</option>
+            {% for m in members %}<option value="{{ m.pk }}" {% if m.pk == user.pk %}data-self="1"{% endif %}>{{ m.first_name|default:m.username }}</option>{% endfor %}
+          </select>
+        </label>
+      </div>
+
+      <label class="flex flex-col gap-1">
+        <span class="text-xs font-bold uppercase tracking-wider opacity-50">Notes</span>
+        <textarea name="notes" id="expNotes" rows="2" class="textarea textarea-bordered w-full" placeholder="Optional"></textarea>
+      </label>
+
+      <details id="expMeta" class="hidden text-xs bg-base-200/60 rounded-xl px-3 py-2">
+        <summary class="cursor-pointer font-semibold opacity-60">Where this came from</summary>
+        <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 mt-2 opacity-75">
+          <dt class="opacity-60">Source</dt><dd id="expMetaSource"></dd>
+          <dt class="opacity-60">Category by</dt><dd id="expMetaCat"></dd>
+          <dt class="opacity-60" id="expMetaRawLbl">Raw text</dt><dd id="expMetaRaw" class="break-words"></dd>
+          <dt class="opacity-60" id="expMetaSubjLbl">Email</dt><dd id="expMetaSubject" class="break-words"></dd>
+        </dl>
+      </details>
+
+      <div class="flex items-center gap-2 pt-1">
+        <button type="button" id="expDeleteBtn" class="btn btn-ghost btn-sm text-error hidden" onclick="Expenses.remove()">
+          <span class="material-symbols-outlined text-base">delete</span>Remove
+        </button>
+        <div class="flex-1"></div>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('expenseModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm" id="expSubmit">Save</button>
+      </div>
+    </form>
+
+    <form method="post" id="expReviewForm" class="hidden">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form>
+    <form method="post" id="expDeleteForm" class="hidden">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<datalist id="expMerchantList">
+  {% for m in summary.merchants %}<option value="{{ m.merchant }}">{% endfor %}
+</datalist>

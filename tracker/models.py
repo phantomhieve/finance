@@ -57,6 +57,7 @@ class User(AbstractUser):
     def can_edit_savings(self):
         return self.user_type == 'PRIMARY'
 
+    # Portfolio: only the household's primary holder (spouse and landlord never see investments).
     @property
     def can_view_portfolio(self):
         return self.user_type == 'PRIMARY'
@@ -64,6 +65,9 @@ class User(AbstractUser):
     @property
     def can_view_jewellery(self):
         return self.user_type in ('PRIMARY', 'ACCOUNT_HOLDER')
+
+    # Household expenses: both partners connect their own Gmail and edit shared spend.
+    can_view_expenses = _is_account_member
 
     @property
     def is_primary(self):
@@ -330,7 +334,7 @@ class HouseholdConfig(models.Model):
         default=True, help_text="Portfolio & investments",
     )
     feature_jewellery = models.BooleanField(
-        default=False, help_text="Jewellery vault",
+        default=True, help_text="Jewellery vault",
     )
     feature_hra = models.BooleanField(
         default=True, help_text="HRA & rent tracking",
@@ -343,6 +347,9 @@ class HouseholdConfig(models.Model):
     )
     feature_ai_insights = models.BooleanField(
         default=True, help_text="AI portfolio analysis",
+    )
+    feature_expenses = models.BooleanField(
+        default=True, help_text="Expense tracker (Gmail-detected spend)",
     )
 
     # Google Sheets — per-household service account

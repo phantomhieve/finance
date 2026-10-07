@@ -26,10 +26,10 @@
     <div class="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6 items-start">
       <div>
         <div class="text-xs opacity-60 font-medium">Total Portfolio</div>
-        <div class="text-3xl font-bold mt-1 text-primary">₹{{ total_portfolio|floatformat:0|indian_number }}</div>
+        <div class="text-3xl font-bold mt-1 text-primary">{{ total_portfolio|inr }}</div>
         <div class="flex gap-4 text-xs mt-2 opacity-60">
-          <span>Invested: <strong>₹{{ total_invested|floatformat:0|indian_number }}</strong></span>
-          <span>Returns: <strong class="{% if total_returns >= 0 %}text-success{% else %}text-error{% endif %}">{% if total_returns >= 0 %}+{% endif %}₹{{ total_returns|floatformat:0|indian_number }}</strong></span>
+          <span>Invested: <strong>{{ total_invested|inr }}</strong></span>
+          <span>Returns: <strong class="{% if total_returns >= 0 %}text-success{% else %}text-error{% endif %}">{% if total_returns >= 0 %}+{% endif %}{{ total_returns|inr }}</strong></span>
         </div>
       </div>
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full lg:min-w-[min(100%,28rem)]">
@@ -37,21 +37,21 @@
           <span class="material-symbols-outlined text-primary shrink-0">candlestick_chart</span>
           <div class="min-w-0">
             <div class="text-[10px] uppercase tracking-wider opacity-50">Stocks</div>
-            <div class="text-base font-bold mt-0.5">₹{{ total_stocks|floatformat:0|indian_number }}</div>
+            <div class="text-base font-bold mt-0.5">{{ total_stocks|inr }}</div>
           </div>
         </div>
         <div class="stat-card flex flex-row items-center gap-2">
           <span class="material-symbols-outlined text-secondary shrink-0">trending_up</span>
           <div class="min-w-0">
             <div class="text-[10px] uppercase tracking-wider opacity-50">Index Funds</div>
-            <div class="text-base font-bold mt-0.5">₹{{ total_index|floatformat:0|indian_number }}</div>
+            <div class="text-base font-bold mt-0.5">{{ total_index|inr }}</div>
           </div>
         </div>
         <div class="stat-card flex flex-row items-center gap-2">
           <span class="material-symbols-outlined text-accent shrink-0">pie_chart</span>
           <div class="min-w-0">
             <div class="text-[10px] uppercase tracking-wider opacity-50">Other MF</div>
-            <div class="text-base font-bold mt-0.5">₹{{ total_other|floatformat:0|indian_number }}</div>
+            <div class="text-base font-bold mt-0.5">{{ total_other|inr }}</div>
           </div>
         </div>
       </div>
@@ -64,7 +64,7 @@
   <div class="card-body p-4">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
       <h2 class="card-title text-base">Stock Holdings</h2>
-      <span class="badge badge-primary badge-sm">₹{{ total_stocks|floatformat:0|indian_number }}</span>
+      <span class="badge badge-primary badge-sm">{{ total_stocks|inr }}</span>
     </div>
     {% if stocks %}
     <div class="hidden md:block overflow-x-auto -mx-2 px-2">
@@ -105,9 +105,9 @@
           <span class="text-xs opacity-50">{{ s.quantity }} qty</span>
         </div>
         <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
-          <div><span class="opacity-50">Bought</span><div class="font-semibold mt-0.5">₹{{ s.purchase_value|floatformat:0|indian_number }}</div></div>
-          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5">₹{{ s.current_value|floatformat:0|indian_number }}</div></div>
-          <div><span class="opacity-50">P&amp;L</span><div class="font-semibold mt-0.5 {% if s.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if s.pnl >= 0 %}+{% endif %}₹{{ s.pnl|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">Bought</span><div class="font-semibold mt-0.5">{{ s.purchase_value|inr }}</div></div>
+          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5">{{ s.current_value|inr }}</div></div>
+          <div><span class="opacity-50">P&amp;L</span><div class="font-semibold mt-0.5 {% if s.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if s.pnl >= 0 %}+{% endif %}{{ s.pnl|inr }}</div></div>
         </div>
       </div>
       {% endfor %}
@@ -123,7 +123,7 @@
   <div class="card-body p-4">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
       <h2 class="card-title text-base">Index Mutual Funds</h2>
-      <span class="badge badge-secondary badge-sm">₹{{ total_index|floatformat:0|indian_number }}</span>
+      <span class="badge badge-secondary badge-sm">{{ total_index|inr }}</span>
     </div>
     {% if index_mf %}
     <div class="hidden md:block overflow-x-auto -mx-2 px-2">
@@ -164,9 +164,9 @@
           <span class="text-xs opacity-50">{{ m.units|floatformat:3 }} units</span>
         </div>
         <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
-          <div><span class="opacity-50">Bought</span><div class="font-semibold mt-0.5">₹{{ m.purchase_value|floatformat:0|indian_number }}</div></div>
-          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5">₹{{ m.current_value|floatformat:0|indian_number }}</div></div>
-          <div><span class="opacity-50">P&amp;L</span><div class="font-semibold mt-0.5 {% if m.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if m.pnl >= 0 %}+{% endif %}₹{{ m.pnl|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">Bought</span><div class="font-semibold mt-0.5">{{ m.purchase_value|inr }}</div></div>
+          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5">{{ m.current_value|inr }}</div></div>
+          <div><span class="opacity-50">P&amp;L</span><div class="font-semibold mt-0.5 {% if m.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if m.pnl >= 0 %}+{% endif %}{{ m.pnl|inr }}</div></div>
         </div>
       </div>
       {% endfor %}
@@ -182,7 +182,7 @@
   <div class="card-body p-4">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
       <h2 class="card-title text-base">Other Mutual Funds</h2>
-      <span class="badge badge-accent badge-sm">₹{{ total_other|floatformat:0|indian_number }}</span>
+      <span class="badge badge-accent badge-sm">{{ total_other|inr }}</span>
     </div>
     {% if other_mf %}
     <div class="hidden md:block overflow-x-auto -mx-2 px-2">
@@ -223,9 +223,9 @@
           <span class="text-xs opacity-50">{{ m.units|floatformat:3 }} units</span>
         </div>
         <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
-          <div><span class="opacity-50">Bought</span><div class="font-semibold mt-0.5">₹{{ m.purchase_value|floatformat:0|indian_number }}</div></div>
-          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5">₹{{ m.current_value|floatformat:0|indian_number }}</div></div>
-          <div><span class="opacity-50">P&amp;L</span><div class="font-semibold mt-0.5 {% if m.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if m.pnl >= 0 %}+{% endif %}₹{{ m.pnl|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">Bought</span><div class="font-semibold mt-0.5">{{ m.purchase_value|inr }}</div></div>
+          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5">{{ m.current_value|inr }}</div></div>
+          <div><span class="opacity-50">P&amp;L</span><div class="font-semibold mt-0.5 {% if m.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if m.pnl >= 0 %}+{% endif %}{{ m.pnl|inr }}</div></div>
         </div>
       </div>
       {% endfor %}

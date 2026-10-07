@@ -17,9 +17,9 @@ dialog textarea {
   font-size: 0.875rem;
   line-height: 1.25rem;
   border-radius: var(--rounded-btn, 0.5rem);
-  border: 1px solid oklch(var(--bc) / 0.15);
-  background-color: oklch(var(--b1) / 1);
-  color: oklch(var(--bc) / 1);
+  border: 1px solid color-mix(in oklch, var(--color-base-content) 15%, transparent);
+  background-color: var(--color-base-100);
+  color: var(--color-base-content);
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
@@ -37,14 +37,14 @@ dialog textarea {
 dialog input:focus,
 dialog select:focus,
 dialog textarea:focus {
-  border-color: oklch(var(--p) / 0.8);
-  box-shadow: 0 0 0 3px oklch(var(--p) / 0.12);
+  border-color: color-mix(in oklch, var(--color-primary) 80%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--color-primary) 12%, transparent);
 }
 
 .form-field input[type="checkbox"] {
   width: 1.25rem;
   height: 1.25rem;
-  accent-color: oklch(var(--p) / 1);
+  accent-color: var(--color-primary);
 }
 
 /* ── Filled icon class ─────────────────────────────────────────────── */
@@ -94,7 +94,7 @@ dialog textarea:focus {
 /* ── Brand gradient text ───────────────────────────────────────────── */
 
 .brand-text {
-  background: linear-gradient(135deg, oklch(var(--p) / 1), oklch(var(--s) / 1));
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -103,18 +103,18 @@ dialog textarea:focus {
 /* ── Navbar glass ──────────────────────────────────────────────────── */
 
 .navbar-glass {
-  background: oklch(var(--b1) / 0.92);
+  background: color-mix(in oklch, var(--color-base-100) 92%, transparent);
   backdrop-filter: blur(24px) saturate(1.5);
-  border-bottom: 1px solid oklch(var(--bc) / 0.05);
-  box-shadow: 0 1px 8px oklch(var(--bc) / 0.06);
+  border-bottom: 1px solid color-mix(in oklch, var(--color-base-content) 5%, transparent);
+  box-shadow: 0 1px 8px color-mix(in oklch, var(--color-base-content) 6%, transparent);
   padding-top: env(safe-area-inset-top, 0px);
 }
 
 [data-theme="winter"] .navbar-glass {
-  background: oklch(var(--b1) / 0.85);
+  background: color-mix(in oklch, var(--color-base-100) 85%, transparent);
   box-shadow:
-    0 1px 3px oklch(var(--bc) / 0.04),
-    0 4px 16px oklch(var(--bc) / 0.03);
+    0 1px 3px color-mix(in oklch, var(--color-base-content) 4%, transparent),
+    0 4px 16px color-mix(in oklch, var(--color-base-content) 3%, transparent);
 }
 
 /* ── Theme toggle button ─────────────────────────────────────────── */
@@ -134,7 +134,7 @@ dialog textarea:focus {
 }
 
 .theme-toggle-btn:hover {
-  background: oklch(var(--bc) / 0.06);
+  background: color-mix(in oklch, var(--color-base-content) 6%, transparent);
 }
 
 .theme-toggle-btn:active {
@@ -183,27 +183,27 @@ dialog textarea:focus {
 
 .hero-gradient {
   background:
-    radial-gradient(ellipse at 0% 0%, oklch(var(--p) / 0.14) 0%, transparent 50%),
-    radial-gradient(ellipse at 100% 100%, oklch(var(--s) / 0.10) 0%, transparent 50%),
-    oklch(var(--b2) / 1);
-  border: 1px solid oklch(var(--p) / 0.12);
+    radial-gradient(ellipse at 0% 0%, color-mix(in oklch, var(--color-primary) 14%, transparent) 0%, transparent 50%),
+    radial-gradient(ellipse at 100% 100%, color-mix(in oklch, var(--color-secondary) 10%, transparent) 0%, transparent 50%),
+    var(--color-base-200);
+  border: 1px solid color-mix(in oklch, var(--color-primary) 12%, transparent);
 }
 
 .hero-gradient-success {
   background:
-    radial-gradient(ellipse at 0% 50%, oklch(var(--su) / 0.12) 0%, transparent 60%),
-    radial-gradient(ellipse at 100% 0%, oklch(var(--p) / 0.08) 0%, transparent 50%),
-    oklch(var(--b2) / 1);
-  border: 1px solid oklch(var(--su) / 0.10);
+    radial-gradient(ellipse at 0% 50%, color-mix(in oklch, var(--color-success) 12%, transparent) 0%, transparent 60%),
+    radial-gradient(ellipse at 100% 0%, color-mix(in oklch, var(--color-primary) 8%, transparent) 0%, transparent 50%),
+    var(--color-base-200);
+  border: 1px solid color-mix(in oklch, var(--color-success) 10%, transparent);
 }
 
 .hero-gradient-portfolio {
   background:
-    radial-gradient(ellipse at 15% 0%, oklch(var(--p) / 0.18) 0%, transparent 45%),
-    radial-gradient(ellipse at 85% 100%, oklch(var(--a) / 0.10) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 50%, oklch(var(--s) / 0.05) 0%, transparent 70%),
-    oklch(var(--b2) / 1);
-  border: 1px solid oklch(var(--p) / 0.14);
+    radial-gradient(ellipse at 15% 0%, color-mix(in oklch, var(--color-primary) 18%, transparent) 0%, transparent 45%),
+    radial-gradient(ellipse at 85% 100%, color-mix(in oklch, var(--color-accent) 10%, transparent) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, color-mix(in oklch, var(--color-secondary) 5%, transparent) 0%, transparent 70%),
+    var(--color-base-200);
+  border: 1px solid color-mix(in oklch, var(--color-primary) 14%, transparent);
   position: relative;
   overflow: hidden;
 }
@@ -214,7 +214,7 @@ dialog textarea:focus {
   left: -100%;
   width: 50%;
   height: 1px;
-  background: linear-gradient(90deg, transparent, oklch(var(--p) / 0.5), transparent);
+  background: linear-gradient(90deg, transparent, color-mix(in oklch, var(--color-primary) 50%, transparent), transparent);
   animation: hero-shimmer 6s ease-in-out infinite;
 }
 @keyframes hero-shimmer {
@@ -233,9 +233,9 @@ dialog textarea:focus {
 .card-hover:hover {
   transform: translateY(-2px);
   box-shadow:
-    0 8px 30px oklch(var(--bc) / 0.07),
-    0 2px 8px oklch(var(--bc) / 0.04);
-  border-color: oklch(var(--p) / 0.08);
+    0 8px 30px color-mix(in oklch, var(--color-base-content) 7%, transparent),
+    0 2px 8px color-mix(in oklch, var(--color-base-content) 4%, transparent);
+  border-color: color-mix(in oklch, var(--color-primary) 8%, transparent);
 }
 
 @media (hover: none) {
@@ -249,36 +249,36 @@ dialog textarea:focus {
 /* ── Stat card ─────────────────────────────────────────────────────── */
 
 .stat-card {
-  background: oklch(var(--b2) / 0.6);
+  background: color-mix(in oklch, var(--color-base-200) 60%, transparent);
   backdrop-filter: blur(8px);
-  border: 1px solid oklch(var(--bc) / 0.05);
+  border: 1px solid color-mix(in oklch, var(--color-base-content) 5%, transparent);
   border-radius: 0.75rem;
   padding: 0.875rem 1rem;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .stat-card:hover {
-  box-shadow: 0 2px 8px oklch(var(--bc) / 0.04);
+  box-shadow: 0 2px 8px color-mix(in oklch, var(--color-base-content) 4%, transparent);
 }
 
 .stat-card-primary {
-  border-color: oklch(var(--p) / 0.18);
-  background: linear-gradient(135deg, oklch(var(--p) / 0.06) 0%, oklch(var(--b2) / 0.6) 100%);
+  border-color: color-mix(in oklch, var(--color-primary) 18%, transparent);
+  background: linear-gradient(135deg, color-mix(in oklch, var(--color-primary) 6%, transparent) 0%, color-mix(in oklch, var(--color-base-200) 60%, transparent) 100%);
 }
 
 .stat-card-success {
-  border-color: oklch(var(--su) / 0.18);
-  background: linear-gradient(135deg, oklch(var(--su) / 0.06) 0%, oklch(var(--b2) / 0.6) 100%);
+  border-color: color-mix(in oklch, var(--color-success) 18%, transparent);
+  background: linear-gradient(135deg, color-mix(in oklch, var(--color-success) 6%, transparent) 0%, color-mix(in oklch, var(--color-base-200) 60%, transparent) 100%);
 }
 
 .stat-card-error {
-  border-color: oklch(var(--er) / 0.18);
-  background: linear-gradient(135deg, oklch(var(--er) / 0.06) 0%, oklch(var(--b2) / 0.6) 100%);
+  border-color: color-mix(in oklch, var(--color-error) 18%, transparent);
+  background: linear-gradient(135deg, color-mix(in oklch, var(--color-error) 6%, transparent) 0%, color-mix(in oklch, var(--color-base-200) 60%, transparent) 100%);
 }
 
 .stat-card-accent {
-  border-color: oklch(var(--a) / 0.18);
-  background: linear-gradient(135deg, oklch(var(--a) / 0.06) 0%, oklch(var(--b2) / 0.6) 100%);
+  border-color: color-mix(in oklch, var(--color-accent) 18%, transparent);
+  background: linear-gradient(135deg, color-mix(in oklch, var(--color-accent) 6%, transparent) 0%, color-mix(in oklch, var(--color-base-200) 60%, transparent) 100%);
 }
 
 /* ── Month grid cards ──────────────────────────────────────────────── */
@@ -289,7 +289,7 @@ dialog textarea:focus {
 
 .month-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 16px oklch(var(--bc) / 0.08);
+  box-shadow: 0 4px 16px color-mix(in oklch, var(--color-base-content) 8%, transparent);
 }
 
 /* ── Mobile table-to-card ──────────────────────────────────────────── */
@@ -297,14 +297,14 @@ dialog textarea:focus {
 .table-card {
   padding: 0.75rem 0.875rem;
   border-radius: 0.75rem;
-  background: oklch(var(--b2) / 0.5);
-  border: 1px solid oklch(var(--bc) / 0.05);
+  background: color-mix(in oklch, var(--color-base-200) 50%, transparent);
+  border: 1px solid color-mix(in oklch, var(--color-base-content) 5%, transparent);
   transition: background 0.15s, border-color 0.15s, transform 0.1s;
 }
 
 .table-card:active {
-  background: oklch(var(--b2) / 0.85);
-  border-color: oklch(var(--bc) / 0.1);
+  background: color-mix(in oklch, var(--color-base-200) 85%, transparent);
+  border-color: color-mix(in oklch, var(--color-base-content) 10%, transparent);
   transform: scale(0.985);
 }
 
@@ -312,10 +312,10 @@ dialog textarea:focus {
 
 .dock {
   padding-bottom: env(safe-area-inset-bottom, 0px);
-  border-top: 1px solid oklch(var(--bc) / 0.06);
-  background: oklch(var(--b1) / 0.96);
+  border-top: 1px solid color-mix(in oklch, var(--color-base-content) 6%, transparent);
+  background: color-mix(in oklch, var(--color-base-100) 96%, transparent);
   backdrop-filter: blur(24px) saturate(1.5);
-  box-shadow: 0 -4px 20px oklch(var(--bc) / 0.08);
+  box-shadow: 0 -4px 20px color-mix(in oklch, var(--color-base-content) 8%, transparent);
 }
 
 .dock a {
@@ -328,7 +328,7 @@ dialog textarea:focus {
 }
 
 .dock a.dock-active {
-  color: oklch(var(--p) / 1);
+  color: var(--color-primary);
   opacity: 1;
 }
 
@@ -337,7 +337,7 @@ dialog textarea:focus {
 }
 
 .dock a.dock-active .material-symbols-outlined {
-  filter: drop-shadow(0 0 6px oklch(var(--p) / 0.3));
+  filter: drop-shadow(0 0 6px color-mix(in oklch, var(--color-primary) 30%, transparent));
 }
 
 /* ── Chart containers ──────────────────────────────────────────────── */
@@ -357,7 +357,7 @@ dialog textarea:focus {
 
 .ai-score-ring-bg {
   fill: none;
-  stroke: oklch(var(--b3) / 1);
+  stroke: var(--color-base-300);
   stroke-width: 4;
 }
 
@@ -370,9 +370,9 @@ dialog textarea:focus {
   transition: stroke-dashoffset 1.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.ai-score-high .ai-score-ring-fg { stroke: oklch(var(--su) / 1); }
-.ai-score-mid .ai-score-ring-fg  { stroke: oklch(var(--wa) / 1); }
-.ai-score-low .ai-score-ring-fg  { stroke: oklch(var(--er) / 1); }
+.ai-score-high .ai-score-ring-fg { stroke: var(--color-success); }
+.ai-score-mid .ai-score-ring-fg  { stroke: var(--color-warning); }
+.ai-score-low .ai-score-ring-fg  { stroke: var(--color-error); }
 
 .ai-score-ring {
   position: relative;
@@ -396,26 +396,26 @@ dialog textarea:focus {
 /* ── AI Insight severity indicators ───────────────────────────────── */
 
 .ai-sev-critical {
-  border-left: 3px solid oklch(var(--er) / 0.8);
-  background: linear-gradient(135deg, oklch(var(--er) / 0.08) 0%, oklch(var(--b2) / 0.4) 100%);
+  border-left: 3px solid color-mix(in oklch, var(--color-error) 80%, transparent);
+  background: linear-gradient(135deg, color-mix(in oklch, var(--color-error) 8%, transparent) 0%, color-mix(in oklch, var(--color-base-200) 40%, transparent) 100%);
   border-radius: 0.5rem;
   padding-left: 1rem !important;
 }
 .ai-sev-warning {
-  border-left: 3px solid oklch(var(--wa) / 0.8);
-  background: linear-gradient(135deg, oklch(var(--wa) / 0.08) 0%, oklch(var(--b2) / 0.4) 100%);
+  border-left: 3px solid color-mix(in oklch, var(--color-warning) 80%, transparent);
+  background: linear-gradient(135deg, color-mix(in oklch, var(--color-warning) 8%, transparent) 0%, color-mix(in oklch, var(--color-base-200) 40%, transparent) 100%);
   border-radius: 0.5rem;
   padding-left: 1rem !important;
 }
 .ai-sev-positive {
-  border-left: 3px solid oklch(var(--su) / 0.8);
-  background: linear-gradient(135deg, oklch(var(--su) / 0.08) 0%, oklch(var(--b2) / 0.4) 100%);
+  border-left: 3px solid color-mix(in oklch, var(--color-success) 80%, transparent);
+  background: linear-gradient(135deg, color-mix(in oklch, var(--color-success) 8%, transparent) 0%, color-mix(in oklch, var(--color-base-200) 40%, transparent) 100%);
   border-radius: 0.5rem;
   padding-left: 1rem !important;
 }
 .ai-sev-info {
-  border-left: 3px solid oklch(var(--in) / 0.8);
-  background: linear-gradient(135deg, oklch(var(--in) / 0.08) 0%, oklch(var(--b2) / 0.4) 100%);
+  border-left: 3px solid color-mix(in oklch, var(--color-info) 80%, transparent);
+  background: linear-gradient(135deg, color-mix(in oklch, var(--color-info) 8%, transparent) 0%, color-mix(in oklch, var(--color-base-200) 40%, transparent) 100%);
   border-radius: 0.5rem;
   padding-left: 1rem !important;
 }
@@ -423,7 +423,7 @@ dialog textarea:focus {
 /* ── Monitor Gauge SVG ────────────────────────────────────────────── */
 
 .mon-gauge-svg { width: 120px; height: 120px; }
-.mon-gauge-track { fill: none; stroke: oklch(var(--b3) / 1); stroke-width: 8; }
+.mon-gauge-track { fill: none; stroke: var(--color-base-300); stroke-width: 8; }
 .mon-gauge-fill {
   fill: none;
   stroke-width: 8;
@@ -437,13 +437,13 @@ dialog textarea:focus {
   dominant-baseline: auto;
   font-size: 16px;
   font-weight: 700;
-  fill: oklch(var(--bc) / 1);
+  fill: var(--color-base-content);
 }
 .mon-gauge-subtext {
   text-anchor: middle;
   dominant-baseline: auto;
   font-size: 8px;
-  fill: oklch(var(--bc) / 0.5);
+  fill: color-mix(in oklch, var(--color-base-content) 50%, transparent);
 }
 
 /* ── Login vault icon ─────────────────────────────────────────────── */
@@ -457,13 +457,13 @@ dialog textarea:focus {
   height: 96px;
   border-radius: 24px;
   background:
-    linear-gradient(135deg, oklch(var(--b1) / 0.6), oklch(var(--b2) / 0.4));
-  border: 1.5px solid oklch(var(--p) / 0.25);
+    linear-gradient(135deg, color-mix(in oklch, var(--color-base-100) 60%, transparent), color-mix(in oklch, var(--color-base-200) 40%, transparent));
+  border: 1.5px solid color-mix(in oklch, var(--color-primary) 25%, transparent);
   box-shadow:
-    0 0 0 1px oklch(var(--p) / 0.08),
-    0 8px 32px oklch(var(--p) / 0.15),
-    0 2px 8px oklch(var(--bc) / 0.1),
-    inset 0 1px 0 oklch(var(--p) / 0.12);
+    0 0 0 1px color-mix(in oklch, var(--color-primary) 8%, transparent),
+    0 8px 32px color-mix(in oklch, var(--color-primary) 15%, transparent),
+    0 2px 8px color-mix(in oklch, var(--color-base-content) 10%, transparent),
+    inset 0 1px 0 color-mix(in oklch, var(--color-primary) 12%, transparent);
   backdrop-filter: blur(12px);
 }
 .vault-icon-wrap::before {
@@ -471,7 +471,7 @@ dialog textarea:focus {
   position: absolute;
   inset: -16px;
   border-radius: 50%;
-  background: radial-gradient(circle, oklch(var(--p) / 0.25) 0%, transparent 70%);
+  background: radial-gradient(circle, color-mix(in oklch, var(--color-primary) 25%, transparent) 0%, transparent 70%);
   filter: blur(16px);
   animation: vault-pulse 3s ease-in-out infinite alternate;
   z-index: -1;
@@ -481,13 +481,13 @@ dialog textarea:focus {
   position: absolute;
   inset: 0;
   border-radius: 24px;
-  background: linear-gradient(160deg, oklch(var(--p) / 0.08) 0%, transparent 50%);
+  background: linear-gradient(160deg, color-mix(in oklch, var(--color-primary) 8%, transparent) 0%, transparent 50%);
   pointer-events: none;
 }
 .vault-icon {
   position: relative;
   z-index: 1;
-  filter: drop-shadow(0 0 10px oklch(var(--p) / 0.25));
+  filter: drop-shadow(0 0 10px color-mix(in oklch, var(--color-primary) 25%, transparent));
 }
 @keyframes vault-pulse {
   to { transform: scale(1.3); opacity: 0.5; }
@@ -504,9 +504,9 @@ dialog textarea:focus {
   overflow: hidden;
   padding-top: env(safe-area-inset-top, 0px);
   background:
-    radial-gradient(ellipse at 50% 0%, oklch(var(--p) / 0.14) 0%, transparent 60%),
-    radial-gradient(ellipse at 0% 100%, oklch(var(--s) / 0.08) 0%, transparent 40%),
-    radial-gradient(ellipse at 100% 50%, oklch(var(--a) / 0.05) 0%, transparent 40%);
+    radial-gradient(ellipse at 50% 0%, color-mix(in oklch, var(--color-primary) 14%, transparent) 0%, transparent 60%),
+    radial-gradient(ellipse at 0% 100%, color-mix(in oklch, var(--color-secondary) 8%, transparent) 0%, transparent 40%),
+    radial-gradient(ellipse at 100% 50%, color-mix(in oklch, var(--color-accent) 5%, transparent) 0%, transparent 40%);
 }
 
 .login-glow {
@@ -518,9 +518,9 @@ dialog textarea:focus {
   animation: login-drift 12s ease-in-out infinite alternate;
 }
 
-.login-glow-1 { width: 350px; height: 350px; top: -100px; left: -80px; background: oklch(var(--p) / 0.35); }
-.login-glow-2 { width: 280px; height: 280px; bottom: -80px; right: -60px; background: oklch(var(--s) / 0.25); animation-delay: -4s; }
-.login-glow-3 { width: 220px; height: 220px; top: 40%; right: 20%; background: oklch(var(--a) / 0.2); animation-delay: -8s; }
+.login-glow-1 { width: 350px; height: 350px; top: -100px; left: -80px; background: color-mix(in oklch, var(--color-primary) 35%, transparent); }
+.login-glow-2 { width: 280px; height: 280px; bottom: -80px; right: -60px; background: color-mix(in oklch, var(--color-secondary) 25%, transparent); animation-delay: -4s; }
+.login-glow-3 { width: 220px; height: 220px; top: 40%; right: 20%; background: color-mix(in oklch, var(--color-accent) 20%, transparent); animation-delay: -8s; }
 
 @keyframes login-drift {
   to { transform: translate(40px, 25px) scale(1.15); }
@@ -551,13 +551,13 @@ dialog textarea:focus {
 /* ── Monitor status indicators ────────────────────────────────────── */
 
 .mon-status-ok {
-  background: oklch(var(--su) / 1);
-  box-shadow: 0 0 8px oklch(var(--su) / 0.5);
+  background: var(--color-success);
+  box-shadow: 0 0 8px color-mix(in oklch, var(--color-success) 50%, transparent);
 }
 
 .mon-status-err {
-  background: oklch(var(--er) / 1);
-  box-shadow: 0 0 8px oklch(var(--er) / 0.5);
+  background: var(--color-error);
+  box-shadow: 0 0 8px color-mix(in oklch, var(--color-error) 50%, transparent);
 }
 
 @keyframes spin-refresh {
@@ -576,7 +576,7 @@ dialog textarea:focus {
 }
 
 .clickable-row:hover {
-  background-color: oklch(var(--b3) / 0.5);
+  background-color: color-mix(in oklch, var(--color-base-300) 50%, transparent);
 }
 
 /* ── Material Symbols baseline ────────────────────────────────────── */
@@ -596,22 +596,22 @@ dialog textarea:focus {
 
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: oklch(var(--bc) / 0.10); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: oklch(var(--bc) / 0.20); }
+::-webkit-scrollbar-thumb { background: color-mix(in oklch, var(--color-base-content) 10%, transparent); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: color-mix(in oklch, var(--color-base-content) 20%, transparent); }
 
 /* ── Desktop sidebar ─────────────────────────────────────────────── */
 
 .sidebar-desktop {
   width: var(--sidebar-w, 15rem);
-  background: oklch(var(--b2) / 1);
-  border-right: 1px solid oklch(var(--bc) / 0.06);
+  background: var(--color-base-200);
+  border-right: 1px solid color-mix(in oklch, var(--color-base-content) 6%, transparent);
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
 }
 
 [data-theme="winter"] .sidebar-desktop {
-  background: oklch(var(--b1) / 1);
-  box-shadow: 1px 0 16px oklch(var(--bc) / 0.04);
+  background: var(--color-base-100);
+  box-shadow: 1px 0 16px color-mix(in oklch, var(--color-base-content) 4%, transparent);
 }
 
 .sidebar-desktop.sidebar-collapsed { --sidebar-w: 4.5rem; }
@@ -632,7 +632,7 @@ dialog textarea:focus {
   align-items: center;
   gap: 0.625rem;
   padding: 0 0.875rem;
-  border-bottom: 1px solid oklch(var(--bc) / 0.06);
+  border-bottom: 1px solid color-mix(in oklch, var(--color-base-content) 6%, transparent);
   flex-shrink: 0;
 }
 
@@ -642,7 +642,7 @@ dialog textarea:focus {
   border-radius: 0.375rem;
   border: none;
   background: transparent;
-  color: oklch(var(--bc) / 0.4);
+  color: color-mix(in oklch, var(--color-base-content) 40%, transparent);
   cursor: pointer;
   display: grid;
   place-items: center;
@@ -651,8 +651,8 @@ dialog textarea:focus {
 }
 
 .sidebar-toggle-btn:hover {
-  background: oklch(var(--bc) / 0.08);
-  color: oklch(var(--bc) / 0.7);
+  background: color-mix(in oklch, var(--color-base-content) 8%, transparent);
+  color: color-mix(in oklch, var(--color-base-content) 70%, transparent);
 }
 
 .sidebar-toggle-btn:active { transform: scale(0.9); }
@@ -720,7 +720,7 @@ dialog textarea:focus {
   border-radius: 0.5rem;
   font-size: 0.8125rem;
   font-weight: 500;
-  color: oklch(var(--bc) / 0.55);
+  color: color-mix(in oklch, var(--color-base-content) 55%, transparent);
   text-decoration: none;
   transition: all 0.15s ease;
   margin-bottom: 2px;
@@ -729,15 +729,15 @@ dialog textarea:focus {
 }
 
 .sidebar-link:hover {
-  color: oklch(var(--bc) / 0.9);
-  background: oklch(var(--bc) / 0.06);
+  color: color-mix(in oklch, var(--color-base-content) 90%, transparent);
+  background: color-mix(in oklch, var(--color-base-content) 6%, transparent);
 }
 
 .sidebar-link:active { transform: scale(0.97); }
 
 .sidebar-active {
-  color: oklch(var(--p) / 1) !important;
-  background: oklch(var(--p) / 0.1);
+  color: var(--color-primary) !important;
+  background: color-mix(in oklch, var(--color-primary) 10%, transparent);
   font-weight: 600;
 }
 
@@ -750,11 +750,11 @@ dialog textarea:focus {
   width: 3px;
   height: 55%;
   border-radius: 0 3px 3px 0;
-  background: oklch(var(--p) / 1);
+  background: var(--color-primary);
 }
 
 .sidebar-active:hover {
-  background: oklch(var(--p) / 0.14);
+  background: color-mix(in oklch, var(--color-primary) 14%, transparent);
 }
 
 .sidebar-collapsed .sidebar-link {
@@ -777,7 +777,7 @@ dialog textarea:focus {
   align-items: center;
   gap: 0.625rem;
   padding: 0.625rem 0.75rem;
-  border-top: 1px solid oklch(var(--bc) / 0.06);
+  border-top: 1px solid color-mix(in oklch, var(--color-base-content) 6%, transparent);
   flex-shrink: 0;
 }
 
@@ -823,7 +823,7 @@ dialog textarea:focus {
 }
 
 .collapse-title:hover {
-  background: oklch(var(--bc) / 0.04);
+  background: color-mix(in oklch, var(--color-base-content) 4%, transparent);
   border-radius: 0.5rem;
 }
 
@@ -833,10 +833,10 @@ progress {
 
 .dropdown-content {
   animation: dropdown-in 0.15s ease;
-  border: 1px solid oklch(var(--bc) / 0.06) !important;
+  border: 1px solid color-mix(in oklch, var(--color-base-content) 6%, transparent) !important;
   box-shadow:
-    0 4px 24px oklch(var(--bc) / 0.12),
-    0 1px 4px oklch(var(--bc) / 0.06) !important;
+    0 4px 24px color-mix(in oklch, var(--color-base-content) 12%, transparent),
+    0 1px 4px color-mix(in oklch, var(--color-base-content) 6%, transparent) !important;
 }
 
 @keyframes dropdown-in {
@@ -852,8 +852,8 @@ progress {
   background: linear-gradient(
     90deg,
     transparent 0%,
-    oklch(var(--bc) / 0.08) 20%,
-    oklch(var(--bc) / 0.08) 80%,
+    color-mix(in oklch, var(--color-base-content) 8%, transparent) 20%,
+    color-mix(in oklch, var(--color-base-content) 8%, transparent) 80%,
     transparent 100%
   );
 }
@@ -895,15 +895,15 @@ progress {
 }
 
 /* From zerodha_consolidated.html (Breakdown Modal) */
-.zerodha-breakdown-modal .td-pos { color: oklch(var(--su) / 1); }
-.zerodha-breakdown-modal .amount-danger { color: oklch(var(--er) / 1); }
+.zerodha-breakdown-modal .td-pos { color: var(--color-success); }
+.zerodha-breakdown-modal .amount-danger { color: var(--color-error); }
 .zerodha-breakdown-modal .td-bold { font-weight: 600; }
 
 /* From admin_monitor.html */
 .join .mon-range-btn.active.btn-ghost {
-  background-color: oklch(var(--p) / 1);
-  color: oklch(var(--pc) / 1);
-  border-color: oklch(var(--p) / 1);
+  background-color: var(--color-primary);
+  color: var(--color-primary-content);
+  border-color: var(--color-primary);
 }
 .mon-status-dot {
   width: 0.625rem;
@@ -916,8 +916,8 @@ progress {
 .mon-chart-legend { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; font-size: 0.75rem; opacity: 0.85; }
 .mon-legend-item { display: inline-flex; align-items: center; gap: 0.25rem; }
 .mon-legend-dot { width: 0.5rem; height: 0.5rem; border-radius: 9999px; flex-shrink: 0; }
-.mon-stat-ok .mon-stat-val { color: oklch(var(--su) / 1); }
-.mon-stat-err .mon-stat-val { color: oklch(var(--er) / 1); }
+.mon-stat-ok .mon-stat-val { color: var(--color-success); }
+.mon-stat-err .mon-stat-val { color: var(--color-error); }
 
 /* ── Jewellery: type colour-coding (hue passed via --h) ───────────── */
 
@@ -1031,17 +1031,17 @@ progress {
   position: sticky;
   top: 3.5rem;
   z-index: 20;
-  background: oklch(var(--b1) / 0.85);
+  background: color-mix(in oklch, var(--color-base-100) 85%, transparent);
   backdrop-filter: blur(20px) saturate(1.8);
   -webkit-backdrop-filter: blur(20px) saturate(1.8);
-  border-bottom: 1px solid oklch(var(--bc) / 0.06);
+  border-bottom: 1px solid color-mix(in oklch, var(--color-base-content) 6%, transparent);
   transition: box-shadow 0.25s ease, background 0.25s;
 }
 .section-nav.scrolled {
   box-shadow:
-    0 4px 20px oklch(var(--bc) / 0.08),
-    0 1px 3px oklch(var(--bc) / 0.04);
-  background: oklch(var(--b1) / 0.92);
+    0 4px 20px color-mix(in oklch, var(--color-base-content) 8%, transparent),
+    0 1px 3px color-mix(in oklch, var(--color-base-content) 4%, transparent);
+  background: color-mix(in oklch, var(--color-base-100) 92%, transparent);
 }
 
 .section-tab {
@@ -1053,7 +1053,7 @@ progress {
   font-weight: 600;
   white-space: nowrap;
   border-radius: 9999px;
-  color: oklch(var(--bc) / 0.45);
+  color: color-mix(in oklch, var(--color-base-content) 45%, transparent);
   transition: color 0.2s, background 0.2s, box-shadow 0.2s, transform 0.12s;
   text-decoration: none;
   cursor: pointer;
@@ -1061,16 +1061,16 @@ progress {
   letter-spacing: 0.01em;
 }
 .section-tab:hover {
-  color: oklch(var(--bc) / 0.8);
-  background: oklch(var(--bc) / 0.06);
+  color: color-mix(in oklch, var(--color-base-content) 80%, transparent);
+  background: color-mix(in oklch, var(--color-base-content) 6%, transparent);
 }
 .section-tab:active {
   transform: scale(0.95);
 }
 .section-tab.active {
-  color: oklch(var(--p) / 1);
-  background: oklch(var(--p) / 0.12);
-  box-shadow: 0 1px 6px oklch(var(--p) / 0.10);
+  color: var(--color-primary);
+  background: color-mix(in oklch, var(--color-primary) 12%, transparent);
+  box-shadow: 0 1px 6px color-mix(in oklch, var(--color-primary) 10%, transparent);
 }
 .section-tab .material-symbols-outlined {
   font-size: 0.9375rem;
@@ -1089,7 +1089,7 @@ progress {
   padding: 1rem 0 0.5rem 0;
   margin-top: 0.75rem;
   margin-bottom: 0.25rem;
-  border-bottom: 1px solid oklch(var(--bc) / 0.06);
+  border-bottom: 1px solid color-mix(in oklch, var(--color-base-content) 6%, transparent);
   position: relative;
   scroll-margin-top: 6rem;
 }
@@ -1101,7 +1101,7 @@ progress {
   width: 2.5rem;
   height: 2px;
   border-radius: 1px;
-  background: oklch(var(--p) / 0.5);
+  background: color-mix(in oklch, var(--color-primary) 50%, transparent);
 }
 .section-group-header .section-icon {
   font-size: 1.125rem;
@@ -1136,8 +1136,8 @@ progress {
   gap: 0.375rem;
   padding: 0.5rem 0.75rem;
   border-radius: 0.75rem;
-  background: oklch(var(--b2) / 1);
-  border: 1px solid oklch(var(--bc) / 0.06);
+  background: var(--color-base-200);
+  border: 1px solid color-mix(in oklch, var(--color-base-content) 6%, transparent);
   white-space: nowrap;
   flex-shrink: 0;
   cursor: pointer;
@@ -1147,8 +1147,8 @@ progress {
   scroll-snap-align: start;
 }
 .quick-stat-chip:hover {
-  border-color: oklch(var(--p) / 0.3);
-  background: oklch(var(--p) / 0.06);
+  border-color: color-mix(in oklch, var(--color-primary) 30%, transparent);
+  background: color-mix(in oklch, var(--color-primary) 6%, transparent);
   transform: translateY(-1px);
 }
 .quick-stat-chip:active {
@@ -1179,7 +1179,143 @@ progress {
   .stat-card { padding: 0.625rem 0.75rem; }
 }
 
+/* ── Expenses ─────────────────────────────────────────────────────── */
+
+/* Floating add button, sits above the mobile dock */
+.exp-fab {
+  position: fixed;
+  right: 1rem;
+  bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+  z-index: 45;
+  width: 3.5rem;
+  height: 3.5rem;
+  border-radius: 1.1rem;
+  box-shadow: 0 8px 24px color-mix(in oklch, var(--color-primary) 45%, transparent);
+}
+
+.exp-month-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 12px;
+  background: color-mix(in oklch, var(--color-base-200) 60%, transparent);
+}
+.exp-month-switch .exp-month-label {
+  min-width: 8.5rem;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+/* Thin category share bar; colour comes from --h like the jewellery chips */
+.exp-bar {
+  --h: 230;
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in oklch, var(--color-base-content) 8%, transparent);
+  overflow: hidden;
+}
+.exp-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: hsl(var(--h) 65% 60%);
+}
+
+.exp-day-header {
+  position: sticky;
+  top: 3.5rem;
+  z-index: 10;
+  background: color-mix(in oklch, var(--color-base-100) 92%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+/* Compact "needs attention" rows */
+.exp-attn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  border-radius: 0.75rem;
+  transition: background 0.15s;
+}
+.exp-attn:hover { background: color-mix(in oklch, var(--color-base-content) 5%, transparent); }
+.exp-attn + .exp-attn { border-top: 1px solid color-mix(in oklch, var(--color-base-content) 5%, transparent); }
+.exp-attn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.7rem;
+}
+.exp-attn-icon .material-symbols-outlined { font-size: 1.15rem; }
+
+/* Highlight chips (per day, biggest, top merchant, rising) */
+.exp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  padding: 0.5rem 0.8rem 0.5rem 0.6rem;
+  border-radius: 0.9rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  white-space: nowrap;
+  text-align: left;
+  background: var(--color-base-200);
+  border: 1px solid color-mix(in oklch, var(--color-base-content) 6%, transparent);
+  font-variant-numeric: tabular-nums;
+}
+.exp-chip .material-symbols-outlined { font-size: 1.2rem; }
+.exp-chip-label {
+  display: block;
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.45;
+}
+
+/* Tiny per-category trend bars on the year view */
+.exp-spark {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 18px;
+}
+.exp-spark > span {
+  flex: 1;
+  min-height: 2px;
+  border-radius: 2px;
+  background: hsl(var(--h, 230) 65% 60% / 0.75);
+}
+.exp-spark > span.is-empty { background: color-mix(in oklch, var(--color-base-content) 10%, transparent); }
+
+.exp-amount-input {
+  font-size: 2rem !important;
+  font-weight: 800;
+  height: 3.75rem !important;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ── Scrollbar hide utility ────────────────────────────────────────── */
 .scrollbar-hide { scrollbar-width: none; }
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 html { scroll-behavior: smooth; }
+
+/* Coming back to the same page after a save: no entry animations, so it feels like an in-place update. */
+.vault-restoring .animate-up,
+.vault-restoring [class*="stagger-"] { animation: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'tracker',
     'portfolio',
     'jewellery',
+    'expenses',
     'mcp_server',
     'oauth2_provider',
     'corsheaders',
@@ -130,6 +131,17 @@ UNFOLD = {
                     {"title": "Goals", "icon": "target", "link": f"{_ADMIN_PREFIX}/portfolio/financialgoal/"},
                     {"title": "AI Insights", "icon": "psychology", "link": f"{_ADMIN_PREFIX}/portfolio/portfolioinsight/"},
                     {"title": "AI insight cooldown", "icon": "schedule", "link": f"{_ADMIN_PREFIX}/portfolio/insightgenerationsettings/"},
+                ],
+            },
+            {
+                "title": "Expenses",
+                "items": [
+                    {"title": "Expenses", "icon": "receipt", "link": f"{_ADMIN_PREFIX}/expenses/expense/"},
+                    {"title": "Categories", "icon": "category", "link": f"{_ADMIN_PREFIX}/expenses/expensecategory/"},
+                    {"title": "Merchant Rules", "icon": "rule", "link": f"{_ADMIN_PREFIX}/expenses/merchantrule/"},
+                    {"title": "Cards & Accounts", "icon": "credit_card", "link": f"{_ADMIN_PREFIX}/expenses/paymentsource/"},
+                    {"title": "Card Statements", "icon": "request_quote", "link": f"{_ADMIN_PREFIX}/expenses/cardstatement/"},
+                    {"title": "Gmail Accounts", "icon": "mail", "link": f"{_ADMIN_PREFIX}/expenses/gmailaccount/"},
                 ],
             },
             {

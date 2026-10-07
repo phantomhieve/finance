@@ -13,6 +13,9 @@ django-allauth[socialaccount]>=65.0
 google-genai>=1.0
 django-unfold>=0.87.0
 webauthn>=2.0
+# Expense tracker
+cryptography>=42.0        # Fernet encryption for Gmail refresh tokens and statement passwords
+pypdf>=5.0                # reading (password-protected) credit card statement PDFs
 # Image upload support
 Pillow>=11.0               # required by Django ImageField for validation/processing
 pillow-heif>=1.4.0         # enables iPhone HEIC/HEIF photo support and auto-JPEG conversion

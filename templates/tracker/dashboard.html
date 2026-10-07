@@ -211,7 +211,7 @@
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="5" class="text-center opacity-50 py-8">No transactions yet — click <strong>Add Entry</strong> above.</td></tr>
+          <tr><td colspan="5" class="text-center opacity-50 py-8">No transactions yet{% if user.can_edit_savings %} — click <strong>Add Entry</strong> above{% endif %}.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -243,7 +243,7 @@
         {% endif %}
       </div>
       {% empty %}
-      <p class="text-center opacity-50 py-8 text-sm">No transactions yet — tap <strong>Add</strong> above.</p>
+      <p class="text-center opacity-50 py-8 text-sm">No transactions yet{% if user.can_edit_savings %} — tap <strong>Add</strong> above{% endif %}.</p>
       {% endfor %}
     </div>
   </div>

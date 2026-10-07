@@ -55,3 +55,43 @@ class SavingsDashboardTests(TestCase):
         self.client.force_login(self.spouse)
         resp = self.client.get('/')
         self.assertTrue(any(m['comment'] == "Car repair" for m in resp.context['monthly_data']))
+
+
+class HouseholdAccessTests(TestCase):
+    def setUp(self):
+        import time
+        self.group = AccountGroup.objects.create(name="Home")
+        self.spouse = User.objects.create_user(username="sp2", password="x", user_type="ACCOUNT_HOLDER", group=self.group)
+        self.client.force_login(self.spouse)
+        session = self.client.session
+        session['portfolio_unlocked_at'] = time.time()
+        session.save()
+
+    def test_account_holder_gets_jewellery_but_not_portfolio(self):
+        self.assertTrue(self.group.config.feature_jewellery)
+        self.assertEqual(self.client.get('/jewellery/').status_code, 200)
+        self.assertEqual(self.client.get('/portfolio/').status_code, 403)
+        self.assertEqual(self.client.get('/portfolio/growth/').status_code, 403)
+        self.assertNotIn('href="/portfolio/"', self.client.get('/').content.decode())
+
+    def test_only_primary_opens_portfolio(self):
+        import time
+        landlord = User.objects.create_user(username="ll2", password="x", user_type="LANDLORD", group=self.group)
+        self.client.force_login(landlord)
+        self.assertEqual(self.client.get('/portfolio/').status_code, 403)
+        primary = User.objects.create_user(username="pr2", password="x", user_type="PRIMARY", group=self.group)
+        self.client.force_login(primary)
+        session = self.client.session
+        session['portfolio_unlocked_at'] = time.time()
+        session.save()
+        self.assertEqual(self.client.get('/portfolio/').status_code, 200)
+
+    def test_dock_hides_disabled_modules(self):
+        config = self.group.config
+        config.feature_jewellery = False
+        config.feature_notes = False
+        config.save()
+        html = self.client.get('/').content.decode()
+        self.assertNotIn('href="/jewellery/"', html)
+        self.assertNotIn('href="/notes/"', html)
+        self.assertIn('href="/hra/"', html)

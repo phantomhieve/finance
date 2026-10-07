@@ -9,14 +9,55 @@ var Vault = (function(){
   var skip = /^(javascript|mailto|tel|#)/i;
   var cur = window.location.href;
 
+  // Keep the reader's place when a form or action link comes back to the same page
+  // (POST → redirect, filters, tabs). Only restored when we land on the path we left.
+  var SCROLL_KEY = 'vault-scroll';
+  var SCROLL_MAX_AGE = 60000;
+
+  function rememberScroll() {
+    try {
+      sessionStorage.setItem(SCROLL_KEY, JSON.stringify({ path: location.pathname, y: window.scrollY, t: Date.now() }));
+    } catch(x) {}
+  }
+
+  function restoreScroll() {
+    var saved;
+    try {
+      saved = JSON.parse(sessionStorage.getItem(SCROLL_KEY) || 'null');
+      sessionStorage.removeItem(SCROLL_KEY);
+    } catch(x) { return; }
+    if (!saved || saved.path !== location.pathname || location.hash) return;
+    if (Date.now() - saved.t > SCROLL_MAX_AGE || !saved.y) return;
+    var started = Date.now();
+    var cancelled = false;
+    function cancel() { cancelled = true; }
+    ['wheel', 'touchstart', 'keydown'].forEach(function(ev) { window.addEventListener(ev, cancel, { once: true, passive: true }); });
+    // Charts and fonts can grow the page after load; keep trying until the target fits.
+    (function attempt() {
+      if (cancelled) return;
+      var maxY = document.documentElement.scrollHeight - window.innerHeight;
+      window.scrollTo({ top: Math.min(saved.y, maxY), behavior: 'instant' });
+      if (maxY < saved.y && Date.now() - started < 1500) requestAnimationFrame(attempt);
+    })();
+  }
+
+  var nativeSubmit = HTMLFormElement.prototype.submit;
+  HTMLFormElement.prototype.submit = function() {
+    if (this.method !== 'dialog') rememberScroll();
+    return nativeSubmit.call(this);
+  };
+
   document.addEventListener('click', function(e) {
     var a = e.target.closest('a[href]');
     if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
     var h = a.getAttribute('href') || '';
     if (!h || skip.test(h) || a.getAttribute('target') === '_blank') return;
     if (a.closest('.dropdown-content')) return;
-    try { if (new URL(h, cur).href === cur) return; } catch(x) {}
+    var dest;
+    try { dest = new URL(h, cur); if (dest.href === cur) return; } catch(x) {}
     e.preventDefault();
+    // Action links (refresh, sync…) redirect back here; plain navigation lands elsewhere and is ignored.
+    if (!dest || !dest.hash) rememberScroll();
     show();
     var href = a.href;
     afterPaint(function(){ window.location.href = href; });
@@ -27,21 +68,14 @@ var Vault = (function(){
     e.preventDefault();
     var dialog = e.target.closest('dialog');
     if (dialog) dialog.close();
-    try { sessionStorage.setItem('vault-scroll', window.scrollY); } catch(x) {}
     show();
     var form = e.target;
     afterPaint(function(){ form.submit(); });
   });
 
-  window.addEventListener('pageshow', function() {
+  window.addEventListener('pageshow', function(e) {
     hide();
-    try {
-      var sy = sessionStorage.getItem('vault-scroll');
-      if (sy !== null) {
-        sessionStorage.removeItem('vault-scroll');
-        requestAnimationFrame(function() { window.scrollTo(0, parseInt(sy, 10)); });
-      }
-    } catch(x) {}
+    if (!e.persisted) restoreScroll();
   });
 
   var sw = document.getElementById('fySwitcher');
