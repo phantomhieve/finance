@@ -1,13 +1,11 @@
-import json
 import logging
 import os
 import sys
-from decimal import Decimal
 
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
-from portfolio.ai import call_shakti, _clean_json_text, PortfolioInsightsResponse
+from portfolio.ai import call_shakti
 from tracker.models import AccountGroup
 
 logger = logging.getLogger(__name__)
