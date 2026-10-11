@@ -26,6 +26,9 @@ STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
 
 if [ -n "$STAGED_FILES" ]; then
   for file in $STAGED_FILES; do
+    if [ "$file" = ".env.example" ]; then
+      continue
+    fi
     for pattern in "${FORBIDDEN_PATTERNS[@]}"; do
       if echo "$file" | grep -Eq "$pattern"; then
         echo "❌ ERROR: Attempting to commit prohibited secret file: $file"

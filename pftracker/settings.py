@@ -315,10 +315,6 @@ GOOGLE_SHEETS_CREDENTIALS = os.environ.get(
     os.environ.get('GOOGLE_APPLICATION_CREDENTIALS', ''),
 )
 
-# Admin monitor: optional local health probe behind reverse proxy
-VAULT_HEALTH_CHECK_URL = os.environ.get('VAULT_HEALTH_CHECK_URL', '')
-VAULT_HEALTH_CHECK_HOST = os.environ.get('VAULT_HEALTH_CHECK_HOST', '')
-
 # Security hardening
 SESSION_COOKIE_HTTPONLY = True
 CSRF_COOKIE_HTTPONLY = True

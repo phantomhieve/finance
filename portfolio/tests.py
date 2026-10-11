@@ -380,12 +380,25 @@ class EmailRenderingTests(TestCase):
 
     def test_weekly_floor_and_render(self):
         from django.template.loader import render_to_string
+        from portfolio.models import FixedDeposit
         from portfolio.emails import apply_floor, build_weekly_context
+        FixedDeposit.objects.create(
+            group=self.group, name="HDFC 1Y", account_name="Primary Acc",
+            principal=Decimal("200000"), interest_rate=Decimal("7.0"),
+            start_date=datetime.date.today(), maturity_date=datetime.date.today() + datetime.timedelta(days=365),
+            is_active=True,
+        )
         ctx = apply_floor(build_weekly_context(self.group), 1000000.0)
-        self.assertEqual(ctx['deficit'], 300000.0)
-        self.assertEqual(ctx['coverage_pct'], 70)
+        self.assertEqual(ctx['deficit'], 100000.0)
+        self.assertEqual(ctx['coverage_pct'], 90)
+        self.assertEqual(len(ctx['cash_positions']), 1)
+        self.assertEqual(len(ctx['fds']), 1)
         html = render_to_string('emails/weekly_brief.html', ctx)
         self.assertIn('Hold &amp; rebuild', html)
+        self.assertIn('Where reserves sit', html)
+        self.assertIn('Bank', html)
+        self.assertIn('HDFC 1Y', html)
+        self.assertIn('Primary Acc', html)
         self.assertNotIn('<details', html)
 
 

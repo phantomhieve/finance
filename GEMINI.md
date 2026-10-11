@@ -57,3 +57,11 @@ These rules guide Google Antigravity agents when operating within this repositor
 
 - Changes made via MCP must record before/after JSON audit records in `MCPAuditLog` (`mcp_server.audit`) to preserve one-click revert capabilities.
 - Starlette ASGI router (`pftracker.asgi`) serves `/mcp` endpoints alongside Django at `/`.
+
+---
+
+## 7. Git Commit Standards
+
+- **Conventional Commits**: Every commit must follow `<type>(<scope>): <summary>` format (`feat`, `fix`, `refactor`, `perf`, `test`, `chore`, `docs`).
+- **Comprehensive Body**: Commit messages must never be vague or single-line summaries. Always include a paragraph detailing motivation and a bulleted list of specific changes, additions, and removals.
+- **Verification Before Committing**: Run test suite (`manage.py test`) and CodeGraph synchronization before finalizing changes.
