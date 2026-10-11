@@ -420,3 +420,14 @@ EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 if not EMAIL_HOST_USER:
     # Fallback to console backend for local development if no email is configured
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# AI & Insights Settings
+# Providers: 'shakti' (Shakti Cloud / OpenAI-compatible) or 'gemini' (Google GenAI)
+AI_PROVIDER = os.environ.get('AI_PROVIDER', 'shakti' if os.environ.get('SHAKTI_API_KEY') else 'gemini')
+SHAKTI_API_KEY = os.environ.get('SHAKTI_API_KEY', '')
+SHAKTI_BASE_URL = os.environ.get('SHAKTI_BASE_URL', 'https://http.prod-llm.shaktistudio.shakticloud.ai')
+SHAKTI_CLIENT_ID = os.environ.get('SHAKTI_CLIENT_ID', '')
+SHAKTI_MODEL = os.environ.get('SHAKTI_MODEL', 'llama3_3')
+SHAKTI_MAX_RETRIES = int(os.environ.get('SHAKTI_MAX_RETRIES', '3'))
+SHAKTI_RETRY_DELAY = int(os.environ.get('SHAKTI_RETRY_DELAY', '3'))
+

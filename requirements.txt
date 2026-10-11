@@ -11,6 +11,7 @@ cloudscraper>=1.2.71
 google-cloud-storage>=2.18.0
 django-allauth[socialaccount]>=65.0
 google-genai>=1.0
+openai>=1.0.0
 django-unfold>=0.87.0
 webauthn>=2.0
 # Expense tracker

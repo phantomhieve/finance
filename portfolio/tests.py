@@ -620,3 +620,71 @@ class ExcludeRealEstateToggleTests(TestCase):
         snap.save()
         self.assertIsNone(get_fy_performance(self.group, Decimal("1100000"), Decimal("900000"),
                                              today=today, exclude_real_estate=True))
+
+
+class ShaktiCloudIntegrationTests(TestCase):
+    def test_clean_json_text_strips_think_tags_and_fences(self):
+        from portfolio.ai import _clean_json_text
+
+        raw = (
+            "<think>Analyzing 6 pillars: Diversification is good, score 74.</think>\n"
+            "```json\n"
+            '{"summary": "Solid portfolio.", "score": 74, "insights": [], "market_context": "Bullish", "outlook": "Hold"}\n'
+            "```"
+        )
+        cleaned = _clean_json_text(raw)
+        self.assertNotIn("<think>", cleaned)
+        self.assertNotIn("```", cleaned)
+        data = json.loads(cleaned)
+        self.assertEqual(data["score"], 74)
+        self.assertEqual(data["summary"], "Solid portfolio.")
+
+    def test_schema_normalizes_casing_and_synonyms(self):
+        from portfolio.ai import PortfolioInsightsResponse
+
+        payload = {
+            "summary": "Diversified household wealth.",
+            "score": "82/100",  # String with formatting
+            "insights": [
+                {
+                    "category": "ASSET_ALLOCATION",  # synonym in uppercase
+                    "severity": "CRITICAL",          # uppercase
+                    "title": "High Equity Exposure",
+                    "detail": "Equity accounts for 75% of liquid portfolio.",
+                    "action": "Trim 5% into liquid debt.",
+                },
+                {
+                    "category": "risk",
+                    "severity": "good",              # synonym for positive
+                    "title": "Zero Debt",
+                    "detail": "Emergency fund is intact.",
+                }
+            ],
+            "market_context": "Nifty trading at 22x P/E",
+            "outlook": "Maintain monthly SIPs."
+        }
+        validated = PortfolioInsightsResponse.model_validate(payload)
+        self.assertEqual(validated.score, 82)
+        self.assertEqual(validated.insights[0].category.value, "rebalancing")
+        self.assertEqual(validated.insights[0].severity.value, "critical")
+        self.assertEqual(validated.insights[1].severity.value, "positive")
+
+    def test_call_shakti_mocked_success(self):
+        from unittest.mock import patch, MagicMock
+        from portfolio.ai import call_shakti
+
+        mock_chunk = MagicMock()
+        mock_chunk.choices = [MagicMock(delta=MagicMock(content='{"summary": "Mock summary", "score": 78, "insights": [], "market_context": "Neutral", "outlook": "Steady"}'))]
+
+        mock_client = MagicMock()
+        mock_client.chat.completions.create.return_value = [mock_chunk]
+
+        with patch("openai.OpenAI", return_value=mock_client), \
+             patch.dict("os.environ", {"SHAKTI_API_KEY": "mock-shakti-key", "SHAKTI_MODEL": "llama3_3"}):
+            res = call_shakti({"summary": {"total_value": 1000000}})
+            self.assertEqual(res.model, "shakti:llama3_3")
+            self.assertEqual(res.insights_dict["score"], 78)
+            self.assertEqual(res.insights_dict["summary"], "Mock summary")
+            # Verify client was initialized with Shakti default headers
+            mock_client.chat.completions.create.assert_called_once()
+
