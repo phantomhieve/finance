@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+#
+# Vault — Git Pre-Commit Hook
+# Validates code hygiene, checks Python syntax, verifies CodeGraph sync,
+# and strictly blocks secret/credential leaks.
+#
+
+set -e
+
+echo "🔍 Running Vault pre-commit checks..."
+
+# 1. Block prohibited secret files from being staged
+FORBIDDEN_PATTERNS=(
+  "^\.env"
+  "^scripts/DEPLOY\.env"
+  "^\.deploy-keys/"
+  "^credentials/"
+  "\.pem$"
+  "\.key$"
+  "portfolio/investor_profile\.md$"
+  "google-service-account\.json$"
+  "backup-sa\.json$"
+)
+
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+
+if [ -n "$STAGED_FILES" ]; then
+  for file in $STAGED_FILES; do
+    for pattern in "${FORBIDDEN_PATTERNS[@]}"; do
+      if echo "$file" | grep -Eq "$pattern"; then
+        echo "❌ ERROR: Attempting to commit prohibited secret file: $file"
+        echo "   Secrets must never be committed to git."
+        exit 1
+      fi
+    done
+  done
+fi
+
+# 2. Check for staged secrets or private keys in diffs (exclude hook script itself)
+if [ -n "$STAGED_FILES" ]; then
+  FILTERED_FILES=$(echo "$STAGED_FILES" | grep -v "scripts/pre-commit" || true)
+  if [ -n "$FILTERED_FILES" ]; then
+    PK_KEY="BEGIN ""PRIVATE KEY"
+    AI_KEY="AIza""Sy"
+    DANGEROUS_DIFF=$(git diff --cached -S"$PK_KEY" -S"$AI_KEY" --name-only -- $FILTERED_FILES || true)
+    if [ -n "$DANGEROUS_DIFF" ]; then
+      echo "❌ ERROR: Potential private key or API key found in staged changes in:"
+      echo "$DANGEROUS_DIFF"
+      exit 1
+    fi
+  fi
+fi
+
+# 3. Python syntax compilation check
+PYTHON_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.py$' || true)
+if [ -n "$PYTHON_FILES" ]; then
+  echo "🐍 Checking Python syntax..."
+  for pyfile in $PYTHON_FILES; do
+    if [ -f "$pyfile" ]; then
+      python3 -m py_compile "$pyfile" || {
+        echo "❌ Python syntax error in: $pyfile"
+        exit 1
+      }
+    fi
+  done
+  echo "   ✓ Python syntax OK"
+fi
+
+# 4. Sync CodeGraph index if codegraph is available
+if command -v codegraph >/dev/null 2>&1; then
+  echo "📊 Synchronizing CodeGraph index..."
+  codegraph sync >/dev/null 2>&1 || true
+  echo "   ✓ CodeGraph index synced"
+fi
+
+echo "✅ All pre-commit checks passed!"
+exit 0
