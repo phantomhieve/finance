@@ -427,7 +427,11 @@ AI_PROVIDER = os.environ.get('AI_PROVIDER', 'shakti' if os.environ.get('SHAKTI_A
 SHAKTI_API_KEY = os.environ.get('SHAKTI_API_KEY', '')
 SHAKTI_BASE_URL = os.environ.get('SHAKTI_BASE_URL', 'https://http.prod-llm.shaktistudio.shakticloud.ai')
 SHAKTI_CLIENT_ID = os.environ.get('SHAKTI_CLIENT_ID', '')
-SHAKTI_MODEL = os.environ.get('SHAKTI_MODEL', 'llama3_3')
+SHAKTI_MODEL = os.environ.get('SHAKTI_MODEL', 'deepseek-r1')
+SHAKTI_MAX_TOKENS = int(os.environ.get('SHAKTI_MAX_TOKENS', '8192'))
+SHAKTI_TIMEOUT = float(os.environ.get('SHAKTI_TIMEOUT', '300.0'))
+SHAKTI_TEMPERATURE = float(os.environ.get('SHAKTI_TEMPERATURE', '0.1'))
 SHAKTI_MAX_RETRIES = int(os.environ.get('SHAKTI_MAX_RETRIES', '3'))
 SHAKTI_RETRY_DELAY = int(os.environ.get('SHAKTI_RETRY_DELAY', '3'))
+
 
