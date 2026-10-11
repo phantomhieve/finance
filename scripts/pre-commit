@@ -69,7 +69,18 @@ if [ -n "$PYTHON_FILES" ]; then
   echo "   ✓ Python syntax OK"
 fi
 
-# 4. Sync CodeGraph index if codegraph is available
+# 4. Ruff lint check (F, E9 errors like unused imports / syntax errors)
+RUFF_BIN="venv/bin/ruff"
+if [ -x "$RUFF_BIN" ] || command -v ruff >/dev/null 2>&1; then
+  echo "🧹 Running ruff lint check (F, E9)..."
+  ${RUFF_BIN:-ruff} check --select F,E9 . || {
+    echo "❌ Ruff lint check failed. Fix errors before committing."
+    exit 1
+  }
+  echo "   ✓ Ruff lint check passed"
+fi
+
+# 5. Sync CodeGraph index if codegraph is available
 if command -v codegraph >/dev/null 2>&1; then
   echo "📊 Synchronizing CodeGraph index..."
   codegraph sync >/dev/null 2>&1 || true

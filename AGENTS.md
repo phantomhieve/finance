@@ -21,7 +21,15 @@ See [GEMINI.md](file:///Users/phantomhive/Desktop/Atul/finance/GEMINI.md) for fu
    - Maintain DaisyUI 5 + Tailwind glassmorphism dark-mode aesthetic (`night` theme).
    - Ensure responsive design with desktop sidebar and mobile bottom dock.
 
-5. **Git Commit Standards**:
+5. **Local Pre-Push Verification (MANDATORY)**:
+   - Always test locally before committing or pushing code:
+     1. Run lint check: `./venv/bin/ruff check --select F,E9 .` (must pass with 0 errors).
+     2. Run test suite: `./venv/bin/python manage.py test --keepdb` (must pass 100%).
+     3. Run CodeGraph sync: `codegraph sync`.
+   - Never push unverified code or broken syntax/unused imports to remote branches.
+
+6. **Git Commit Standards**:
    - Always write structured Conventional Commits (`type(scope): summary`).
    - Always provide a detailed commit body describing *why* the change was made and a bulleted breakdown of modified components. Never use vague one-liners.
+
 

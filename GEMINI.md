@@ -60,8 +60,11 @@ These rules guide Google Antigravity agents when operating within this repositor
 
 ---
 
-## 7. Git Commit Standards
+## 7. Git Commit & Pre-Push Verification Standards
 
+- **Pre-Push Local Verification (MANDATORY)**: Never commit or push unverified code. Before committing and pushing:
+  - Run lint verification locally: `./venv/bin/ruff check --select F,E9 .` (must pass with 0 errors).
+  - Run test suite locally: `./venv/bin/python manage.py test --keepdb` (must pass 100%).
+  - Synchronize CodeGraph index: `codegraph sync`.
 - **Conventional Commits**: Every commit must follow `<type>(<scope>): <summary>` format (`feat`, `fix`, `refactor`, `perf`, `test`, `chore`, `docs`).
 - **Comprehensive Body**: Commit messages must never be vague or single-line summaries. Always include a paragraph detailing motivation and a bulleted list of specific changes, additions, and removals.
-- **Verification Before Committing**: Run test suite (`manage.py test`) and CodeGraph synchronization before finalizing changes.
