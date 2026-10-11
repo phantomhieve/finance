@@ -235,6 +235,65 @@ class JewelleryTrackerTests(TestCase):
         self.assertTrue(item.photo.name.endswith('.jpg'))
         self.assertFalse(item.photo.name.endswith('.heic'))
 
+    def test_serve_photo_webp_caching_and_etag(self):
+        import os
+        from io import BytesIO
+        from PIL import Image
+        from django.core.management import call_command
+
+        # Create a valid JPEG image
+        im = Image.new("RGB", (600, 600), color="gold")
+        buf = BytesIO()
+        im.save(buf, format="JPEG")
+        buf.seek(0)
+
+        photo_file = SimpleUploadedFile("chain.jpg", buf.read(), content_type="image/jpeg")
+        item = JewelleryItem.objects.create(
+            group=self.group,
+            category='CHAIN',
+            metal_type='GOLD',
+            purity='22k',
+            weight_grams=Decimal('15.50'),
+            location='BANK_LOCKER',
+            photo=photo_file
+        )
+
+        # 1. Request thumb variant
+        url = reverse('jewellery_photo', kwargs={'pk': item.pk})
+        response = self.client.get(f"{url}?size=thumb")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'image/webp')
+        self.assertIn('ETag', response)
+        etag = response['ETag']
+
+        # Verify cached file was written under cache/
+        cache_dir = os.path.join(os.path.dirname(item.photo.path), 'cache')
+        base_name = os.path.splitext(os.path.basename(item.photo.path))[0]
+        thumb_path = os.path.join(cache_dir, f"{base_name}_thumb.webp")
+        self.assertTrue(os.path.exists(thumb_path))
+
+        # 2. Conditional request with matching If-None-Match should return 304 Not Modified
+        cached_response = self.client.get(f"{url}?size=thumb", HTTP_IF_NONE_MATCH=etag)
+        self.assertEqual(cached_response.status_code, 304)
+
+        # 3. Request full variant
+        full_response = self.client.get(f"{url}?size=full")
+        self.assertEqual(full_response.status_code, 200)
+        self.assertEqual(full_response['Content-Type'], 'image/webp')
+        full_path = os.path.join(cache_dir, f"{base_name}_full.webp")
+        self.assertTrue(os.path.exists(full_path))
+
+        # 4. Management command test
+        call_command('generate_jewellery_thumbnails', force=True)
+        self.assertTrue(os.path.exists(thumb_path))
+        self.assertTrue(os.path.exists(full_path))
+
+        # 5. On item deletion, cached thumbnails should be cleaned up
+        item.delete()
+        self.assertFalse(os.path.exists(thumb_path))
+        self.assertFalse(os.path.exists(full_path))
+
+
 
 class JewelleryAccessControlTests(TestCase):
     def setUp(self):

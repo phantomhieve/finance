@@ -75,7 +75,7 @@ jobs:
             printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
           else
             echo "::warning::DEPLOY_KNOWN_HOSTS not set; trusting the host key on first use."
-            ssh-keyscan -t ed25519,rsa -p "${SSH_PORT:-22}" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+            ssh-keyscan -4 -t ed25519,rsa -p "${SSH_PORT:-22}" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
           fi
 
       - name: Deploy

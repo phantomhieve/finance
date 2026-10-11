@@ -6,12 +6,13 @@ from django.urls import reverse
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.contrib import messages
-from django.http import FileResponse, Http404, JsonResponse, HttpResponseForbidden
+from django.http import FileResponse, Http404, JsonResponse, HttpResponseForbidden, HttpResponseNotModified
 
 from pftracker.utils import safe_redirect
 from portfolio.views import _require_jewellery, _user_group
 from .models import JewelleryItem
 from .forms import JewelleryItemForm
+from .utils import get_or_create_thumbnail
 from portfolio.models import CommodityPrice
 
 
@@ -186,7 +187,7 @@ def search_autocomplete(request):
                 'location': item.get_location_display(),
                 'weight': f'{item.weight_grams:g}g',
                 'photo_url': (
-                    f"{reverse('jewellery_photo', args=[item.pk])}?t={item.updated_at.timestamp()}" if item.photo else ''
+                    f"{reverse('jewellery_photo', args=[item.pk])}?size=thumb&t={item.updated_at.timestamp()}" if item.photo else ''
                 ),
             })
             if len(results) >= 8:  # Limit suggestions
@@ -211,28 +212,56 @@ _SAFE_PHOTO_CONTENT_TYPES = {
 @_require_jewellery
 def serve_photo(request, pk):
     """
-    Secure media serving. Verifies authentication, portfolio access,
-    and that the requested item belongs to the user's AccountGroup.
-    The content type is forced to a known-safe image type so a file can
-    never be served as HTML/script.
+    Secure media serving with responsive WebP caching and conditional HTTP caching.
+    Verifies authentication, portfolio access, and that the requested item belongs
+    to the user's AccountGroup.
+    The content type is forced to a known-safe image type so a file can never be
+    served as HTML/script.
     """
     obj = get_object_or_404(JewelleryItem, pk=pk, group=_user_group(request))
     if not obj.photo or not obj.photo.name:
         raise Http404("Photo not found")
 
     ext = os.path.splitext(obj.photo.name)[1].lower()
-    content_type = _SAFE_PHOTO_CONTENT_TYPES.get(ext)
-    if content_type is None:
+    fallback_content_type = _SAFE_PHOTO_CONTENT_TYPES.get(ext)
+    if fallback_content_type is None:
         raise Http404("Unsupported media type")
 
     file_path = obj.photo.path
     if not os.path.exists(file_path):
         raise Http404("File does not exist")
 
-    response = FileResponse(open(file_path, 'rb'), content_type=content_type)
+    size_variant = request.GET.get('size', 'thumb')
+    if size_variant == 'raw':
+        serve_path = file_path
+        content_type = fallback_content_type
+    else:
+        if size_variant not in ('thumb', 'full'):
+            size_variant = 'thumb'
+        serve_path, content_type = get_or_create_thumbnail(
+            file_path,
+            size_variant=size_variant,
+            fallback_content_type=fallback_content_type,
+        )
+
+    try:
+        stat = os.stat(serve_path)
+        etag = f'"{pk}-{int(stat.st_mtime)}-{stat.st_size}-{size_variant}"'
+    except OSError:
+        raise Http404("File stat failed")
+
+    client_etag = request.headers.get('If-None-Match') or request.META.get('HTTP_IF_NONE_MATCH')
+    if client_etag == etag:
+        res = HttpResponseNotModified()
+        res['ETag'] = etag
+        res['Cache-Control'] = 'private, max-age=604800, immutable'
+        return res
+
+    response = FileResponse(open(serve_path, 'rb'), content_type=content_type)
     response['Content-Disposition'] = (
-        f'inline; filename="{os.path.basename(obj.photo.name)}"'
+        f'inline; filename="{os.path.basename(serve_path)}"'
     )
     response['X-Content-Type-Options'] = 'nosniff'
-    response['Cache-Control'] = 'private, max-age=86400'
+    response['ETag'] = etag
+    response['Cache-Control'] = 'private, max-age=604800, immutable'
     return response

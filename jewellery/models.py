@@ -2,7 +2,10 @@ import os
 import uuid
 from decimal import Decimal
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 from portfolio.models import CommodityPrice
+from .utils import delete_cached_thumbnails
 
 
 def jewellery_photo_path(instance, filename):
@@ -175,3 +178,17 @@ class JewelleryItem(models.Model):
     @property
     def pnl(self):
         return Decimal('0.00')
+
+
+@receiver(post_delete, sender=JewelleryItem)
+def cleanup_jewellery_thumbnails_on_delete(sender, instance, **kwargs):
+    """Delete cached WebP thumbnails and the original image file when an item is deleted."""
+    if instance.photo:
+        try:
+            photo_path = instance.photo.path
+            delete_cached_thumbnails(photo_path)
+            if os.path.exists(photo_path):
+                os.remove(photo_path)
+        except Exception:
+            pass
+
