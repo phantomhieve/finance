@@ -162,7 +162,7 @@
       {# Colour tile + icon always present; photo (if any) overlays it and is removed on load error. #}
       <span class="icon-filled material-symbols-outlined jw-type-icon text-5xl lg:text-6xl opacity-80 group-hover:scale-110 transition-transform duration-500">{{ item.category_icon }}</span>
       {% if item.photo %}
-      <img src="{% url 'jewellery_photo' item.pk %}?t={{ item.updated_at.timestamp }}" alt="{{ item.display_label }}" onerror="this.remove()"
+      <img src="{% url 'jewellery_photo' item.pk %}?size=thumb&t={{ item.updated_at.timestamp }}" alt="{{ item.display_label }}" onerror="this.remove()"
            class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
       {% endif %}
 
@@ -204,7 +204,7 @@
         <span class="icon-filled material-symbols-outlined text-2xl">{{ item.category_icon }}</span>
       </span>
       {% if item.photo %}
-      <img src="{% url 'jewellery_photo' item.pk %}?t={{ item.updated_at.timestamp }}" alt="{{ item.display_label }}" onerror="this.remove()"
+      <img src="{% url 'jewellery_photo' item.pk %}?size=thumb&t={{ item.updated_at.timestamp }}" alt="{{ item.display_label }}" onerror="this.remove()"
            class="absolute inset-0 w-16 h-16 rounded-2xl object-cover" loading="lazy" />
       {% endif %}
     </span>

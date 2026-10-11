@@ -17,7 +17,7 @@ CRON_NAME="${DEPLOY_CRON_NAME:-vault}"
 CRON_LOG="${DEPLOY_CRON_LOG:-/var/log/vault/cron.log}"
 STATIC_DIR="${DEPLOY_STATIC_DIR:-}"
 
-SSH_OPTS=(-o StrictHostKeyChecking=accept-new -p "$SSH_PORT")
+SSH_OPTS=(-4 -o StrictHostKeyChecking=accept-new -p "$SSH_PORT")
 if [[ -n "${SSH_KEY_FILE:-}" ]]; then
   SSH_OPTS+=(-i "$SSH_KEY_FILE")
 fi
@@ -79,8 +79,8 @@ if [[ -n "${STATIC_DIR}" ]]; then
   sudo rsync -a --delete staticfiles/ "${STATIC_DIR}/"
 fi
 # Ensure media upload directories exist and are only accessible by the app user
-mkdir -p "${APP_DIR}/media/jewellery_photos"
-chmod 750 "${APP_DIR}/media" "${APP_DIR}/media/jewellery_photos"
+mkdir -p "${APP_DIR}/media/jewellery_photos/cache"
+chmod 750 "${APP_DIR}/media" "${APP_DIR}/media/jewellery_photos" "${APP_DIR}/media/jewellery_photos/cache"
 sudo mkdir -p "$(dirname "${CRON_LOG}")" && sudo touch "${CRON_LOG}"
 sed -e "s|__APP_DIR__|${APP_DIR}|g" -e "s|__APP_OWNER__|${APP_OWNER}|g" \
     -e "s|__CRON_LOG__|${CRON_LOG}|g" -e "s|__CRON_NAME__|${CRON_NAME}|g" \
