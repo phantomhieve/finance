@@ -48,7 +48,7 @@ class Command(BaseCommand):
             os.environ.get('SHAKTI_CLIENT_ID')
             or getattr(settings, 'SHAKTI_CLIENT_ID', '')
         )
-        model = os.environ.get('SHAKTI_MODEL') or getattr(settings, 'SHAKTI_MODEL', 'llama3_3')
+        model = os.environ.get('SHAKTI_MODEL') or getattr(settings, 'SHAKTI_MODEL', 'deepseek-r1')
 
         self.stdout.write(self.style.MIGRATE_HEADING("=== Shakti Cloud Configuration ==="))
         self.stdout.write(f"Base URL:     {base_url}")

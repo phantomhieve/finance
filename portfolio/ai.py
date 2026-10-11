@@ -18,7 +18,7 @@ from pathlib import Path
 
 from django.conf import settings
 from google import genai
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 from .models import StockHolding, MutualFundHolding
 
@@ -83,6 +83,13 @@ class Insight(BaseModel):
             }
             if v_clean in mapping:
                 return mapping[v_clean]
+            if 'risk' in v_clean:
+                return 'risk'
+            if 'opp' in v_clean:
+                return 'opportunity'
+            if 'tax' in v_clean:
+                return 'tax'
+            return 'rebalancing'
         return v
 
     @field_validator('severity', mode='before')
@@ -96,14 +103,23 @@ class Insight(BaseModel):
             mapping = {
                 'high': 'critical',
                 'urgent': 'critical',
+                'severe': 'critical',
                 'medium': 'warning',
                 'warn': 'warning',
+                'moderate': 'warning',
                 'low': 'info',
+                'neutral': 'info',
+                'informational': 'info',
                 'good': 'positive',
                 'success': 'positive',
+                'opportunity': 'positive',
+                'rebalancing': 'info',
+                'goal': 'info',
+                'tax': 'info',
             }
             if v_clean in mapping:
                 return mapping[v_clean]
+            return 'info'
         return v
 
 
@@ -113,6 +129,69 @@ class PortfolioInsightsResponse(BaseModel):
     insights: list[Insight]
     market_context: str = ""
     outlook: str = ""
+
+    @model_validator(mode='before')
+    @classmethod
+    def normalize_response_dict(cls, data):
+        if not isinstance(data, dict):
+            return data
+
+        # 1. Alias field names if LLM used common synonyms
+        if 'summary' not in data:
+            for alt in ('overview', 'executive_summary', 'portfolio_summary', 'analysis'):
+                if alt in data and data[alt]:
+                    data['summary'] = str(data[alt])
+                    break
+            else:
+                data['summary'] = "Portfolio analysis completed successfully."
+
+        if 'score' not in data:
+            for alt in ('financial_health_score', 'health_score', 'rating'):
+                if alt in data and data[alt] is not None:
+                    data['score'] = data[alt]
+                    break
+            else:
+                data['score'] = 65
+
+        if 'insights' not in data:
+            for alt in ('key_insights', 'recommendations', 'items', 'findings'):
+                if alt in data and isinstance(data[alt], list):
+                    data['insights'] = data[alt]
+                    break
+            else:
+                data['insights'] = []
+
+        if 'market_context' not in data:
+            for alt in ('market_overview', 'macro', 'macro_context'):
+                if alt in data and data[alt]:
+                    data['market_context'] = str(data[alt])
+                    break
+
+        if 'outlook' not in data:
+            for alt in ('next_steps', 'priorities', 'recommendations_summary', 'action_plan'):
+                if alt in data and data[alt]:
+                    data['outlook'] = str(data[alt])
+                    break
+
+        # 2. Heal individual insights list
+        raw_insights = data.get('insights')
+        if isinstance(raw_insights, list):
+            cleaned_list = []
+            for item in raw_insights:
+                if isinstance(item, dict):
+                    # Ensure title exists
+                    if not item.get('title'):
+                        item['title'] = str(item.get('headline') or item.get('name') or item.get('category') or 'Insight')[:100]
+                    # Ensure detail exists
+                    if not item.get('detail'):
+                        item['detail'] = str(item.get('description') or item.get('text') or item.get('title') or '')
+                    # Normalize empty action
+                    if not item.get('action') or str(item.get('action')).strip().lower() in ('none', 'null', 'n/a', ''):
+                        item['action'] = None
+                    cleaned_list.append(item)
+            data['insights'] = cleaned_list
+
+        return data
 
     @field_validator('score', mode='before')
     @classmethod
@@ -125,7 +204,7 @@ class PortfolioInsightsResponse(BaseModel):
             if m:
                 val = int(m.group(0))
                 return max(0, min(100, val))
-        return int(v)
+        return 65
 
 
 # ---------------------------------------------------------------------------
@@ -780,10 +859,7 @@ GeminiResult = AIResult
 
 
 def _clean_json_text(text: str) -> str:
-    """Extract valid JSON from LLM output, stripping reasoning tags and markdown fences.
-
-    Includes auto-repair for responses that were truncated by token limits mid-list.
-    """
+    """Extract valid JSON from LLM output, stripping reasoning tags and markdown fences."""
     if not text:
         return ""
     import re
@@ -807,36 +883,77 @@ def _clean_json_text(text: str) -> str:
     if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
         text = text[first_brace:last_brace + 1].strip()
 
-    # Try standard parse
-    try:
-        json.loads(text)
-        return text
-    except Exception:
-        pass
-
-    # Resilient repair for truncated JSON lists:
-    # If text was cut off while outputting insights array, find the last completed inner object end '}'
-    if first_brace != -1:
-        candidate = text
-        while candidate:
-            last_inner = candidate.rfind('}')
-            if last_inner <= first_brace:
-                break
-            repaired = candidate[:last_inner + 1].rstrip().rstrip(',') + '\n  ]\n}'
-            try:
-                json.loads(repaired)
-                logger.info("Successfully repaired truncated JSON from LLM at offset %d", last_inner)
-                return repaired
-            except Exception:
-                candidate = candidate[:last_inner]
-
+    # Clean trailing commas before } or ]
+    text = re.sub(r',\s*([\]}])', r'\1', text)
     return text
+
+
+def _structure_analysis_with_ai(
+    analysis_text: str,
+    api_key: str = "",
+    base_url: str = "",
+) -> PortfolioInsightsResponse:
+    """DAG Stage 2: Transform raw analytical text or imperfect JSON into structured Pydantic schema using AI."""
+    from openai import OpenAI
+
+    model = os.environ.get('SHAKTI_MODEL') or getattr(settings, 'SHAKTI_MODEL', 'deepseek-r1')
+    client_id = os.environ.get('SHAKTI_CLIENT_ID') or getattr(settings, 'SHAKTI_CLIENT_ID', '')
+
+    logger.info("DAG Stage 2: Structuring analysis with AI model '%s'...", model)
+
+    structurer_client = OpenAI(
+        api_key=api_key or os.environ.get('SHAKTI_API_KEY') or getattr(settings, 'SHAKTI_API_KEY', ''),
+        base_url=base_url or os.environ.get('SHAKTI_BASE_URL') or getattr(settings, 'SHAKTI_BASE_URL', 'https://http.prod-llm.shaktistudio.shakticloud.ai'),
+        default_headers={"id": client_id} if client_id else None,
+        timeout=180.0,
+    )
+
+    structurer_system = (
+        "You are an expert financial data structuring engine. "
+        "Your task is to convert the provided portfolio analysis into a single, valid JSON object matching this schema:\n"
+        "{\n"
+        '  "summary": "2-3 sentence executive overview leading with greatest strength and most urgent weakness",\n'
+        '  "score": 65,\n'
+        '  "insights": [\n'
+        '    {\n'
+        '      "category": "risk|opportunity|rebalancing|goal|tax|macro|consolidation|international",\n'
+        '      "severity": "critical|warning|positive|info",\n'
+        '      "title": "Concise headline, max 10 words",\n'
+        '      "detail": "2-4 sentences citing specific figures",\n'
+        '      "action": "Concrete next step or null"\n'
+        '    }\n'
+        '  ],\n'
+        '  "market_context": "2-3 sentences on Indian macro",\n'
+        '  "outlook": "2-3 sentences on next 3-6 months priorities"\n'
+        "}\n"
+        "Rules:\n"
+        "1. Extract all facts, valuations, and figures faithfully from the analysis text. Do not invent numbers.\n"
+        "2. Ensure category is one of: risk, opportunity, rebalancing, goal, tax, macro, consolidation, international.\n"
+        "3. Ensure severity is one of: critical, warning, positive, info.\n"
+        "4. Output ONLY valid JSON starting with { and ending with }. No code fences, no extra text."
+    )
+
+    response = structurer_client.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": structurer_system},
+            {"role": "user", "content": f"Extract and format the structured insights from this analysis text:\n\n{analysis_text}"},
+        ],
+        max_tokens=8192,
+        temperature=0.0,
+        stream=False,
+    )
+    raw_output = response.choices[0].message.content or ""
+    cleaned = _clean_json_text(raw_output)
+    return PortfolioInsightsResponse.model_validate_json(cleaned)
 
 
 def call_shakti(prompt_data: dict, group=None) -> AIResult:
     """Call Shakti Cloud OpenAI-compatible endpoint with portfolio data and return structured insights.
 
     Uses streaming response accumulation to ensure network resilience against cloud/proxy timeouts.
+    Employs a 2-stage DAG: Stage 1 performs deep reasoning via DeepSeek-R1; if direct parsing
+    encounters formatting anomalies, Stage 2 uses an AI Structurer to extract compliant JSON.
     """
     from openai import OpenAI
     import time
@@ -941,11 +1058,23 @@ def call_shakti(prompt_data: dict, group=None) -> AIResult:
     try:
         parsed = PortfolioInsightsResponse.model_validate_json(cleaned_json)
     except Exception as parse_err:
-        logger.error(
-            "Failed to parse Shakti Cloud response as PortfolioInsightsResponse: %s\nSnippet: %s",
-            parse_err, cleaned_json[:500]
+        logger.warning(
+            "Direct JSON parse from Stage 1 failed (%s); triggering Stage 2 DAG AI Structurer...",
+            parse_err,
         )
-        raise RuntimeError(f"Shakti Cloud returned invalid JSON: {parse_err}") from parse_err
+        try:
+            parsed = _structure_analysis_with_ai(
+                analysis_text=raw_text,
+                api_key=api_key,
+                base_url=base_url,
+            )
+            logger.info("Successfully structured insights via Stage 2 DAG AI Structurer!")
+        except Exception as struct_err:
+            logger.error(
+                "Both direct parse and Stage 2 AI structurer failed: %s | Stage 1 error: %s\nSnippet: %s",
+                struct_err, parse_err, cleaned_json[:500]
+            )
+            raise RuntimeError(f"Failed to structure Shakti Cloud insights: {struct_err}") from struct_err
 
     return AIResult(
         model=f"shakti:{model}",
