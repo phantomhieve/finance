@@ -81,6 +81,7 @@ fi
 # Ensure media upload directories exist and are only accessible by the app user
 mkdir -p "${APP_DIR}/media/jewellery_photos/cache"
 chmod 750 "${APP_DIR}/media" "${APP_DIR}/media/jewellery_photos" "${APP_DIR}/media/jewellery_photos/cache"
+venv/bin/python manage.py generate_jewellery_thumbnails || true
 sudo mkdir -p "$(dirname "${CRON_LOG}")" && sudo touch "${CRON_LOG}"
 sed -e "s|__APP_DIR__|${APP_DIR}|g" -e "s|__APP_OWNER__|${APP_OWNER}|g" \
     -e "s|__CRON_LOG__|${CRON_LOG}|g" -e "s|__CRON_NAME__|${CRON_NAME}|g" \
