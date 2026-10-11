@@ -20,3 +20,8 @@ See [GEMINI.md](file:///Users/phantomhive/Desktop/Atul/finance/GEMINI.md) for fu
 4. **UI & Theme**:
    - Maintain DaisyUI 5 + Tailwind glassmorphism dark-mode aesthetic (`night` theme).
    - Ensure responsive design with desktop sidebar and mobile bottom dock.
+
+5. **Git Commit Standards**:
+   - Always write structured Conventional Commits (`type(scope): summary`).
+   - Always provide a detailed commit body describing *why* the change was made and a bulleted breakdown of modified components. Never use vague one-liners.
+

@@ -76,9 +76,12 @@ def build_monthly_context(group, insights):
 
 
 def build_weekly_context(group):
-    cash = float(CashPosition.objects.filter(group=group, is_baby=False)
-                 .aggregate(t=Sum('amount'))['t'] or 0)
-    fds = FixedDeposit.objects.filter(group=group, is_active=True, is_baby=False)
+    cash_qs = CashPosition.objects.filter(group=group, is_baby=False).order_by('-amount')
+    cash = float(cash_qs.aggregate(t=Sum('amount'))['t'] or 0)
+    cash_positions = list(cash_qs)
+
+    fds_qs = FixedDeposit.objects.filter(group=group, is_active=True, is_baby=False).order_by('maturity_date')
+    fds = list(fds_qs)
     fd = sum(float(f.current_value) for f in fds)
 
     by_symbol = {}
@@ -104,6 +107,8 @@ def build_weekly_context(group):
         'total_cash': cash,
         'total_fd': fd,
         'total_liquid': cash + fd,
+        'cash_positions': cash_positions,
+        'fds': fds,
         'stocks': stocks,
         'notable': [s for s in stocks if s['flag']],
         'drawdowns': sum(1 for s in stocks if s['flag'] == 'drawdown'),

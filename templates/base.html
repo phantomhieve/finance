@@ -130,12 +130,6 @@
     {% endif %}
     {% if user.is_superuser %}
     <p class="sidebar-section-title sidebar-label mt-5">Admin</p>
-    <div class="tooltip tooltip-right sidebar-tip" data-tip="Server Monitor">
-      <a href="{% url 'admin_monitor' %}" class="sidebar-link {% if request.resolver_match.url_name == 'admin_monitor' %}sidebar-active{% endif %}">
-        <span class="icon-filled material-symbols-outlined text-lg text-rose-400 flex-shrink-0">dns</span>
-        <span class="sidebar-label">Server Monitor</span>
-      </a>
-    </div>
     <div class="tooltip tooltip-right sidebar-tip" data-tip="Django Admin">
       <a href="{% url 'admin:index' %}" class="sidebar-link">
         <span class="icon-filled material-symbols-outlined text-lg text-violet-400 flex-shrink-0">admin_panel_settings</span>

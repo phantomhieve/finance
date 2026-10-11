@@ -30,10 +30,6 @@ urlpatterns = [
     path('goals/annual/', views.set_annual_goal, name='set_annual_goal'),
     path('month-comment/', views.save_month_comment, name='save_month_comment'),
 
-    # Admin panels (superuser only)
-    path('admin/monitor/', views.admin_monitor, name='admin_monitor'),
-    path('admin/api/metrics/', views.server_metrics, name='server_metrics'),
-
     # Auth — SSO only, dev login available in DEBUG mode
     path('login/', views.login_view, name='login'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
