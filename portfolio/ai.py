@@ -780,12 +780,17 @@ GeminiResult = AIResult
 
 
 def _clean_json_text(text: str) -> str:
-    """Extract valid JSON from LLM output, stripping reasoning tags and markdown fences."""
+    """Extract valid JSON from LLM output, stripping reasoning tags and markdown fences.
+
+    Includes auto-repair for responses that were truncated by token limits mid-list.
+    """
     if not text:
         return ""
     import re
     # Strip <think>...</think> reasoning traces if present
     text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    if '<think>' in text and '</think>' not in text:
+        text = text.split('<think>', 1)[0]
     text = text.strip()
 
     # Strip code block fences
@@ -801,6 +806,29 @@ def _clean_json_text(text: str) -> str:
     last_brace = text.rfind('}')
     if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
         text = text[first_brace:last_brace + 1].strip()
+
+    # Try standard parse
+    try:
+        json.loads(text)
+        return text
+    except Exception:
+        pass
+
+    # Resilient repair for truncated JSON lists:
+    # If text was cut off while outputting insights array, find the last completed inner object end '}'
+    if first_brace != -1:
+        candidate = text
+        while candidate:
+            last_inner = candidate.rfind('}')
+            if last_inner <= first_brace:
+                break
+            repaired = candidate[:last_inner + 1].rstrip().rstrip(',') + '\n  ]\n}'
+            try:
+                json.loads(repaired)
+                logger.info("Successfully repaired truncated JSON from LLM at offset %d", last_inner)
+                return repaired
+            except Exception:
+                candidate = candidate[:last_inner]
 
     return text
 
@@ -825,17 +853,20 @@ def call_shakti(prompt_data: dict, group=None) -> AIResult:
         os.environ.get('SHAKTI_CLIENT_ID')
         or getattr(settings, 'SHAKTI_CLIENT_ID', '')
     )
-    model = os.environ.get('SHAKTI_MODEL') or getattr(settings, 'SHAKTI_MODEL', 'llama3_3')
+    model = os.environ.get('SHAKTI_MODEL') or getattr(settings, 'SHAKTI_MODEL', 'deepseek-r1')
+    max_tokens = int(os.environ.get('SHAKTI_MAX_TOKENS') or getattr(settings, 'SHAKTI_MAX_TOKENS', 8192))
+    timeout_sec = float(os.environ.get('SHAKTI_TIMEOUT') or getattr(settings, 'SHAKTI_TIMEOUT', 300.0))
+    temperature = float(os.environ.get('SHAKTI_TEMPERATURE') or getattr(settings, 'SHAKTI_TEMPERATURE', 0.1))
     max_retries = int(os.environ.get('SHAKTI_MAX_RETRIES') or getattr(settings, 'SHAKTI_MAX_RETRIES', 3))
     retry_delay = int(os.environ.get('SHAKTI_RETRY_DELAY') or getattr(settings, 'SHAKTI_RETRY_DELAY', 3))
 
-    logger.info("Calling Shakti Cloud model '%s' at '%s'", model, base_url)
+    logger.info("Calling Shakti Cloud model '%s' at '%s' (max_tokens=%d, timeout=%ds)", model, base_url, max_tokens, int(timeout_sec))
 
     client = OpenAI(
         api_key=api_key,
         base_url=base_url,
         default_headers={"id": client_id} if client_id else None,
-        timeout=120.0,
+        timeout=timeout_sec,
     )
 
     system_instruction = get_system_instruction(group)
@@ -863,7 +894,7 @@ def call_shakti(prompt_data: dict, group=None) -> AIResult:
 
     user_message = (
         "Analyze this portfolio. Use the data below and macro_context. "
-        "Generate 8-15 insights across at least 5 categories.\n\n"
+        "Generate 8-12 insights across at least 5 categories.\n\n"
         f"Portfolio Data:\n{json.dumps(prompt_data, cls=_DecimalEncoder, indent=2)}"
     )
 
@@ -881,8 +912,8 @@ def call_shakti(prompt_data: dict, group=None) -> AIResult:
             response = client.chat.completions.create(
                 model=model,
                 messages=messages,
-                max_tokens=4096,
-                temperature=0.2,
+                max_tokens=max_tokens,
+                temperature=temperature,
                 stream=True,
             )
             chunks = []

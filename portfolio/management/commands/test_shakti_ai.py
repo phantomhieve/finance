@@ -32,6 +32,11 @@ class Command(BaseCommand):
             action='store_true',
             help="Run financial score calculation using built-in synthetic benchmark portfolio data.",
         )
+        parser.add_argument(
+            '--save',
+            action='store_true',
+            help="Save the generated insight to the database so it appears immediately on the web dashboard.",
+        )
 
     def handle(self, *args, **options):
         api_key = os.environ.get('SHAKTI_API_KEY') or getattr(settings, 'SHAKTI_API_KEY', '')
@@ -95,6 +100,15 @@ class Command(BaseCommand):
         try:
             result = call_shakti(prompt_data, group=group)
             self._display_score_results(result)
+            if group and options.get('save'):
+                from portfolio.models import PortfolioInsight
+                ins = PortfolioInsight.objects.create(
+                    group=group,
+                    model_used=result.model,
+                    prompt_data=prompt_data,
+                    insights=result.insights_dict,
+                )
+                self.stdout.write(self.style.SUCCESS(f"\n[Saved to database as PortfolioInsight #{ins.id}! Dashboard updated.]"))
         except Exception as e:
             self.stdout.write(self.style.ERROR(f"\nFailed to calculate finance score via Shakti Cloud: {e}"))
             logger.exception("Shakti test failure")
