@@ -18,7 +18,7 @@ from pathlib import Path
 
 from django.conf import settings
 from google import genai
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from .models import StockHolding, MutualFundHolding
 
@@ -63,13 +63,69 @@ class Insight(BaseModel):
     detail: str
     action: str | None = None
 
+    @field_validator('category', mode='before')
+    @classmethod
+    def normalize_category(cls, v):
+        if isinstance(v, str):
+            v_clean = v.strip().lower()
+            valid = {c.value for c in InsightCategory}
+            if v_clean in valid:
+                return v_clean
+            mapping = {
+                'allocation': 'rebalancing',
+                'asset_allocation': 'rebalancing',
+                'diversification': 'rebalancing',
+                'liquidity': 'risk',
+                'concentration': 'risk',
+                'debt': 'risk',
+                'regulatory': 'tax',
+                'compliance': 'tax',
+            }
+            if v_clean in mapping:
+                return mapping[v_clean]
+        return v
+
+    @field_validator('severity', mode='before')
+    @classmethod
+    def normalize_severity(cls, v):
+        if isinstance(v, str):
+            v_clean = v.strip().lower()
+            valid = {s.value for s in InsightSeverity}
+            if v_clean in valid:
+                return v_clean
+            mapping = {
+                'high': 'critical',
+                'urgent': 'critical',
+                'medium': 'warning',
+                'warn': 'warning',
+                'low': 'info',
+                'good': 'positive',
+                'success': 'positive',
+            }
+            if v_clean in mapping:
+                return mapping[v_clean]
+        return v
+
 
 class PortfolioInsightsResponse(BaseModel):
     summary: str
     score: int
     insights: list[Insight]
-    market_context: str
-    outlook: str
+    market_context: str = ""
+    outlook: str = ""
+
+    @field_validator('score', mode='before')
+    @classmethod
+    def normalize_score(cls, v):
+        if isinstance(v, (int, float)):
+            return max(0, min(100, int(round(v))))
+        if isinstance(v, str):
+            import re
+            m = re.search(r'\d+', v)
+            if m:
+                val = int(m.group(0))
+                return max(0, min(100, val))
+        return int(v)
 
 
 # ---------------------------------------------------------------------------
@@ -710,13 +766,160 @@ def build_prompt_data(summary, growth, group):
 
 
 # ---------------------------------------------------------------------------
-# Gemini caller
+# AI Caller: Shakti Cloud (OpenAI-compatible) & Google Gemini
 # ---------------------------------------------------------------------------
 
-class GeminiResult:
+class AIResult:
     def __init__(self, model: str, insights_dict: dict):
         self.model = model
         self.insights_dict = insights_dict
+
+
+# Backwards compatibility alias
+GeminiResult = AIResult
+
+
+def _clean_json_text(text: str) -> str:
+    """Extract valid JSON from LLM output, stripping reasoning tags and markdown fences."""
+    if not text:
+        return ""
+    import re
+    # Strip <think>...</think> reasoning traces if present
+    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    text = text.strip()
+
+    # Strip code block fences
+    if text.startswith('```'):
+        lines = text.split('\n')
+        if len(lines) >= 2 and lines[-1].strip().startswith('```'):
+            text = '\n'.join(lines[1:-1]).strip()
+        else:
+            text = text.split('\n', 1)[1].rsplit('```', 1)[0].strip()
+
+    # Locate outer json object
+    first_brace = text.find('{')
+    last_brace = text.rfind('}')
+    if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+        text = text[first_brace:last_brace + 1].strip()
+
+    return text
+
+
+def call_shakti(prompt_data: dict, group=None) -> AIResult:
+    """Call Shakti Cloud OpenAI-compatible endpoint with portfolio data and return structured insights.
+
+    Uses streaming response accumulation to ensure network resilience against cloud/proxy timeouts.
+    """
+    from openai import OpenAI
+    import time
+
+    api_key = os.environ.get('SHAKTI_API_KEY') or getattr(settings, 'SHAKTI_API_KEY', '')
+    if not api_key:
+        raise ValueError('SHAKTI_API_KEY environment variable is not set')
+
+    base_url = (
+        os.environ.get('SHAKTI_BASE_URL')
+        or getattr(settings, 'SHAKTI_BASE_URL', 'https://http.prod-llm.shaktistudio.shakticloud.ai')
+    ).strip().rstrip('/')
+    client_id = (
+        os.environ.get('SHAKTI_CLIENT_ID')
+        or getattr(settings, 'SHAKTI_CLIENT_ID', '')
+    )
+    model = os.environ.get('SHAKTI_MODEL') or getattr(settings, 'SHAKTI_MODEL', 'llama3_3')
+    max_retries = int(os.environ.get('SHAKTI_MAX_RETRIES') or getattr(settings, 'SHAKTI_MAX_RETRIES', 3))
+    retry_delay = int(os.environ.get('SHAKTI_RETRY_DELAY') or getattr(settings, 'SHAKTI_RETRY_DELAY', 3))
+
+    logger.info("Calling Shakti Cloud model '%s' at '%s'", model, base_url)
+
+    client = OpenAI(
+        api_key=api_key,
+        base_url=base_url,
+        default_headers={"id": client_id} if client_id else None,
+        timeout=120.0,
+    )
+
+    system_instruction = get_system_instruction(group)
+    json_format_instruction = (
+        "\n\nCRITICAL RESPONSE INSTRUCTION:\n"
+        "You must respond with ONLY a valid, parseable JSON object matching this schema:\n"
+        "{\n"
+        '  "summary": "2-3 sentence executive overview leading with greatest strength and most urgent weakness",\n'
+        '  "score": 72,\n'
+        '  "insights": [\n'
+        '    {\n'
+        '      "category": "risk|opportunity|rebalancing|goal|tax|macro|consolidation|international",\n'
+        '      "severity": "critical|warning|positive|info",\n'
+        '      "title": "Short title max 10 words",\n'
+        '      "detail": "2-4 sentences citing specific figures",\n'
+        '      "action": "Concrete next step or null"\n'
+        '    }\n'
+        '  ],\n'
+        '  "market_context": "2-3 sentences on current Indian macro conditions",\n'
+        '  "outlook": "2-3 sentences on next 3-6 months priorities"\n'
+        "}\n"
+        "Do not include markdown code block backticks (```json), do not include filler text, and do not include <think> tags. "
+        "Output pure JSON starting with { and ending with }."
+    )
+
+    user_message = (
+        "Analyze this portfolio. Use the data below and macro_context. "
+        "Generate 8-15 insights across at least 5 categories.\n\n"
+        f"Portfolio Data:\n{json.dumps(prompt_data, cls=_DecimalEncoder, indent=2)}"
+    )
+
+    messages = [
+        {"role": "system", "content": system_instruction + json_format_instruction},
+        {"role": "user", "content": user_message},
+    ]
+
+    raw_text = ""
+    last_error = None
+
+    for attempt in range(max_retries):
+        try:
+            logger.info("Shakti Cloud request attempt %d/%d for model %s", attempt + 1, max_retries, model)
+            response = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                max_tokens=4096,
+                temperature=0.2,
+                stream=True,
+            )
+            chunks = []
+            for res in response:
+                if res.choices and len(res.choices) > 0 and res.choices[0].delta:
+                    content = res.choices[0].delta.content or ""
+                    chunks.append(content)
+            raw_text = "".join(chunks).strip()
+            if raw_text:
+                break
+        except Exception as e:
+            last_error = e
+            logger.warning("Shakti Cloud attempt %d failed: %s", attempt + 1, e)
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+            else:
+                raise RuntimeError(
+                    f"Failed to get response from Shakti Cloud after {max_retries} attempts: {last_error}"
+                ) from last_error
+
+    if not raw_text:
+        raise RuntimeError("Received empty response from Shakti Cloud")
+
+    cleaned_json = _clean_json_text(raw_text)
+    try:
+        parsed = PortfolioInsightsResponse.model_validate_json(cleaned_json)
+    except Exception as parse_err:
+        logger.error(
+            "Failed to parse Shakti Cloud response as PortfolioInsightsResponse: %s\nSnippet: %s",
+            parse_err, cleaned_json[:500]
+        )
+        raise RuntimeError(f"Shakti Cloud returned invalid JSON: {parse_err}") from parse_err
+
+    return AIResult(
+        model=f"shakti:{model}",
+        insights_dict=parsed.model_dump(mode='json'),
+    )
 
 
 _MACRO_PROMPT = (
@@ -769,16 +972,8 @@ def _fetch_macro_context(client) -> dict | None:
         return None
 
 
-def call_gemini(prompt_data: dict, group=None) -> GeminiResult:
-    """Call Gemini with portfolio data and return structured insights.
-
-    Step 1: Fetch live macro data via Google Search grounding (cheap model).
-    Step 2: Run full portfolio analysis with structured output (main model).
-
-    Args:
-        prompt_data: Portfolio data dict from build_prompt_data.
-        group: Optional AccountGroup for per-household AI config.
-    """
+def call_gemini_direct(prompt_data: dict, group=None) -> AIResult:
+    """Call Google Gemini with portfolio data and return structured insights."""
     api_key = os.environ.get('GEMINI_API_KEY', '')
     if not api_key:
         raise ValueError('GEMINI_API_KEY environment variable is not set')
@@ -813,7 +1008,55 @@ def call_gemini(prompt_data: dict, group=None) -> GeminiResult:
 
     parsed = PortfolioInsightsResponse.model_validate_json(response.text)
 
-    return GeminiResult(
+    return AIResult(
         model=model,
         insights_dict=parsed.model_dump(mode='json'),
     )
+
+
+def call_ai_insights(prompt_data: dict, group=None) -> AIResult:
+    """Unified entry point for AI portfolio analysis and financial scoring.
+
+    Selects provider based on settings.AI_PROVIDER ('shakti' or 'gemini'),
+    with automatic failover if both credentials are configured.
+    """
+    provider = (
+        getattr(settings, 'AI_PROVIDER', '').lower()
+        or os.environ.get('AI_PROVIDER', '').lower()
+        or ('shakti' if (os.environ.get('SHAKTI_API_KEY') or getattr(settings, 'SHAKTI_API_KEY', '')) else 'gemini')
+    )
+    shakti_key = os.environ.get('SHAKTI_API_KEY') or getattr(settings, 'SHAKTI_API_KEY', '')
+    gemini_key = os.environ.get('GEMINI_API_KEY') or getattr(settings, 'GEMINI_API_KEY', '')
+
+    if provider == 'shakti' or (not provider and shakti_key):
+        if not shakti_key:
+            if gemini_key:
+                logger.info("SHAKTI_API_KEY not configured, falling back to Gemini")
+                return call_gemini_direct(prompt_data, group=group)
+            raise ValueError("SHAKTI_API_KEY environment variable is not set")
+        try:
+            return call_shakti(prompt_data, group=group)
+        except Exception as e:
+            if gemini_key:
+                logger.warning("Shakti Cloud failed (%s), falling back to Gemini", e)
+                return call_gemini_direct(prompt_data, group=group)
+            raise
+    elif provider == 'gemini' or gemini_key:
+        if not gemini_key:
+            if shakti_key:
+                logger.info("GEMINI_API_KEY not configured, falling back to Shakti Cloud")
+                return call_shakti(prompt_data, group=group)
+            raise ValueError("GEMINI_API_KEY environment variable is not set")
+        try:
+            return call_gemini_direct(prompt_data, group=group)
+        except Exception as e:
+            if shakti_key:
+                logger.warning("Gemini failed (%s), falling back to Shakti Cloud", e)
+                return call_shakti(prompt_data, group=group)
+            raise
+    else:
+        raise ValueError("Neither SHAKTI_API_KEY nor GEMINI_API_KEY is configured")
+
+
+# Alias call_gemini to call_ai_insights for backward compatibility with existing callers
+call_gemini = call_ai_insights
