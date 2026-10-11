@@ -203,11 +203,11 @@ WSGI_APPLICATION = 'pftracker.wsgi.wsgi_application'
 
 
 # Database — uses DATABASE_URL env var if set, otherwise SQLite for local dev
-# conn_max_age: persistent connections for Postgres (reduces connect overhead; tune if max_connections is low)
+# conn_max_age defaults to 0 to prevent connection exhaustion across ASGI worker threads
 DATABASES = {
     'default': dj_database_url.config(
         default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
-        conn_max_age=600,
+        conn_max_age=int(os.environ.get('DJANGO_CONN_MAX_AGE', '0')),
     )
 }
 
