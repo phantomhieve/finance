@@ -444,4 +444,8 @@ GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
 GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-3.1-pro-preview')
 EXPENSES_GEMINI_MODEL = os.environ.get('EXPENSES_GEMINI_MODEL', 'gemini-3.5-flash-lite')
 
+# Multi-Stage DAG Engine for Portfolio Insights
+ENABLE_PORTFOLIO_DAG = os.environ.get('ENABLE_PORTFOLIO_DAG', 'true').lower() in ('true', '1', 'yes')
+PORTFOLIO_DAG_CONCURRENCY = os.environ.get('PORTFOLIO_DAG_CONCURRENCY', 'true').lower() in ('true', '1', 'yes')
+
 

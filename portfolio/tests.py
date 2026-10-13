@@ -688,3 +688,187 @@ class ShaktiCloudIntegrationTests(TestCase):
             # Verify client was initialized with Shakti default headers
             mock_client.chat.completions.create.assert_called_once()
 
+
+class PortfolioInsightsDAGTests(TestCase):
+    def test_intermediate_schemas_validation(self):
+        from portfolio.dag import (
+            AllocationLensResult,
+            QualityLensResult,
+            MacroStressLensResult,
+            StrategyLensResult,
+            DAGExecutionMetadata,
+        )
+
+        alloc = AllocationLensResult(
+            sub_score=85,
+            allocation_findings=["75% Equity, 25% Debt"],
+            concentration_warnings=["HDFC Bank is 12%"],
+            liquidity_tier_assessment="Tier 1 exceeds 6 months",
+            emergency_floor_ok=True,
+        )
+        self.assertEqual(alloc.sub_score, 85)
+        self.assertTrue(alloc.emergency_floor_ok)
+
+        qual = QualityLensResult(
+            sub_score=75,
+            equity_quality_findings=["Top gainer: Tata Motors"],
+            legacy_fund_audits=[{"fund_name": "Axis Bluechip", "action": "merge", "target": "Nifty 50 Index"}],
+        )
+        self.assertEqual(qual.sub_score, 75)
+        self.assertEqual(len(qual.legacy_fund_audits), 1)
+
+        macro = MacroStressLensResult(
+            sub_score=70,
+            valuation_regime="Nifty PE 21.5 (Fair)",
+            crash_drawdown_amount="Rs 12.5L",
+        )
+        self.assertEqual(macro.sub_score, 70)
+
+        strat = StrategyLensResult(
+            sub_score=80,
+            tax_harvesting_plan="Harvest 1.25L LTCG",
+        )
+        self.assertEqual(strat.sub_score, 80)
+
+        meta = DAGExecutionMetadata(
+            started_at="2026-10-13T10:00:00Z",
+            completed_at="2026-10-13T10:00:02Z",
+            elapsed_ms=2000.0,
+            nodes_executed=["Stage1A", "Stage1B", "Stage1C", "Stage2", "Stage3"],
+            sub_scores={"allocation": 85, "quality": 75, "strategy": 80, "macro": 70},
+            grounded_score=78,
+            fallback_used=False,
+        )
+        self.assertEqual(meta.grounded_score, 78)
+        self.assertFalse(meta.fallback_used)
+
+    def test_terminal_grounded_score_formula(self):
+        from portfolio.dag import (
+            AllocationLensResult,
+            QualityLensResult,
+            MacroStressLensResult,
+            StrategyLensResult,
+            run_stage_3_terminal_synthesis,
+        )
+        from portfolio.ai import PortfolioInsightsResponse
+        from unittest.mock import patch
+
+        alloc = AllocationLensResult(sub_score=80)
+        qual = QualityLensResult(sub_score=70)
+        strat = StrategyLensResult(sub_score=90)
+        macro = MacroStressLensResult(sub_score=60)
+        # Expected grounded score: round(0.30*80 + 0.25*70 + 0.25*90 + 0.20*60)
+        # = 24 + 17.5 + 22.5 + 12 = 76
+
+        mock_llm_response = PortfolioInsightsResponse(
+            summary="Strong foundation with actionable rebalancing.",
+            score=99,  # LLM attempted to hallucinate 99
+            insights=[],
+            market_context="Neutral",
+            outlook="Maintain SIPs",
+        )
+
+        with patch("portfolio.dag.gateway.generate_structured", return_value=mock_llm_response):
+            synth = run_stage_3_terminal_synthesis(
+                data={"summary": {"total_value": 1000000}},
+                investor_profile="Profile test",
+                allocation=alloc,
+                quality=qual,
+                macro=macro,
+                strategy=strat,
+            )
+            # Must strictly overwrite hallucinated score 99 with mathematically grounded score 76
+            self.assertEqual(synth.score, 76)
+
+    def test_dag_execution_with_mocked_gateway(self):
+        from portfolio.dag import (
+            PortfolioInsightsDAG,
+            AllocationLensResult,
+            QualityLensResult,
+            MacroStressLensResult,
+            StrategyLensResult,
+        )
+        from portfolio.ai import PortfolioInsightsResponse, Insight
+        from unittest.mock import patch
+
+        def mock_generate_structured(schema, *args, **kwargs):
+            if schema == AllocationLensResult:
+                return AllocationLensResult(
+                    sub_score=82,
+                    allocation_findings=["Balanced 70:30"],
+                    candidate_insights=[
+                        Insight(category="rebalancing", severity="info", title="Rebalance equity", detail="Equity is 72%")
+                    ],
+                )
+            elif schema == QualityLensResult:
+                return QualityLensResult(
+                    sub_score=78,
+                    legacy_fund_audits=[{"fund_name": "Old Fund", "action": "exit"}],
+                )
+            elif schema == MacroStressLensResult:
+                return MacroStressLensResult(
+                    sub_score=74,
+                    valuation_regime="Fair value",
+                )
+            elif schema == StrategyLensResult:
+                return StrategyLensResult(
+                    sub_score=80,
+                    tax_harvesting_plan="Utilize 1.25L LTCG",
+                )
+            elif schema == PortfolioInsightsResponse:
+                return PortfolioInsightsResponse(
+                    summary="Solid asset mix with high equity discipline.",
+                    score=65,  # will be overridden by grounded formula
+                    insights=[
+                        Insight(category="rebalancing", severity="info", title="Rebalance equity", detail="Equity is 72%")
+                    ],
+                )
+            raise ValueError(f"Unknown schema: {schema}")
+
+        with patch("portfolio.dag.gateway.generate_structured", side_effect=mock_generate_structured):
+            dag = PortfolioInsightsDAG(use_concurrent=True)
+            res, meta = dag.execute({"summary": {"total_value": 5000000}})
+
+            self.assertEqual(len(meta.nodes_executed), 5)
+            self.assertFalse(meta.fallback_used)
+            # 0.30*82 + 0.25*78 + 0.25*80 + 0.20*74 = 24.6 + 19.5 + 20 + 14.8 = 78.9 -> 79
+            self.assertEqual(res.score, 79)
+            self.assertEqual(meta.grounded_score, 79)
+
+    def test_dag_node_failure_resilience(self):
+        from portfolio.dag import (
+            PortfolioInsightsDAG,
+            QualityLensResult,
+            MacroStressLensResult,
+            StrategyLensResult,
+        )
+        from portfolio.ai import PortfolioInsightsResponse
+        from unittest.mock import patch
+
+        def mock_generate_with_fail(schema, *args, **kwargs):
+            from portfolio.dag import AllocationLensResult
+            if schema == AllocationLensResult:
+                raise RuntimeError("Node 1A network timeout")
+            elif schema == QualityLensResult:
+                return QualityLensResult(sub_score=70)
+            elif schema == MacroStressLensResult:
+                return MacroStressLensResult(sub_score=65)
+            elif schema == StrategyLensResult:
+                return StrategyLensResult(sub_score=72)
+            elif schema == PortfolioInsightsResponse:
+                return PortfolioInsightsResponse(
+                    summary="Resilient synthesis summary.",
+                    score=70,
+                    insights=[],
+                )
+            raise ValueError(f"Unknown schema: {schema}")
+
+        with patch("portfolio.dag.gateway.generate_structured", side_effect=mock_generate_with_fail):
+            dag = PortfolioInsightsDAG(use_concurrent=False)
+            res, meta = dag.execute({"summary": {"total_value": 3000000}})
+
+            # Fallback was utilized for Stage 1A, execution completed smoothly
+            self.assertTrue(meta.fallback_used)
+            self.assertEqual(res.summary, "Resilient synthesis summary.")
+            self.assertGreater(res.score, 0)
+

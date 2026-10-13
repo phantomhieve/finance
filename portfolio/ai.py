@@ -1062,7 +1062,19 @@ def call_ai_insights(prompt_data: dict, group=None) -> AIResult:
         if macro:
             prompt_data['macro_context'] = macro
 
-    # 2. Main analysis with structured output
+    # 2. Multi-Stage DAG Execution (preferred engine)
+    enable_dag = getattr(settings, 'ENABLE_PORTFOLIO_DAG', True)
+    if enable_dag:
+        try:
+            from .dag import run_portfolio_insights_dag
+            return run_portfolio_insights_dag(prompt_data, group=group)
+        except Exception as dag_err:
+            logger.warning(
+                "Multi-stage Portfolio DAG execution encountered issue (%s); falling back to single-shot generation...",
+                dag_err,
+            )
+
+    # 3. Single-shot analysis fallback with structured output
     user_message = (
         "Analyze this portfolio. Use the data below and macro_context. "
         "Generate 8-15 insights across at least 5 categories.\n\n"
