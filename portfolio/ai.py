@@ -858,94 +858,10 @@ class AIResult:
 GeminiResult = AIResult
 
 
-def _clean_json_text(text: str) -> str:
-    """Extract valid JSON from LLM output, stripping reasoning tags and markdown fences."""
-    if not text:
-        return ""
-    import re
-    # Strip <think>...</think> reasoning traces if present
-    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
-    if '<think>' in text and '</think>' not in text:
-        text = text.split('<think>', 1)[0]
-    text = text.strip()
-
-    # Strip code block fences
-    if text.startswith('```'):
-        lines = text.split('\n')
-        if len(lines) >= 2 and lines[-1].strip().startswith('```'):
-            text = '\n'.join(lines[1:-1]).strip()
-        else:
-            text = text.split('\n', 1)[1].rsplit('```', 1)[0].strip()
-
-    # Locate outer json object
-    first_brace = text.find('{')
-    last_brace = text.rfind('}')
-    if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
-        text = text[first_brace:last_brace + 1].strip()
-
-    # Clean trailing commas before } or ]
-    text = re.sub(r',\s*([\]}])', r'\1', text)
-    return text
+from pftracker.ai_gateway import clean_json_text as _clean_json_text  # noqa: F401 — re-exported for backwards compatibility
 
 
-def _structure_analysis_with_ai(
-    analysis_text: str,
-    api_key: str = "",
-    base_url: str = "",
-) -> PortfolioInsightsResponse:
-    """DAG Stage 2: Transform raw analytical text or imperfect JSON into structured Pydantic schema using AI."""
-    from openai import OpenAI
 
-    model = os.environ.get('SHAKTI_MODEL') or getattr(settings, 'SHAKTI_MODEL', 'deepseek-r1')
-    client_id = os.environ.get('SHAKTI_CLIENT_ID') or getattr(settings, 'SHAKTI_CLIENT_ID', '')
-
-    logger.info("DAG Stage 2: Structuring analysis with AI model '%s'...", model)
-
-    structurer_client = OpenAI(
-        api_key=api_key or os.environ.get('SHAKTI_API_KEY') or getattr(settings, 'SHAKTI_API_KEY', ''),
-        base_url=base_url or os.environ.get('SHAKTI_BASE_URL') or getattr(settings, 'SHAKTI_BASE_URL', 'https://http.prod-llm.shaktistudio.shakticloud.ai'),
-        default_headers={"id": client_id} if client_id else None,
-        timeout=180.0,
-    )
-
-    structurer_system = (
-        "You are an expert financial data structuring engine. "
-        "Your task is to convert the provided portfolio analysis into a single, valid JSON object matching this schema:\n"
-        "{\n"
-        '  "summary": "2-3 sentence executive overview leading with greatest strength and most urgent weakness",\n'
-        '  "score": 65,\n'
-        '  "insights": [\n'
-        '    {\n'
-        '      "category": "risk|opportunity|rebalancing|goal|tax|macro|consolidation|international",\n'
-        '      "severity": "critical|warning|positive|info",\n'
-        '      "title": "Concise headline, max 10 words",\n'
-        '      "detail": "2-4 sentences citing specific figures",\n'
-        '      "action": "Concrete next step or null"\n'
-        '    }\n'
-        '  ],\n'
-        '  "market_context": "2-3 sentences on Indian macro",\n'
-        '  "outlook": "2-3 sentences on next 3-6 months priorities"\n'
-        "}\n"
-        "Rules:\n"
-        "1. Extract all facts, valuations, and figures faithfully from the analysis text. Do not invent numbers.\n"
-        "2. Ensure category is one of: risk, opportunity, rebalancing, goal, tax, macro, consolidation, international.\n"
-        "3. Ensure severity is one of: critical, warning, positive, info.\n"
-        "4. Output ONLY valid JSON starting with { and ending with }. No code fences, no extra text."
-    )
-
-    response = structurer_client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": structurer_system},
-            {"role": "user", "content": f"Extract and format the structured insights from this analysis text:\n\n{analysis_text}"},
-        ],
-        max_tokens=8192,
-        temperature=0.0,
-        stream=False,
-    )
-    raw_output = response.choices[0].message.content or ""
-    cleaned = _clean_json_text(raw_output)
-    return PortfolioInsightsResponse.model_validate_json(cleaned)
 
 
 def call_shakti(prompt_data: dict, group=None) -> AIResult:
@@ -955,8 +871,8 @@ def call_shakti(prompt_data: dict, group=None) -> AIResult:
     Employs a 2-stage DAG: Stage 1 performs deep reasoning via DeepSeek-R1; if direct parsing
     encounters formatting anomalies, Stage 2 uses an AI Structurer to extract compliant JSON.
     """
-    from openai import OpenAI
-    import time
+    from pftracker.ai_gateway import AINode
+    from pftracker.ai_gateway.adapters.openai_compat import OpenAICompatibleAdapter
 
     api_key = os.environ.get('SHAKTI_API_KEY') or getattr(settings, 'SHAKTI_API_KEY', '')
     if not api_key:
@@ -975,106 +891,37 @@ def call_shakti(prompt_data: dict, group=None) -> AIResult:
     timeout_sec = float(os.environ.get('SHAKTI_TIMEOUT') or getattr(settings, 'SHAKTI_TIMEOUT', 300.0))
     temperature = float(os.environ.get('SHAKTI_TEMPERATURE') or getattr(settings, 'SHAKTI_TEMPERATURE', 0.1))
     max_retries = int(os.environ.get('SHAKTI_MAX_RETRIES') or getattr(settings, 'SHAKTI_MAX_RETRIES', 3))
-    retry_delay = int(os.environ.get('SHAKTI_RETRY_DELAY') or getattr(settings, 'SHAKTI_RETRY_DELAY', 3))
 
-    logger.info("Calling Shakti Cloud model '%s' at '%s' (max_tokens=%d, timeout=%ds)", model, base_url, max_tokens, int(timeout_sec))
-
-    client = OpenAI(
-        api_key=api_key,
+    node = AINode(
+        id="shakti-direct",
+        provider="openai_compatible",
         base_url=base_url,
-        default_headers={"id": client_id} if client_id else None,
+        api_keys=[api_key],
+        default_model=model,
+        headers={"id": client_id} if client_id else {},
         timeout=timeout_sec,
+        max_retries=max_retries,
     )
 
     system_instruction = get_system_instruction(group)
-    json_format_instruction = (
-        "\n\nCRITICAL RESPONSE INSTRUCTION:\n"
-        "You must respond with ONLY a valid, parseable JSON object matching this schema:\n"
-        "{\n"
-        '  "summary": "2-3 sentence executive overview leading with greatest strength and most urgent weakness",\n'
-        '  "score": 72,\n'
-        '  "insights": [\n'
-        '    {\n'
-        '      "category": "risk|opportunity|rebalancing|goal|tax|macro|consolidation|international",\n'
-        '      "severity": "critical|warning|positive|info",\n'
-        '      "title": "Short title max 10 words",\n'
-        '      "detail": "2-4 sentences citing specific figures",\n'
-        '      "action": "Concrete next step or null"\n'
-        '    }\n'
-        '  ],\n'
-        '  "market_context": "2-3 sentences on current Indian macro conditions",\n'
-        '  "outlook": "2-3 sentences on next 3-6 months priorities"\n'
-        "}\n"
-        "Do not include markdown code block backticks (```json), do not include filler text, and do not include <think> tags. "
-        "Output pure JSON starting with { and ending with }."
-    )
-
     user_message = (
         "Analyze this portfolio. Use the data below and macro_context. "
         "Generate 8-12 insights across at least 5 categories.\n\n"
         f"Portfolio Data:\n{json.dumps(prompt_data, cls=_DecimalEncoder, indent=2)}"
     )
 
-    messages = [
-        {"role": "system", "content": system_instruction + json_format_instruction},
-        {"role": "user", "content": user_message},
-    ]
-
-    raw_text = ""
-    last_error = None
-
-    for attempt in range(max_retries):
-        try:
-            logger.info("Shakti Cloud request attempt %d/%d for model %s", attempt + 1, max_retries, model)
-            response = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                stream=True,
-            )
-            chunks = []
-            for res in response:
-                if res.choices and len(res.choices) > 0 and res.choices[0].delta:
-                    content = res.choices[0].delta.content or ""
-                    chunks.append(content)
-            raw_text = "".join(chunks).strip()
-            if raw_text:
-                break
-        except Exception as e:
-            last_error = e
-            logger.warning("Shakti Cloud attempt %d failed: %s", attempt + 1, e)
-            if attempt < max_retries - 1:
-                time.sleep(retry_delay)
-            else:
-                raise RuntimeError(
-                    f"Failed to get response from Shakti Cloud after {max_retries} attempts: {last_error}"
-                ) from last_error
-
-    if not raw_text:
-        raise RuntimeError("Received empty response from Shakti Cloud")
-
-    cleaned_json = _clean_json_text(raw_text)
-    try:
-        parsed = PortfolioInsightsResponse.model_validate_json(cleaned_json)
-    except Exception as parse_err:
-        logger.warning(
-            "Direct JSON parse from Stage 1 failed (%s); triggering Stage 2 DAG AI Structurer...",
-            parse_err,
-        )
-        try:
-            parsed = _structure_analysis_with_ai(
-                analysis_text=raw_text,
-                api_key=api_key,
-                base_url=base_url,
-            )
-            logger.info("Successfully structured insights via Stage 2 DAG AI Structurer!")
-        except Exception as struct_err:
-            logger.error(
-                "Both direct parse and Stage 2 AI structurer failed: %s | Stage 1 error: %s\nSnippet: %s",
-                struct_err, parse_err, cleaned_json[:500]
-            )
-            raise RuntimeError(f"Failed to structure Shakti Cloud insights: {struct_err}") from struct_err
+    adapter = OpenAICompatibleAdapter()
+    parsed = adapter.generate_structured(
+        node=node,
+        schema=PortfolioInsightsResponse,
+        prompt=user_message,
+        system=system_instruction,
+        model=model,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        api_key=api_key,
+        stream=True,
+    )
 
     return AIResult(
         model=f"shakti:{model}",
@@ -1109,27 +956,37 @@ _MACRO_PROMPT = (
 )
 
 
-def _fetch_macro_context(client) -> dict | None:
+def _fetch_macro_context(client=None) -> dict | None:
     """Use a cheap model with Google Search grounding to get live macro data."""
     try:
-        resp = client.models.generate_content(
-            model=_MODEL_FAST,
-            contents=_MACRO_PROMPT,
-            config=genai.types.GenerateContentConfig(
-                tools=[genai.types.Tool(google_search=genai.types.GoogleSearch())],
-                temperature=0.1,
-            ),
-        )
-        text = resp.text.strip()
-        if text.startswith('```'):
-            text = text.split('\n', 1)[1].rsplit('```', 1)[0].strip()
-        macro = json.loads(text)
-        logger.info("Macro context fetched: Nifty=%s, RBI=%s%%",
-                     macro.get('nifty50_level'), macro.get('rbi_repo_rate_pct'))
-        return macro
+        from pftracker.ai_gateway import gateway
+        macro = gateway.fetch_macro_grounding(_MACRO_PROMPT)
+        if macro:
+            return macro
     except Exception as e:
-        logger.warning("Failed to fetch macro context via Google Search: %s", e)
-        return None
+        logger.debug("Gateway macro grounding failed: %s; trying direct client", e)
+
+    if client:
+        try:
+            resp = client.models.generate_content(
+                model=_MODEL_FAST,
+                contents=_MACRO_PROMPT,
+                config=genai.types.GenerateContentConfig(
+                    tools=[genai.types.Tool(google_search=genai.types.GoogleSearch())],
+                    temperature=0.1,
+                ),
+            )
+            text = resp.text.strip()
+            if text.startswith('```'):
+                text = text.split('\n', 1)[1].rsplit('```', 1)[0].strip()
+            macro = json.loads(text)
+            logger.info("Macro context fetched: Nifty=%s, RBI=%s%%",
+                         macro.get('nifty50_level'), macro.get('rbi_repo_rate_pct'))
+            return macro
+        except Exception as e:
+            logger.warning("Failed to fetch macro context via Google Search: %s", e)
+            return None
+    return None
 
 
 def call_gemini_direct(prompt_data: dict, group=None) -> AIResult:
@@ -1141,32 +998,38 @@ def call_gemini_direct(prompt_data: dict, group=None) -> AIResult:
     model = _get_model()
     logger.info("Calling Gemini model: %s", model)
 
-    client = genai.Client(api_key=api_key)
+    from pftracker.ai_gateway import AINode
+    from pftracker.ai_gateway.adapters.gemini import GeminiAdapter
 
-    # Step 1: fetch live macro context
+    node = AINode(
+        id="gemini-direct",
+        provider="gemini",
+        api_keys=[api_key],
+        default_model=model,
+    )
+
+    client = genai.Client(api_key=api_key)
     macro = _fetch_macro_context(client)
     if macro:
         prompt_data['macro_context'] = macro
 
-    # Step 2: main analysis with structured output
+    system_instruction = get_system_instruction(group)
     user_message = (
         "Analyze this portfolio. Use the data below and macro_context. "
         "Generate 8-15 insights across at least 5 categories.\n\n"
         f"Portfolio Data:\n{json.dumps(prompt_data, cls=_DecimalEncoder, indent=2)}"
     )
 
-    response = client.models.generate_content(
+    adapter = GeminiAdapter()
+    parsed = adapter.generate_structured(
+        node=node,
+        schema=PortfolioInsightsResponse,
+        prompt=user_message,
+        system=system_instruction,
         model=model,
-        contents=user_message,
-        config=genai.types.GenerateContentConfig(
-            system_instruction=get_system_instruction(group),
-            response_mime_type='application/json',
-            response_schema=PortfolioInsightsResponse,
-            temperature=0.3,
-        ),
+        api_key=api_key,
+        temperature=0.3,
     )
-
-    parsed = PortfolioInsightsResponse.model_validate_json(response.text)
 
     return AIResult(
         model=model,
@@ -1178,44 +1041,57 @@ def call_ai_insights(prompt_data: dict, group=None) -> AIResult:
     """Unified entry point for AI portfolio analysis and financial scoring.
 
     Selects provider based on settings.AI_PROVIDER ('shakti' or 'gemini'),
-    with automatic failover if both credentials are configured.
+    with automatic multi-node routing and failover via Vault AI Gateway.
     """
+    from pftracker.ai_gateway import TaskType, gateway
+
+    shakti_key = os.environ.get('SHAKTI_API_KEY') or getattr(settings, 'SHAKTI_API_KEY', '')
+    gemini_key = os.environ.get('GEMINI_API_KEY') or getattr(settings, 'GEMINI_API_KEY', '')
+    if not shakti_key and not gemini_key and not gateway.is_available(TaskType.REASONING):
+        raise ValueError("Neither SHAKTI_API_KEY nor GEMINI_API_KEY is configured")
+
     provider = (
         getattr(settings, 'AI_PROVIDER', '').lower()
         or os.environ.get('AI_PROVIDER', '').lower()
-        or ('shakti' if (os.environ.get('SHAKTI_API_KEY') or getattr(settings, 'SHAKTI_API_KEY', '')) else 'gemini')
+        or ('shakti' if shakti_key else 'gemini')
     )
-    shakti_key = os.environ.get('SHAKTI_API_KEY') or getattr(settings, 'SHAKTI_API_KEY', '')
-    gemini_key = os.environ.get('GEMINI_API_KEY') or getattr(settings, 'GEMINI_API_KEY', '')
 
-    if provider == 'shakti' or (not provider and shakti_key):
-        if not shakti_key:
+    # 1. Fetch live macro context if available
+    if 'macro_context' not in prompt_data:
+        macro = _fetch_macro_context()
+        if macro:
+            prompt_data['macro_context'] = macro
+
+    # 2. Main analysis with structured output
+    user_message = (
+        "Analyze this portfolio. Use the data below and macro_context. "
+        "Generate 8-15 insights across at least 5 categories.\n\n"
+        f"Portfolio Data:\n{json.dumps(prompt_data, cls=_DecimalEncoder, indent=2)}"
+    )
+
+    try:
+        parsed = gateway.generate_structured(
+            schema=PortfolioInsightsResponse,
+            prompt=user_message,
+            system=get_system_instruction(group),
+            task=TaskType.REASONING,
+            temperature=0.2,
+        )
+        return AIResult(
+            model=f"{provider}:insights",
+            insights_dict=parsed.model_dump(mode='json'),
+        )
+    except Exception as gw_err:
+        logger.warning("Gateway structured execution failed (%s); falling back to direct provider...", gw_err)
+        if provider == 'shakti':
             if gemini_key:
-                logger.info("SHAKTI_API_KEY not configured, falling back to Gemini")
                 return call_gemini_direct(prompt_data, group=group)
-            raise ValueError("SHAKTI_API_KEY environment variable is not set")
-        try:
             return call_shakti(prompt_data, group=group)
-        except Exception as e:
-            if gemini_key:
-                logger.warning("Shakti Cloud failed (%s), falling back to Gemini", e)
-                return call_gemini_direct(prompt_data, group=group)
-            raise
-    elif provider == 'gemini' or gemini_key:
-        if not gemini_key:
+        elif provider == 'gemini':
             if shakti_key:
-                logger.info("GEMINI_API_KEY not configured, falling back to Shakti Cloud")
                 return call_shakti(prompt_data, group=group)
-            raise ValueError("GEMINI_API_KEY environment variable is not set")
-        try:
             return call_gemini_direct(prompt_data, group=group)
-        except Exception as e:
-            if shakti_key:
-                logger.warning("Gemini failed (%s), falling back to Shakti Cloud", e)
-                return call_shakti(prompt_data, group=group)
-            raise
-    else:
-        raise ValueError("Neither SHAKTI_API_KEY nor GEMINI_API_KEY is configured")
+        raise
 
 
 # Alias call_gemini to call_ai_insights for backward compatibility with existing callers

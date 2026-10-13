@@ -1,13 +1,13 @@
 import json
 import os
 
-from google import genai
 from pydantic import BaseModel
 from django.core.management.base import BaseCommand
 from django.template.loader import render_to_string
 
+from pftracker.ai_gateway import TaskType, gateway
 from tracker.models import AccountGroup
-from portfolio.ai import _load_investor_profile, _get_model
+from portfolio.ai import _load_investor_profile
 from portfolio.emails import apply_floor, build_weekly_context, send_html_email
 from portfolio.templatetags.indian_format import inr
 
@@ -67,11 +67,9 @@ class Command(BaseCommand):
 
     def _ai_context(self, group, notable):
         """Safety floor from the investor profile + valuation notes for notable positions."""
-        api_key = os.environ.get('GEMINI_API_KEY', '')
-        if not api_key:
+        if not gateway.is_available(TaskType.REASONING):
             return DEFAULT_FLOOR, {}
         try:
-            client = genai.Client(api_key=api_key)
             stocks_json = json.dumps([{'symbol': s['symbol'], 'pnl_pct': round(s['pnl_pct'], 2)} for s in notable])
             prompt = (
                 "You are a financial analyst generating a weekly equity brief.\n\n"
@@ -81,12 +79,12 @@ class Command(BaseCommand):
                 "based on their net performance. Two sentences max per stock.\n"
                 f"Stocks: {stocks_json}\n"
             )
-            response = client.models.generate_content(
-                model=_get_model(),
-                contents=prompt,
-                config={'response_mime_type': 'application/json', 'response_schema': WeeklyAnalysisResponse},
+            parsed = gateway.generate_structured(
+                schema=WeeklyAnalysisResponse,
+                prompt=prompt,
+                task=TaskType.REASONING,
+                temperature=0.2,
             )
-            parsed = response.parsed
             if not parsed:
                 return DEFAULT_FLOOR, {}
             self.stdout.write(self.style.SUCCESS('Successfully generated AI context and dynamic floor.'))
