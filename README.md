@@ -16,8 +16,8 @@ A production-grade personal finance, investment management, and household expens
   - **Real Estate Assets**: Property tracking supporting North Indian land units (Gaj, Sq. Yards, Sq. Ft, Bigha, Acres), circle rates, holding CAGR, rental yields, and automated LLM prompt generation for micro-market research.
   - **Child Portfolio Segregation**: `is_baby` flag to cleanly isolate child investments ("Advay portfolio") from the master portfolio.
 - **Jewellery Vault** — Precious metals inventory (Gold, Silver, Platinum, Diamonds) categorized by ornament type, purity multipliers, bank locker/home safe locations, and live valuations tied to commodity spot prices. Photo uploads support iPhone HEIC/HEIF auto-conversion.
-- **Automated Expense Tracker** — Ingests household spend from bank and card alert emails across multiple connected Gmail inboxes (`gmail.readonly`). Features deterministic regex parsing for 30+ Indian institutions, Gemini AI fallback, password-protected credit card statement PDF parsing, anomaly detection (median/MAD statistics), and automated bill reminders.
-- **AI Portfolio Insights** — Gemini-powered portfolio reviews with structured Pydantic schemas evaluating risk, rebalancing, tax, and macro factors, governed by a configurable cooldown.
+- **AI Portfolio Insights & Multi-Stage DAG Engine** — Directed Acyclic Graph (DAG) workflow engine (`portfolio/dag.py`) executing specialized diagnostic lenses (Allocation & Liquidity, Asset Quality & Legacy Fund Audit, Macro Regime & Crash Stress), cross-pillar strategy with Indian FY 2026-27 tax optimization (Section 112A LTCG harvesting, Section 54/54EC real estate indexation choices), and mathematically grounded composite health scoring ($0.30 \times S_{\text{allocation}} + 0.25 \times S_{\text{quality}} + 0.25 \times S_{\text{strategy}} + 0.20 \times S_{\text{macro}}$).
+- **Unified AI Gateway** — Centralized AI routing hub (`pftracker/ai_gateway`) supporting Shakti Cloud (DeepSeek-R1, LLaMA 3.3) and Google Gemini (Gemini 3.1 Pro Preview, Gemini 3.5 Flash Lite). Features multi-node load balancing, multi-key rotation pools on HTTP 429 rate limits, circuit breakers, and automatic Dev vs. Prod model selection (`DEBUG=True` uses fast/free models).
 - **Model Context Protocol (MCP) Server** — Native `/mcp` ASGI endpoint exposing read resources and write tools with OAuth 2.0 PKCE authentication and full before/after audit rollback logs (`MCPAuditLog`).
 - **CodeGraph Intelligence** — Built-in local code knowledge graph (AST-level symbol indexing, call hierarchies, blast-radius impact analysis) integrated with Antigravity IDE.
 - **Bank-Grade Security** — WebAuthn biometric unlock (Face ID / Touch ID), portfolio session TTL, Fernet encryption for tokens and passwords, strict CSP, and automated GCS backups.
@@ -118,10 +118,59 @@ Vault includes full native support for **Google Antigravity** and agentic workfl
 
 ---
 
+## AI Intelligence & Multi-Stage DAG Architecture
+
+Vault uses a specialized **Directed Acyclic Graph (DAG) Workflow Engine** (`portfolio/dag.py`) backed by the **Unified AI Gateway** (`pftracker/ai_gateway`):
+
+```
+                       ┌────────────────────────────────────────────────────────┐
+                       │          Raw Portfolio JSON + Live Macro Data          │
+                       └──────────────────────────┬─────────────────────────────┘
+                                                  │ (Anti-Token Dilution Slicing)
+                   ┌──────────────────────────────┼──────────────────────────────┐
+                   ▼                              ▼                              ▼
+    ┌─────────────────────────────┐┌─────────────────────────────┐┌─────────────────────────────┐
+    │  Stage 1A: Allocation Lens  ││   Stage 1B: Asset Quality   ││    Stage 1C: Macro Stress   │
+    │  • SEBI Age Glide Path      ││  • Legacy MF Merge/Exit     ││  • Nifty PE Valuation Zone  │
+    │  • HHI & Stock Conc. (>5%)  ││  • RE Micro-Market & Yield  ││  • -35% Equity Crash Drawdown│
+    │  • Tier 1 Emergency Floor   ││  • EPF Hurdle Rate vs FD    ││  • Net Worth Momentum Trend │
+    └──────────────┬──────────────┘└──────────────┬──────────────┘└──────────────┬──────────────┘
+                   │                              │                              │
+                   └──────────────────────────────┼──────────────────────────────┘
+                                                  ▼ (Fan-in)
+                                   ┌─────────────────────────────┐
+                                   │ Stage 2: Strategy Synthesis │
+                                   │ • Sec 112A LTCG Harvesting  │
+                                   │ • Sec 54/54EC RE Indexation │
+                                   │ • Goal Gap SIP Rebalancing  │
+                                   └──────────────┬──────────────┘
+                                                  ▼
+                                   ┌─────────────────────────────┐
+                                   │ Stage 3: Terminal Grounding │
+                                   │ • Deterministic Health Score│
+                                   │ • Deduplicated Insights     │
+                                   │ • Executive Summary & Outlook│
+                                   └─────────────────────────────┘
+```
+
+### Deterministic Financial Health Scoring
+To eliminate the score hallucinations common in single-shot prompts, the final 0–100 score is computed mathematically:
+$$\text{Health Score} = \text{round}(0.30 \times S_{\text{allocation}} + 0.25 \times S_{\text{quality}} + 0.25 \times S_{\text{strategy}} + 0.20 \times S_{\text{macro}})$$
+Clamped between 0 and 100.
+
+### AI Gateway Features (`pftracker.ai_gateway`)
+- **Multi-Provider & Multi-Node Routing**: Primary / fallback routing across Shakti Cloud (`deepseek-r1`, `llama3_3`) and Google Gemini (`gemini-3.1-pro-preview`, `gemini-3.5-flash-lite`).
+- **Resilient Key Rotation Pools**: Automatic round-robin rotation upon HTTP 429 rate limits with 60-second cooldowns.
+- **Circuit Breaker Protection**: Consecutive node failures trip circuits to `OPEN` to prevent cascading latency spikes.
+- **Dev vs. Prod Model Tiering**: When `DJANGO_DEBUG=True`, automatically selects lightweight/fast models (`gemini-3.5-flash-lite`) for near-zero development costs.
+
+---
+
 ## Management Commands
 
 | Command | Description |
 | :--- | :--- |
+| `test_shakti_ai` | Pings Shakti Cloud / DeepSeek, verifies streaming, or benchmarks DAG scoring |
 | `refresh_prices` | Scrapes latest gold (24K) and silver spot prices from goodreturns.in |
 | `sync_sheets` | Syncs Zerodha holdings and mutual funds from Google Sheets |
 | `take_snapshot` | Captures monthly asset and return snapshot for net-worth tracking |
@@ -161,6 +210,7 @@ Recommended production schedule (`CRON_TZ=Asia/Kolkata`):
 ```
 finance/
 ├── pftracker/               # Project configuration & ASGI gateway
+│   ├── ai_gateway/          # Unified AI Gateway (routing, circuit breakers, Shakti & Gemini)
 │   ├── asgi.py              # Starlette ASGI router (/mcp + Django /)
 │   ├── settings.py          # Django 6.0 settings & security policies
 │   ├── utils.py             # Indian FY math, precision helpers, credentials
@@ -172,7 +222,8 @@ finance/
 ├── portfolio/               # Investments, Zerodha, FDs, Real Estate & AI
 │   ├── models.py            # ZerodhaAccount, Holdings, FDs, RealEstate, Goals
 │   ├── services.py          # Portfolio valuation, compounding, Sheets sync
-│   ├── ai.py                # Gemini API integration with Pydantic schemas
+│   ├── dag.py               # Multi-stage DAG workflow engine for portfolio diagnostics
+│   ├── ai.py                # Gemini & Shakti API caller, prompts, schemas, fallbacks
 │   └── views.py             # Master portfolio, Advay baby portfolio, WebAuthn unlock
 ├── jewellery/               # Precious metals vault
 │   ├── models.py            # JewelleryItem (Gold, Silver, Platinum), purity factors
