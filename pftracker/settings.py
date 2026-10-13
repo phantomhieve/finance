@@ -421,10 +421,15 @@ if not EMAIL_HOST_USER:
     # Fallback to console backend for local development if no email is configured
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
-# AI & Insights Settings
-# Providers: 'shakti' (Shakti Cloud / OpenAI-compatible) or 'gemini' (Google GenAI)
+# AI & Insights Settings (Vault AI Gateway)
+# Providers: 'shakti', 'gemini', or 'auto' (automatic multi-node failover)
 AI_PROVIDER = os.environ.get('AI_PROVIDER', 'shakti' if os.environ.get('SHAKTI_API_KEY') else 'gemini')
+AI_NODES = os.environ.get('AI_NODES', '')  # Optional structured JSON array of node definitions
+
+# Multi-key & Multi-node pools (comma-separated or single)
+SHAKTI_API_KEYS = os.environ.get('SHAKTI_API_KEYS', '')
 SHAKTI_API_KEY = os.environ.get('SHAKTI_API_KEY', '')
+SHAKTI_BASE_URLS = os.environ.get('SHAKTI_BASE_URLS', '')
 SHAKTI_BASE_URL = os.environ.get('SHAKTI_BASE_URL', 'https://http.prod-llm.shaktistudio.shakticloud.ai')
 SHAKTI_CLIENT_ID = os.environ.get('SHAKTI_CLIENT_ID', '')
 SHAKTI_MODEL = os.environ.get('SHAKTI_MODEL', 'deepseek-r1')
@@ -433,5 +438,10 @@ SHAKTI_TIMEOUT = float(os.environ.get('SHAKTI_TIMEOUT', '300.0'))
 SHAKTI_TEMPERATURE = float(os.environ.get('SHAKTI_TEMPERATURE', '0.1'))
 SHAKTI_MAX_RETRIES = int(os.environ.get('SHAKTI_MAX_RETRIES', '3'))
 SHAKTI_RETRY_DELAY = int(os.environ.get('SHAKTI_RETRY_DELAY', '3'))
+
+GEMINI_API_KEYS = os.environ.get('GEMINI_API_KEYS', '')
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-3.1-pro-preview')
+EXPENSES_GEMINI_MODEL = os.environ.get('EXPENSES_GEMINI_MODEL', 'gemini-3.5-flash-lite')
 
 

@@ -516,7 +516,7 @@ def save_month_comment(request):
         return _safe_redirect(request, 'dashboard')
 
     if comment_text:
-        obj, created = MonthlySavingsComment.objects.update_or_create(
+        _, created = MonthlySavingsComment.objects.update_or_create(
             user=request.user,
             month=month_date,
             defaults={'comment': comment_text},
@@ -720,7 +720,7 @@ def notes_list(request):
                     note.settled_pct = max(0, min(100, int((initial - pending) / initial * 100)))
                 else:
                     note.settled_pct = 0
-            except Exception:
+            except (ValueError, TypeError, ZeroDivisionError):
                 note.settled_pct = 0
         else:
             note.settled_pct = None

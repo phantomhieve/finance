@@ -121,21 +121,36 @@ class Command(BaseCommand):
             api_key=api_key,
             base_url=base_url,
             default_headers={"id": client_id} if client_id else None,
-            timeout=60.0,
+            timeout=300.0,
         )
         try:
             response = client.chat.completions.create(
                 model=model,
                 messages=[{"role": "user", "content": prompt}],
-                max_tokens=1024,
+                max_tokens=8192,
                 stream=True,
             )
             self.stdout.write(self.style.SUCCESS("Stream response started:\n"))
+            in_reasoning = False
             for res in response:
                 if res.choices and len(res.choices) > 0 and res.choices[0].delta:
-                    content = res.choices[0].delta.content or ""
-                    sys.stdout.write(content)
-                    sys.stdout.flush()
+                    delta = res.choices[0].delta
+                    reasoning = getattr(delta, 'reasoning_content', None) or ""
+                    content = getattr(delta, 'content', None) or ""
+                    if reasoning:
+                        if not in_reasoning:
+                            sys.stdout.write("<think>\n")
+                            in_reasoning = True
+                        sys.stdout.write(reasoning)
+                        sys.stdout.flush()
+                    if content:
+                        if in_reasoning:
+                            sys.stdout.write("\n</think>\n\n")
+                            in_reasoning = False
+                        sys.stdout.write(content)
+                        sys.stdout.flush()
+            if in_reasoning:
+                sys.stdout.write("\n</think>\n\n")
             sys.stdout.write("\n\n")
             self.stdout.write(self.style.SUCCESS("Ping succeeded!"))
         except Exception as e:

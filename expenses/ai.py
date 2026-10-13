@@ -9,7 +9,7 @@ import os
 
 from pydantic import BaseModel
 
-from portfolio.ai import _MODEL_FAST
+from pftracker.ai_gateway import TaskType, gateway
 
 from .parsing import mask_sensitive
 
@@ -19,28 +19,19 @@ MAX_BATCH = 40
 
 
 def ai_available():
-    return bool(os.environ.get('GEMINI_API_KEY'))
-
-
-def _model():
-    return os.environ.get('EXPENSES_GEMINI_MODEL') or _MODEL_FAST
+    return gateway.is_available(TaskType.FAST) or bool(os.environ.get('GEMINI_API_KEY'))
 
 
 def _generate(prompt, schema, system):
-    from google import genai
-
-    client = genai.Client(api_key=os.environ['GEMINI_API_KEY'])
-    response = client.models.generate_content(
-        model=_model(),
-        contents=prompt,
-        config=genai.types.GenerateContentConfig(
-            system_instruction=system,
-            response_mime_type='application/json',
-            response_schema=schema,
-            temperature=0.1,
-        ),
+    model_override = os.environ.get('EXPENSES_GEMINI_MODEL')
+    return gateway.generate_structured(
+        schema=schema,
+        prompt=prompt,
+        system=system,
+        task=TaskType.FAST,
+        model=model_override,
+        temperature=0.1,
     )
-    return schema.model_validate_json(response.text)
 
 
 # ---------------------------------------------------------------------------

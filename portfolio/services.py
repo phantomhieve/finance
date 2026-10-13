@@ -1,7 +1,7 @@
 import datetime
 import logging
 import re
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 import cloudscraper
 import requests
@@ -41,7 +41,7 @@ def _parse_inr(value):
         return _ZERO
     try:
         return Decimal(cleaned)
-    except Exception:
+    except (InvalidOperation, TypeError, ValueError):
         return _ZERO
 
 
@@ -714,7 +714,7 @@ def _sync_mf(acct, spreadsheet, range_name, fund_type):
             continue
         try:
             units = Decimal(str(row[1]).replace(',', '').strip() or '0')
-        except Exception:
+        except (InvalidOperation, TypeError, ValueError):
             continue
         bulk.append(MutualFundHolding(
             account=acct, fund_name=fund_name, fund_type=fund_type,
