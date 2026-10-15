@@ -177,3 +177,26 @@ class GatewayExecutionTests(SimpleTestCase):
         obj = self.gw.generate_structured(MockTestSchema, "Categorize Swiggy")
         self.assertEqual(obj.category, "GROCERIES")
         self.assertEqual(obj.confidence, 0.98)
+
+
+class ModelAliasNormalizationTests(SimpleTestCase):
+    def test_gemini_argon_alias_normalization(self):
+        from .adapters.gemini import _normalize_model_name
+
+        self.assertEqual(_normalize_model_name("argon"), "gemini-4-argon")
+        self.assertEqual(_normalize_model_name("gemini-argon"), "gemini-4-argon")
+        self.assertEqual(_normalize_model_name("gemini_argon"), "gemini-4-argon")
+        self.assertEqual(_normalize_model_name("ARGON"), "gemini-4-argon")
+        self.assertEqual(_normalize_model_name(None), "gemini-4-argon")
+        self.assertEqual(_normalize_model_name("gemini-4-argon"), "gemini-4-argon")
+
+    def test_gemini_flash_alias_normalization(self):
+        from .adapters.gemini import _normalize_model_name
+
+        self.assertEqual(_normalize_model_name("flash"), "gemini-3.8-flash")
+        self.assertEqual(_normalize_model_name("gemini-flash"), "gemini-3.8-flash")
+        self.assertEqual(_normalize_model_name("3.8-flash"), "gemini-3.8-flash")
+        self.assertEqual(_normalize_model_name("gemini-3.8-flash"), "gemini-3.8-flash")
+        self.assertEqual(_normalize_model_name("gemini-3.5-flash-lite"), "gemini-3.8-flash")
+
+

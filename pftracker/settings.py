@@ -441,8 +441,8 @@ SHAKTI_RETRY_DELAY = int(os.environ.get('SHAKTI_RETRY_DELAY', '3'))
 
 GEMINI_API_KEYS = os.environ.get('GEMINI_API_KEYS', '')
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
-GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-3.1-pro-preview')
-EXPENSES_GEMINI_MODEL = os.environ.get('EXPENSES_GEMINI_MODEL', 'gemini-3.5-flash-lite')
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-4-argon')
+EXPENSES_GEMINI_MODEL = os.environ.get('EXPENSES_GEMINI_MODEL', 'gemini-3.8-flash')
 
 # Multi-Stage DAG Engine for Portfolio Insights
 ENABLE_PORTFOLIO_DAG = os.environ.get('ENABLE_PORTFOLIO_DAG', 'true').lower() in ('true', '1', 'yes')

@@ -17,7 +17,7 @@ A production-grade personal finance, investment management, and household expens
   - **Child Portfolio Segregation**: `is_baby` flag to cleanly isolate child investments ("Advay portfolio") from the master portfolio.
 - **Jewellery Vault** — Precious metals inventory (Gold, Silver, Platinum, Diamonds) categorized by ornament type, purity multipliers, bank locker/home safe locations, and live valuations tied to commodity spot prices. Photo uploads support iPhone HEIC/HEIF auto-conversion.
 - **AI Portfolio Insights & Multi-Stage DAG Engine** — Directed Acyclic Graph (DAG) workflow engine (`portfolio/dag.py`) executing specialized diagnostic lenses (Allocation & Liquidity, Asset Quality & Legacy Fund Audit, Macro Regime & Crash Stress), cross-pillar strategy with Indian FY 2026-27 tax optimization (Section 112A LTCG harvesting, Section 54/54EC real estate indexation choices), and mathematically grounded composite health scoring ($0.30 \times S_{\text{allocation}} + 0.25 \times S_{\text{quality}} + 0.25 \times S_{\text{strategy}} + 0.20 \times S_{\text{macro}}$).
-- **Unified AI Gateway** — Centralized AI routing hub (`pftracker/ai_gateway`) supporting Shakti Cloud (DeepSeek-R1, LLaMA 3.3) and Google Gemini (Gemini 3.1 Pro Preview, Gemini 3.5 Flash Lite). Features multi-node load balancing, multi-key rotation pools on HTTP 429 rate limits, circuit breakers, and automatic Dev vs. Prod model selection (`DEBUG=True` uses fast/free models).
+- **Unified AI Gateway** — Centralized AI routing hub (`pftracker/ai_gateway`) supporting Shakti Cloud (DeepSeek-R1, LLaMA 3.3) and Google Gemini (Gemini 4 Argon, Gemini 3.8 Flash). Features multi-node load balancing, multi-key rotation pools on HTTP 429 rate limits, circuit breakers, and automatic Dev vs. Prod model selection (`DEBUG=True` uses fast/free models).
 - **Model Context Protocol (MCP) Server** — Native `/mcp` ASGI endpoint exposing read resources and write tools with OAuth 2.0 PKCE authentication and full before/after audit rollback logs (`MCPAuditLog`).
 - **CodeGraph Intelligence** — Built-in local code knowledge graph (AST-level symbol indexing, call hierarchies, blast-radius impact analysis) integrated with Antigravity IDE.
 - **Bank-Grade Security** — WebAuthn biometric unlock (Face ID / Touch ID), portfolio session TTL, Fernet encryption for tokens and passwords, strict CSP, and automated GCS backups.
@@ -159,10 +159,10 @@ $$\text{Health Score} = \text{round}(0.30 \times S_{\text{allocation}} + 0.25 \t
 Clamped between 0 and 100.
 
 ### AI Gateway Features (`pftracker.ai_gateway`)
-- **Multi-Provider & Multi-Node Routing**: Primary / fallback routing across Shakti Cloud (`deepseek-r1`, `llama3_3`) and Google Gemini (`gemini-3.1-pro-preview`, `gemini-3.5-flash-lite`).
+- **Multi-Provider & Multi-Node Routing**: Primary / fallback routing across Shakti Cloud (`deepseek-r1`, `llama3_3`) and Google Gemini (`gemini-4-argon`, `gemini-3.8-flash`, `gemini-3.1-pro-preview`).
 - **Resilient Key Rotation Pools**: Automatic round-robin rotation upon HTTP 429 rate limits with 60-second cooldowns.
 - **Circuit Breaker Protection**: Consecutive node failures trip circuits to `OPEN` to prevent cascading latency spikes.
-- **Dev vs. Prod Model Tiering**: When `DJANGO_DEBUG=True`, automatically selects lightweight/fast models (`gemini-3.5-flash-lite`) for near-zero development costs.
+- **Dev vs. Prod Model Tiering**: When `DJANGO_DEBUG=True`, automatically selects lightweight/fast models (`gemini-3.8-flash`) for near-zero development costs. In production, leverages frontier reasoning models (`gemini-4-argon` / `deepseek-r1`).
 
 ---
 
