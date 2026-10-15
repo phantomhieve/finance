@@ -9,7 +9,7 @@ from django.db import IntegrityError
 from django.utils import timezone
 
 from . import ai
-from .anomaly import apply_flags
+from .anomaly import ai_detect_anomalies_for_expenses
 from .gmail import GmailAuthError, GmailClient, GmailError, decode_body, message_parts
 from .models import Expense, GmailAccount, ProcessedEmail
 from .parsing import (
@@ -92,6 +92,9 @@ def ingest_email(account, message_id, sender, subject, body, received_at, pdfs=(
         parsed = parse_transaction(sender, subject, body, received_at)
         if parsed and not parsed.merchant:
             parsed = _ai_parsed(subject, body, received_date) or parsed
+        if not parsed:
+            # Fall back to AI extraction if deterministic rules missed custom alert formatting
+            parsed = _ai_parsed(subject, body, received_date)
         if parsed:
             expense, _ = build_expense(
                 group, parsed, source='EMAIL', member=account.user, gmail_account=account,
@@ -171,9 +174,12 @@ def sync_account(account, time_budget=None, max_messages=MAX_MESSAGES):
     if result.new_expense_ids or result.statements or result.payments:
         ai_categorise_pending(account.group)
         settled = settle_internal_movements(account.group, since.date())
-        for expense in (Expense.objects.filter(pk__in=set(result.new_expense_ids) | set(settled))
-                        .select_related('category')):
-            apply_flags(expense)
+        affected = list(
+            Expense.objects.filter(pk__in=set(result.new_expense_ids) | set(settled))
+            .select_related('category', 'payment_source')
+        )
+        if affected:
+            ai_detect_anomalies_for_expenses(affected, group=account.group)
 
     account.last_sync_new = result.transactions
     account.last_error = ''

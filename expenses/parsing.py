@@ -1,8 +1,10 @@
-"""Parse Indian bank / card alert emails into structured transactions and statement summaries.
+"""Parse Indian bank and card alert emails into structured transactions and statement summaries.
 
-Deterministic regex first (fast, free, private); callers may fall back to the AI extractor in
-``expenses.ai`` when an email looks transactional but these patterns can't read it.
+Deterministic regex engine first (fast, private, zero-cost); callers may fall back to the AI extractor
+in ``expenses.ai`` when an email looks transactional but deterministic patterns cannot parse it.
 """
+from __future__ import annotations
+
 import datetime
 import html
 import re
@@ -10,38 +12,59 @@ from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 
 # ---------------------------------------------------------------------------
-# Text helpers
+# Text helpers & HTML Cleaning
 # ---------------------------------------------------------------------------
 
+_TAG_DROP = re.compile(r'<(script|style|head)\b.*?</\1\s*>|<!--.*?-->', re.I | re.S)
 _TAG_BREAKS = re.compile(r'<\s*(br|/p|/div|/tr|/li|/h\d)\b[^>]*>', re.I)
 _TAG_CELLS = re.compile(r'<\s*/t[dh]\s*>', re.I)
-_TAG_DROP = re.compile(r'<(script|style|head)\b.*?</\1\s*>', re.I | re.S)
 _TAG_ANY = re.compile(r'<[^>]+>')
 
 
-def html_to_text(markup):
-    text = _TAG_DROP.sub(' ', markup or '')
+def html_to_text(markup: str | None) -> str:
+    """Convert raw HTML email content into clean plaintext preserving linebreaks and table cells."""
+    if not markup:
+        return ''
+    text = _TAG_DROP.sub(' ', markup)
     text = _TAG_BREAKS.sub('\n', text)
     text = _TAG_CELLS.sub(' ', text)
     text = _TAG_ANY.sub(' ', text)
-    text = html.unescape(text).replace('\xa0', ' ')
+    text = html.unescape(text).replace('\xa0', ' ').replace('\u200b', '')
     return clean_text(text)
 
 
-def clean_text(text):
+def clean_text(text: str | None) -> str:
+    """Normalize multi-spaces within lines and strip empty line runs."""
     lines = [re.sub(r'[ \t\r\f\v]+', ' ', ln).strip() for ln in (text or '').splitlines()]
     return '\n'.join(ln for ln in lines if ln)
 
 
-def mask_sensitive(text):
+def mask_sensitive(text: str | None) -> str:
     """Mask long digit runs (account / card / reference numbers) before sending text to an LLM."""
-    return re.sub(r'\d{6,}', lambda m: 'X' * (len(m.group()) - 4) + m.group()[-4:], text or '')
+    if not text:
+        return ''
+    # Mask card numbers formatted with dashes or spaces: 1234-5678-9012-3456
+    masked = re.sub(
+        r'\b\d{4}[-\s]\d{4}[-\s]\d{4}[-\s](\d{4})\b',
+        lambda m: 'XXXX-XXXX-XXXX-' + m.group(1),
+        text,
+    )
+    # Mask contiguous digit runs >= 6 digits, preserving last 4
+    return re.sub(
+        r'\d{6,}',
+        lambda m: 'X' * (len(m.group()) - 4) + m.group()[-4:],
+        masked,
+    )
 
 
-def to_decimal(raw):
+def to_decimal(raw: object) -> Decimal | None:
+    """Safely convert currency string or number to Decimal without float imprecision."""
+    if raw is None:
+        return None
     try:
-        return Decimal(str(raw).replace(',', '').strip())
-    except (InvalidOperation, AttributeError):
+        clean = re.sub(r'[^\d.-]', '', str(raw).strip())
+        return Decimal(clean) if clean else None
+    except (InvalidOperation, ValueError, TypeError):
         return None
 
 
@@ -50,7 +73,7 @@ def to_decimal(raw):
 # ---------------------------------------------------------------------------
 
 # (substring of sender address or body, display name). Order matters: more specific first.
-_INSTITUTIONS = [
+_INSTITUTIONS: list[tuple[str, str]] = [
     ('sbicard', 'SBI Card'),
     ('onlinesbi', 'SBI'),
     ('sbi.co.in', 'SBI'),
@@ -88,98 +111,190 @@ _INSTITUTIONS = [
     ('amazonpay', 'Amazon Pay'),
     ('jupiter', 'Jupiter'),
     ('fi.money', 'Fi'),
+    ('cred.club', 'CRED'),
+    ('cred', 'CRED'),
+    ('tataneu', 'Tata Neu'),
+    ('postpe', 'PostPe'),
+    ('navi', 'Navi'),
+    ('airtel payments bank', 'Airtel Payments Bank'),
+    ('airtel bank', 'Airtel Payments Bank'),
 ]
 
 
-def detect_institution(sender, body):
+def detect_institution(sender: str | None, body: str | None) -> str:
+    """Identify the bank, credit card issuer, or payment app from sender or body text."""
     sender_l = (sender or '').lower()
     for needle, name in _INSTITUTIONS:
         if needle in sender_l:
             return name
-    body_l = (body or '').lower()[:600]
+    body_l = (body or '').lower()[:700]
     for needle, name in _INSTITUTIONS:
         if ' ' in needle and needle in body_l:
+            return name
+    for needle, name in _INSTITUTIONS:
+        if needle in body_l[:300]:
             return name
     return ''
 
 
 # ---------------------------------------------------------------------------
-# Classification
+# Classification & Amount Extraction
 # ---------------------------------------------------------------------------
 
-_AMOUNT = r'(?:INR|Rs\.?|₹)\s?([0-9][0-9,]*(?:\.[0-9]{1,2})?)'
-_AMOUNT_RE = re.compile(_AMOUNT, re.I)
-_FOREIGN_AMOUNT_RE = re.compile(r'\b(USD|EUR|GBP|AED|SGD|AUD|CAD|JPY|CHF|THB)\s?([0-9][0-9,]*(?:\.[0-9]{1,2})?)', re.I)
+# Standard Indian currency prefix followed by amount
+_AMOUNT_CORE = r'(?:INR\.?|Rs\.?|₹|INR\s*[:\-]|Rs\s*[:\-])\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)'
+_AMOUNT_RE = re.compile(_AMOUNT_CORE, re.I)
+
+# Transaction-linked amount search: binds directly to debit/credit verbs to avoid available balance
+_TXN_AMOUNT_RE = re.compile(
+    r'(?:debited\s*(?:by|with|for)?|spent|charged|withdrawn|deducted|paid|credited\s*(?:with|by)?|received|refunded|payment\s+of|txn\s+of|transaction\s+of|amount\s*[:\-])'
+    r'\s*(?:INR\.?|Rs\.?|₹)?\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)',
+    re.I,
+)
+
+# Currency suffix fallback (e.g. "1,500.00 INR" or "1500/-")
+_AMOUNT_SUFFIX_RE = re.compile(
+    r'\b([0-9][0-9,]*(?:\.[0-9]{1,2})?)\s*(?:INR|Rs\.?|/-)\b',
+    re.I,
+)
+
+_FOREIGN_AMOUNT_RE = re.compile(
+    r'\b(USD|EUR|GBP|AED|SGD|AUD|CAD|JPY|CHF|THB)\s*([0-9][0-9,]*(?:\.[0-9]{1,2})?)',
+    re.I,
+)
 
 _DEBIT_WORDS = re.compile(
-    r'\b(debited|spent|used\s+for|been\s+used|for\s+using|withdrawn|deducted|charged|paid|sent|purchase'
-    r'|transaction\s+of|txn\s+of)\b', re.I)
-_CREDIT_WORDS = re.compile(r'\b(credited|received|refund(?:ed)?|reversal|reversed|deposited|cashback\s+of)\b', re.I)
+    r'\b(debited|spent|used\s+for|been\s+used|for\s+using|withdrawn|deducted|charged|paid|payment\s+made|sent\s+to|transfer(?:red)?\s+to|purchase|transaction\s+of|txn\s+of)\b',
+    re.I,
+)
+
+# High-confidence explicit debit phrases
+_DEBIT_EXPLICIT_RE = re.compile(
+    r'\b(debited\s+(?:from|with|for)|debited\s+to\s+your\s+account|spent\s+(?:at|on|for)|charged\s+to|paid\s+to|transferred\s+to|withdrawn\s+from)\b',
+    re.I,
+)
+
+# Explicit credit phrases — notice loose "received" is restricted so order alerts don't flip to credit
+_CREDIT_WORDS = re.compile(
+    r'\b(credited|refund(?:ed)?|reversal|reversed|deposited|cashback|(?:amount|money|funds?)\s+(?:has\s+been\s+)?received|received\s+(?:INR|Rs\.?|₹)\s*[0-9]|received\s+from|salary\s+credited)\b',
+    re.I,
+)
+
+# High-confidence explicit credit phrases
+_CREDIT_EXPLICIT_RE = re.compile(
+    r'\b(credited\s+to|refund\s+of|refunded\s+to|cashback\s+credited|deposited\s+in(?:to)?|received\s+from|(?:amount|money)\s+received\s+from)\b',
+    re.I,
+)
+
+# Merchant purchase receipts (e.g. Swiggy order, Google Cloud invoice, Airtel bill payment receipt) -> DEBIT
+_PAYMENT_RECEIPT_WORDS = re.compile(
+    r'\b(?:we(?:\'?ve|\s+have)?\s+received\s+(?:your\s+)?payment'
+    r'|payment\s+received'
+    r'|payment\s+receipt'
+    r'|receipt\s+for\s+(?:your\s+)?payment'
+    r'|thank\s+you\s+for\s+(?:your\s+)?payment'
+    r'|payment\s+was\s+successful'
+    r'|payment\s+successful'
+    r'|payment\s+confirmed)\b',
+    re.I,
+)
 
 _NOISE = re.compile(
     r'\b(otp|one[\s-]?time\s+password|verification\s+code|do\s+not\s+share\s+(?:this|the)\s+(?:otp|code)'
     r'|pre-?approved|limited\s+period|apply\s+now|avail\s+now|exclusive\s+offer|win\s+(?:up\s+to|a)'
     r'|will\s+be\s+debited|is\s+due\s+on|due\s+for\s+renewal|has\s+been\s+declined|was\s+declined'
     r'|transaction\s+(?:has\s+)?failed|could\s+not\s+be\s+processed|insufficient\s+(?:funds|balance)'
-    r'|mandate\s+(?:has\s+been\s+)?(?:registered|created)|standing\s+instruction\s+registered)\b',
+    r'|mandate\s+(?:has\s+been\s+)?(?:registered|created)|standing\s+instruction\s+registered'
+    r'|autopay\s+(?:scheduled|registered|created)|payment\s+failed|unsuccessful)\b',
     re.I,
 )
 
 _STATEMENT_SUBJECT = re.compile(r'\b(e-?statement|statement)\b', re.I)
 _STATEMENT_BODY = re.compile(r'(total\s+(?:amount\s+)?due|minimum\s+(?:amount\s+)?due|payment\s+due\s+date)', re.I)
 _CARD_PAYMENT = re.compile(
-    r'(payment\s+(?:of\s+)?' + _AMOUNT + r'.{0,80}?(?:received|credited|successful|has\s+been\s+received)'
+    r'(payment\s+(?:of\s+)?' + _AMOUNT_CORE + r'.{0,80}?(?:received|credited|successful|has\s+been\s+received)'
     r'.{0,80}?credit\s+card'
     r'|(?:received|credited).{0,40}?payment.{0,80}?credit\s+card'
-    r'|credit\s+card.{0,80}?payment\s+(?:of\s+)?' + _AMOUNT + r'.{0,40}?(?:received|credited|successful))',
+    r'|credit\s+card.{0,80}?payment\s+(?:of\s+)?' + _AMOUNT_CORE + r'.{0,40}?(?:received|credited|successful))',
     re.I | re.S,
 )
 
 
-def classify(sender, subject, body):
+def classify(sender: str | None, subject: str | None, body: str | None) -> str:
     """Return one of TXN, STATEMENT, CARD_PAYMENT, IGNORED for an email."""
     text = f'{subject}\n{body}'
     if _STATEMENT_SUBJECT.search(subject or '') and _STATEMENT_BODY.search(body or ''):
         return 'STATEMENT'
     if _CARD_PAYMENT.search(text):
         return 'CARD_PAYMENT'
-    if not _AMOUNT_RE.search(text) and not _FOREIGN_AMOUNT_RE.search(text):
+    if not _AMOUNT_RE.search(text) and not _FOREIGN_AMOUNT_RE.search(text) and not _AMOUNT_SUFFIX_RE.search(text):
         return 'IGNORED'
     if _NOISE.search(text):
         return 'IGNORED'
-    if _DEBIT_WORDS.search(text) or _CREDIT_WORDS.search(text):
+    if _PAYMENT_RECEIPT_WORDS.search(text) or _DEBIT_WORDS.search(text) or _CREDIT_WORDS.search(text):
         return 'TXN'
     return 'IGNORED'
 
 
+def _direction(text: str) -> str:
+    """Determine DEBIT vs CREDIT. Bulletproofed against misleading 'received order' phrases."""
+    # 1. Purchase/bill payment receipt ("we have received your payment of Rs 500 for Google Cloud") -> DEBIT
+    if _PAYMENT_RECEIPT_WORDS.search(text):
+        if not re.search(r'\b(refund\s+receipt|money\s+received\s+from|received\s+from)\b', text, re.I):
+            return 'DEBIT'
+
+    # 2. Explicit credit indicators (refund, cashback, credited to account, salary)
+    has_explicit_credit = bool(_CREDIT_EXPLICIT_RE.search(text))
+    # 3. Explicit debit indicators (debited from account, spent at, charged to)
+    has_explicit_debit = bool(_DEBIT_EXPLICIT_RE.search(text))
+
+    if has_explicit_debit and not has_explicit_credit:
+        return 'DEBIT'
+    if has_explicit_credit and not has_explicit_debit:
+        return 'CREDIT'
+
+    # 4. Proximity & priority fallback
+    debit = _DEBIT_WORDS.search(text)
+    credit = _CREDIT_WORDS.search(text)
+    if debit and credit:
+        return 'DEBIT' if debit.start() <= credit.start() else 'CREDIT'
+    return 'CREDIT' if credit and not debit else 'DEBIT'
+
+
 # ---------------------------------------------------------------------------
-# Field extractors
+# Field Extractors (Dates, Times, Instruments, Accounts)
 # ---------------------------------------------------------------------------
 
-_MONTHS = {m: i for i, m in enumerate(
-    ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'], start=1)}
+_MONTHS = {
+    m: i for i, m in enumerate(
+        ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'],
+        start=1,
+    )
+}
 
 _DATE_PATTERNS = [
-    # 2025-10-05
+    # 2025-10-05 or 2025/10/05
     (re.compile(r'\b(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b'), 'ymd'),
     # 05-10-2025, 05/10/25, 05.10.25
     (re.compile(r'\b(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})\b'), 'dmy'),
-    # 05-Oct-25, 05 Oct 2025, 05Oct25, 5-OCT-2025
-    (re.compile(r'\b(\d{1,2})[-\s]?([A-Za-z]{3})[a-z]*[-\s,]*(\d{2,4})\b'), 'dMy'),
-    # Oct 05, 2025
-    (re.compile(r'\b([A-Za-z]{3})[a-z]*\s+(\d{1,2}),?\s+(\d{4})\b'), 'Mdy'),
+    # 05-Oct-25, 5th Oct 2025, 05Oct25, 5-OCT-2025, 5th October 2025
+    (re.compile(r'\b(\d{1,2})(?:st|nd|rd|th)?[-\s]?([A-Za-z]{3})[a-z]*[-\s,]*(\d{2,4})\b', re.I), 'dMy'),
+    # Oct 05, 2025 or October 5th, 2025
+    (re.compile(r'\b([A-Za-z]{3})[a-z]*\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})\b', re.I), 'Mdy'),
 ]
 
 
-def _year(y):
-    y = int(y)
-    return y + 2000 if y < 100 else y
+def _year(y: str | int) -> int:
+    val = int(y)
+    return val + 2000 if val < 100 else val
 
 
-def parse_date(text, reference=None):
-    """First plausible date in text. With a reference date, reject dates more than 60 days away."""
+def parse_date(text: str | None, reference: datetime.date | None = None) -> datetime.date | None:
+    """Extract first plausible calendar date. With a reference date, rejects dates > 60 days away."""
+    if not text:
+        return None
     for rx, kind in _DATE_PATTERNS:
-        for m in rx.finditer(text or ''):
+        for m in rx.finditer(text):
             try:
                 if kind == 'ymd':
                     d = datetime.date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
@@ -206,7 +321,8 @@ def parse_date(text, reference=None):
 _TIME_RE = re.compile(r'\b([01]?\d|2[0-3]):([0-5]\d)(?::([0-5]\d))?\s*([AaPp][Mm])?\b')
 
 
-def parse_time(text):
+def parse_time(text: str | None) -> datetime.time | None:
+    """Extract transaction time if present in the alert string."""
     m = _TIME_RE.search(text or '')
     if not m:
         return None
@@ -226,7 +342,8 @@ _LAST4_PATTERNS = [
 ]
 
 
-def parse_last4(text):
+def parse_last4(text: str | None) -> str:
+    """Extract the last 4 digits of the card or bank account from alert text."""
     for rx in _LAST4_PATTERNS:
         m = rx.search(text or '')
         if m:
@@ -234,7 +351,8 @@ def parse_last4(text):
     return ''
 
 
-def parse_instrument(text):
+def parse_instrument(text: str | None) -> str:
+    """Identify payment instrument: CREDIT_CARD, DEBIT_CARD, BANK_ACCOUNT, UPI, OTHER."""
     t = (text or '').lower()
     if 'credit card' in t or re.search(r'av(?:ai)?l(?:able|\.)?\s*(?:credit\s*)?l(?:imi)?t|avl\s*lmt', t):
         return 'CREDIT_CARD'
@@ -242,14 +360,15 @@ def parse_instrument(text):
         return 'DEBIT_CARD'
     if re.search(r'(\ba/c\b|\bac\b|\bacct\b|\baccount\b|\bsavings\b)', t):
         return 'BANK_ACCOUNT'
-    if re.search(r'\bcard\b', t):
+    if re.search(r'\b(?:card\s*(?:ending|no|number)|credit\s*card)\b', t):
         return 'CREDIT_CARD'
     if re.search(r'\b(upi|vpa|wallet)\b', t):
         return 'UPI'
     return 'OTHER'
 
 
-def parse_channel(text, instrument):
+def parse_channel(text: str | None, instrument: str) -> str:
+    """Identify payment channel: UPI, ATM, IMPS, AUTO_DEBIT, NETBANKING, CARD, OTHER."""
     t = (text or '').lower()
     if re.search(r'\b(upi|vpa)\b|@[a-z]{2,}\b', t):
         return 'UPI'
@@ -261,25 +380,39 @@ def parse_channel(text, instrument):
         return 'AUTO_DEBIT'
     if re.search(r'net\s*banking|netbanking|billdesk|payu', t):
         return 'NETBANKING'
-    if instrument in ('CREDIT_CARD', 'DEBIT_CARD'):
+    if instrument in ('CREDIT_CARD', 'DEBIT_CARD') or re.search(r'\b(pos|swipe|ecom)\b', t):
         return 'CARD'
     return 'OTHER'
 
 
 _REF_RE = re.compile(
-    r'(?:upi\s*ref(?:erence)?|ref(?:erence)?|rrn|txn\s*id|transaction\s*id|utr)\.?\s*(?:no\.?|number|#|id)?'
-    r'\s*(?:is)?\s*[:\-]?\s*([A-Za-z0-9]{6,24})',
+    r'(?:upi\s*ref(?:erence)?|ref(?:erence)?|rrn|txn\s*id|transaction\s*id|utr|order\s*id)\.?\s*(?:no\.?|number|#|id)?'
+    r'\s*(?:is)?\s*[:\-]?\s*([A-Za-z0-9_\-]{6,28})',
     re.I,
 )
 
 
-def parse_reference(text):
+def parse_reference(text: str | None) -> str:
+    """Extract unique transaction reference / UTR / RRN / Order ID."""
     m = _REF_RE.search(text or '')
     return m.group(1) if m else ''
 
 
-_STOP = r'(?=\s+on\s+\d|\s+on\s+[A-Za-z]{3}\s+\d|\s+on\s+your\b|\s+using\b|\s*\.\s|\s*\.$|\s+avl|\s+avbl|\s+available|\s+ref\b|\s+upi\b|\s+via\b|\s+for\s+inr|\s*\(|\s*,\s*(?:avl|ref)|\s+total\s+avbl|\n|$)'
+# ---------------------------------------------------------------------------
+# Merchant Parsing & Normalization
+# ---------------------------------------------------------------------------
+
+_STOP = (
+    r'(?=\s+on\s+\d|\s+on\s+[A-Za-z]{3}\s+\d|\s+on\s+your\b|\s+using\b|\s*\.\s|\s*\.$'
+    r'|\s+avl|\s+avbl|\s+available|\s+ref\b|\s+upi\b|\s+via\b|\s+for\s+inr|\s*\(|\s*,\s*(?:avl|ref)'
+    r'|\s+total\s+avbl|\s+bal\b|\s+balance\b|\s+clear\s+bal\b|\s+eff\s+bal\b|\s+throug?h\b'
+    r'|\s+with\s+(?:ref|rrn|txn|utr)\b|\s+dated\b|\s+if\s+not\b|\s+not\s+you\b|\s+call\s+1800\b'
+    r'|\s+sms\s+block\b|\s+toll\s*free\b|\n|$)'
+)
+
 _MERCHANT_PATTERNS = [
+    # UPI with real name in parentheses: "to VPA swiggy@icici (Swiggy)" / "to user@upi (Ramesh Kumar)"
+    re.compile(r'\b(?:to|by|from)\s+(?:vpa\s+)?\S+@[a-z0-9._\-]+\s*\(([^)]{2,60})\)', re.I),
     # HDFC UPI: "to VPA abc@okicici MERCHANT NAME on 05-10-25" / credits "by VPA x@okhdfc NAME on"
     re.compile(r'\b(?:to|by|from)\s+vpa\s+(\S+@\S+?)\s+(.{2,60}?)' + _STOP, re.I),
     re.compile(r'\b(?:to|by|from)\s+vpa\s+(\S+@[a-z]{2,})', re.I),
@@ -289,7 +422,11 @@ _MERCHANT_PATTERNS = [
     # Axis summary: "Merchant Name: AMAZON"
     re.compile(r'merchant\s*(?:name)?\s*[:\-]\s*(.{2,60}?)' + _STOP, re.I),
     # ICICI: "on 05-Oct-25 on AMAZON. Avl Limit"; "on 05-Oct-25 at AMAZON"
-    re.compile(r'\bon\s+\d{1,2}[-/\s][A-Za-z0-9]{2,3}[-/\s]\d{2,4}(?:[\s,:]+\d{1,2}:\d{2}(?::\d{2})?)?\s+(?:on|at)\s+(.{2,60}?)' + _STOP, re.I),
+    re.compile(
+        r'\bon\s+\d{1,2}[-/\s][A-Za-z0-9]{2,3}[-/\s]\d{2,4}(?:[\s,:]+\d{1,2}:\d{2}(?::\d{2})?)?\s+(?:on|at)\s+(.{2,60}?)'
+        + _STOP,
+        re.I,
+    ),
     # HDFC / SBI card: "at AMAZON on 05-10-25"
     re.compile(r'\bat\s+(.{2,60}?)' + _STOP, re.I),
     # HDFC: "towards MERCHANT"
@@ -298,11 +435,13 @@ _MERCHANT_PATTERNS = [
     re.compile(r'\binfo\s*[:\-]\s*(.{2,80}?)' + _STOP, re.I),
     # Axis: "UPI/P2M/123456/MERCHANT"
     re.compile(r'\b(?:UPI|IMPS|NEFT)/(?:P2[AM]/)?\d+/([^/\s]{2,40})', re.I),
-    # SBI: "transfer to MERCHANT Ref No"
+    # SBI / Kotak: "transfer to MERCHANT Ref No"
     re.compile(r'\btransfer(?:red)?\s+to\s+(.{2,60}?)' + _STOP, re.I),
     # Kotak: "Sent Rs.500 from Kotak Bank AC X1234 to MERCHANT on"
+    re.compile(r'\b(?:sent|paid)\s+to\s+([A-Z][A-Za-z0-9 &.\'\-]{2,60}?)' + _STOP, re.I),
     re.compile(r'\bto\s+([A-Z][A-Za-z0-9 &.\'\-]{2,60}?)' + _STOP),
-    # Credits: "received from NAME", "credited by NAME"
+    # Credits: "received from NAME", "from NAME on", "credited by NAME"
+    re.compile(r'\bfrom\s+([A-Za-z][A-Za-z0-9 &.\'\-]{2,60}?)' + _STOP, re.I),
     re.compile(r'\b(?:from|by)\s+([A-Za-z][A-Za-z0-9 &.\'\-]{2,60}?)' + _STOP, re.I),
 ]
 
@@ -313,15 +452,15 @@ _BAD_MERCHANT = re.compile(
 )
 
 
-def parse_merchant(text):
+def parse_merchant(text: str | None) -> tuple[str, str]:
+    """Extract raw merchant string and supporting context from alert text."""
     for rx in _MERCHANT_PATTERNS:
         for m in rx.finditer(text or ''):
             groups = [g for g in m.groups() if g]
             if not groups:
                 continue
-            # VPA + name: prefer the human name, keep VPA as raw context
             candidate = groups[-1].strip(' .,:-')
-            if len(groups) == 2 and len(candidate) < 3:
+            if len(groups) >= 2 and len(candidate) < 3:
                 candidate = groups[0]
             if len(candidate) < 2 or _BAD_MERCHANT.match(candidate):
                 continue
@@ -329,158 +468,59 @@ def parse_merchant(text):
     return '', ''
 
 
-# ---------------------------------------------------------------------------
-# Merchant normalisation
-# ---------------------------------------------------------------------------
+class _KnownBrandsProxy(dict):
+    """Dynamic dictionary proxy pulling from BrandKnowledge in database for backward compatibility."""
 
-# token in the alnum key → (display name, default category name)
-KNOWN_BRANDS = {
-    'SWIGGYINSTAMART': ('Swiggy Instamart', 'Groceries'),
-    'INSTAMART': ('Swiggy Instamart', 'Groceries'),
-    'SWIGGY': ('Swiggy', 'Food & Dining'),
-    'ZOMATO': ('Zomato', 'Food & Dining'),
-    'BLINKIT': ('Blinkit', 'Groceries'),
-    'GROFERS': ('Blinkit', 'Groceries'),
-    'ZEPTO': ('Zepto', 'Groceries'),
-    'BIGBASKET': ('BigBasket', 'Groceries'),
-    'BBNOW': ('BigBasket', 'Groceries'),
-    'DMART': ('DMart', 'Groceries'),
-    'AVENUESUPERMART': ('DMart', 'Groceries'),
-    'JIOMART': ('JioMart', 'Groceries'),
-    'AMAZONPRIME': ('Amazon Prime', 'Subscriptions'),
-    'AMAZONPAY': ('Amazon', 'Shopping'),
-    'AMAZON': ('Amazon', 'Shopping'),
-    'FLIPKART': ('Flipkart', 'Shopping'),
-    'MYNTRA': ('Myntra', 'Shopping'),
-    'AJIO': ('Ajio', 'Shopping'),
-    'NYKAA': ('Nykaa', 'Personal Care'),
-    'MEESHO': ('Meesho', 'Shopping'),
-    'TATACLIQ': ('Tata CLiQ', 'Shopping'),
-    'CROMA': ('Croma', 'Shopping'),
-    'RELIANCEDIGITAL': ('Reliance Digital', 'Shopping'),
-    'IKEA': ('IKEA', 'Household & Services'),
-    'UBER': ('Uber', 'Transport'),
-    'OLACABS': ('Ola', 'Transport'),
-    'ANITECHNOLOGIES': ('Ola', 'Transport'),
-    'RAPIDO': ('Rapido', 'Transport'),
-    'NAMMAYATRI': ('Namma Yatri', 'Transport'),
-    'METRO': ('Metro', 'Transport'),
-    'FASTAG': ('FASTag', 'Transport'),
-    'IRCTC': ('IRCTC', 'Travel'),
-    'MAKEMYTRIP': ('MakeMyTrip', 'Travel'),
-    'GOIBIBO': ('Goibibo', 'Travel'),
-    'CLEARTRIP': ('Cleartrip', 'Travel'),
-    'INDIGO': ('IndiGo', 'Travel'),
-    'INTERGLOBE': ('IndiGo', 'Travel'),
-    'AIRINDIA': ('Air India', 'Travel'),
-    'AKASA': ('Akasa Air', 'Travel'),
-    'AIRBNB': ('Airbnb', 'Travel'),
-    'OYO': ('OYO', 'Travel'),
-    'REDBUS': ('redBus', 'Travel'),
-    'NETFLIX': ('Netflix', 'Subscriptions'),
-    'SPOTIFY': ('Spotify', 'Subscriptions'),
-    'HOTSTAR': ('Disney+ Hotstar', 'Subscriptions'),
-    'JIOHOTSTAR': ('JioHotstar', 'Subscriptions'),
-    'YOUTUBE': ('YouTube Premium', 'Subscriptions'),
-    'GOOGLEPLAY': ('Google Play', 'Subscriptions'),
-    'APPLECOM': ('Apple', 'Subscriptions'),
-    'ITUNES': ('Apple', 'Subscriptions'),
-    'OPENAI': ('OpenAI', 'Subscriptions'),
-    'CHATGPT': ('OpenAI', 'Subscriptions'),
-    'BOOKMYSHOW': ('BookMyShow', 'Entertainment'),
-    'PVR': ('PVR INOX', 'Entertainment'),
-    'INOX': ('PVR INOX', 'Entertainment'),
-    'DISTRICT': ('District', 'Entertainment'),
-    'STARBUCKS': ('Starbucks', 'Food & Dining'),
-    'MCDONALD': ("McDonald's", 'Food & Dining'),
-    'DOMINOS': ("Domino's", 'Food & Dining'),
-    'KFC': ('KFC', 'Food & Dining'),
-    'BURGERKING': ('Burger King', 'Food & Dining'),
-    'EATCLUB': ('EatClub', 'Food & Dining'),
-    'HALDIRAM': ("Haldiram's", 'Food & Dining'),
-    'APOLLO': ('Apollo', 'Health'),
-    'PHARMEASY': ('PharmEasy', 'Health'),
-    'NETMEDS': ('Netmeds', 'Health'),
-    'TATA1MG': ('Tata 1mg', 'Health'),
-    'PRACTO': ('Practo', 'Health'),
-    'CULTFIT': ('cult.fit', 'Health'),
-    'CUREFIT': ('cult.fit', 'Health'),
-    'URBANCOMPANY': ('Urban Company', 'Household & Services'),
-    'URBANCLAP': ('Urban Company', 'Household & Services'),
-    'JIO': ('Jio', 'Bills & Utilities'),
-    'AIRTEL': ('Airtel', 'Bills & Utilities'),
-    'VODAFONE': ('Vi', 'Bills & Utilities'),
-    'BSNL': ('BSNL', 'Bills & Utilities'),
-    'ACTFIBERNET': ('ACT Fibernet', 'Bills & Utilities'),
-    'TATAPOWER': ('Tata Power', 'Bills & Utilities'),
-    'BESCOM': ('BESCOM', 'Bills & Utilities'),
-    'ADANIELECTRIC': ('Adani Electricity', 'Bills & Utilities'),
-    'BSES': ('BSES', 'Bills & Utilities'),
-    'MAHANAGARGAS': ('Mahanagar Gas', 'Bills & Utilities'),
-    'INDRAPRASTHAGAS': ('IGL', 'Bills & Utilities'),
-    'BBPS': ('Bill payment', 'Bills & Utilities'),
-    'INDIANOIL': ('Indian Oil', 'Fuel'),
-    'IOCL': ('Indian Oil', 'Fuel'),
-    'HPCL': ('HP Petrol', 'Fuel'),
-    'BPCL': ('Bharat Petroleum', 'Fuel'),
-    'BHARATPETROLEUM': ('Bharat Petroleum', 'Fuel'),
-    'SHELL': ('Shell', 'Fuel'),
-    'NAYARA': ('Nayara', 'Fuel'),
-    'LIC': ('LIC', 'Insurance'),
-    'ACKO': ('Acko', 'Insurance'),
-    'POLICYBAZAAR': ('PolicyBazaar', 'Insurance'),
-    'HDFCERGO': ('HDFC Ergo', 'Insurance'),
-    'ICICILOMBARD': ('ICICI Lombard', 'Insurance'),
-    'STARHEALTH': ('Star Health', 'Insurance'),
-    'ZERODHA': ('Zerodha', 'Investments'),
-    'GROWW': ('Groww', 'Investments'),
-    'KUVERA': ('Kuvera', 'Investments'),
-    'COIN': ('Zerodha Coin', 'Investments'),
-    'NPSTRUST': ('NPS', 'Investments'),
-    'INDIANCLEARINGCORP': ('Mutual fund SIP', 'Investments'),
-    'BSESTARMF': ('Mutual fund SIP', 'Investments'),
-    'CRED': ('CRED', 'Credit Card Payment'),
-    'CREDITCARDPAYMENT': ('Credit card bill', 'Credit Card Payment'),
-    'CREDITCARD': ('Credit card bill', 'Credit Card Payment'),
-    'CCPAYMENT': ('Credit card bill', 'Credit Card Payment'),
-    'CCPMT': ('Credit card bill', 'Credit Card Payment'),
-}
+    def __getitem__(self, key: str) -> tuple[str, str, str]:
+        from .knowledge import lookup_brand
 
-# Keyword fallbacks for unknown merchants: substring in the alnum key → category name.
-CATEGORY_KEYWORDS = [
-    ('CASHWDL', 'Cash Withdrawal'), ('ATMWDL', 'Cash Withdrawal'), ('ATM', 'Cash Withdrawal'),
-    ('RESTAURANT', 'Food & Dining'), ('CAFE', 'Food & Dining'), ('BAKERY', 'Food & Dining'),
-    ('FOODS', 'Food & Dining'), ('KITCHEN', 'Food & Dining'), ('DHABA', 'Food & Dining'), ('BIRYANI', 'Food & Dining'),
-    ('SUPERMARKET', 'Groceries'), ('HYPERMARKET', 'Groceries'), ('SUPERMART', 'Groceries'), ('KIRANA', 'Groceries'), ('MART', 'Groceries'), ('FRESH', 'Groceries'),
-    ('DAIRY', 'Groceries'), ('VEGETABLE', 'Groceries'),
-    ('PETROL', 'Fuel'), ('FUEL', 'Fuel'), ('FILLING', 'Fuel'),
-    ('PHARMA', 'Health'), ('MEDICAL', 'Health'), ('CHEMIST', 'Health'), ('HOSPITAL', 'Health'),
-    ('CLINIC', 'Health'), ('DIAGNOSTIC', 'Health'), ('DENTAL', 'Health'), ('LAB', 'Health'),
-    ('SALON', 'Personal Care'), ('SPA', 'Personal Care'),
-    ('SCHOOL', 'Education'), ('COLLEGE', 'Education'), ('ACADEMY', 'Education'), ('TUITION', 'Education'),
-    ('ELECTRICITY', 'Bills & Utilities'), ('BROADBAND', 'Bills & Utilities'), ('RECHARGE', 'Bills & Utilities'),
-    ('WATER', 'Bills & Utilities'), ('GAS', 'Bills & Utilities'), ('DTH', 'Bills & Utilities'),
-    ('INSURANCE', 'Insurance'), ('PREMIUM', 'Insurance'),
-    ('EMI', 'EMI & Loans'), ('LOAN', 'EMI & Loans'), ('NACH', 'EMI & Loans'),
-    ('RENT', 'Rent & Housing'), ('MAINTENANCE', 'Rent & Housing'), ('SOCIETY', 'Rent & Housing'),
-    ('HOTEL', 'Travel'), ('AIRLINE', 'Travel'), ('AIRWAYS', 'Travel'), ('TRAVEL', 'Travel'), ('RAILWAY', 'Travel'),
-    ('CAB', 'Transport'), ('TAXI', 'Transport'), ('PARKING', 'Transport'), ('TOLL', 'Transport'),
-    ('MUTUALFUND', 'Investments'), ('SIP', 'Investments'), ('SECURITIES', 'Investments'),
-    ('DONATION', 'Gifts & Donations'), ('TEMPLE', 'Gifts & Donations'), ('TRUST', 'Gifts & Donations'),
-    ('CHARGES', 'Fees & Charges'), ('FEE', 'Fees & Charges'), ('GST', 'Fees & Charges'), ('PENALTY', 'Fees & Charges'),
-    ('FASHION', 'Shopping'), ('APPAREL', 'Shopping'), ('ELECTRONICS', 'Shopping'), ('STORE', 'Shopping'),
-    ('RETAIL', 'Shopping'), ('JEWELLER', 'Shopping'),
-    ('MOVIE', 'Entertainment'), ('CINEMA', 'Entertainment'), ('GAMING', 'Entertainment'),
-]
+        val = lookup_brand(key)
+        if val is None:
+            raise KeyError(key)
+        return val
 
-_VPA_NOISE = re.compile(r'^(paytmqr|paytm|bharatpe|q\d+|gpay|phonepe|mab|ombk|upi|pay|bhim)[._\-]*', re.I)
+    def __contains__(self, key: object) -> bool:
+        from .knowledge import lookup_brand
+
+        return lookup_brand(str(key)) is not None
+
+    def get(self, key: str, default: object = None) -> object:
+        from .knowledge import lookup_brand
+
+        val = lookup_brand(key)
+        return val if val is not None else default
+
+
+KNOWN_BRANDS = _KnownBrandsProxy()
+
+
+class _CategoryKeywordsProxy(list):
+    """Dynamic list proxy pulling from KeywordKnowledge in database for backward compatibility."""
+
+    def __iter__(self):
+        from .knowledge import get_keyword_rules
+
+        return iter(get_keyword_rules())
+
+    def __len__(self) -> int:
+        from .knowledge import get_keyword_rules
+
+        return len(get_keyword_rules())
+
+
+CATEGORY_KEYWORDS = _CategoryKeywordsProxy()
+
+_VPA_NOISE = re.compile(
+    r'^(paytmqr|paytm|bharatpe|q\d+|gpay|phonepe|mab|ombk|upi|pay|bhim)[._\-]*',
+    re.I,
+)
 _MERCHANT_NOISE = re.compile(
     r'\b(upi|pos|ecom|imps|neft|rtgs|p2m|p2a|pvt|private|ltd|limited|llp|india|in|inc|co|corp|the|www|com|payments?)\b',
     re.I,
 )
 
 
-def normalize_merchant(raw):
+def normalize_merchant(raw: str | None) -> tuple[str, str]:
     """Return (display_name, merchant_key). The key is stable across alert formats for learning."""
     s = (raw or '').strip()
     if not s:
@@ -493,45 +533,71 @@ def normalize_merchant(raw):
     cleaned = re.sub(r'\s+', ' ', _MERCHANT_NOISE.sub(' ', s)).strip(' .,-')
     cleaned = re.sub(r'^(?:from|to|by|at)\s+', '', cleaned, flags=re.I)
     key = re.sub(r'[^A-Z0-9]', '', (cleaned or s).upper())[:60]
+
+    from .knowledge import get_brand_tokens, lookup_brand
+
+    # 1. Direct match in BrandKnowledge (cached DB catalog)
+    match = lookup_brand(key)
+    if match:
+        return match[0], key
+
+    # 2. Substring token match against known brands in database
     words = _words(cleaned or s)
-    for token in _BRAND_TOKENS:
+    for token in get_brand_tokens():
         if _token_hit(token, key, words):
-            return KNOWN_BRANDS[token][0], token
+            tmatch = lookup_brand(token)
+            if tmatch:
+                return tmatch[0], token
+
     display = (cleaned or s).strip()
     if display.isupper() or display.islower():
         display = display.title()
     return display[:120], key
 
 
-# Longest first so e.g. CREDITCARDPAYMENT wins over CRED.
-_BRAND_TOKENS = sorted(KNOWN_BRANDS, key=len, reverse=True)
-# Tokens this short must be a whole word, or LIC would match SLICE and FEE would match COFFEE.
 _SHORT_TOKEN = 4
 
 
-def _words(text):
+def _words(text: str) -> set[str]:
     return set(re.findall(r'[A-Z0-9]+', (text or '').upper()))
 
 
-def _token_hit(token, key, words):
+def _token_hit(token: str, key: str, words: set[str]) -> bool:
     if len(token) <= _SHORT_TOKEN:
         return token in words or key == token
     return token in key
 
 
-def brand_category(merchant_key, text=''):
-    brand = KNOWN_BRANDS.get(merchant_key)
-    if brand:
-        return brand[1]
+def brand_category(merchant_key: str, text: str = '') -> str | None:
+    """Resolve category name from BrandKnowledge or KeywordKnowledge in database."""
+    from .knowledge import get_keyword_rules, lookup_brand
+
+    match = lookup_brand(merchant_key)
+    if match:
+        return match[1]
     words = _words(text)
-    for token, category in CATEGORY_KEYWORDS:
-        if _token_hit(token, merchant_key, words):
-            return category
+    for item in get_keyword_rules():
+        if _token_hit(item[0], merchant_key, words):
+            return item[1]
+    return None
+
+
+def brand_icon(merchant_key: str, text: str = '') -> str | None:
+    """Return specific Material Symbols icon for a known merchant brand or keyword."""
+    from .knowledge import get_keyword_rules, lookup_brand
+
+    match = lookup_brand(merchant_key)
+    if match and len(match) > 2:
+        return match[2]
+    words = _words(text)
+    for item in get_keyword_rules():
+        if len(item) > 2 and _token_hit(item[0], merchant_key, words):
+            return item[2]
     return None
 
 
 # ---------------------------------------------------------------------------
-# Public parse results
+# Public Parse Results
 # ---------------------------------------------------------------------------
 
 @dataclass
@@ -572,33 +638,47 @@ class ParsedLine:
     is_credit: bool = False
 
 
-def _direction(text):
-    debit, credit = _DEBIT_WORDS.search(text), _CREDIT_WORDS.search(text)
-    if debit and credit:
-        return 'DEBIT' if debit.start() < credit.start() else 'CREDIT'
-    return 'CREDIT' if credit and not debit else 'DEBIT'
-
-
-def parse_transaction(sender, subject, body, received=None):
-    """Parse a single transaction alert. Returns ParsedTransaction or None."""
+def parse_transaction(
+    sender: str | None,
+    subject: str | None,
+    body: str | None,
+    received: datetime.datetime | datetime.date | None = None,
+) -> ParsedTransaction | None:
+    """Parse a single bank or card alert email into a structured ParsedTransaction."""
     text = clean_text(f'{body}')
     full = f'{subject}\n{text}'
     received_date = received.date() if isinstance(received, datetime.datetime) else received
 
+    # 1. Currency & Amount extraction
     currency = 'INR'
-    m = _AMOUNT_RE.search(full)
-    fm = _FOREIGN_AMOUNT_RE.search(full)
-    if fm and (not m or fm.start() < m.start()):
-        currency, amount = fm.group(1).upper(), to_decimal(fm.group(2))
+    m_txn = _TXN_AMOUNT_RE.search(full)
+    m_inr = _AMOUNT_RE.search(full)
+    m_foreign = _FOREIGN_AMOUNT_RE.search(full)
+    m_suffix = _AMOUNT_SUFFIX_RE.search(full)
+
+    # Prefer explicit transaction-tied amount first to avoid available balance numbers
+    if m_txn:
+        amount = to_decimal(m_txn.group(1))
+    elif m_inr:
+        amount = to_decimal(m_inr.group(1))
+    elif m_foreign:
+        currency = m_foreign.group(1).upper()
+        amount = to_decimal(m_foreign.group(2))
+    elif m_suffix:
+        amount = to_decimal(m_suffix.group(1))
     else:
-        amount = to_decimal(m.group(1)) if m else None
+        amount = None
+
     if not amount or amount <= 0:
         return None
 
+    # 2. Merchant extraction & normalization
     merchant_text, merchant_raw = parse_merchant(text)
     if not merchant_text:
         merchant_text, merchant_raw = parse_merchant(subject or '')
     display, key = normalize_merchant(merchant_text)
+
+    # 3. Instrument, channel & details
     instrument = parse_instrument(full)
 
     return ParsedTransaction(
@@ -618,21 +698,25 @@ def parse_transaction(sender, subject, body, received=None):
     )
 
 
-def _labelled_amount(text, label):
-    m = re.search(label + r'[^0-9₹\n]{0,40}?(?:' + _AMOUNT + r'|([0-9][0-9,]*\.[0-9]{2}))', text, re.I)
+def _labelled_amount(text: str, label: str) -> Decimal | None:
+    m = re.search(
+        label + r'[^0-9₹\n]{0,40}?(?:' + _AMOUNT_CORE + r'|([0-9][0-9,]*\.[0-9]{2}))',
+        text,
+        re.I,
+    )
     if not m:
         return None
     return to_decimal(m.group(1) or m.group(2))
 
 
-def _labelled_date(text, label):
+def _labelled_date(text: str, label: str) -> datetime.date | None:
     m = re.search(label + r'[^0-9A-Za-z\n]{0,15}(.{6,25})', text, re.I)
     return parse_date(m.group(1)) if m else None
 
 
-def parse_statement_summary(sender, subject, text):
-    """Totals, due date and period from a statement email body or PDF text."""
-    full = f'{subject}\n{text}'
+def parse_statement_summary(sender: str | None, subject: str | None, text: str | None) -> ParsedStatement:
+    """Extract totals, due date, and billing period from a statement email body or PDF plaintext."""
+    full = f'{subject}\n{text or ""}'
     st = ParsedStatement(
         institution=detect_institution(sender, full),
         last4=parse_last4(full),
@@ -643,7 +727,8 @@ def parse_statement_summary(sender, subject, text):
     )
     period = re.search(
         r'(?:statement\s+period|billing\s+(?:period|cycle))[^0-9A-Za-z]{0,10}(.{6,20}?)\s*(?:to|-|–)\s*(.{6,20})',
-        full, re.I,
+        full,
+        re.I,
     )
     if period:
         st.period_start, st.period_end = parse_date(period.group(1)), parse_date(period.group(2))
@@ -661,12 +746,14 @@ _LINE_RE = re.compile(
 )
 _SKIP_LINE = re.compile(
     r'(opening\s+balance|closing\s+balance|total\s+(?:amount\s+)?due|minimum\s+(?:amount\s+)?due|'
-    r'credit\s+limit|available\s+limit|previous\s+balance|reward\s+points)', re.I)
+    r'credit\s+limit|available\s+limit|previous\s+balance|reward\s+points)',
+    re.I,
+)
 
 
-def parse_statement_lines(text):
-    """Line items from statement PDF text. Payment-received lines are marked credit."""
-    lines = []
+def parse_statement_lines(text: str | None) -> list[ParsedLine]:
+    """Parse line items from statement PDF plaintext. Payment-received lines are marked credit."""
+    lines: list[ParsedLine] = []
     for raw in (text or '').splitlines():
         if _SKIP_LINE.search(raw):
             continue
@@ -679,13 +766,18 @@ def parse_statement_lines(text):
             continue
         desc = re.sub(r'\s+', ' ', m.group(2)).strip()
         is_credit = (m.group(4) or '').upper().startswith('C') or bool(
-            re.search(r'payment\s+received|thank\s+you\s+for\s+(?:the\s+)?payment|refund|reversal', desc, re.I))
+            re.search(r'payment\s+received|thank\s+you\s+for\s+(?:the\s+)?payment|refund|reversal', desc, re.I)
+        )
         lines.append(ParsedLine(txn_date=d, description=desc[:255], amount=amount, is_credit=is_credit))
     return lines
 
 
-def parse_card_payment(sender, subject, body):
-    """(amount, last4, institution) for a 'payment received on your credit card' email."""
+def parse_card_payment(
+    sender: str | None,
+    subject: str | None,
+    body: str | None,
+) -> tuple[Decimal | None, str, str]:
+    """Extract (amount, last4, institution) for a 'payment received on your credit card' alert email."""
     full = f'{subject}\n{clean_text(body)}'
     m = _AMOUNT_RE.search(full)
     return (to_decimal(m.group(1)) if m else None), parse_last4(full), detect_institution(sender, full)

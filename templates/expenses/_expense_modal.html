@@ -22,8 +22,8 @@
       </div>
 
       <div class="join w-full">
-        <input type="radio" name="direction" value="DEBIT" aria-label="Spent" class="join-item btn btn-sm flex-1" checked id="expDirDebit">
-        <input type="radio" name="direction" value="CREDIT" aria-label="Received / refund" class="join-item btn btn-sm flex-1" id="expDirCredit">
+        <input type="radio" name="direction" value="DEBIT" aria-label="Spent" class="join-item btn btn-sm flex-1 cursor-pointer" checked id="expDirDebit">
+        <input type="radio" name="direction" value="CREDIT" aria-label="Received / refund" class="join-item btn btn-sm flex-1 cursor-pointer" id="expDirCredit">
       </div>
 
       <label class="flex flex-col gap-1">
@@ -41,11 +41,11 @@
       <div class="grid grid-cols-2 gap-3">
         <label class="flex flex-col gap-1">
           <span class="text-xs font-bold uppercase tracking-wider opacity-50">Date</span>
-          <input type="date" name="txn_date" id="expDate" required class="input input-bordered w-full" value="{{ today|date:'Y-m-d' }}">
+          <input type="date" name="txn_date" id="expDate" required class="input input-bordered w-full cursor-pointer" value="{{ today|date:'Y-m-d' }}">
         </label>
         <label class="flex flex-col gap-1">
           <span class="text-xs font-bold uppercase tracking-wider opacity-50">Category</span>
-          <select name="category" id="expCategory" class="select select-bordered w-full">
+          <select name="category" id="expCategory" class="select select-bordered w-full cursor-pointer">
             <option value="">Uncategorised</option>
             {% for c in categories %}<option value="{{ c.pk }}">{{ c.name }}</option>{% endfor %}
           </select>
@@ -53,21 +53,21 @@
       </div>
 
       <label class="flex items-start gap-2 cursor-pointer hidden" id="expRememberRow">
-        <input type="checkbox" name="remember" id="expRemember" class="checkbox checkbox-sm checkbox-primary mt-0.5" checked>
+        <input type="checkbox" name="remember" id="expRemember" class="checkbox checkbox-sm checkbox-primary mt-0.5 cursor-pointer" checked>
         <span class="text-xs leading-snug opacity-75">Always file <strong id="expRememberName">this merchant</strong> under this category — and re-file its past transactions.</span>
       </label>
 
       <div class="grid grid-cols-2 gap-3">
         <label class="flex flex-col gap-1">
           <span class="text-xs font-bold uppercase tracking-wider opacity-50">Paid with</span>
-          <select name="payment_source" id="expSource" class="select select-bordered w-full">
+          <select name="payment_source" id="expSource" class="select select-bordered w-full cursor-pointer">
             <option value="">—</option>
             {% for s in payment_sources %}<option value="{{ s.pk }}">{{ s.display_name }}</option>{% endfor %}
           </select>
         </label>
         <label class="flex flex-col gap-1">
           <span class="text-xs font-bold uppercase tracking-wider opacity-50">Spent by</span>
-          <select name="member" id="expMember" class="select select-bordered w-full">
+          <select name="member" id="expMember" class="select select-bordered w-full cursor-pointer">
             <option value="">—</option>
             {% for m in members %}<option value="{{ m.pk }}" {% if m.pk == user.pk %}data-self="1"{% endif %}>{{ m.first_name|default:m.username }}</option>{% endfor %}
           </select>
@@ -76,7 +76,7 @@
 
       <label class="flex flex-col gap-1">
         <span class="text-xs font-bold uppercase tracking-wider opacity-50">Notes</span>
-        <textarea name="notes" id="expNotes" rows="2" class="textarea textarea-bordered w-full" placeholder="Optional"></textarea>
+        <textarea name="notes" id="expNotes" rows="2" class="textarea textarea-bordered w-full" placeholder="Optional notes"></textarea>
       </label>
 
       <details id="expMeta" class="hidden text-xs bg-base-200/60 rounded-xl px-3 py-2">
@@ -90,12 +90,12 @@
       </details>
 
       <div class="flex items-center gap-2 pt-1">
-        <button type="button" id="expDeleteBtn" class="btn btn-ghost btn-sm text-error hidden" onclick="Expenses.remove()">
+        <button type="button" id="expDeleteBtn" class="btn btn-ghost btn-sm text-error hidden cursor-pointer" onclick="Expenses.remove()">
           <span class="material-symbols-outlined text-base">delete</span>Remove
         </button>
         <div class="flex-1"></div>
-        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('expenseModal')">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm" id="expSubmit">Save</button>
+        <button type="button" class="btn btn-ghost btn-sm cursor-pointer" onclick="closeModal('expenseModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm cursor-pointer" id="expSubmit">Save</button>
       </div>
     </form>
 

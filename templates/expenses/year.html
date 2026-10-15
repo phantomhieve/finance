@@ -94,7 +94,7 @@
         <h2 class="text-xs font-bold uppercase tracking-widest opacity-50 mb-2">Months</h2>
         {% for m in summary.months %}
         {% if m.started %}
-        <a href="{% url 'expenses_home' %}?m={{ m.param }}" class="flex items-center gap-3 py-2 rounded-lg hover:bg-base-content/5 -mx-1 px-1">
+        <a href="{% url 'expenses_home' %}?m={{ m.param }}" class="flex items-center gap-3 py-2 rounded-lg hover:bg-base-content/5 -mx-1 px-1 cursor-pointer">
           <span class="text-sm font-semibold w-16 shrink-0">{{ m.label }} <span class="text-[10px] opacity-40 font-normal">'{{ m.year|stringformat:"d"|slice:"2:" }}</span></span>
           <div class="exp-bar flex-1" style="--h:28"><span style="width:{{ m.bar }}%"></span></div>
           <span class="text-sm font-bold tabular-nums w-24 text-right">{% if m.total %}{{ m.total|inr }}{% else %}<span class="opacity-30">—</span>{% endif %}</span>

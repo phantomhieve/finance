@@ -9,6 +9,7 @@ urlpatterns = [
     path('<int:pk>/edit/', views.expense_edit, name='expense_edit'),
     path('<int:pk>/delete/', views.expense_delete, name='expense_delete'),
     path('<int:pk>/review/', views.expense_review, name='expense_review'),
+    path('ai-audit/', views.expenses_ai_audit, name='expenses_ai_audit'),
 
     path('settings/', views.expenses_settings, name='expenses_settings'),
     path('gmail/connect/', views.gmail_connect, name='expenses_gmail_connect'),

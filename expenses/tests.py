@@ -51,7 +51,7 @@ STATEMENT_TEXT = """04/03/2026 SWIGGY INSTAMART BANGALORE 1,249.00
 Total Amount Due 32,450.00"""
 
 
-class ParserTests(SimpleTestCase):
+class ParserTests(TestCase):
     def test_card_alert(self):
         self.assertEqual(classify(*HDFC_CARD), 'TXN')
         p = parse_transaction(*HDFC_CARD, RECEIVED)
@@ -69,6 +69,30 @@ class ParserTests(SimpleTestCase):
     def test_credit(self):
         p = parse_transaction(*ICICI_CREDIT, RECEIVED)
         self.assertEqual((p.direction, p.amount, p.merchant), ('CREDIT', Decimal('52000.00'), 'Acme'))
+
+    def test_merchant_payment_receipt_is_debit(self):
+        gcloud = (
+            'google-cloud-compliance@google.com',
+            "Google Cloud Platform & APIs: We've received your payment for 01A311-DB1EF5-F7FAD9",
+            "Thanks for your payment of Rs 500.00 for Google Cloud Platform. We have received your payment.",
+        )
+        self.assertEqual(classify(*gcloud), 'TXN')
+        p = parse_transaction(*gcloud, RECEIVED)
+        self.assertIsNotNone(p)
+        self.assertEqual(p.direction, 'DEBIT')
+        self.assertEqual(p.amount, Decimal('500.00'))
+
+        airtel = (
+            'airtel@airtel.com',
+            "Here’s your Airtel payment receipt!",
+            "Dear Customer, we have received your payment of Rs 529.82 towards your Airtel broadband bill. Thank you.",
+        )
+        self.assertEqual(classify(*airtel), 'TXN')
+        p2 = parse_transaction(*airtel, RECEIVED)
+        self.assertIsNotNone(p2)
+        self.assertEqual(p2.direction, 'DEBIT')
+        self.assertEqual(p2.amount, Decimal('529.82'))
+
 
     def test_otp_and_other_kinds(self):
         self.assertEqual(classify(*OTP), 'IGNORED')
@@ -587,3 +611,133 @@ class EmailTests(ExpenseTestCase):
         self.assertEqual(len(mail.outbox), 1)
         st.refresh_from_db()
         self.assertEqual(st.reminder_sent_on, today)
+
+
+class ExpensesAITests(SimpleTestCase):
+    def test_prompt_builders(self):
+        from .ai.prompts import (
+            build_categorise_prompt, build_extract_prompt,
+            build_monthly_note_prompt, build_statement_prompt,
+        )
+
+        cat_prompt = build_categorise_prompt(
+            [{'id': 1, 'merchant': 'Uber', 'amount': 250.0}],
+            ['Transport', 'Food & Dining'],
+            [('Uber', 'Transport')],
+        )
+        self.assertIn('Allowed categories:', cat_prompt)
+        self.assertIn('Transport', cat_prompt)
+        self.assertIn('Uber', cat_prompt)
+
+        ext_prompt = build_extract_prompt('Alert', 'A/c 12345678 debited by Rs 500')
+        self.assertIn('Subject: Alert', ext_prompt)
+        self.assertNotIn('12345678', ext_prompt)  # Sensitive account masked
+
+        st_prompt = build_statement_prompt('01/03/2026 SWIGGY 500.00')
+        self.assertIn('SWIGGY', st_prompt)
+
+        note_prompt = build_monthly_note_prompt({'total_spend': 50000})
+        self.assertIn('50000', note_prompt)
+
+    @mock.patch('expenses.ai.runner.gateway.generate_structured')
+    @mock.patch('expenses.ai.runner.ai_available', return_value=True)
+    def test_categorise_runner(self, mock_avail, mock_gen):
+        from .ai import CategoryBatch, CategoryChoice, categorise
+
+        mock_gen.return_value = CategoryBatch(
+            results=[CategoryChoice(id=42, category='Groceries', confidence=0.95)]
+        )
+        res = categorise(
+            [{'id': 42, 'merchant': 'Blinkit', 'amount': 400.0}],
+            ['Groceries', 'Transport'],
+            [],
+        )
+        self.assertEqual(res, {42: ('Groceries', 0.95)})
+
+    @mock.patch('expenses.ai.runner.gateway.generate_structured')
+    @mock.patch('expenses.ai.runner.ai_available', return_value=True)
+    def test_extract_transaction_runner(self, mock_avail, mock_gen):
+        from .ai import ExtractedTxn, extract_transaction
+
+        mock_gen.return_value = ExtractedTxn(
+            is_transaction=True, amount=1249.0, merchant='Swiggy', direction='DEBIT'
+        )
+        res = extract_transaction('Swiggy Order', 'Debited INR 1249 for Swiggy')
+        self.assertIsNotNone(res)
+        self.assertEqual(res.amount, 1249.0)
+        self.assertEqual(res.merchant, 'Swiggy')
+
+
+class BrandKnowledgeTests(TestCase):
+    def setUp(self):
+        super().setUp()
+        from .knowledge import ensure_seed_knowledge
+
+        ensure_seed_knowledge()
+
+    def test_seed_and_lookup(self):
+        from .knowledge import ensure_seed_knowledge, lookup_brand
+        from .models import BrandKnowledge
+
+        ensure_seed_knowledge()
+        self.assertTrue(BrandKnowledge.objects.filter(merchant_key='SWIGGY').exists())
+        swiggy = lookup_brand('SWIGGY')
+        self.assertIsNotNone(swiggy)
+        self.assertEqual(swiggy[0], 'Swiggy')
+        self.assertEqual(swiggy[1], 'Food & Dining')
+        self.assertEqual(swiggy[2], 'delivery_dining')
+
+    def test_ai_expansion(self):
+        from .knowledge import lookup_brand, record_ai_brand
+
+        entry = record_ai_brand(
+            merchant_key='CHAIPOINT',
+            display_name='Chai Point',
+            category_name='Food & Dining',
+            icon='coffee',
+            confidence=0.9,
+        )
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry.source, 'AI')
+
+        looked_up = lookup_brand('CHAIPOINT')
+        self.assertIsNotNone(looked_up)
+        self.assertEqual(looked_up[0], 'Chai Point')
+        self.assertEqual(looked_up[1], 'Food & Dining')
+        self.assertEqual(looked_up[2], 'coffee')
+
+    def test_category_template_and_proxy(self):
+        from .categories import DEFAULT_CATEGORIES
+        from .knowledge import get_category_hue, get_category_icon, get_category_templates
+        from .models import CategoryTemplate
+
+        templates = get_category_templates()
+        self.assertGreaterEqual(len(templates), 20)
+        self.assertGreaterEqual(len(DEFAULT_CATEGORIES), 20)
+        self.assertEqual(CategoryTemplate.objects.count(), len(templates))
+
+        icon = get_category_icon('Food & Dining')
+        self.assertEqual(icon, 'restaurant')
+        hue = get_category_hue('Food & Dining')
+        self.assertEqual(hue, 20)
+
+    def test_keyword_knowledge_and_resolution(self):
+        from .models import KeywordKnowledge
+        from .parsing import brand_category, brand_icon
+
+        self.assertTrue(KeywordKnowledge.objects.filter(keyword='ATM').exists())
+        self.assertEqual(brand_category('UNKNOWNXYZ', 'Payment for ATM cash'), 'Cash Withdrawal')
+        self.assertEqual(brand_icon('UNKNOWNXYZ', 'Payment for ATM cash'), 'local_atm')
+
+    def test_ensure_default_categories_populates_group(self):
+        from tracker.models import AccountGroup
+        from .categories import ensure_default_categories
+        from .models import CategoryTemplate, ExpenseCategory
+
+        grp = AccountGroup.objects.create(name='Knowledge Test Group')
+        ensure_default_categories(grp)
+        group_cats = ExpenseCategory.objects.filter(group=grp)
+        self.assertEqual(group_cats.count(), CategoryTemplate.objects.count())
+
+
+
