@@ -6,7 +6,7 @@ MAX_STATEMENT_BYTES = 10 * 1024 * 1024
 
 
 class ExpenseForm(forms.ModelForm):
-    remember = forms.BooleanField(required=False, initial=True)
+    remember = forms.BooleanField(required=False, initial=False)
 
     class Meta:
         model = Expense
