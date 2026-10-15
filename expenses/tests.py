@@ -798,4 +798,77 @@ class BrandKnowledgeTests(TestCase):
         self.assertEqual(group_cats.count(), CategoryTemplate.objects.count())
 
 
+class ExpenseAuditCooldownTests(ExpenseTestCase):
+    def test_audit_cooldown_allows_first_run(self):
+        from .anomaly import audit_cooldown_status
+        status = audit_cooldown_status(self.group)
+        self.assertTrue(status['can_audit'])
+        self.assertIsNone(status['latest_run'])
+
+    def test_audit_cooldown_blocks_within_seven_days(self):
+        import datetime
+        from django.utils import timezone
+        from .anomaly import audit_cooldown_status
+        from .models import ExpenseAuditRun
+
+        # Create an audit run 2 days ago
+        two_days_ago = timezone.now() - datetime.timedelta(days=2)
+        run = ExpenseAuditRun.objects.create(
+            group=self.group,
+            run_by=self.user,
+            expenses_scanned=20,
+            anomalies_flagged=1,
+            flagged_ids=[101],
+        )
+        ExpenseAuditRun.objects.filter(pk=run.pk).update(created_at=two_days_ago)
+
+        status = audit_cooldown_status(self.group)
+        self.assertFalse(status['can_audit'])
+        self.assertEqual(status['remaining_days'], 4)
+        self.assertIsNotNone(status['next_available'])
+
+    def test_audit_cooldown_allows_after_seven_days(self):
+        import datetime
+        from django.utils import timezone
+        from .anomaly import audit_cooldown_status
+        from .models import ExpenseAuditRun
+
+        # Create an audit run 8 days ago
+        eight_days_ago = timezone.now() - datetime.timedelta(days=8)
+        run = ExpenseAuditRun.objects.create(
+            group=self.group,
+            run_by=self.user,
+            expenses_scanned=20,
+            anomalies_flagged=0,
+        )
+        ExpenseAuditRun.objects.filter(pk=run.pk).update(created_at=eight_days_ago)
+
+        status = audit_cooldown_status(self.group)
+        self.assertTrue(status['can_audit'])
+
+    def test_ai_audit_view_enforces_cooldown(self):
+        import datetime
+        from django.urls import reverse
+        from django.utils import timezone
+        from .models import ExpenseAuditRun
+
+        run = ExpenseAuditRun.objects.create(
+            group=self.group,
+            run_by=self.user,
+            expenses_scanned=10,
+            anomalies_flagged=0,
+        )
+        one_day_ago = timezone.now() - datetime.timedelta(days=1)
+        ExpenseAuditRun.objects.filter(pk=run.pk).update(created_at=one_day_ago)
+
+        self.client.force_login(self.user)
+        # Attempt to run audit while cooldown is active
+        response = self.client.post(reverse('expenses_ai_audit'))
+        self.assertEqual(response.status_code, 302)
+        self.assertNotIn('?flagged=1', response.url)
+
+        # Count of audit runs should still be 1 (no new run created)
+        self.assertEqual(ExpenseAuditRun.objects.filter(group=self.group).count(), 1)
+
+
 

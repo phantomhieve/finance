@@ -17,7 +17,7 @@ from portfolio.emails import app_url
 from tracker.services import parse_fy_param
 
 from . import crypto, gmail
-from .anomaly import ai_audit_expenses, apply_flags
+from .anomaly import ai_audit_expenses, apply_flags, audit_cooldown_status
 from .forms import CategoryForm, ExpenseForm, PaymentSourceForm, StatementUploadForm
 from .models import CardStatement, Expense, ExpenseCategory, GmailAccount, MerchantRule, PaymentSource
 from .services import (
@@ -164,6 +164,7 @@ def expenses_home(request):
         'trend': trend,
         'open_flags': sum(1 for e in summary['flagged'] if not e.flag_reviewed),
         'attention_count': len(dues) + len(context_reconnect) + (1 if pending_passwords else 0),
+        'audit_status': audit_cooldown_status(group),
         'chart': {
             'daily': summary['daily'], 'prev_daily': summary['prev_daily'],
             'upto': summary['pace']['day'] if summary['pace'] else len(summary['daily']),
@@ -282,9 +283,19 @@ def expense_review(request, pk):
 @_require_expenses
 @require_POST
 def expenses_ai_audit(request):
-    """Run an on-demand Gemini AI forensic audit across recent transactions."""
+    """Run an on-demand Gemini AI forensic audit across recent transactions with rate-limiting guardrails."""
     group = _group(request)
-    flagged_count = ai_audit_expenses(group, limit=60)
+    status = audit_cooldown_status(group)
+    if not status['can_audit']:
+        rem_msg = f"{status['remaining_days']}d {status['remaining_hours']}h" if status['remaining_days'] else f"{status['remaining_hours']}h"
+        messages.warning(
+            request,
+            f"AI audit can only be run once a week. "
+            f"Next audit is available in {rem_msg} (on {status['next_available']:%d %b at %I:%M %p})."
+        )
+        return safe_redirect(request, 'expenses_home')
+
+    flagged_count = ai_audit_expenses(group, limit=60, user=request.user)
     if flagged_count > 0:
         messages.warning(
             request,

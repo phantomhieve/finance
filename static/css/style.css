@@ -1214,9 +1214,9 @@ progress {
 
 .exp-day-header {
   position: sticky;
-  top: 3.5rem;
+  top: 0;
   z-index: 10;
-  background: color-mix(in oklch, var(--color-base-100) 92%, transparent);
+  background: color-mix(in oklch, var(--color-base-200) 92%, transparent);
   backdrop-filter: blur(12px);
 }
 

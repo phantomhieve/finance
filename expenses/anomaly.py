@@ -7,11 +7,13 @@ import statistics
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any, Iterable
 
+from django.utils import timezone
+
 from . import ai
-from .models import Expense
+from .models import Expense, ExpenseAuditRun
 
 if TYPE_CHECKING:
-    from tracker.models import AccountGroup
+    from tracker.models import AccountGroup, User
 
 logger = logging.getLogger(__name__)
 
@@ -250,9 +252,53 @@ def apply_flags(expense: Expense, save: bool = True, use_ai: bool = False) -> li
     return reasons
 
 
-def ai_audit_expenses(group: AccountGroup, limit: int = 60) -> int:
+AUDIT_COOLDOWN_DAYS = 7
+
+
+def audit_cooldown_status(group: AccountGroup) -> dict[str, Any]:
+    """Check whether an on-demand AI forensic audit is currently allowed for this household."""
+    latest = ExpenseAuditRun.objects.filter(group=group).order_by('-created_at').first()
+    if not latest:
+        return {
+            'can_audit': True,
+            'latest_run': None,
+            'remaining_days': 0,
+            'remaining_hours': 0,
+            'next_available': None,
+        }
+
+    cooldown = datetime.timedelta(days=AUDIT_COOLDOWN_DAYS)
+    elapsed = timezone.now() - latest.created_at
+    if elapsed >= cooldown:
+        return {
+            'can_audit': True,
+            'latest_run': latest,
+            'remaining_days': 0,
+            'remaining_hours': 0,
+            'next_available': None,
+        }
+
+    remaining = cooldown - elapsed
+    rem_days = remaining.days
+    rem_hours = int(remaining.seconds // 3600)
+    next_available = latest.created_at + cooldown
+    return {
+        'can_audit': False,
+        'latest_run': latest,
+        'remaining_days': rem_days,
+        'remaining_hours': rem_hours,
+        'next_available': next_available,
+    }
+
+
+def ai_audit_expenses(
+    group: AccountGroup,
+    limit: int = 60,
+    user: User | None = None,
+) -> int:
     """Run an on-demand AI forensic audit of recent debit transactions for a household group.
 
+    Records the audit execution in ExpenseAuditRun for auditing and weekly rate-limiting guardrails.
     Returns the count of flagged anomalous expenses.
     """
     recent = list(
@@ -261,4 +307,12 @@ def ai_audit_expenses(group: AccountGroup, limit: int = 60) -> int:
         .order_by('-txn_date')[:limit]
     )
     flagged_map = ai_detect_anomalies_for_expenses(recent, group=group)
+    ExpenseAuditRun.objects.create(
+        group=group,
+        run_by=user if getattr(user, 'is_authenticated', False) else None,
+        expenses_scanned=len(recent),
+        anomalies_flagged=len(flagged_map),
+        flagged_ids=list(flagged_map.keys()),
+    )
     return len(flagged_map)
+
