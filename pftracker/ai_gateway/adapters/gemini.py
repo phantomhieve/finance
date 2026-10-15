@@ -15,6 +15,31 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
 
+def _normalize_model_name(model: str | None) -> str:
+    """Normalize user-friendly aliases like 'argon' to 'gemini-4-argon' and 'flash' to 'gemini-3.8-flash'."""
+    if not model:
+        return "gemini-4-argon"
+    m = model.strip()
+    m_lower = m.lower()
+    if m_lower in ("argon", "gemini-argon", "gemini_argon"):
+        return "gemini-4-argon"
+    if m_lower in (
+        "flash",
+        "gemini-flash",
+        "gemini_flash",
+        "3.8-flash",
+        "gemini-3.8-flash",
+        "gemini_3_8_flash",
+        "3.5-flash",
+        "gemini-3.5-flash",
+        "gemini-3.5-flash-lite",
+        "gemini_3_5_flash_lite",
+    ):
+        return "gemini-3.8-flash"
+    return m
+
+
+
 class GeminiAdapter(BaseAIAdapter):
     """Adapter for Google Gemini using the google-genai SDK."""
 
@@ -39,7 +64,7 @@ class GeminiAdapter(BaseAIAdapter):
         from google import genai
 
         client = self._get_client(node, api_key=api_key)
-        target_model = model or node.default_model
+        target_model = _normalize_model_name(model or node.default_model)
 
         config_kwargs: dict[str, Any] = {"temperature": temperature}
         if system:
@@ -69,7 +94,7 @@ class GeminiAdapter(BaseAIAdapter):
         from google import genai
 
         client = self._get_client(node, api_key=api_key)
-        target_model = model or node.default_model
+        target_model = _normalize_model_name(model or node.default_model)
 
         config_kwargs: dict[str, Any] = {
             "response_mime_type": "application/json",
@@ -106,7 +131,7 @@ class GeminiAdapter(BaseAIAdapter):
         from google import genai
 
         client = self._get_client(node, api_key=api_key)
-        target_model = model or node.default_model
+        target_model = _normalize_model_name(model or node.default_model)
 
         try:
             resp = client.models.generate_content(

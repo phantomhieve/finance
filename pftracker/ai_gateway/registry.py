@@ -162,13 +162,22 @@ class NodeRegistry:
         gemini_model_prod = (
             getattr(settings, "GEMINI_MODEL", "")
             or os.environ.get("GEMINI_MODEL", "")
-            or ("gemini-3.5-flash-lite" if is_debug else "gemini-3.1-pro-preview")
+            or ("gemini-3.8-flash" if is_debug else "gemini-4-argon")
         )
+        if gemini_model_prod.strip().lower() in ("argon", "gemini-argon", "gemini_argon"):
+            gemini_model_prod = "gemini-4-argon"
+        elif gemini_model_prod.strip().lower() in ("flash", "gemini-flash", "3.8-flash", "gemini-3.8-flash"):
+            gemini_model_prod = "gemini-3.8-flash"
+
         gemini_model_fast = (
             getattr(settings, "EXPENSES_GEMINI_MODEL", "")
             or os.environ.get("EXPENSES_GEMINI_MODEL", "")
-            or "gemini-3.5-flash-lite"
+            or "gemini-3.8-flash"
         )
+        if gemini_model_fast.strip().lower() in ("argon", "gemini-argon", "gemini_argon"):
+            gemini_model_fast = "gemini-4-argon"
+        elif gemini_model_fast.strip().lower() in ("flash", "gemini-flash", "3.8-flash", "gemini-3.8-flash"):
+            gemini_model_fast = "gemini-3.8-flash"
 
         gemini_priority = 1 if pref_provider == "gemini" else 2
 
