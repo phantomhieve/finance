@@ -2,8 +2,8 @@ from django.contrib import admin
 from unfold.admin import ModelAdmin, TabularInline
 
 from .models import (
-    BrandKnowledge, CardStatement, CategoryTemplate, Expense, ExpenseCategory, GmailAccount, KeywordKnowledge,
-    MerchantRule, PaymentSource, ProcessedEmail, StatementLine,
+    BrandKnowledge, CardStatement, CategoryTemplate, Expense, ExpenseAuditRun, ExpenseCategory,
+    GmailAccount, KeywordKnowledge, MerchantRule, PaymentSource, ProcessedEmail, StatementLine,
 )
 
 
@@ -103,5 +103,15 @@ class KeywordKnowledgeAdmin(ModelAdmin):
     list_display = ('keyword', 'category_name', 'icon', 'sort_order')
     list_filter = ('category_name',)
     search_fields = ('keyword', 'category_name')
+
+
+@admin.register(ExpenseAuditRun)
+class ExpenseAuditRunAdmin(ModelAdmin):
+    list_display = ('created_at', 'group', 'run_by', 'expenses_scanned', 'anomalies_flagged')
+    list_filter = ('group',)
+    readonly_fields = ('created_at', 'group', 'run_by', 'expenses_scanned', 'anomalies_flagged', 'flagged_ids')
+
+    def has_add_permission(self, request):
+        return False
 
 

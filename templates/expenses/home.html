@@ -285,101 +285,115 @@
   </div>
 
   {# ——— RIGHT COLUMN: Transactions Feed & Filtering ——— #}
-  <div id="expFeedColumn" class="lg:col-span-3 flex flex-col animate-up">
+  <div id="expFeedColumn" class="lg:col-span-3 flex flex-col animate-up min-w-0">
 
-    {# Search and Filter Toolbar #}
-    <div class="flex flex-col gap-2 mb-3">
-      <form method="get" id="expFilterForm">
-        <input type="hidden" name="m" value="{{ month_param }}">
-        {% if f_cat %}<input type="hidden" name="cat" value="{{ f_cat }}">{% endif %}
-        {% if f_member %}<input type="hidden" name="member" value="{{ f_member }}">{% endif %}
-        <div class="relative">
-          <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-base-content/50"><span class="material-symbols-outlined text-[18px]">search</span></span>
-          <input type="search" name="q" value="{{ f_query }}" placeholder="Search merchant, notes, amount…" autocomplete="off"
-                 class="input w-full h-[42px] min-h-[42px] pl-10 bg-base-100 border border-base-content/10 rounded-xl text-sm transition-all focus:border-primary/50">
-        </div>
-      </form>
-      <div class="flex items-center justify-between gap-2">
-        <div class="flex gap-2 overflow-x-auto scrollbar-hide pb-0.5 flex-1">
-          <a href="?m={{ month_param }}" class="filter-pill cursor-pointer {% if not is_filtered %}is-active{% endif %}">All</a>
-          <a href="?m={{ month_param }}&flagged=1" class="filter-pill cursor-pointer {% if f_flagged %}is-active{% endif %}"><span class="material-symbols-outlined text-sm text-warning">flag</span>Flagged{% if open_flags %} · {{ open_flags }}{% endif %}</a>
-          <a href="?m={{ month_param }}&source=EMAIL" class="filter-pill cursor-pointer {% if f_source == 'EMAIL' %}is-active{% endif %}"><span class="material-symbols-outlined text-sm">mail</span>Email</a>
-          <a href="?m={{ month_param }}&source=STATEMENT" class="filter-pill cursor-pointer {% if f_source == 'STATEMENT' %}is-active{% endif %}"><span class="material-symbols-outlined text-sm">request_quote</span>Statement</a>
-          <a href="?m={{ month_param }}&source=MANUAL" class="filter-pill cursor-pointer {% if f_source == 'MANUAL' %}is-active{% endif %}"><span class="material-symbols-outlined text-sm">edit</span>Manual</a>
-        </div>
-        <form method="post" action="{% url 'expenses_ai_audit' %}" class="shrink-0">
-          {% csrf_token %}
-          <button type="submit" class="btn btn-xs btn-outline btn-primary gap-1 font-semibold rounded-lg cursor-pointer" title="Run Gemini AI forensic audit across recent transactions">
-            <span class="material-symbols-outlined text-[15px]">auto_awesome</span>
-            <span class="hidden sm:inline">AI Audit</span>
-          </button>
+    <div id="expFeedCard" class="card bg-base-200/70 shadow-sm border border-base-content/10 flex flex-col overflow-hidden min-h-0">
+
+      {# Pinned Header: Search + Filter Pills + AI Audit #}
+      <div class="p-3 sm:p-4 border-b border-base-content/10 bg-base-200/90 backdrop-blur-md shrink-0 flex flex-col gap-2.5 z-10">
+        <form method="get" id="expFilterForm">
+          <input type="hidden" name="m" value="{{ month_param }}">
+          {% if f_cat %}<input type="hidden" name="cat" value="{{ f_cat }}">{% endif %}
+          {% if f_member %}<input type="hidden" name="member" value="{{ f_member }}">{% endif %}
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-base-content/50"><span class="material-symbols-outlined text-[18px]">search</span></span>
+            <input type="search" name="q" value="{{ f_query }}" placeholder="Search merchant, notes, amount…" autocomplete="off"
+                   class="input w-full h-[40px] min-h-[40px] pl-10 bg-base-100 border border-base-content/10 rounded-xl text-sm transition-all focus:border-primary/50">
+          </div>
         </form>
-      </div>
-    </div>
-
-    {% if is_filtered %}
-    <div class="flex items-center justify-between mb-2 px-1">
-      <a href="?m={{ month_param }}" class="btn btn-ghost btn-xs gap-1 text-error/70 cursor-pointer"><span class="material-symbols-outlined text-sm">close</span>Clear filters</a>
-      <span class="text-[10px] font-bold uppercase tracking-wider opacity-40">{{ row_count }} result{{ row_count|pluralize }}</span>
-    </div>
-    {% endif %}
-
-    {# Chronological Feed #}
-    {% if days %}
-    <div class="flex flex-col gap-1">
-      {% for day in days %}
-      <div class="exp-day-header flex items-center justify-between px-1.5 py-1.5">
-        <span class="text-[11px] font-bold uppercase tracking-wider opacity-60">{% if day.date == today %}Today{% else %}{{ day.date|date:"D, j M" }}{% endif %}</span>
-        {% if day.spend %}<span class="text-[11px] font-semibold opacity-60 tabular-nums">{{ day.spend|inr }}</span>{% endif %}
-      </div>
-      <div class="flex flex-col gap-1.5 mb-2.5">
-        {% for e in day.items %}
-        <button type="button"
-                class="table-card cursor-pointer flex items-center gap-3.5 text-left w-full {% if e.needs_review %}border-warning/50 bg-warning/5{% endif %}"
-                onclick="Expenses.open({{ e.pk }})">
-          <span class="jw-type-avatar shrink-0" style="--h:{% if e.category %}{{ e.category.hue }}{% else %}40{% endif %}">
-            <span class="icon-filled material-symbols-outlined text-xl">{{ e.icon }}</span>
-          </span>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-1.5">
-              <span class="font-bold text-sm truncate tracking-tight">{{ e.merchant|default:"Unknown" }}</span>
-              {% if e.needs_review %}<span class="material-symbols-outlined text-[15px] text-warning icon-filled" title="Looks unusual">flag</span>{% endif %}
-              {% if e.source == 'STATEMENT' %}<span class="material-symbols-outlined text-[15px] text-info" title="Found only on the card statement">request_quote</span>{% endif %}
-            </div>
-            <div class="text-[11px] opacity-60 truncate mt-0.5">
-              {% if e.category %}
-                <span>{{ e.category.name }}</span>
-                {% if e.category_source == 'AI' %}<span class="badge badge-xs badge-soft badge-primary font-bold ml-1">AI</span>{% endif %}
-              {% else %}
-                <span class="text-warning font-semibold">Tap to categorise</span>
-              {% endif %}
-              {% if e.payment_source %}<span class="opacity-40">·</span> {{ e.payment_source.short_name }}{% endif %}
-              {% if e.member %}<span class="opacity-40">·</span> {{ e.member.first_name|default:e.member.username }}{% endif %}
-            </div>
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex gap-2 overflow-x-auto scrollbar-hide pb-0.5 flex-1">
+            <a href="?m={{ month_param }}" class="filter-pill cursor-pointer {% if not is_filtered %}is-active{% endif %}">All</a>
+            <a href="?m={{ month_param }}&flagged=1" class="filter-pill cursor-pointer {% if f_flagged %}is-active{% endif %}"><span class="material-symbols-outlined text-sm text-warning">flag</span>Flagged{% if open_flags %} · {{ open_flags }}{% endif %}</a>
+            <a href="?m={{ month_param }}&source=EMAIL" class="filter-pill cursor-pointer {% if f_source == 'EMAIL' %}is-active{% endif %}"><span class="material-symbols-outlined text-sm">mail</span>Email</a>
+            <a href="?m={{ month_param }}&source=STATEMENT" class="filter-pill cursor-pointer {% if f_source == 'STATEMENT' %}is-active{% endif %}"><span class="material-symbols-outlined text-sm">request_quote</span>Statement</a>
+            <a href="?m={{ month_param }}&source=MANUAL" class="filter-pill cursor-pointer {% if f_source == 'MANUAL' %}is-active{% endif %}"><span class="material-symbols-outlined text-sm">edit</span>Manual</a>
           </div>
-          <div class="text-right shrink-0">
-            <div class="text-sm font-bold tabular-nums {% if e.direction == 'CREDIT' %}text-success{% elif not e.is_spend %}opacity-50{% endif %}">
-              {% if e.direction == 'CREDIT' %}+{% endif %}{% if e.currency != 'INR' %}{{ e.currency }} {{ e.amount|floatformat:2 }}{% else %}{{ e.amount|inr }}{% endif %}
-            </div>
-            {% if e.txn_time %}<div class="text-[10px] opacity-40 tabular-nums">{{ e.txn_time|time:"H:i" }}</div>{% endif %}
+          {% if audit_status.can_audit %}
+          <form method="post" action="{% url 'expenses_ai_audit' %}" class="shrink-0">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-xs btn-outline btn-primary gap-1 font-semibold rounded-lg cursor-pointer" title="Run Gemini AI forensic audit across recent transactions (available once a week)">
+              <span class="material-symbols-outlined text-[15px]">auto_awesome</span>
+              <span class="hidden sm:inline">AI Audit</span>
+            </button>
+          </form>
+          {% else %}
+          <div class="tooltip tooltip-left sm:tooltip-bottom shrink-0" data-tip="AI audit is limited to once a week. Next available on {{ audit_status.next_available|date:'j M, g:i A' }} (in {% if audit_status.remaining_days %}{{ audit_status.remaining_days }}d {% endif %}{{ audit_status.remaining_hours }}h).">
+            <button type="button" class="btn btn-xs btn-outline btn-primary opacity-45 cursor-not-allowed gap-1 font-semibold rounded-lg" disabled>
+              <span class="material-symbols-outlined text-[15px]">auto_awesome</span>
+              <span class="hidden sm:inline">AI Audit ({% if audit_status.remaining_days %}{{ audit_status.remaining_days }}d{% else %}{{ audit_status.remaining_hours }}h{% endif %})</span>
+            </button>
           </div>
-        </button>
-        {% endfor %}
+          {% endif %}
+        </div>
+        {% if is_filtered %}
+        <div class="flex items-center justify-between pt-0.5 px-0.5">
+          <a href="?m={{ month_param }}" class="btn btn-ghost btn-xs gap-1 text-error/70 cursor-pointer"><span class="material-symbols-outlined text-sm">close</span>Clear filters</a>
+          <span class="text-[10px] font-bold uppercase tracking-wider opacity-40">{{ row_count }} result{{ row_count|pluralize }}</span>
+        </div>
+        {% endif %}
       </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    <div class="card bg-base-200/50 border border-base-content/10 py-16 px-4 text-center flex flex-col items-center justify-center gap-3">
-      <div class="w-16 h-16 rounded-2xl bg-orange-400/10 border border-orange-400/20 flex items-center justify-center">
-        <span class="icon-filled material-symbols-outlined text-3xl text-orange-400">receipt_long</span>
+
+      {# Scrollable Activity Feed Area #}
+      <div id="expFeedList" class="overflow-y-auto flex-1 min-h-0 p-3 sm:p-4 scrollbar-thin">
+        {% if days %}
+        <div class="flex flex-col gap-1">
+          {% for day in days %}
+          <div class="exp-day-header flex items-center justify-between px-2 py-1.5 -mx-1 mb-1 rounded-lg">
+            <span class="text-[11px] font-bold uppercase tracking-wider opacity-60">{% if day.date == today %}Today{% else %}{{ day.date|date:"D, j M" }}{% endif %}</span>
+            {% if day.spend %}<span class="text-[11px] font-semibold opacity-60 tabular-nums">{{ day.spend|inr }}</span>{% endif %}
+          </div>
+          <div class="flex flex-col gap-1.5 mb-2.5">
+            {% for e in day.items %}
+            <button type="button"
+                    class="table-card cursor-pointer flex items-center gap-3.5 text-left w-full {% if e.needs_review %}border-warning/50 bg-warning/5{% endif %}"
+                    onclick="Expenses.open({{ e.pk }})">
+              <span class="jw-type-avatar shrink-0" style="--h:{% if e.category %}{{ e.category.hue }}{% else %}40{% endif %}">
+                <span class="icon-filled material-symbols-outlined text-xl">{{ e.icon }}</span>
+              </span>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5">
+                  <span class="font-bold text-sm truncate tracking-tight">{{ e.merchant|default:"Unknown" }}</span>
+                  {% if e.needs_review %}<span class="material-symbols-outlined text-[15px] text-warning icon-filled" title="Looks unusual">flag</span>{% endif %}
+                  {% if e.source == 'STATEMENT' %}<span class="material-symbols-outlined text-[15px] text-info" title="Found only on the card statement">request_quote</span>{% endif %}
+                </div>
+                <div class="text-[11px] opacity-60 truncate mt-0.5">
+                  {% if e.category %}
+                    <span>{{ e.category.name }}</span>
+                    {% if e.category_source == 'AI' %}<span class="badge badge-xs badge-soft badge-primary font-bold ml-1">AI</span>{% endif %}
+                  {% else %}
+                    <span class="text-warning font-semibold">Tap to categorise</span>
+                  {% endif %}
+                  {% if e.payment_source %}<span class="opacity-40">·</span> {{ e.payment_source.short_name }}{% endif %}
+                  {% if e.member %}<span class="opacity-40">·</span> {{ e.member.first_name|default:e.member.username }}{% endif %}
+                </div>
+              </div>
+              <div class="text-right shrink-0">
+                <div class="text-sm font-bold tabular-nums {% if e.direction == 'CREDIT' %}text-success{% elif not e.is_spend %}opacity-50{% endif %}">
+                  {% if e.direction == 'CREDIT' %}+{% endif %}{% if e.currency != 'INR' %}{{ e.currency }} {{ e.amount|floatformat:2 }}{% else %}{{ e.amount|inr }}{% endif %}
+                </div>
+                {% if e.txn_time %}<div class="text-[10px] opacity-40 tabular-nums">{{ e.txn_time|time:"H:i" }}</div>{% endif %}
+              </div>
+            </button>
+            {% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="py-16 px-4 text-center flex flex-col items-center justify-center gap-3">
+          <div class="w-16 h-16 rounded-2xl bg-orange-400/10 border border-orange-400/20 flex items-center justify-center">
+            <span class="icon-filled material-symbols-outlined text-3xl text-orange-400">receipt_long</span>
+          </div>
+          <p class="font-bold text-base opacity-75">{% if is_filtered %}No matching expenses found{% else %}No expenses in {{ summary.label }}{% endif %}</p>
+          <p class="text-xs opacity-50 max-w-xs">{% if accounts %}New bank and card alerts sync automatically every hour.{% else %}Connect Gmail in settings to auto-sync transactions.{% endif %}</p>
+          <button type="button" class="btn btn-primary btn-sm gap-1.5 mt-2 cursor-pointer" onclick="Expenses.open()">
+            <span class="material-symbols-outlined text-base">add</span>Add expense manually
+          </button>
+        </div>
+        {% endif %}
       </div>
-      <p class="font-bold text-base opacity-75">{% if is_filtered %}No matching expenses found{% else %}No expenses in {{ summary.label }}{% endif %}</p>
-      <p class="text-xs opacity-50 max-w-xs">{% if accounts %}New bank and card alerts sync automatically every hour.{% else %}Connect Gmail in settings to auto-sync transactions.{% endif %}</p>
-      <button type="button" class="btn btn-primary btn-sm gap-1.5 mt-2 cursor-pointer" onclick="Expenses.open()">
-        <span class="material-symbols-outlined text-base">add</span>Add expense manually
-      </button>
+
     </div>
-    {% endif %}
 
   </div>
 
@@ -419,6 +433,33 @@ function switchExpMobileTab(tab) {
     insightsBtn.classList.add('opacity-70');
   }
 }
+
+function syncExpHeights() {
+  var card = document.getElementById('expFeedCard');
+  var leftCol = document.getElementById('expInsightsColumn');
+  if (!card || !leftCol) return;
+  if (window.innerWidth < 1024) {
+    card.style.height = '';
+    card.style.maxHeight = '';
+    return;
+  }
+  var h = leftCol.offsetHeight;
+  if (h > 150) {
+    var targetH = Math.max(h, 520);
+    card.style.height = targetH + 'px';
+    card.style.maxHeight = targetH + 'px';
+  }
+}
+window.addEventListener('load', syncExpHeights);
+window.addEventListener('resize', syncExpHeights);
+if (window.ResizeObserver) {
+  var _leftEl = document.getElementById('expInsightsColumn');
+  if (_leftEl) new ResizeObserver(syncExpHeights).observe(_leftEl);
+}
+syncExpHeights();
+setTimeout(syncExpHeights, 60);
+setTimeout(syncExpHeights, 300);
+setTimeout(syncExpHeights, 800);
 </script>
 
 {% endblock %}

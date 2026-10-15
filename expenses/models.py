@@ -423,3 +423,23 @@ class ProcessedEmail(models.Model):
         constraints = [
             models.UniqueConstraint(fields=['gmail_account', 'message_id'], name='unique_processed_email'),
         ]
+
+
+class ExpenseAuditRun(models.Model):
+    """Execution record for Gemini AI forensic anomaly scans with rate-limiting guardrails."""
+
+    group = models.ForeignKey('tracker.AccountGroup', on_delete=models.CASCADE, related_name='expense_audit_runs')
+    run_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    expenses_scanned = models.PositiveIntegerField(default=0)
+    anomalies_flagged = models.PositiveIntegerField(default=0)
+    flagged_ids = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['group', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f"{self.group.name} AI audit at {self.created_at:%Y-%m-%d %H:%M} ({self.anomalies_flagged} flagged)"
