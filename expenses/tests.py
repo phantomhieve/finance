@@ -174,7 +174,7 @@ class CategorisationTests(ExpenseTestCase):
         first = self.email_expense()
         second = self.email_expense(message_id='m2')
         shopping = self.cats['Shopping']
-        refiled = learn_category(first, shopping, self.user)
+        refiled = learn_category(first, shopping, self.user, apply_to_similar=True)
         self.assertEqual(refiled, 1)
         second.refresh_from_db()
         self.assertEqual((second.category, second.category_source), (shopping, 'RULE'))
@@ -187,9 +187,67 @@ class CategorisationTests(ExpenseTestCase):
         first = self.email_expense()
         second = self.email_expense(message_id='m2')
         learn_category(second, self.cats['Health'], self.user, apply_to_similar=False)
-        learn_category(first, self.cats['Shopping'], self.user)
+        learn_category(first, self.cats['Shopping'], self.user, apply_to_similar=True)
         second.refresh_from_db()
         self.assertEqual(second.category.name, 'Health')
+
+    def test_manual_category_change_on_ai_expense_does_not_mutate_other_ai_expenses(self):
+        """When multiple expenses are categorized by AI, manually editing one expense
+        must NOT update other expenses of the same merchant unless explicitly opted in."""
+        e1 = self.email_expense(message_id='ai1')
+        e2 = self.email_expense(message_id='ai2')
+        e3 = self.email_expense(message_id='ai3')
+        for e in (e1, e2, e3):
+            e.category = self.cats['Food & Dining']
+            e.category_source = 'AI'
+            e.save()
+
+        health = self.cats['Health']
+        # Default behavior: apply_to_similar=False
+        refiled = learn_category(e1, health, self.user)
+        self.assertEqual(refiled, 0)
+
+        e1.refresh_from_db()
+        e2.refresh_from_db()
+        e3.refresh_from_db()
+
+        # e1 updated to Health (USER)
+        self.assertEqual(e1.category, health)
+        self.assertEqual(e1.category_source, 'USER')
+
+        # e2 and e3 remain Food & Dining (AI)
+        self.assertEqual(e2.category, self.cats['Food & Dining'])
+        self.assertEqual(e2.category_source, 'AI')
+        self.assertEqual(e3.category, self.cats['Food & Dining'])
+        self.assertEqual(e3.category_source, 'AI')
+
+    def test_expense_edit_view_defaults_remember_to_false(self):
+        """Editing an expense via the web UI without 'remember' checked must not touch other expenses."""
+        from django.urls import reverse
+        e1 = self.email_expense(message_id='edit1')
+        e2 = self.email_expense(message_id='edit2')
+        for e in (e1, e2):
+            e.category = self.cats['Food & Dining']
+            e.category_source = 'AI'
+            e.save()
+
+        self.client.force_login(self.user)
+        response = self.client.post(reverse('expense_edit', args=[e1.pk]), {
+            'amount': str(e1.amount),
+            'direction': e1.direction,
+            'txn_date': e1.txn_date.isoformat(),
+            'merchant': e1.merchant,
+            'category': self.cats['Shopping'].pk,
+        })
+        self.assertEqual(response.status_code, 302)
+
+        e1.refresh_from_db()
+        e2.refresh_from_db()
+
+        self.assertEqual(e1.category, self.cats['Shopping'])
+        self.assertEqual(e1.category_source, 'USER')
+        self.assertEqual(e2.category, self.cats['Food & Dining'])
+        self.assertEqual(e2.category_source, 'AI')
 
     def test_transfers_are_not_spend(self):
         self.add('1000', 'Swiggy', datetime.date(2026, 3, 2), 'Food & Dining')

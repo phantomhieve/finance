@@ -167,7 +167,7 @@ def ai_categorise_pending(group: AccountGroup, limit: int = 200) -> int:
 
 
 @transaction.atomic
-def learn_category(expense: Expense, category: ExpenseCategory, user: User, apply_to_similar: bool = True) -> int:
+def learn_category(expense: Expense, category: ExpenseCategory, user: User, apply_to_similar: bool = False) -> int:
     """User picked a category: remember it for this merchant and re-file past non-user rows."""
     expense.category = category
     expense.category_source = 'USER'

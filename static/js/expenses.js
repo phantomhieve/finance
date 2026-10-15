@@ -30,6 +30,7 @@ var Expenses = (function () {
     var changed = !current || String(current.category) !== category;
     toggle('expRememberRow', !!(merchant && category && changed), 'flex');
     setText('expRememberName', merchant || 'this merchant');
+    if (!changed && $('expRemember')) $('expRemember').checked = false;
   }
 
   function open(id) {
@@ -37,6 +38,7 @@ var Expenses = (function () {
     if (!form) return;
     current = id ? data[String(id)] : null;
     form.reset();
+    if ($('expRemember')) $('expRemember').checked = false;
 
     if (current) {
       form.action = current.edit_url;
