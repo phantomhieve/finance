@@ -2,7 +2,8 @@ from django.contrib import admin
 from unfold.admin import ModelAdmin, TabularInline
 
 from .models import (
-    CardStatement, Expense, ExpenseCategory, GmailAccount, MerchantRule, PaymentSource, ProcessedEmail, StatementLine,
+    BrandKnowledge, CardStatement, CategoryTemplate, Expense, ExpenseCategory, GmailAccount, KeywordKnowledge,
+    MerchantRule, PaymentSource, ProcessedEmail, StatementLine,
 )
 
 
@@ -80,3 +81,27 @@ class ProcessedEmailAdmin(ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(CategoryTemplate)
+class CategoryTemplateAdmin(ModelAdmin):
+    list_display = ('name', 'kind', 'icon', 'hue', 'sort_order')
+    list_filter = ('kind',)
+    search_fields = ('name',)
+
+
+@admin.register(BrandKnowledge)
+class BrandKnowledgeAdmin(ModelAdmin):
+    list_display = ('display_name', 'merchant_key', 'category_name', 'icon', 'source', 'confidence', 'hits')
+    list_filter = ('source', 'category_name')
+    search_fields = ('display_name', 'merchant_key', 'category_name')
+    readonly_fields = ('created_at', 'updated_at')
+
+
+@admin.register(KeywordKnowledge)
+class KeywordKnowledgeAdmin(ModelAdmin):
+    list_display = ('keyword', 'category_name', 'icon', 'sort_order')
+    list_filter = ('category_name',)
+    search_fields = ('keyword', 'category_name')
+
+

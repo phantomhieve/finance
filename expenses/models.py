@@ -34,6 +34,23 @@ class ExpenseCategory(models.Model):
         return self.kind == 'SPEND'
 
 
+class CategoryTemplate(models.Model):
+    """System-wide category templates stored in the database to seed household categories."""
+
+    name = models.CharField(max_length=60, unique=True)
+    kind = models.CharField(max_length=10, choices=ExpenseCategory.KIND_CHOICES, default='SPEND')
+    icon = models.CharField(max_length=40, default='category', help_text='Material Symbols icon name')
+    hue = models.PositiveSmallIntegerField(default=230, help_text='0-360 colour hue for chips')
+    sort_order = models.PositiveSmallIntegerField(default=100)
+
+    class Meta:
+        ordering = ['sort_order', 'name']
+        verbose_name_plural = 'Category templates'
+
+    def __str__(self):
+        return self.name
+
+
 class GmailAccount(models.Model):
     """A household member's Gmail mailbox connected with the gmail.readonly scope."""
 
@@ -279,6 +296,25 @@ class Expense(models.Model):
     def needs_review(self):
         return self.is_flagged and not self.flag_reviewed
 
+    @property
+    def icon(self):
+        """Contextual Material Symbols icon: merchant brand icon → category icon → channel fallback."""
+        from .parsing import brand_icon
+
+        b_icon = brand_icon(self.merchant_key, f'{self.merchant} {self.merchant_raw}')
+        if b_icon:
+            return b_icon
+        if self.category and self.category.icon:
+            return self.category.icon
+        if self.channel == 'ATM':
+            return 'local_atm'
+        if self.channel == 'UPI':
+            return 'qr_code_2'
+        if self.channel == 'CARD':
+            return 'credit_card'
+        return 'category'
+
+
 
 class StatementLine(models.Model):
     statement = models.ForeignKey(CardStatement, on_delete=models.CASCADE, related_name='lines')
@@ -318,6 +354,52 @@ class MerchantRule(models.Model):
 
     def __str__(self):
         return f'{self.merchant_label or self.merchant_key} → {self.category}'
+
+
+class BrandKnowledge(models.Model):
+    """Global merchant knowledge catalog that automatically expands via AI discovery.
+
+    Stores normalized merchant keys, human-friendly display names, default category names,
+    and specific Material Symbols icons.
+    """
+    SOURCE_CHOICES = (
+        ('SEED', 'System Seed'),
+        ('AI', 'AI Discovered'),
+        ('USER', 'User Taught'),
+    )
+
+    merchant_key = models.CharField(max_length=60, unique=True, db_index=True)
+    display_name = models.CharField(max_length=120)
+    category_name = models.CharField(max_length=60)
+    icon = models.CharField(max_length=40, default='category', help_text='Material Symbols icon name')
+    source = models.CharField(max_length=10, choices=SOURCE_CHOICES, default='SEED')
+    confidence = models.FloatField(default=1.0)
+    hits = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['display_name', 'merchant_key']
+        verbose_name_plural = 'Brand knowledge entries'
+
+    def __str__(self):
+        return f'{self.display_name} ({self.merchant_key}) → {self.category_name}'
+
+
+class KeywordKnowledge(models.Model):
+    """Global keyword mapping database table: substring token → category + icon."""
+
+    keyword = models.CharField(max_length=40, unique=True, db_index=True)
+    category_name = models.CharField(max_length=60)
+    icon = models.CharField(max_length=40, default='category', help_text='Material Symbols icon name')
+    sort_order = models.PositiveSmallIntegerField(default=100)
+
+    class Meta:
+        ordering = ['sort_order', 'keyword']
+        verbose_name_plural = 'Keyword knowledge rules'
+
+    def __str__(self):
+        return f'{self.keyword} → {self.category_name}'
 
 
 class ProcessedEmail(models.Model):

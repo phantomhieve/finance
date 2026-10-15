@@ -17,7 +17,7 @@ from portfolio.emails import app_url
 from tracker.services import parse_fy_param
 
 from . import crypto, gmail
-from .anomaly import apply_flags
+from .anomaly import ai_audit_expenses, apply_flags
 from .forms import CategoryForm, ExpenseForm, PaymentSourceForm, StatementUploadForm
 from .models import CardStatement, Expense, ExpenseCategory, GmailAccount, MerchantRule, PaymentSource
 from .services import (
@@ -276,6 +276,22 @@ def expense_review(request, pk):
     expense.flag_reviewed = request.POST.get('action') != 'reopen'
     expense.save(update_fields=['flag_reviewed', 'updated_at'])
     messages.success(request, 'Marked as fine.' if expense.flag_reviewed else 'Flag reopened.')
+    return safe_redirect(request, 'expenses_home')
+
+
+@_require_expenses
+@require_POST
+def expenses_ai_audit(request):
+    """Run an on-demand Gemini AI forensic audit across recent transactions."""
+    group = _group(request)
+    flagged_count = ai_audit_expenses(group, limit=60)
+    if flagged_count > 0:
+        messages.warning(
+            request,
+            f'AI forensic audit completed: flagged {flagged_count} suspicious transaction{"s" if flagged_count != 1 else ""} for review.'
+        )
+        return redirect(reverse('expenses_home') + '?flagged=1')
+    messages.success(request, 'AI forensic audit completed: all recent transactions look healthy with no anomalies detected.')
     return safe_redirect(request, 'expenses_home')
 
 
