@@ -40,6 +40,19 @@ def _normalize_model_name(model: str | None) -> str:
 
 
 
+def _clean_schema_for_gemini(data: Any) -> Any:
+    """Recursively strip 'additionalProperties' and unsupported schema keywords for Gemini API."""
+    if isinstance(data, dict):
+        return {
+            k: _clean_schema_for_gemini(v)
+            for k, v in data.items()
+            if k not in ("additionalProperties", "$schema")
+        }
+    if isinstance(data, list):
+        return [_clean_schema_for_gemini(item) for item in data]
+    return data
+
+
 class GeminiAdapter(BaseAIAdapter):
     """Adapter for Google Gemini using the google-genai SDK."""
 
@@ -91,6 +104,7 @@ class GeminiAdapter(BaseAIAdapter):
         api_key: str | None = None,
         **kwargs: Any,
     ) -> T:
+        import json
         from google import genai
 
         client = self._get_client(node, api_key=api_key)
@@ -98,7 +112,6 @@ class GeminiAdapter(BaseAIAdapter):
 
         config_kwargs: dict[str, Any] = {
             "response_mime_type": "application/json",
-            "response_schema": schema,
             "temperature": temperature,
         }
         if system:
@@ -106,11 +119,37 @@ class GeminiAdapter(BaseAIAdapter):
         if max_tokens:
             config_kwargs["max_output_tokens"] = max_tokens
 
-        resp = client.models.generate_content(
-            model=target_model,
-            contents=prompt,
-            config=genai.types.GenerateContentConfig(**config_kwargs),
-        )
+        if hasattr(schema, "model_json_schema"):
+            try:
+                config_kwargs["response_schema"] = _clean_schema_for_gemini(schema.model_json_schema())
+            except Exception:
+                config_kwargs["response_schema"] = schema
+        else:
+            config_kwargs["response_schema"] = schema
+
+        try:
+            resp = client.models.generate_content(
+                model=target_model,
+                contents=prompt,
+                config=genai.types.GenerateContentConfig(**config_kwargs),
+            )
+        except Exception as exc:
+            if "additionalProperties" in str(exc) or "schema" in str(exc).lower():
+                logger.warning("Gemini response_schema failed (%s); retrying with JSON mode fallback...", exc)
+                config_kwargs.pop("response_schema", None)
+                schema_json = json.dumps(schema.model_json_schema()) if hasattr(schema, "model_json_schema") else ""
+                fallback_prompt = (
+                    f"{prompt}\n\nIMPORTANT: Output valid JSON matching this schema:\n{schema_json}"
+                    if schema_json else prompt
+                )
+                resp = client.models.generate_content(
+                    model=target_model,
+                    contents=fallback_prompt,
+                    config=genai.types.GenerateContentConfig(**config_kwargs),
+                )
+            else:
+                raise
+
         raw_text = resp.text or ""
         try:
             return schema.model_validate_json(raw_text)
