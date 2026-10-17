@@ -28,15 +28,15 @@
     <div class="flex flex-col lg:flex-row lg:items-stretch lg:justify-between gap-4">
       <div class="stat-card stat-card-success flex-1 min-w-0">
         <div class="text-[10px] uppercase tracking-wider opacity-50">Active FDs total</div>
-        <div class="text-lg font-bold mt-0.5 text-success">₹{{ active_total|floatformat:0|indian_number }}</div>
+        <div class="text-lg font-bold mt-0.5 text-success">{{ active_total|inr }}</div>
       </div>
       <div class="stat-card flex-1 min-w-0">
         <div class="text-[10px] uppercase tracking-wider opacity-50">Matured FDs total</div>
-        <div class="text-lg font-bold mt-0.5">₹{{ matured_total|floatformat:0|indian_number }}</div>
+        <div class="text-lg font-bold mt-0.5">{{ matured_total|inr }}</div>
       </div>
       <div class="stat-card stat-card-primary flex-1 min-w-0">
         <div class="text-[10px] uppercase tracking-wider opacity-50">Total interest</div>
-        <div class="text-base font-bold mt-0.5">₹{{ total_interest|floatformat:0|indian_number }}</div>
+        <div class="text-base font-bold mt-0.5">{{ total_interest|inr }}</div>
       </div>
     </div>
   </div>
@@ -69,10 +69,10 @@
           <tr class="hover">
             <td class="font-semibold">{{ fd.name }}</td>
             <td class="opacity-60 text-sm">{{ fd.account_name }}</td>
-            <td class="text-right whitespace-nowrap" data-val="{{ fd.principal }}">₹{{ fd.principal|floatformat:0|indian_number }}</td>
+            <td class="text-right whitespace-nowrap" data-val="{{ fd.principal }}">{{ fd.principal|inr }}</td>
             <td class="text-right" data-val="{{ fd.interest_rate }}">{{ fd.interest_rate }}%</td>
             <td><span class="badge badge-ghost badge-sm">{{ fd.get_compounding_display }}</span></td>
-            <td class="text-right whitespace-nowrap font-semibold text-success" data-val="{{ fd.current_value }}">₹{{ fd.current_value|floatformat:0|indian_number }}</td>
+            <td class="text-right whitespace-nowrap font-semibold text-success" data-val="{{ fd.current_value }}">{{ fd.current_value|inr }}</td>
             <td class="opacity-60 text-sm whitespace-nowrap" data-val="{{ fd.maturity_date|date:'Ymd' }}">{{ fd.maturity_date|date:"d M Y" }}{% if fd.days_remaining > 0 %} <span class="text-xs opacity-60">({{ fd.days_remaining }}d)</span>{% endif %}</td>
             <td class="text-right">
               <button type="button" class="btn btn-ghost btn-xs btn-square" data-edit-fd data-id="{{ fd.id }}" data-name="{{ fd.name }}" data-account="{{ fd.account_name }}" data-principal="{{ fd.principal }}" data-rate="{{ fd.interest_rate }}" data-compounding="{{ fd.compounding }}" data-start="{{ fd.start_date|date:'Y-m-d' }}" data-maturity="{{ fd.maturity_date|date:'Y-m-d' }}" data-active="{{ fd.is_active|yesno:'true,false' }}" data-remarks="{{ fd.remarks }}">
@@ -83,7 +83,7 @@
           {% endfor %}
           <tr class="total-row hover border-t border-base-300 font-semibold">
             <td class="text-primary" colspan="5">Total</td>
-            <td class="text-right text-primary" data-val="{{ active_total }}">₹{{ active_total|floatformat:0|indian_number }}</td>
+            <td class="text-right text-primary" data-val="{{ active_total }}">{{ active_total|inr }}</td>
             <td colspan="2"></td>
           </tr>
         </tbody>
@@ -103,9 +103,9 @@
           </button>
         </div>
         <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
-          <div><span class="opacity-50">Principal</span><div class="font-semibold mt-0.5">₹{{ fd.principal|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">Principal</span><div class="font-semibold mt-0.5">{{ fd.principal|inr }}</div></div>
           <div><span class="opacity-50">Rate</span><div class="font-semibold mt-0.5">{{ fd.interest_rate }}%</div></div>
-          <div><span class="opacity-50">Value</span><div class="font-semibold mt-0.5 text-success">₹{{ fd.current_value|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">Value</span><div class="font-semibold mt-0.5 text-success">{{ fd.current_value|inr }}</div></div>
         </div>
         <div class="flex items-center gap-2 mt-2 text-xs">
           <span class="badge badge-ghost badge-xs">{{ fd.get_compounding_display }}</span>
@@ -115,7 +115,7 @@
       {% endfor %}
       <div class="flex items-center justify-between px-1 pt-2 border-t border-base-300 text-sm">
         <span class="font-bold text-primary">Total</span>
-        <span class="font-bold text-primary">₹{{ active_total|floatformat:0|indian_number }}</span>
+        <span class="font-bold text-primary">{{ active_total|inr }}</span>
       </div>
     </div>
     {% else %}
@@ -151,10 +151,10 @@
           <tr class="hover">
             <td class="font-semibold">{{ fd.name }}</td>
             <td class="opacity-60 text-sm">{{ fd.account_name }}</td>
-            <td class="text-right whitespace-nowrap" data-val="{{ fd.principal }}">₹{{ fd.principal|floatformat:0|indian_number }}</td>
+            <td class="text-right whitespace-nowrap" data-val="{{ fd.principal }}">{{ fd.principal|inr }}</td>
             <td class="text-right" data-val="{{ fd.interest_rate }}">{{ fd.interest_rate }}%</td>
             <td><span class="badge badge-ghost badge-sm">{{ fd.get_compounding_display }}</span></td>
-            <td class="text-right whitespace-nowrap font-semibold text-success" data-val="{{ fd.current_value }}">₹{{ fd.current_value|floatformat:0|indian_number }}</td>
+            <td class="text-right whitespace-nowrap font-semibold text-success" data-val="{{ fd.current_value }}">{{ fd.current_value|inr }}</td>
             <td class="opacity-60 text-sm whitespace-nowrap" data-val="{{ fd.maturity_date|date:'Ymd' }}">{{ fd.maturity_date|date:"d M Y" }}</td>
             <td class="text-right">
               <button type="button" class="btn btn-ghost btn-xs btn-square" data-edit-fd data-id="{{ fd.id }}" data-name="{{ fd.name }}" data-account="{{ fd.account_name }}" data-principal="{{ fd.principal }}" data-rate="{{ fd.interest_rate }}" data-compounding="{{ fd.compounding }}" data-start="{{ fd.start_date|date:'Y-m-d' }}" data-maturity="{{ fd.maturity_date|date:'Y-m-d' }}" data-active="{{ fd.is_active|yesno:'true,false' }}" data-remarks="{{ fd.remarks }}">
@@ -165,7 +165,7 @@
           {% endfor %}
           <tr class="total-row hover border-t border-base-300 font-semibold">
             <td class="text-primary" colspan="5">Total</td>
-            <td class="text-right text-primary" data-val="{{ matured_total }}">₹{{ matured_total|floatformat:0|indian_number }}</td>
+            <td class="text-right text-primary" data-val="{{ matured_total }}">{{ matured_total|inr }}</td>
             <td colspan="2"></td>
           </tr>
         </tbody>
@@ -185,9 +185,9 @@
           </button>
         </div>
         <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
-          <div><span class="opacity-50">Principal</span><div class="font-semibold mt-0.5">₹{{ fd.principal|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">Principal</span><div class="font-semibold mt-0.5">{{ fd.principal|inr }}</div></div>
           <div><span class="opacity-50">Rate</span><div class="font-semibold mt-0.5">{{ fd.interest_rate }}%</div></div>
-          <div><span class="opacity-50">Value</span><div class="font-semibold mt-0.5 text-success">₹{{ fd.current_value|floatformat:0|indian_number }}</div></div>
+          <div><span class="opacity-50">Value</span><div class="font-semibold mt-0.5 text-success">{{ fd.current_value|inr }}</div></div>
         </div>
         <div class="flex items-center gap-2 mt-2 text-xs">
           <span class="badge badge-ghost badge-xs">{{ fd.get_compounding_display }}</span>
@@ -197,7 +197,7 @@
       {% endfor %}
       <div class="flex items-center justify-between px-1 pt-2 border-t border-base-300 text-sm">
         <span class="font-bold text-primary">Total</span>
-        <span class="font-bold text-primary">₹{{ matured_total|floatformat:0|indian_number }}</span>
+        <span class="font-bold text-primary">{{ matured_total|inr }}</span>
       </div>
     </div>
     {% else %}

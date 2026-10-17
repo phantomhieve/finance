@@ -1,0 +1,189 @@
+"""Google GenAI provider adapter with native structured outputs and Search Grounding."""
+from __future__ import annotations
+
+import json
+import logging
+from typing import Any, TypeVar
+
+from pydantic import BaseModel
+
+from ..sanitizer import clean_json_text
+from ..types import AINode
+from .base import BaseAIAdapter
+
+logger = logging.getLogger(__name__)
+T = TypeVar("T", bound=BaseModel)
+
+
+def _normalize_model_name(model: str | None) -> str:
+    """Normalize user-friendly aliases like 'argon' to 'gemini-4-argon' and 'flash' to 'gemini-3.8-flash'."""
+    if not model:
+        return "gemini-4-argon"
+    m = model.strip()
+    m_lower = m.lower()
+    if m_lower in ("argon", "gemini-argon", "gemini_argon"):
+        return "gemini-4-argon"
+    if m_lower in (
+        "flash",
+        "gemini-flash",
+        "gemini_flash",
+        "3.8-flash",
+        "gemini-3.8-flash",
+        "gemini_3_8_flash",
+        "3.5-flash",
+        "gemini-3.5-flash",
+        "gemini-3.5-flash-lite",
+        "gemini_3_5_flash_lite",
+    ):
+        return "gemini-3.8-flash"
+    return m
+
+
+
+def _clean_schema_for_gemini(data: Any) -> Any:
+    """Recursively strip 'additionalProperties' and unsupported schema keywords for Gemini API."""
+    if isinstance(data, dict):
+        return {
+            k: _clean_schema_for_gemini(v)
+            for k, v in data.items()
+            if k not in ("additionalProperties", "$schema")
+        }
+    if isinstance(data, list):
+        return [_clean_schema_for_gemini(item) for item in data]
+    return data
+
+
+class GeminiAdapter(BaseAIAdapter):
+    """Adapter for Google Gemini using the google-genai SDK."""
+
+    def _get_client(self, node: AINode, api_key: str | None = None):
+        from google import genai
+        key = api_key or (node.api_keys[0] if node.api_keys else "")
+        if not key:
+            raise ValueError(f"No API key provided for Gemini node '{node.id}'")
+        return genai.Client(api_key=key)
+
+    def generate_text(
+        self,
+        node: AINode,
+        prompt: str,
+        system: str | None = None,
+        model: str | None = None,
+        temperature: float = 0.2,
+        max_tokens: int | None = None,
+        api_key: str | None = None,
+        **kwargs: Any,
+    ) -> str:
+        from google import genai
+
+        client = self._get_client(node, api_key=api_key)
+        target_model = _normalize_model_name(model or node.default_model)
+
+        config_kwargs: dict[str, Any] = {"temperature": temperature}
+        if system:
+            config_kwargs["system_instruction"] = system
+        if max_tokens:
+            config_kwargs["max_output_tokens"] = max_tokens
+
+        resp = client.models.generate_content(
+            model=target_model,
+            contents=prompt,
+            config=genai.types.GenerateContentConfig(**config_kwargs),
+        )
+        return resp.text or ""
+
+    def generate_structured(
+        self,
+        node: AINode,
+        schema: type[T],
+        prompt: str,
+        system: str | None = None,
+        model: str | None = None,
+        temperature: float = 0.1,
+        max_tokens: int | None = None,
+        api_key: str | None = None,
+        **kwargs: Any,
+    ) -> T:
+        import json
+        from google import genai
+
+        client = self._get_client(node, api_key=api_key)
+        target_model = _normalize_model_name(model or node.default_model)
+
+        config_kwargs: dict[str, Any] = {
+            "response_mime_type": "application/json",
+            "temperature": temperature,
+        }
+        if system:
+            config_kwargs["system_instruction"] = system
+        if max_tokens:
+            config_kwargs["max_output_tokens"] = max_tokens
+
+        if hasattr(schema, "model_json_schema"):
+            try:
+                config_kwargs["response_schema"] = _clean_schema_for_gemini(schema.model_json_schema())
+            except Exception:
+                config_kwargs["response_schema"] = schema
+        else:
+            config_kwargs["response_schema"] = schema
+
+        try:
+            resp = client.models.generate_content(
+                model=target_model,
+                contents=prompt,
+                config=genai.types.GenerateContentConfig(**config_kwargs),
+            )
+        except Exception as exc:
+            if "additionalProperties" in str(exc) or "schema" in str(exc).lower():
+                logger.warning("Gemini response_schema failed (%s); retrying with JSON mode fallback...", exc)
+                config_kwargs.pop("response_schema", None)
+                schema_json = json.dumps(schema.model_json_schema()) if hasattr(schema, "model_json_schema") else ""
+                fallback_prompt = (
+                    f"{prompt}\n\nIMPORTANT: Output valid JSON matching this schema:\n{schema_json}"
+                    if schema_json else prompt
+                )
+                resp = client.models.generate_content(
+                    model=target_model,
+                    contents=fallback_prompt,
+                    config=genai.types.GenerateContentConfig(**config_kwargs),
+                )
+            else:
+                raise
+
+        raw_text = resp.text or ""
+        try:
+            return schema.model_validate_json(raw_text)
+        except Exception:
+            # Fall back to sanitizer in case model returned extra fences
+            cleaned = clean_json_text(raw_text)
+            return schema.model_validate_json(cleaned)
+
+    def fetch_macro_grounding(
+        self,
+        node: AINode,
+        prompt: str,
+        api_key: str | None = None,
+        model: str | None = None,
+        **kwargs: Any,
+    ) -> dict | None:
+        """Fetch live macroeconomic context using Google Search grounding."""
+        from google import genai
+
+        client = self._get_client(node, api_key=api_key)
+        target_model = _normalize_model_name(model or node.default_model)
+
+        try:
+            resp = client.models.generate_content(
+                model=target_model,
+                contents=prompt,
+                config=genai.types.GenerateContentConfig(
+                    tools=[genai.types.Tool(google_search=genai.types.GoogleSearch())],
+                    temperature=0.1,
+                ),
+            )
+            raw = (resp.text or "").strip()
+            cleaned = clean_json_text(raw)
+            return json.loads(cleaned)
+        except Exception as e:
+            logger.warning("Failed to fetch macro grounding via Gemini: %s", e)
+            return None

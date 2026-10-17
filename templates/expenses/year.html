@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+{% load indian_format static %}
+
+{% block title %}Expenses · {{ summary.label }} — Vault{% endblock %}
+
+{% block page_header %}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+  <div class="flex items-start justify-between gap-2">
+    <div>
+      <p class="text-xs font-bold tracking-widest uppercase text-orange-400">Household Spend</p>
+      <h1 class="text-xl lg:text-2xl font-extrabold">{{ summary.label }}</h1>
+    </div>
+    <a href="{% url 'expenses_home' %}" class="btn btn-ghost btn-sm gap-1 sm:hidden"><span class="material-symbols-outlined text-base">arrow_back</span>Month</a>
+  </div>
+  <div class="flex flex-wrap items-center gap-2 justify-center sm:justify-start w-full sm:w-auto">
+    <div class="fy-tabs" id="fySwitcher">
+      {% for fy in fy_options %}
+      <a href="?fy={{ fy }}" class="fy-tab {% if fy == fy_start %}fy-tab-active{% endif %}">{{ fy }}-{{ fy|add:1 }}</a>
+      {% endfor %}
+    </div>
+    <a href="{% url 'expenses_home' %}" class="btn btn-ghost btn-sm gap-1 hidden sm:inline-flex"><span class="material-symbols-outlined text-base">arrow_back</span>Monthly view</a>
+  </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="card hero-gradient-portfolio shadow-sm mb-4 animate-up">
+  <div class="card-body p-4 lg:p-5">
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:items-end">
+      <div>
+        <p class="text-[10px] font-bold uppercase tracking-widest opacity-40">{% if summary.in_progress %}Spent so far{% else %}Total spent{% endif %}</p>
+        <p class="text-3xl font-extrabold tabular-nums mt-1">{{ summary.total|inr }}</p>
+        {% if summary.prev_delta_pct is not None %}
+        <p class="text-xs mt-1.5 flex items-center gap-1 flex-wrap">
+          <span class="badge badge-sm font-semibold {% if summary.prev_delta_pct > 0 %}badge-error{% else %}badge-success{% endif %} badge-soft gap-0.5">
+            <span class="material-symbols-outlined text-sm">{% if summary.prev_delta_pct > 0 %}arrow_upward{% else %}arrow_downward{% endif %}</span>{% if summary.prev_delta_pct > 0 %}+{% endif %}{{ summary.prev_delta_pct }}%
+          </span>
+          <span class="opacity-60">vs {{ summary.prev_label }}{% if summary.in_progress %} by this date{% endif %} ({{ summary.prev_total|inr_short }})</span>
+        </p>
+        {% endif %}
+      </div>
+      <div class="grid grid-cols-2 gap-2 sm:col-span-2">
+        <div class="stat-card">
+          <div class="text-[10px] uppercase tracking-wider opacity-50">Monthly average</div>
+          <div class="text-base font-bold mt-0.5 tabular-nums">{{ summary.avg_month|inr }}</div>
+        </div>
+        <div class="stat-card">
+          <div class="text-[10px] uppercase tracking-wider opacity-50">Highest month</div>
+          <div class="text-base font-bold mt-0.5 tabular-nums">{% if summary.top_month %}{{ summary.top_month.label }} · {{ summary.top_month.total|inr_short }}{% else %}—{% endif %}</div>
+        </div>
+      </div>
+    </div>
+    {% if summary.total %}
+    <div class="mt-4" style="height:260px"><canvas id="yearChart" data-month-url="{% url 'expenses_home' %}" aria-label="Monthly spend by category"></canvas></div>
+    <p class="text-[10px] opacity-40 mt-1">Dashed line: monthly average{% if summary.in_progress %} of completed months{% endif %} · tap a month to open it</p>
+    {% endif %}
+  </div>
+</div>
+
+{% if summary.total %}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 items-start">
+  <div class="flex flex-col gap-4">
+    <div class="card bg-base-200 shadow-sm animate-up" style="animation-delay:.05s">
+      <div class="card-body p-4">
+        <h2 class="text-xs font-bold uppercase tracking-widest opacity-50 mb-1">By category</h2>
+        <p class="text-[11px] opacity-45 mb-1">Bars show each month, April → March</p>
+        {% for c in summary.categories %}
+        <div class="flex items-center gap-3 py-2 {% if forloop.counter > 8 %}exp-ycat-more hidden{% endif %}">
+          <span class="jw-type-avatar" style="--h:{{ c.hue }};width:2.25rem;height:2.25rem;border-radius:.7rem"><span class="icon-filled material-symbols-outlined text-lg">{{ c.icon }}</span></span>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-baseline justify-between gap-2">
+              <span class="text-sm font-semibold truncate">{{ c.name }}</span>
+              <span class="text-sm font-bold tabular-nums">{{ c.total|inr }}</span>
+            </div>
+            <div class="flex items-center gap-3 mt-1">
+              <div class="exp-spark flex-1" style="--h:{{ c.hue }}" aria-hidden="true">
+                {% for v in c.spark %}<span {% if not v %}class="is-empty"{% endif %} style="height:{% if v %}{{ v }}{% else %}10{% endif %}%"></span>{% endfor %}
+              </div>
+              <span class="text-[10px] opacity-50 tabular-nums w-24 text-right shrink-0">{{ c.avg_month|inr_short }}/mo · {{ c.pct }}%</span>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+        {% if summary.categories|length > 8 %}
+        <button type="button" class="btn btn-ghost btn-xs mt-1 self-center" onclick="document.querySelectorAll('.exp-ycat-more').forEach(function(e){e.classList.toggle('hidden')});this.remove()">Show all {{ summary.categories|length }}</button>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="flex flex-col gap-4">
+    <div class="card bg-base-200 shadow-sm animate-up" style="animation-delay:.1s">
+      <div class="card-body p-4">
+        <h2 class="text-xs font-bold uppercase tracking-widest opacity-50 mb-2">Months</h2>
+        {% for m in summary.months %}
+        {% if m.started %}
+        <a href="{% url 'expenses_home' %}?m={{ m.param }}" class="flex items-center gap-3 py-2 rounded-lg hover:bg-base-content/5 -mx-1 px-1 cursor-pointer">
+          <span class="text-sm font-semibold w-16 shrink-0">{{ m.label }} <span class="text-[10px] opacity-40 font-normal">'{{ m.year|stringformat:"d"|slice:"2:" }}</span></span>
+          <div class="exp-bar flex-1" style="--h:28"><span style="width:{{ m.bar }}%"></span></div>
+          <span class="text-sm font-bold tabular-nums w-24 text-right">{% if m.total %}{{ m.total|inr }}{% else %}<span class="opacity-30">—</span>{% endif %}</span>
+          <span class="material-symbols-outlined text-sm opacity-25">chevron_right</span>
+        </a>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+
+    {% if summary.merchants %}
+    <div class="card bg-base-200 shadow-sm animate-up" style="animation-delay:.15s">
+      <div class="card-body p-4">
+        <h2 class="text-xs font-bold uppercase tracking-widest opacity-50 mb-2">Top merchants</h2>
+        {% for m in summary.merchants %}
+        <div class="flex items-center justify-between py-1.5 text-sm gap-3">
+          <span class="truncate"><span class="opacity-35 tabular-nums mr-2">{{ forloop.counter }}</span>{{ m.merchant }}</span>
+          <span class="font-bold tabular-nums shrink-0">{{ m.total|inr }} <span class="text-[10px] opacity-40 font-normal">× {{ m.count }}</span></span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% else %}
+<div class="flex flex-col items-center justify-center py-16 gap-3 text-center">
+  <div class="w-16 h-16 rounded-2xl bg-orange-400/10 border border-orange-400/20 flex items-center justify-center">
+    <span class="icon-filled material-symbols-outlined text-3xl text-orange-400">calendar_month</span>
+  </div>
+  <p class="font-semibold opacity-60">No spend recorded in {{ summary.label }} yet</p>
+</div>
+{% endif %}
+
+{{ chart|json_script:"expense-year-chart" }}
+{% endblock %}
+
+{% block chart_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/expenses.js' %}"></script>
+{% endblock %}

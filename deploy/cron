@@ -8,5 +8,26 @@ CRON_TZ=Asia/Kolkata
 # Daily 6:00 AM IST — Google Sheets sync, then commodity prices.
 0 6 * * *  __APP_OWNER__  cd __APP_DIR__ && set -a && . ./.env && set +a && venv/bin/python manage.py sync_sheets >> __CRON_LOG__ 2>&1 ; venv/bin/python manage.py refresh_prices >> __CRON_LOG__ 2>&1
 
+# FY-end land appreciation (+6%) — 5:45 AM IST on 1 April, before the March (FY close) snapshot
+45 5 1 4 *  __APP_OWNER__  cd __APP_DIR__ && set -a && . ./.env && set +a && venv/bin/python manage.py appreciate_land >> __CRON_LOG__ 2>&1
+
 # Monthly portfolio snapshot — 6:00 AM IST on day 1
 0 6 1 * *  __APP_OWNER__  cd __APP_DIR__ && set -a && . ./.env && set +a && venv/bin/python manage.py take_snapshot >> __CRON_LOG__ 2>&1
+
+# Monthly AI email summary — 6:30 AM IST on day 1 (after snapshot is taken)
+30 6 1 * *  __APP_OWNER__  cd __APP_DIR__ && set -a && . ./.env && set +a && venv/bin/python manage.py send_monthly_summary >> __CRON_LOG__ 2>&1
+
+# Financial-year review email — 6:45 AM IST on 1 April (after the FY close snapshot)
+45 6 1 4 *  __APP_OWNER__  cd __APP_DIR__ && set -a && . ./.env && set +a && venv/bin/python manage.py send_fy_review >> __CRON_LOG__ 2>&1
+
+# Weekly Equity Intelligence Brief — 6:30 AM IST every Sunday
+30 6 * * 0  __APP_OWNER__  cd __APP_DIR__ && set -a && . ./.env && set +a && venv/bin/python manage.py send_weekly_brief >> __CRON_LOG__ 2>&1
+
+# Expenses: pull bank / card alert emails from connected Gmail inboxes — hourly at :17
+17 * * * *  __APP_OWNER__  cd __APP_DIR__ && set -a && . ./.env && set +a && venv/bin/python manage.py sync_expenses >> __CRON_LOG__ 2>&1
+
+# Expenses: credit card bill reminders — 9:00 AM IST daily
+0 9 * * *  __APP_OWNER__  cd __APP_DIR__ && set -a && . ./.env && set +a && venv/bin/python manage.py expense_reminders >> __CRON_LOG__ 2>&1
+
+# Expenses: household spend summary for last month — 8:00 AM IST on day 1 (after a final sync)
+0 8 1 * *  __APP_OWNER__  cd __APP_DIR__ && set -a && . ./.env && set +a && venv/bin/python manage.py sync_expenses >> __CRON_LOG__ 2>&1 ; venv/bin/python manage.py send_expense_summary >> __CRON_LOG__ 2>&1

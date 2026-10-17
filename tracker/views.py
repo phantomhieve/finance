@@ -1,5 +1,5 @@
+import calendar
 import datetime
-import logging
 from functools import wraps
 
 from django.conf import settings
@@ -13,7 +13,7 @@ from django.http import Http404, HttpResponseForbidden, JsonResponse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 
-from pftracker.utils import safe_redirect
+from pftracker.utils import feature_enabled, safe_redirect
 
 from .models import Transaction, HRAExpense, FinancialGoal, GoalIncrement, MonthlyGoalAdjustment, Note, MonthlySavingsComment
 from .forms import (
@@ -34,12 +34,12 @@ from .services import (
     current_fy_start_year,
     parse_fy_param,
     fy_label,
-    get_base_goal,
+    get_base_monthly_goal,
     get_fy_increments,
     get_fy_adjustments,
     apply_carry_forward,
     apply_monthly_adjustments,
-    aggregate_hra,
+    hra_spent as get_hra_spent,
     aggregate_transactions,
     group_user_filter,
 )
@@ -63,6 +63,18 @@ def _require_role(*allowed_types):
 
 def _safe_redirect(request, fallback='dashboard'):
     return safe_redirect(request, fallback)
+
+
+def _require_feature(feature_name):
+    """Decorator to gate a view behind a HouseholdConfig feature toggle."""
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            if not feature_enabled(request.user, feature_name):
+                raise Http404
+            return view_func(request, *args, **kwargs)
+        return wrapper
+    return decorator
 
 
 def _fy_context(request):
@@ -117,6 +129,7 @@ def _fy_context(request):
 # ---------------------------------------------------------------------------
 
 @login_required
+@_require_feature('savings')
 def dashboard(request):
     if not request.user.can_view_savings:
         return redirect('hra_tracker')
@@ -133,12 +146,9 @@ def dashboard(request):
 
     fy_goal_obj = FinancialGoal.objects.filter(gf, month=fc['fy_start_date']).first()
     if fy_goal_obj:
-        goal_obj = fy_goal_obj
-        total_goal = float(goal_obj.total_goal)
-        base_monthly = float(goal_obj.monthly_goal)
+        base_monthly = float(fy_goal_obj.monthly_goal)
     else:
-        goal_obj, total_goal, base_monthly = get_base_goal(request.user)
-        base_monthly = apply_carry_forward(request.user, fc['fy_start_date'], base_monthly)
+        base_monthly = apply_carry_forward(request.user, fc['fy_start_date'], get_base_monthly_goal(request.user))
 
     increments = get_fy_increments(request.user, fc['fy_start_date'], fc['fy_end_date'])
     adjustments = get_fy_adjustments(request.user, fc['fy_start_date'], fc['fy_end_date'])
@@ -148,19 +158,18 @@ def dashboard(request):
     total_goal = sum(per_month_goals.values())
 
     total_savings, total_transfers, total_income, total_expense = aggregate_transactions(transactions)
-    hra_spent, hra_additions, hra_net = aggregate_hra(
-        request.user, fc['fy_start_date'], fc['fy_end_date']
-    )
+    hra_spent = get_hra_spent(request.user, fc['fy_start_date'], fc['fy_end_date'])
 
     goal_achieved = total_savings + total_income + (total_transfers - hra_spent)
     goal_remaining = total_goal - goal_achieved
-    goal_pct = min(100, int((goal_achieved / total_goal) * 100)) if total_goal else 0
+    goal_pct = max(0, min(100, int((goal_achieved / total_goal) * 100))) if total_goal else 0
 
     monthly_data = _build_monthly_data(
         transactions, request.user, fy_start, today, per_month_goals
     )
+    pace = _savings_pace(monthly_data, goal_achieved, total_goal, today, fc['fy_start_date'], fc['fy_end_date'])
 
-    recent_transactions = transactions.order_by('-date')[:50]
+    fy_transactions = transactions.order_by('-date', '-id')
 
     txn_form = TransactionForm(initial={'date': today})
     goal_form = GoalIncrementForm()
@@ -173,15 +182,15 @@ def dashboard(request):
 
     dashboard_chart_data = {
         'months': [m['short'] for m in monthly_data],
-        'totals': [float(m['total']) if m.get('total') else 0 for m in monthly_data],
-        'goals': [float(m['goal']) for m in monthly_data],
-        'cumulative': [float(m['cumulative']) if m.get('cumulative') else 0 for m in monthly_data],
-        'cumulative_goals': [float(m['cumulative_goal']) if m.get('cumulative_goal') else 0 for m in monthly_data],
+        'totals': [m['total'] for m in monthly_data],
+        'goals': [m['goal'] for m in monthly_data],
+        # None stops the "saved" line at the current month instead of running flat to March
+        'cumulative': [m['cumulative'] if m['started'] else None for m in monthly_data],
+        'cumulative_goals': [m['cumulative_goal'] for m in monthly_data],
     }
 
     context = {
         **fc,
-        'current_fy_start': fc['current_fy'],
         'total_savings': total_savings,
         'total_transfers': total_transfers,
         'total_income': total_income,
@@ -190,13 +199,12 @@ def dashboard(request):
         'monthly_goal': base_monthly,
         'goal_achieved': goal_achieved,
         'goal_remaining': goal_remaining,
+        'goal_surplus': max(0.0, -goal_remaining),
         'goal_pct': goal_pct,
-        'hra_additions': hra_additions,
-        'hra_spent': hra_spent,
-        'hra_net': hra_net,
+        'pace': pace,
         'hra_balance': total_transfers - hra_spent,
         'monthly_data': monthly_data,
-        'recent_transactions': recent_transactions,
+        'transactions': fy_transactions,
         'txn_form': txn_form,
         'goal_form': goal_form,
         'adjust_form': adjust_form,
@@ -204,10 +212,34 @@ def dashboard(request):
         'fy_goal_form': fy_goal_form,
         'increments': increments,
         'adjustments': adjustments,
-        'goal_obj': goal_obj,
         'dashboard_chart_data': dashboard_chart_data,
     }
     return render(request, 'tracker/dashboard.html', context)
+
+
+def _savings_pace(monthly_data, achieved, total_goal, today, fy_start_date, fy_end_date):
+    """Where the FY stands against a steady month-by-month climb to the annual goal.
+
+    Open FY: gap vs the goal expected by today (current month pro-rated) and the monthly
+    amount still needed. Closed FY: final verdict. Future FY: None.
+    """
+    if today < fy_start_date:
+        return None
+    if today > fy_end_date:
+        gap = achieved - total_goal
+        return {'state': 'closed', 'hit': gap >= 0, 'gap': gap, 'gap_abs': abs(gap)}
+    idx = (today.month - 4) % 12
+    days_in_month = calendar.monthrange(today.year, today.month)[1]
+    expected = sum(m['goal'] for m in monthly_data[:idx]) + monthly_data[idx]['goal'] * today.day / days_in_month
+    months_left = 12 - idx
+    still_needed = max(0.0, total_goal - achieved)
+    return {
+        'state': 'open',
+        'gap': achieved - expected,
+        'gap_abs': abs(achieved - expected),
+        'months_left': months_left,
+        'need_per_month': still_needed / months_left,
+    }
 
 
 def _build_monthly_data(transactions, user, fy_start, today, per_month_goals):
@@ -219,18 +251,15 @@ def _build_monthly_data(transactions, user, fy_start, today, per_month_goals):
         .values('_y', '_m')
         .annotate(
             savings=Sum(Case(When(type='SAVINGS', then='amount'), default=Value(0), output_field=DecimalField())),
-            transfers=Sum(Case(When(type='TRANSFER', then='amount'), default=Value(0), output_field=DecimalField())),
             income=Sum(Case(When(type='EXTRA_INCOME', then='amount'), default=Value(0), output_field=DecimalField())),
             expense=Sum(Case(When(type='EXPENSE', then='amount'), default=Value(0), output_field=DecimalField())),
         )
     )
     agg_map = {(r['_y'], r['_m']): r for r in monthly_agg}
 
-    # Fetch all month comments for this user in this FY
-    fy_start_date = datetime.date(fy_start, 4, 1)
-    fy_end_date = datetime.date(fy_start + 1, 3, 31)
+    fy_start_date, fy_end_date = fy_date_range(fy_start)
     comments_qs = MonthlySavingsComment.objects.filter(
-        user=user, month__gte=fy_start_date, month__lte=fy_end_date,
+        group_user_filter(user), month__gte=fy_start_date, month__lte=fy_end_date,
     )
     comments_map = {(c.month.year, c.month.month): c for c in comments_qs}
 
@@ -246,7 +275,6 @@ def _build_monthly_data(transactions, user, fy_start, today, per_month_goals):
 
         row = agg_map.get((m_year, m_num), {})
         savings = float(row.get('savings') or 0)
-        transfers = float(row.get('transfers') or 0)
         income = float(row.get('income') or 0)
         expense = float(row.get('expense') or 0)
 
@@ -271,10 +299,6 @@ def _build_monthly_data(transactions, user, fy_start, today, per_month_goals):
         monthly_data.append({
             'name': month_name,
             'short': month_name[:3],
-            'savings': savings,
-            'transfers': transfers,
-            'income': income,
-            'expense': expense,
             'total': total_put,
             'cumulative': cumulative,
             'cumulative_goal': cumulative_goal,
@@ -284,7 +308,6 @@ def _build_monthly_data(transactions, user, fy_start, today, per_month_goals):
             'started': started,
             'pct': pct,
             'comment': comment_obj.comment if comment_obj else '',
-            'comment_id': comment_obj.id if comment_obj else None,
             'month_date': m_date.isoformat(),
         })
 
@@ -493,7 +516,7 @@ def save_month_comment(request):
         return _safe_redirect(request, 'dashboard')
 
     if comment_text:
-        obj, created = MonthlySavingsComment.objects.update_or_create(
+        _, created = MonthlySavingsComment.objects.update_or_create(
             user=request.user,
             month=month_date,
             defaults={'comment': comment_text},
@@ -515,6 +538,7 @@ def save_month_comment(request):
 # ---------------------------------------------------------------------------
 
 @login_required
+@_require_feature('hra')
 def hra_tracker(request):
     fc = _fy_context(request)
     gf = group_user_filter(request.user)
@@ -635,168 +659,13 @@ def _gf_kwargs(gf):
     return {}
 
 
-# ---------------------------------------------------------------------------
-# Admin-only views (superuser)
-# ---------------------------------------------------------------------------
-
-def _require_superuser(view_func):
-    @wraps(view_func)
-    def _wrapped(request, *args, **kwargs):
-        if not request.user.is_superuser:
-            raise Http404
-        return view_func(request, *args, **kwargs)
-    return _wrapped
-
-
-@login_required
-@_require_superuser
-def admin_monitor(request):
-    return render(request, 'tracker/admin_monitor.html')
-
-
-logger = logging.getLogger(__name__)
-
-
-@login_required
-@_require_superuser
-def server_metrics(request):
-    """Scrape local Prometheus exporters and return a metrics snapshot."""
-    import requests as http_requests
-    import time as _time
-
-    now = _time.time()
-
-    def _scrape(url):
-        try:
-            r = http_requests.get(url, timeout=3)
-            return r.text if r.ok else ''
-        except Exception:
-            return ''
-
-    def _parse(text, name, labels=None):
-        """Extract a single metric value from Prometheus text format."""
-        for line in text.splitlines():
-            if not line.startswith(name):
-                continue
-            if labels:
-                if not all(f'{k}="{v}"' in line for k, v in labels.items()):
-                    continue
-            try:
-                return float(line.split()[-1])
-            except (ValueError, IndexError):
-                continue
-        return None
-
-    def _parse_all(text, name, label_key=None):
-        """Extract all series for a metric, keyed by a label value."""
-        results = {}
-        for line in text.splitlines():
-            if not line.startswith(name + '{'):
-                continue
-            try:
-                val = float(line.split()[-1])
-                if label_key:
-                    start = line.index(f'{label_key}="') + len(label_key) + 2
-                    end = line.index('"', start)
-                    key = line[start:end]
-                else:
-                    key = ''
-                results[key] = val
-            except (ValueError, IndexError):
-                continue
-        return results
-
-    node_text = _scrape('http://localhost:9100/metrics')
-    pg_text = _scrape('http://localhost:9187/metrics')
-
-    # --- Node metrics ---
-    boot_time = _parse(node_text, 'node_boot_time_seconds')
-    mem_total = _parse(node_text, 'node_memory_MemTotal_bytes')
-    mem_avail = _parse(node_text, 'node_memory_MemAvailable_bytes')
-    disk_total = _parse(node_text, 'node_filesystem_size_bytes', {'mountpoint': '/', 'fstype': 'ext4'})
-    disk_avail = _parse(node_text, 'node_filesystem_avail_bytes', {'mountpoint': '/', 'fstype': 'ext4'})
-    net_rx = _parse(node_text, 'node_network_receive_bytes_total', {'device': 'enp4s0'})
-    net_tx = _parse(node_text, 'node_network_transmit_bytes_total', {'device': 'enp4s0'})
-    load1 = _parse(node_text, 'node_load1')
-    load5 = _parse(node_text, 'node_load5')
-    load15 = _parse(node_text, 'node_load15')
-
-    cpu_modes = _parse_all(node_text, 'node_cpu_seconds_total', 'mode')
-    cpu_count = 0
-    for line in node_text.splitlines():
-        if line.startswith('node_cpu_seconds_total{') and 'mode="idle"' in line:
-            cpu_count += 1
-
-    # --- Postgres metrics ---
-    pg_up = _parse(pg_text, 'pg_up')
-    pg_conns = _parse_all(pg_text, 'pg_stat_database_numbackends', 'datname')
-    pg_sizes = _parse_all(pg_text, 'pg_database_size_bytes', 'datname')
-    pg_hits = _parse_all(pg_text, 'pg_stat_database_blks_hit', 'datname')
-    pg_reads = _parse_all(pg_text, 'pg_stat_database_blks_read', 'datname')
-
-    user_dbs = {k: v for k, v in pg_conns.items()
-                if k not in ('template0', 'template1')}
-    total_conns = sum(user_dbs.values()) if user_dbs else 0
-    total_size = sum(v for k, v in pg_sizes.items()
-                     if k not in ('template0', 'template1'))
-    total_hits = sum(v for k, v in pg_hits.items()
-                     if k not in ('template0', 'template1'))
-    total_reads = sum(v for k, v in pg_reads.items()
-                      if k not in ('template0', 'template1'))
-    cache_ratio = total_hits / (total_hits + total_reads) if (total_hits + total_reads) > 0 else None
-
-    # --- Website check ---
-    web_up = False
-    web_ms = None
-    health_url = getattr(settings, 'VAULT_HEALTH_CHECK_URL', '')
-    if health_url:
-        try:
-            t0 = _time.time()
-            req_kwargs = {'timeout': 5, 'allow_redirects': False}
-            health_host = getattr(settings, 'VAULT_HEALTH_CHECK_HOST', '')
-            if health_host:
-                req_kwargs['headers'] = {'Host': health_host}
-            wr = http_requests.get(health_url, **req_kwargs)
-            web_ms = round((_time.time() - t0) * 1000, 1)
-            web_up = wr.status_code in (200, 302)
-        except Exception:
-            pass
-
-    return JsonResponse({
-        'ts': now,
-        'node': {
-            'boot_time': boot_time,
-            'uptime': round(now - boot_time) if boot_time else None,
-            'cpu_modes': cpu_modes,
-            'cpu_count': cpu_count,
-            'mem_total': mem_total,
-            'mem_available': mem_avail,
-            'disk_total': disk_total,
-            'disk_available': disk_avail,
-            'net_rx': net_rx,
-            'net_tx': net_tx,
-            'load1': load1,
-            'load5': load5,
-            'load15': load15,
-        },
-        'pg': {
-            'up': pg_up == 1,
-            'connections': total_conns,
-            'db_size': total_size,
-            'cache_ratio': cache_ratio,
-        },
-        'web': {
-            'up': web_up,
-            'response_ms': web_ms,
-        },
-    })
-
 
 # ---------------------------------------------------------------------------
 # Notes (all authenticated users, own notes only)
 # ---------------------------------------------------------------------------
 
 @login_required
+@_require_feature('notes')
 def notes_list(request):
     """Display all notes for the current user, with section and FY filter."""
     fc = _fy_context(request)
@@ -851,7 +720,7 @@ def notes_list(request):
                     note.settled_pct = max(0, min(100, int((initial - pending) / initial * 100)))
                 else:
                     note.settled_pct = 0
-            except Exception:
+            except (ValueError, TypeError, ZeroDivisionError):
                 note.settled_pct = 0
         else:
             note.settled_pct = None

@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load humanize %}
+{% load humanize indian_format %}
 
 {% block title %}HRA & Rent — Vault{% endblock %}
 
@@ -33,17 +33,17 @@
     <div class="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8">
       <div>
         <p class="text-[10px] font-bold uppercase tracking-widest opacity-40">Remaining Balance</p>
-        <p class="text-3xl lg:text-4xl font-extrabold mt-1 {% if remaining_balance >= 0 %}text-success{% else %}text-error{% endif %}">₹{{ remaining_balance|floatformat:0|intcomma }}</p>
+        <p class="text-3xl lg:text-4xl font-extrabold mt-1 {% if remaining_balance >= 0 %}text-success{% else %}text-error{% endif %}">{{ remaining_balance|inr }}</p>
         <p class="text-xs opacity-30 mt-1">Available in HRA Pool</p>
       </div>
       <div class="flex gap-3">
         <div class="stat-card stat-card-success">
           <div class="text-[10px] uppercase tracking-wider opacity-50">Total Added</div>
-          <div class="text-lg font-bold text-success mt-0.5">₹{{ total_additions|floatformat:0|intcomma }}</div>
+          <div class="text-lg font-bold text-success mt-0.5">{{ total_additions|inr }}</div>
         </div>
         <div class="stat-card stat-card-error">
           <div class="text-[10px] uppercase tracking-wider opacity-50">Total Spent</div>
-          <div class="text-lg font-bold text-error mt-0.5">₹{{ total_expense|floatformat:0|intcomma }}</div>
+          <div class="text-lg font-bold text-error mt-0.5">{{ total_expense|inr }}</div>
         </div>
       </div>
     </div>
@@ -67,9 +67,9 @@
       <div class="month-card rounded-xl p-2.5 text-center text-xs border {% if m.status == 'rent_paid' %}border-success/30 bg-success/5{% elif m.status == 'rent_due' %}border-error/20 bg-error/5{% elif m.status == 'current' %}border-info/30 bg-info/5{% else %}border-base-300/50 bg-base-300/20{% endif %}">
         <div class="font-semibold mb-1.5 text-[10px] uppercase tracking-wider {% if m.status == 'rent_paid' %}text-success{% elif m.status == 'rent_due' %}text-error{% elif m.status == 'current' %}text-info{% else %}opacity-60{% endif %}">{{ m.name }}</div>
         {% if m.started %}
-        <div class="font-bold text-success text-sm">₹{{ m.addition|floatformat:0|intcomma }}</div>
+        <div class="font-bold text-success text-sm">{{ m.addition|inr }}</div>
         <div class="text-[10px] opacity-30">Added</div>
-        <div class="text-sm text-error mt-1">-₹{{ m.expense|floatformat:0|intcomma }}</div>
+        <div class="text-sm text-error mt-1">-{{ m.expense|inr }}</div>
         <div class="text-[10px] opacity-30">Spent</div>
         {% else %}
         <div class="text-sm opacity-20 mt-1">—</div>
@@ -90,7 +90,7 @@
         {% for metric in mode_metrics %}
         <div class="flex justify-between items-center p-3 bg-base-300/30 rounded-lg text-sm hover:bg-base-300/50 transition-colors">
           <span class="opacity-60">{{ metric.mode_of_payment }}</span>
-          <span class="font-semibold">₹{{ metric.total|floatformat:0|intcomma }}</span>
+          <span class="font-semibold">{{ metric.total|inr }}</span>
         </div>
         {% empty %}
         <p class="text-sm opacity-40 py-4 text-center">No spends yet.</p>
@@ -125,8 +125,8 @@
                 </div>
               </td>
               <td class="font-semibold whitespace-nowrap">
-                {% if expense.is_revert %}<span class="text-success">+₹{{ expense.amount|floatformat:0|intcomma }}</span>
-                {% else %}<span class="text-error">−₹{{ expense.amount|floatformat:0|intcomma }}</span>{% endif %}
+                {% if expense.is_revert %}<span class="text-success">+{{ expense.amount|inr }}</span>
+                {% else %}<span class="text-error">−{{ expense.amount|inr }}</span>{% endif %}
               </td>
               {% if user.can_edit_hra %}
               <td>
@@ -150,8 +150,8 @@
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2">
               <span class="font-semibold text-sm whitespace-nowrap">
-                {% if expense.is_revert %}<span class="text-success">+₹{{ expense.amount|floatformat:0|intcomma }}</span>
-                {% else %}<span class="text-error">−₹{{ expense.amount|floatformat:0|intcomma }}</span>{% endif %}
+                {% if expense.is_revert %}<span class="text-success">+{{ expense.amount|inr }}</span>
+                {% else %}<span class="text-error">−{{ expense.amount|inr }}</span>{% endif %}
               </span>
               {% if expense.hra_type == 'RENT_PAID' %}<span class="badge badge-success badge-xs">Added</span>
               {% elif expense.hra_type == 'EXPENSE' %}<span class="badge badge-error badge-xs">Spent</span>

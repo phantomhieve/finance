@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load humanize %}
+{% load humanize indian_format %}
 
 {% block title %}Notes — Vault{% endblock %}
 
@@ -212,17 +212,17 @@
           <span class="text-success flex items-center gap-1">
             <span class="material-symbols-outlined text-sm">arrow_downward</span>To Receive
           </span>
-          <span class="text-success font-bold text-sm">₹{{ note.pending_amount|floatformat:0|intcomma }}</span>
+          <span class="text-success font-bold text-sm">{{ note.pending_amount|inr }}</span>
           {% else %}
           <span class="text-error flex items-center gap-1">
             <span class="material-symbols-outlined text-sm">arrow_upward</span>To Pay
           </span>
-          <span class="text-error font-bold text-sm">₹{{ note.pending_amount|floatformat:0|intcomma }}</span>
+          <span class="text-error font-bold text-sm">{{ note.pending_amount|inr }}</span>
           {% endif %}
         </div>
         {% if note.initial_amount %}
         <div class="flex justify-between items-center text-[10px] opacity-50 border-t border-base-300/40 pt-1.5 mt-0.5">
-          <span>Initial: ₹{{ note.initial_amount|floatformat:0|intcomma }}</span>
+          <span>Initial: {{ note.initial_amount|inr }}</span>
           {% if note.settled_pct is not None %}<span>{{ note.settled_pct }}% settled</span>{% endif %}
         </div>
         {% if note.settled_pct is not None %}
@@ -235,7 +235,7 @@
       {# Amount + actions #}
       <div class="flex items-center {% if note.amount and note.section != 'Pending' %}justify-between border-t border-base-300/40 pt-2 mt-auto{% else %}justify-end mt-auto pt-1{% endif %}">
         {% if note.amount and note.section != 'Pending' %}
-        <span class="text-sm font-bold text-primary">₹{{ note.amount|floatformat:0|intcomma }}</span>
+        <span class="text-sm font-bold text-primary">{{ note.amount|inr }}</span>
         {% endif %}
         <div class="flex gap-1">
           <button class="btn btn-ghost btn-xs btn-square"
@@ -283,15 +283,15 @@
           <div class="flex items-center justify-between font-semibold">
             {% if note.pending_type == 'CREDIT' %}
             <span class="text-success flex items-center gap-0.5 text-[11px]"><span class="material-symbols-outlined text-xs">arrow_downward</span>Receive</span>
-            <span class="text-success font-bold">₹{{ note.pending_amount|floatformat:0|intcomma }}</span>
+            <span class="text-success font-bold">{{ note.pending_amount|inr }}</span>
             {% else %}
             <span class="text-error flex items-center gap-0.5 text-[11px]"><span class="material-symbols-outlined text-xs">arrow_upward</span>Pay</span>
-            <span class="text-error font-bold">₹{{ note.pending_amount|floatformat:0|intcomma }}</span>
+            <span class="text-error font-bold">{{ note.pending_amount|inr }}</span>
             {% endif %}
           </div>
           {% if note.initial_amount %}
           <div class="flex justify-between items-center text-[9px] opacity-50 pt-1 mt-0.5 border-t border-base-300/40">
-            <span>Initial: ₹{{ note.initial_amount|floatformat:0|intcomma }}</span>
+            <span>Initial: {{ note.initial_amount|inr }}</span>
             {% if note.settled_pct is not None %}<span>{{ note.settled_pct }}%</span>{% endif %}
           </div>
           {% if note.settled_pct is not None %}
@@ -302,7 +302,7 @@
         {% endif %}
 
         {% if note.amount and note.section != 'Pending' %}
-        <div class="text-sm font-bold text-primary mt-1">₹{{ note.amount|floatformat:0|intcomma }}</div>
+        <div class="text-sm font-bold text-primary mt-1">{{ note.amount|inr }}</div>
         {% endif %}
       </div>
       <div class="flex flex-col gap-1 shrink-0">

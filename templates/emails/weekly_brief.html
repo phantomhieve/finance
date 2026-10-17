@@ -1,0 +1,166 @@
+{% extends "emails/_base.html" %}
+{% load indian_format %}
+
+{% block title %}Vault weekly brief · {{ date }}{% endblock %}
+
+{% block preheader %}{% if deficit > 0 %}Liquidity {{ deficit|inr_short }} short of your safety floor{% else %}{{ deployable|inr_short }} deployable above your safety floor{% endif %} · {{ drawdowns }} drawdown{{ drawdowns|pluralize }}, {{ outperformers }} outperformer{{ outperformers|pluralize }}{% endblock %}
+
+{% block eyebrow %}Weekly brief · {{ date }}{% endblock %}
+
+{% block content %}
+
+{# ── Liquidity verdict ─────────────────────────────────────────── #}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+  <td><p class="em-muted" style="margin:0 0 6px 0; font-size:13px; color:#64748b;">{% if deficit > 0 %}Shortfall vs safety floor{% else %}Deployable surplus{% endif %}</p></td>
+  <td align="right">{% if deficit > 0 %}<span style="display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:700; background-color:#fef2f2; color:#b91c1c;">Hold &amp; rebuild</span>{% else %}<span style="display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:700; background-color:#ecfdf5; color:#047857;">Clear to deploy</span>{% endif %}</td>
+</tr></table>
+<p class="em-hero num" style="margin:0; font-size:40px; line-height:46px; font-weight:800; letter-spacing:-0.5px; color:{% if deficit > 0 %}#b91c1c{% else %}#047857{% endif %};">{% if deficit > 0 %}{{ deficit|inr }}{% else %}{{ deployable|inr }}{% endif %}</p>
+<p class="em-muted" style="margin:8px 0 0 0; font-size:14px; line-height:21px; color:#475569;">
+  {% if deficit > 0 %}Liquid reserves are below your emergency floor. Pause non-essential investing until it's restored.{% else %}Liquid reserves are above your emergency floor. The excess can go to work per your target allocation.{% endif %}
+</p>
+
+<div style="height:14px; line-height:14px; font-size:0;">&nbsp;</div>
+{% if deficit > 0 %}
+  {% include "emails/_bar.html" with pct=coverage_bar color="#ef4444" %}
+{% else %}
+  {% include "emails/_bar.html" with pct=coverage_bar color="#10b981" %}
+{% endif %}
+
+{# ── Compact Liquidity Snapshot ── #}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:14px;"><tr>
+  <td class="em-soft em-line" style="background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px 14px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td width="33%" valign="top">
+        <p class="em-muted" style="margin:0; font-size:11px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; color:#64748b;">Liquid reserves</p>
+        <p class="em-text num" style="margin:3px 0 0 0; font-size:15px; font-weight:700; color:#0f172a;">{{ total_liquid|inr_short }}</p>
+      </td>
+      <td width="34%" valign="top" align="center" style="border-left:1px solid #e2e8f0; border-right:1px solid #e2e8f0; padding:0 8px;">
+        <p class="em-muted" style="margin:0; font-size:11px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; color:#64748b;">Safety floor</p>
+        <p class="em-text num" style="margin:3px 0 0 0; font-size:15px; font-weight:700; color:#0f172a;">{{ floor|inr_short }}</p>
+      </td>
+      <td width="33%" valign="top" align="right">
+        <p class="em-muted" style="margin:0; font-size:11px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; color:#64748b;">Coverage</p>
+        <p class="num" style="margin:3px 0 0 0; font-size:15px; font-weight:700; color:{% if deficit > 0 %}#b91c1c{% else %}#047857{% endif %};">{{ coverage_pct }}%</p>
+      </td>
+    </tr></table>
+  </td>
+</tr></table>
+
+{# ── Direct equity snapshot ────────────────────────────────────── #}
+{% if stocks %}
+{% include "emails/_section.html" with title="Direct equity" %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+  <td class="em-stack" width="33%" valign="top" style="padding-right:6px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="em-soft em-line" style="background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px;">
+      <p class="em-muted" style="margin:0; font-size:11px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; color:#64748b;">Invested</p>
+      <p class="em-text num" style="margin:4px 0 0 0; font-size:18px; font-weight:700; color:#0f172a;">{{ equity_invested|inr_short }}</p>
+    </td></tr></table>
+  </td>
+  <td class="em-stack" width="34%" valign="top" style="padding:0 3px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="em-soft em-line" style="background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px;">
+      <p class="em-muted" style="margin:0; font-size:11px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; color:#64748b;">Current</p>
+      <p class="em-text num" style="margin:4px 0 0 0; font-size:18px; font-weight:700; color:#0f172a;">{{ equity_current|inr_short }}</p>
+    </td></tr></table>
+  </td>
+  <td class="em-stack" width="33%" valign="top" style="padding-left:6px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td class="em-soft em-line" style="background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px;">
+      <p class="em-muted" style="margin:0; font-size:11px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; color:#64748b;">Unrealised P&amp;L</p>
+      <p class="num" style="margin:4px 0 0 0; font-size:18px; font-weight:700; color:{% if equity_pnl >= 0 %}#047857{% else %}#b91c1c{% endif %};">{% if equity_pnl >= 0 %}+{% endif %}{{ equity_pnl_pct|floatformat:1 }}%</p>
+    </td></tr></table>
+  </td>
+</tr></table>
+{% endif %}
+
+{# ── Needs attention ───────────────────────────────────────────── #}
+{% if notable %}
+{% include "emails/_section.html" with title="Positions to review" %}
+{% for s in notable %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:12px;"><tr>
+  <td width="4" style="width:4px; border-radius:2px; background-color:{% if s.flag == 'drawdown' %}#ef4444{% else %}#10b981{% endif %};">&nbsp;</td>
+  <td style="padding:2px 0 2px 14px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td>
+        <span class="em-text" style="font-size:15px; font-weight:700; color:#0f172a;">{{ s.symbol }}</span>
+        <span style="font-size:10px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:{% if s.flag == 'drawdown' %}#b91c1c{% else %}#047857{% endif %};">&nbsp;{% if s.flag == 'drawdown' %}Drawdown{% else %}Outperformer{% endif %}</span>
+      </td>
+      <td align="right" class="num" style="font-size:15px; font-weight:700; color:{% if s.pnl >= 0 %}#047857{% else %}#b91c1c{% endif %};">{% if s.pnl >= 0 %}+{% endif %}{{ s.pnl_pct|floatformat:1 }}%</td>
+    </tr></table>
+    <p class="em-muted num" style="margin:2px 0 0 0; font-size:12px; color:#64748b;">{{ s.invested|inr_short }} invested &rarr; {{ s.current|inr_short }} now ({% if s.pnl >= 0 %}+{% endif %}{{ s.pnl|inr_short }})</p>
+    {% if s.ai %}<p class="em-text" style="margin:6px 0 0 0; font-size:14px; line-height:21px; color:#334155;">{{ s.ai }}</p>{% endif %}
+  </td>
+</tr></table>
+{% endfor %}
+{% endif %}
+
+{# ── All holdings ──────────────────────────────────────────────── #}
+{% if stocks %}
+{% include "emails/_section.html" with title="All holdings · worst first" %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr>
+    <td class="em-muted em-line" style="padding:0 0 8px 0; font-size:11px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; color:#64748b; border-bottom:1px solid #e2e8f0;">Symbol</td>
+    <td class="em-muted em-line em-hide-sm" align="right" style="padding:0 0 8px 0; font-size:11px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; color:#64748b; border-bottom:1px solid #e2e8f0;">Invested</td>
+    <td class="em-muted em-line" align="right" style="padding:0 0 8px 0; font-size:11px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; color:#64748b; border-bottom:1px solid #e2e8f0;">Current</td>
+    <td class="em-muted em-line" align="right" style="padding:0 0 8px 0; font-size:11px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; color:#64748b; border-bottom:1px solid #e2e8f0;">P&amp;L</td>
+  </tr>
+  {% for s in stocks %}
+  <tr>
+    <td class="em-line" style="padding:9px 8px 9px 0; border-bottom:1px solid #e2e8f0;">
+      <span class="em-text" style="font-size:14px; font-weight:600; color:#0f172a;">{{ s.symbol }}</span><br>
+      <span class="em-muted" style="font-size:11px; color:#94a3b8;">{% for a in s.accounts %}{{ a.name }} · {{ a.qty }}{% if not forloop.last %}&ensp;{% endif %}{% endfor %}</span>
+    </td>
+    <td class="em-text em-line em-hide-sm num" align="right" style="padding:9px 8px 9px 0; font-size:14px; color:#0f172a; border-bottom:1px solid #e2e8f0;">{{ s.invested|inr }}</td>
+    <td class="em-text em-line num" align="right" style="padding:9px 8px 9px 0; font-size:14px; color:#0f172a; border-bottom:1px solid #e2e8f0;">{{ s.current|inr }}</td>
+    <td class="em-line num" align="right" style="padding:9px 0; font-size:14px; font-weight:700; border-bottom:1px solid #e2e8f0; color:{% if s.pnl_pct <= -10 %}#b91c1c{% elif s.pnl_pct >= 0 %}#047857{% else %}#64748b{% endif %};">{% if s.pnl_pct >= 0 %}+{% endif %}{{ s.pnl_pct|floatformat:1 }}%</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+{# ── Where reserves sit (Liquid Breakdown at bottom) ─────────────── #}
+{% if cash_positions or fds %}
+{% include "emails/_section.html" with title="Where reserves sit" %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:12px;"><tr>
+  <td><p class="em-muted" style="margin:0; font-size:12px; color:#64748b;">Itemized liquid reserves backing your safety floor.</p></td>
+  <td align="right"><span class="em-text num" style="font-size:13px; font-weight:700; color:#0f172a;">{{ total_liquid|inr }}</span></td>
+</tr></table>
+
+{% if cash_positions %}
+<p class="em-muted" style="margin:14px 0 6px 0; font-size:11px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; color:#64748b;">Cash &amp; bank accounts · {{ total_cash|inr }}</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+  {% for c in cash_positions %}
+  <tr>
+    <td class="em-line" style="padding:8px 0; border-bottom:1px solid #e2e8f0;">
+      <span class="em-text" style="font-size:14px; font-weight:600; color:#0f172a;">{{ c.name }}</span>{% if c.remarks %}<br>
+      <span class="em-muted" style="font-size:11px; color:#64748b;">{{ c.remarks }}</span>{% endif %}
+    </td>
+    <td class="em-text em-line num" align="right" style="padding:8px 0; font-size:14px; font-weight:600; color:#0f172a; border-bottom:1px solid #e2e8f0; vertical-align:middle;">
+      {{ c.amount|inr }}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+{% if fds %}
+<p class="em-muted" style="margin:16px 0 6px 0; font-size:11px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase; color:#64748b;">Fixed deposits · {{ total_fd|inr }}</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+  {% for f in fds %}
+  <tr>
+    <td class="em-line" style="padding:8px 0; border-bottom:1px solid #e2e8f0;">
+      <span class="em-text" style="font-size:14px; font-weight:600; color:#0f172a;">{{ f.name }}</span><br>
+      <span class="em-muted" style="font-size:11px; color:#64748b;">{{ f.account_name }}{% if f.interest_rate %} · {{ f.interest_rate }}%{% endif %}{% if f.maturity_date %} · Matures {{ f.maturity_date|date:"d M Y" }}{% endif %}</span>
+    </td>
+    <td class="em-text em-line num" align="right" style="padding:8px 0; font-size:14px; font-weight:600; color:#0f172a; border-bottom:1px solid #e2e8f0; vertical-align:middle;">
+      {{ f.current_value|inr }}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+{% endif %}
+
+<div style="height:16px; line-height:16px; font-size:0;">&nbsp;</div>
+{% endblock %}
+
+{% block cta_label %}Review holdings{% endblock %}
+{% block footer_note %}Weekly brief generated on {{ date }}. Drawdown = 10%+ below cost; outperformer = 15%+ above.{% endblock %}

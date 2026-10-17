@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load humanize %}
+{% load indian_format %}
 {% load static %}
 
 {% block title %}Monthly Savings — Vault{% endblock %}
@@ -37,9 +37,9 @@
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div>
         <p class="text-xs font-bold uppercase tracking-wider opacity-40">Annual Goal</p>
-        <p class="text-3xl lg:text-4xl font-extrabold mt-1 text-primary">₹{{ total_goal|floatformat:0|intcomma }}</p>
+        <p class="text-3xl lg:text-4xl font-extrabold mt-1 text-primary tabular-nums">{{ total_goal|inr }}</p>
         <div class="flex flex-wrap gap-2 mt-2 text-xs opacity-60">
-          <span>Base ₹{{ monthly_goal|floatformat:0|intcomma }}/mo</span>
+          <span>Base {{ monthly_goal|inr }}/mo</span>
           {% if increments %}<span class="badge badge-success badge-sm">{{ increments|length }} increment{{ increments|length|pluralize }}</span>{% endif %}
           {% if adjustments %}<span class="badge badge-secondary badge-sm">{{ adjustments|length }} adjustment{{ adjustments|length|pluralize }}</span>{% endif %}
         </div>
@@ -53,37 +53,45 @@
         <div class="flex justify-between mt-3">
           <div>
             <p class="text-[10px] uppercase tracking-wider opacity-40">Achieved</p>
-            <p class="text-sm font-bold {% if goal_achieved >= 0 %}text-success{% else %}text-error{% endif %}">₹{{ goal_achieved|floatformat:0|intcomma }}</p>
+            <p class="text-sm font-bold tabular-nums {% if goal_achieved >= 0 %}text-success{% else %}text-error{% endif %}">{{ goal_achieved|inr }}</p>
           </div>
           <div class="text-right">
-            <p class="text-[10px] uppercase tracking-wider opacity-40">Remaining</p>
-            <p class="text-sm font-bold {% if goal_remaining > 0 %}text-error{% else %}text-success{% endif %}">₹{{ goal_remaining|floatformat:0|intcomma }}</p>
+            <p class="text-[10px] uppercase tracking-wider opacity-40">{% if goal_remaining > 0 %}Remaining{% else %}Over goal{% endif %}</p>
+            <p class="text-sm font-bold tabular-nums {% if goal_remaining > 0 %}text-base-content{% else %}text-success{% endif %}">{% if goal_remaining > 0 %}{{ goal_remaining|inr }}{% else %}+{{ goal_surplus|inr }}{% endif %}</p>
           </div>
         </div>
+        {% if pace.state == 'open' %}
+        <p class="text-xs mt-3 flex items-start gap-1.5 {% if pace.gap >= 0 %}text-success{% else %}text-warning{% endif %}">
+          <span class="material-symbols-outlined text-sm">{% if pace.gap >= 0 %}trending_up{% else %}schedule{% endif %}</span>
+          <span>
+            {{ pace.gap_abs|inr_short }} {% if pace.gap >= 0 %}ahead of{% else %}behind{% endif %} pace
+            {% if goal_remaining > 0 %}<span class="opacity-70 text-base-content">· need {{ pace.need_per_month|inr }}/mo for {{ pace.months_left }} more month{{ pace.months_left|pluralize }}</span>{% endif %}
+          </span>
+        </p>
+        {% elif pace.state == 'closed' %}
+        <p class="text-xs mt-3 flex items-center gap-1.5 {% if pace.hit %}text-success{% else %}text-warning{% endif %}">
+          <span class="material-symbols-outlined text-sm">{% if pace.hit %}verified{% else %}flag{% endif %}</span>
+          {% if pace.hit %}Goal achieved for {{ fy_label }}{% else %}Closed {{ pace.gap_abs|inr_short }} short of the goal{% endif %}
+        </p>
+        {% endif %}
       </div>
-      <div class="grid grid-cols-2 lg:grid-cols-3 gap-2.5">
-        <div class="stat-card stat-card-primary">
-          <div class="text-[10px] uppercase tracking-wider opacity-50">Savings</div>
-          <div class="text-base font-bold mt-0.5 text-primary">₹{{ total_savings|floatformat:0|intcomma }}</div>
-        </div>
-        <div class="stat-card stat-card-accent">
-          <div class="text-[10px] uppercase tracking-wider opacity-50">Transfers</div>
-          <div class="text-base font-bold mt-0.5">₹{{ total_transfers|floatformat:0|intcomma }}</div>
+      <div class="grid grid-cols-2 gap-2.5 content-start">
+        <div class="stat-card stat-card-primary"{% if total_expense %} title="Savings minus {{ total_expense|inr }} of expenses"{% endif %}>
+          <div class="text-[10px] uppercase tracking-wider opacity-50">{% if total_expense %}Net Savings{% else %}Savings{% endif %}</div>
+          <div class="text-base font-bold mt-0.5 text-primary tabular-nums">{{ total_savings|inr }}</div>
         </div>
         <div class="stat-card stat-card-success">
           <div class="text-[10px] uppercase tracking-wider opacity-50">Extra Income</div>
-          <div class="text-base font-bold mt-0.5 text-success">₹{{ total_income|floatformat:0|intcomma }}</div>
+          <div class="text-base font-bold mt-0.5 text-success tabular-nums">{{ total_income|inr }}</div>
         </div>
-        {% if total_expense %}
-        <div class="stat-card stat-card-error">
-          <div class="text-[10px] uppercase tracking-wider opacity-50">Expenses</div>
-          <div class="text-base font-bold mt-0.5 text-error">-₹{{ total_expense|floatformat:0|intcomma }}</div>
+        <div class="stat-card stat-card-accent">
+          <div class="text-[10px] uppercase tracking-wider opacity-50">Transfers</div>
+          <div class="text-base font-bold mt-0.5 tabular-nums">{{ total_transfers|inr }}</div>
         </div>
-        {% endif %}
-        <div class="stat-card {% if hra_balance >= 0 %}stat-card-success{% else %}stat-card-error{% endif %}">
+        <a href="{% url 'hra_tracker' %}" class="stat-card no-underline text-inherit {% if hra_balance >= 0 %}stat-card-success{% else %}stat-card-error{% endif %}" title="HRA transfers minus HRA expenses this FY">
           <div class="text-[10px] uppercase tracking-wider opacity-50">HRA Balance</div>
-          <div class="text-base font-bold mt-0.5 {% if hra_balance >= 0 %}text-success{% else %}text-error{% endif %}">{% if hra_balance >= 0 %}+{% endif %}₹{{ hra_balance|floatformat:0|intcomma }}</div>
-        </div>
+          <div class="text-base font-bold mt-0.5 tabular-nums {% if hra_balance >= 0 %}text-success{% else %}text-error{% endif %}">{% if hra_balance >= 0 %}+{% endif %}{{ hra_balance|inr }}</div>
+        </a>
       </div>
     </div>
   </div>
@@ -103,10 +111,10 @@
     <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-2">
       {% for m in monthly_data %}
       <div class="month-card group rounded-xl p-2.5 text-center text-xs border relative {% if m.status == 'good' %}border-success/30 bg-success/5{% elif m.status == 'partial' %}border-warning/30 bg-warning/5{% elif m.status == 'missed' %}border-error/20 bg-error/5{% else %}border-base-300/50 bg-base-300/20{% endif %}">
-        <div class="font-semibold opacity-60 mb-1.5 text-[10px] uppercase tracking-wider">{{ m.name }}</div>
+        <div class="font-semibold opacity-60 mb-1.5 text-[10px] uppercase tracking-wider" title="{{ m.name }}">{{ m.short }}</div>
         {% if m.started %}
-        <div class="font-bold text-sm">₹{{ m.total|floatformat:0|intcomma }}</div>
-        <div class="text-[10px] {% if m.surplus >= 0 %}text-success{% else %}text-error{% endif %} font-semibold mt-0.5">{% if m.surplus >= 0 %}+{% endif %}₹{{ m.surplus|floatformat:0|intcomma }}</div>
+        <div class="font-bold text-sm tabular-nums" title="{{ m.total|inr }} saved of {{ m.goal|inr }}">{{ m.total|inr_short }}</div>
+        <div class="text-[10px] tabular-nums {% if m.surplus >= 0 %}text-success{% else %}text-error/80{% endif %} font-semibold mt-0.5">{% if m.surplus >= 0 %}+{% endif %}{{ m.surplus|inr_short }}</div>
         <progress class="progress progress-xs w-full mt-1.5 {% if m.status == 'good' %}progress-success{% elif m.status == 'partial' %}progress-warning{% else %}progress-error{% endif %}" value="{{ m.pct }}" max="100"></progress>
         <div class="text-[10px] opacity-40 mt-0.5">{{ m.pct }}%</div>
         {# Comment indicator / add button absolutely positioned to maintain grid height consistency #}
@@ -114,14 +122,14 @@
         <button class="absolute top-1.5 right-1.5 btn btn-ghost btn-xs btn-square h-5 w-5 p-0 min-h-0 text-info opacity-75 hover:opacity-100" title="{{ m.comment }}" onclick="openMonthComment('{{ m.month_date }}', '{{ m.name }}', '{{ m.comment|escapejs }}')">
           <span class="icon-filled material-symbols-outlined text-xs">chat_bubble</span>
         </button>
-        {% elif user.can_edit_savings and m.status == 'missed' or user.can_edit_savings and m.status == 'partial' %}
+        {% elif user.can_edit_savings and m.status != 'good' %}
         <button class="absolute top-1.5 right-1.5 btn btn-ghost btn-xs btn-square h-5 w-5 p-0 min-h-0 opacity-25 sm:opacity-0 group-hover:opacity-60 transition-opacity {% if m.status == 'missed' %}text-error{% elif m.status == 'partial' %}text-warning{% endif %}" title="Add comment" onclick="openMonthComment('{{ m.month_date }}', '{{ m.name }}', '')">
           <span class="material-symbols-outlined text-xs">add_comment</span>
         </button>
         {% endif %}
         {% else %}
-        <div class="text-sm opacity-30 mt-1">₹{{ m.goal|floatformat:0|intcomma }}</div>
-        <div class="text-[10px] opacity-20">Target</div>
+        <div class="text-sm opacity-30 mt-1 tabular-nums" title="{{ m.goal|inr }}">{{ m.goal|inr_short }}</div>
+        <div class="text-[10px] opacity-30">Target</div>
         {% endif %}
       </div>
       {% endfor %}
@@ -171,20 +179,20 @@
 {# ——— TRANSACTIONS ——— #}
 <div class="card bg-base-200 shadow-sm animate-up" style="animation-delay:0.3s">
   <div class="card-body p-4">
-    <h2 class="card-title text-base mb-2">Transactions</h2>
+    <h2 class="card-title text-base mb-2">Transactions {% if transactions %}<span class="badge badge-ghost badge-sm font-normal">{{ transactions|length }} in {{ fy_label }}</span>{% endif %}</h2>
 
     {# Desktop table #}
     <div class="hidden md:block overflow-x-auto">
       <table class="table table-sm" id="txnTable">
         <thead><tr><th>Date</th><th>Amount</th><th>Type</th><th>Remarks</th><th class="w-10"></th></tr></thead>
         <tbody>
-          {% for t in recent_transactions %}
+          {% for t in transactions %}
           <tr class="hover">
             <td class="opacity-60 text-sm whitespace-nowrap">{{ t.date|date:"d M Y" }}</td>
             <td class="font-semibold whitespace-nowrap">
-              {% if t.type == 'EXPENSE' %}<span class="text-error">-₹{{ t.amount|intcomma }}</span>
-              {% elif t.type == 'EXTRA_INCOME' or t.type == 'SAVINGS' %}<span class="text-success">+₹{{ t.amount|intcomma }}</span>
-              {% else %}₹{{ t.amount|intcomma }}{% endif %}
+              {% if t.type == 'EXPENSE' %}<span class="text-error">−{{ t.amount|inr }}</span>
+              {% elif t.type == 'EXTRA_INCOME' or t.type == 'SAVINGS' %}<span class="text-success">+{{ t.amount|inr }}</span>
+              {% else %}{{ t.amount|inr }}{% endif %}
             </td>
             <td>
               {% if t.type == 'SAVINGS' %}<span class="badge badge-primary badge-sm">Savings</span>
@@ -203,7 +211,7 @@
             </td>
           </tr>
           {% empty %}
-          <tr><td colspan="5" class="text-center opacity-50 py-8">No transactions yet — click <strong>Add Entry</strong> above.</td></tr>
+          <tr><td colspan="5" class="text-center opacity-50 py-8">No transactions yet{% if user.can_edit_savings %} — click <strong>Add Entry</strong> above{% endif %}.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -211,14 +219,14 @@
 
     {# Mobile card view #}
     <div class="md:hidden space-y-2" id="txnCards">
-      {% for t in recent_transactions %}
+      {% for t in transactions %}
       <div class="table-card flex items-center justify-between gap-3">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
             <span class="font-semibold text-sm whitespace-nowrap">
-              {% if t.type == 'EXPENSE' %}<span class="text-error">-₹{{ t.amount|intcomma }}</span>
-              {% elif t.type == 'EXTRA_INCOME' or t.type == 'SAVINGS' %}<span class="text-success">+₹{{ t.amount|intcomma }}</span>
-              {% else %}₹{{ t.amount|intcomma }}{% endif %}
+              {% if t.type == 'EXPENSE' %}<span class="text-error">−{{ t.amount|inr }}</span>
+              {% elif t.type == 'EXTRA_INCOME' or t.type == 'SAVINGS' %}<span class="text-success">+{{ t.amount|inr }}</span>
+              {% else %}{{ t.amount|inr }}{% endif %}
             </span>
             {% if t.type == 'SAVINGS' %}<span class="badge badge-primary badge-xs">Savings</span>
             {% elif t.type == 'TRANSFER' %}<span class="badge badge-info badge-xs">Transfer</span>
@@ -235,7 +243,7 @@
         {% endif %}
       </div>
       {% empty %}
-      <p class="text-center opacity-50 py-8 text-sm">No transactions yet — tap <strong>Add</strong> above.</p>
+      <p class="text-center opacity-50 py-8 text-sm">No transactions yet{% if user.can_edit_savings %} — tap <strong>Add</strong> above{% endif %}.</p>
       {% endfor %}
     </div>
   </div>
@@ -276,9 +284,9 @@
       <span class="material-symbols-outlined text-primary">flag</span>Manage Goals
     </h3>
     <div role="tablist" class="tabs tabs-bordered mt-4" id="goalTabs">
-      <a role="tab" class="tab tab-active" data-tab="tab-fy" onclick="switchTab('goalTabs','tab-fy',this)">Set FY Goal</a>
-      <a role="tab" class="tab" data-tab="tab-inc" onclick="switchTab('goalTabs','tab-inc',this)">Increment</a>
-      <a role="tab" class="tab" data-tab="tab-adj" onclick="switchTab('goalTabs','tab-adj',this)">Adjust</a>
+      <a role="tab" class="tab tab-active" data-tab="tab-fy" onclick="switchTab('tab-fy',this)">Set FY Goal</a>
+      <a role="tab" class="tab" data-tab="tab-inc" onclick="switchTab('tab-inc',this)">Increment</a>
+      <a role="tab" class="tab" data-tab="tab-adj" onclick="switchTab('tab-adj',this)">Adjust</a>
     </div>
 
     {# Tab 1: Set FY Goal #}
@@ -305,7 +313,7 @@
           <div class="flex justify-between items-center">
             <span>
               <span class="material-symbols-outlined text-sm text-warning align-middle">{% if inc.increment_amount < 0 %}arrow_downward{% else %}arrow_upward{% endif %}</span>
-              {% if inc.increment_amount > 0 %}+{% endif %}₹{{ inc.increment_amount|floatformat:0|intcomma }}/mo from {{ inc.effective_month|date:"M Y" }}
+              {% if inc.increment_amount > 0 %}+{% endif %}{{ inc.increment_amount|inr }}/mo from {{ inc.effective_month|date:"M Y" }}
               {% if inc.reason %}<span class="opacity-40">— {{ inc.reason }}</span>{% endif %}
             </span>
             <span class="flex gap-1">
@@ -342,7 +350,7 @@
           <div class="flex justify-between items-center">
             <span>
               <span class="material-symbols-outlined text-sm text-warning align-middle">{% if adj.adjustment_amount < 0 %}remove{% else %}add{% endif %}</span>
-              {% if adj.adjustment_amount > 0 %}+{% endif %}₹{{ adj.adjustment_amount|floatformat:0|intcomma }} only for {{ adj.month|date:"M Y" }}
+              {% if adj.adjustment_amount > 0 %}+{% endif %}{{ adj.adjustment_amount|inr }} only for {{ adj.month|date:"M Y" }}
               {% if adj.reason %}<span class="opacity-40">— {{ adj.reason }}</span>{% endif %}
             </span>
             <span class="flex gap-1">
@@ -385,7 +393,7 @@ document.addEventListener('DOMContentLoaded', function () {
   initPagination('txnTable', window.innerWidth <= 640 ? 7 : 15);
 });
 
-function switchTab(groupPrefix, targetId, btnEl) {
+function switchTab(targetId, btnEl) {
   var container = btnEl.closest('.modal-box');
   container.querySelectorAll('[role=tab]').forEach(function(b) { b.classList.remove('tab-active'); });
   container.querySelectorAll('.tab-pane').forEach(function(p) { p.classList.add('hidden'); });

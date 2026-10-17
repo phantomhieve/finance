@@ -44,9 +44,10 @@ django.setup()
 # Now safe to import Django models and app code
 # ---------------------------------------------------------------------------
 from django.apps import apps as django_apps  # noqa: E402
-from django.db.models import Sum, Case, When  # noqa: E402
+from django.db.models import Sum  # noqa: E402
 
 from mcp.server import MCPServer  # noqa: E402
+from mcp.types import Icon  # noqa: E402
 
 from tracker.models import (  # noqa: E402
     AccountGroup, User, Transaction, Category,
@@ -55,18 +56,21 @@ from tracker.models import (  # noqa: E402
     MonthlySavingsComment,
 )
 from portfolio.models import (  # noqa: E402
-    ZerodhaAccount, StockHolding, MutualFundHolding,
-    EPFEntry, NPSEntry, FixedDeposit, CashPosition,
+    ZerodhaAccount, EPFEntry, NPSEntry, FixedDeposit, CashPosition,
     BondHolding, CryptoHolding, CommodityHolding,
     CommodityPrice, MonthlySnapshot,
     FinancialGoal as PortfolioGoal, USStockHolding,
-    PortfolioInsight,
+    PortfolioInsight, InsightGenerationSettings, RealEstateHolding,
 )
 from jewellery.models import JewelleryItem  # noqa: E402
 from portfolio.services import (  # noqa: E402
-    get_portfolio_summary, refresh_commodity_prices,
-    refresh_us_stock_prices,
+    get_portfolio_summary as _fetch_portfolio_summary,
+    refresh_commodity_prices as _refresh_commodity_prices,
+    refresh_us_stock_prices as _refresh_us_stock_prices,
+    get_growth_data as _fetch_growth_data,
 )
+from portfolio.ai import build_prompt_data, call_gemini  # noqa: E402
+from pftracker.utils import fy_start_from_label  # noqa: E402
 from mcp_server.models import MCPAuditLog  # noqa: E402
 from mcp_server.audit import (  # noqa: E402
     log_create, log_update, log_delete,
@@ -75,7 +79,7 @@ from mcp_server.audit import (  # noqa: E402
 
 # Logging — write to stderr, never stdout (stdio transport uses stdout)
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='[%(asctime)s] %(levelname)s %(name)s %(message)s',
     stream=sys.stderr,
 )
@@ -129,11 +133,6 @@ def _parse_decimal(value) -> Decimal:
         return _ZERO
 
 
-def _qs_to_dicts(qs, fields):
-    """Convert a queryset to a list of dicts with specified fields."""
-    return list(qs.values(*fields))
-
-
 def _model_to_dict(instance, exclude=None):
     """Convert a model instance to a dict, handling special types."""
     exclude = exclude or set()
@@ -155,7 +154,21 @@ def _model_to_dict(instance, exclude=None):
 # MCP Server
 # ---------------------------------------------------------------------------
 
-mcp = MCPServer("Vault Finance")
+_public_url = os.environ.get("VAULT_PUBLIC_URL", "http://localhost:8000").rstrip("/")
+mcp = MCPServer(
+    name="Vault Finance",
+    title="Vault Finance",
+    description="Personal Finance & Portfolio Tracker MCP Server",
+    version="1.0.0",
+    website_url=_public_url,
+    icons=[
+        Icon(
+            src=f"{_public_url}/static/icons/icon-512.png",
+            mime_type="image/png",
+            sizes=["512x512"],
+        )
+    ],
+)
 
 
 # =====================================================================
@@ -166,7 +179,7 @@ mcp = MCPServer("Vault Finance")
 def portfolio_summary() -> str:
     """Full portfolio summary: total value, per-asset breakdown, P&L, goals, equity split, consolidated view."""
     group = _get_group()
-    summary = get_portfolio_summary(group=group)
+    summary = _fetch_portfolio_summary(group=group)
 
     # Convert to serialisable format (strip Django objects)
     result = {
@@ -203,6 +216,9 @@ def portfolio_summary() -> str:
         'silver_rate_per_gram': str(summary['silver_rate']),
         'us_stocks_invested': str(summary['us_stocks_invested']),
         'us_stocks_current': str(summary['us_stocks_current']),
+        'real_estate_invested': str(summary['real_estate_invested']),
+        'real_estate_current': str(summary['real_estate_current']),
+        'real_estate_returns': str(summary['real_estate_returns']),
     }
     return _to_json(result)
 
@@ -358,6 +374,30 @@ def portfolio_us_stocks() -> str:
     return _to_json(result)
 
 
+@mcp.resource("vault://portfolio/real-estate")
+def portfolio_real_estate() -> str:
+    """Real estate property investments (land, plots, apartments, commercial)."""
+    group = _get_group()
+    qs = RealEstateHolding.objects.filter(group=group) if group else RealEstateHolding.objects.all()
+    result = []
+    for h in qs:
+        d = _model_to_dict(h)
+        d['area_in_gaj'] = str(h.area_in_gaj)
+        d['area_in_sqft'] = str(h.area_in_sqft)
+        d['area_display'] = h.area_display
+        d['total_cost_basis'] = str(h.total_cost_basis)
+        d['purchase_rate_per_gaj'] = str(h.purchase_rate_per_gaj)
+        d['current_rate_per_gaj'] = str(h.current_rate_per_gaj)
+        d['pnl'] = str(h.pnl)
+        d['pnl_pct'] = str(h.pnl_pct)
+        d['cagr_pct'] = str(h.cagr_pct)
+        d['annual_rental_income'] = str(h.annual_rental_income)
+        d['rental_yield_pct'] = str(h.rental_yield_pct)
+        d['location_summary'] = h.location_summary_for_llm
+        result.append(d)
+    return _to_json(result)
+
+
 @mcp.resource("vault://portfolio/goals")
 def portfolio_goals() -> str:
     """Portfolio financial goals and progress."""
@@ -463,6 +503,8 @@ def jewellery_items() -> str:
     """All jewellery items with estimated values."""
     group = _get_group()
     qs = JewelleryItem.objects.filter(group=group) if group else JewelleryItem.objects.all()
+    qs = list(qs)
+    JewelleryItem.attach_rates(qs)
     result = []
     for item in qs:
         d = _model_to_dict(item, exclude={'photo'})
@@ -491,6 +533,528 @@ def mcp_audit_log() -> str:
             'data_before': e.data_before,
             'data_after': e.data_after,
         })
+    return _to_json(result)
+
+
+# =====================================================================
+#  TOOLS — Read operations (Data queries)
+# =====================================================================
+
+@mcp.tool()
+def get_portfolio_summary() -> str:
+    """Get complete portfolio summary: total net worth, invested value, total returns, P&L %, asset breakdown, goals, and consolidated holdings."""
+    return portfolio_summary()
+
+
+@mcp.tool()
+def get_portfolio_stocks(symbol: str = "", account_name: str = "") -> str:
+    """Get all stock holdings across Zerodha accounts with purchase values, current market values, and P&L.
+
+    Args:
+        symbol: Optional stock symbol filter (e.g. 'TCS', 'INFY')
+        account_name: Optional Zerodha account name filter
+    """
+    group = _get_group()
+    accounts = ZerodhaAccount.objects.filter(group=group) if group else ZerodhaAccount.objects.all()
+    if account_name:
+        accounts = accounts.filter(name__icontains=account_name)
+    result = []
+    for acct in accounts:
+        holdings = acct.stock_holdings.all()
+        if symbol:
+            holdings = holdings.filter(symbol__icontains=symbol)
+        for h in holdings:
+            result.append({
+                'account': acct.name,
+                'symbol': h.symbol,
+                'quantity': h.quantity,
+                'purchase_value': str(h.purchase_value),
+                'current_value': str(h.current_value),
+                'pnl': str(h.pnl),
+                'pnl_pct': str(h.pnl_pct),
+                'is_baby': h.is_baby,
+            })
+    return _to_json(result)
+
+
+@mcp.tool()
+def get_portfolio_mutual_funds(fund_name: str = "", account_name: str = "") -> str:
+    """Get all mutual fund holdings across Zerodha accounts.
+
+    Args:
+        fund_name: Optional fund name filter
+        account_name: Optional account name filter
+    """
+    group = _get_group()
+    accounts = ZerodhaAccount.objects.filter(group=group) if group else ZerodhaAccount.objects.all()
+    if account_name:
+        accounts = accounts.filter(name__icontains=account_name)
+    result = []
+    for acct in accounts:
+        holdings = acct.mf_holdings.all()
+        if fund_name:
+            holdings = holdings.filter(fund_name__icontains=fund_name)
+        for h in holdings:
+            result.append({
+                'account': acct.name,
+                'fund_name': h.fund_name,
+                'fund_type': h.fund_type,
+                'units': str(h.units),
+                'purchase_value': str(h.purchase_value),
+                'current_value': str(h.current_value),
+                'pnl': str(h.pnl),
+                'pnl_pct': str(h.pnl_pct),
+                'is_baby': h.is_baby,
+            })
+    return _to_json(result)
+
+
+@mcp.tool()
+def get_epf_details() -> str:
+    """Get EPF (Employee Provident Fund) running balance, total contribution, total interest, and recent entries."""
+    return portfolio_epf()
+
+
+@mcp.tool()
+def get_nps_details() -> str:
+    """Get NPS (National Pension System) current balance, total contribution, total interest, and recent entries."""
+    return portfolio_nps()
+
+
+@mcp.tool()
+def get_fixed_deposits(is_active_only: bool = True) -> str:
+    """Get fixed deposits with principal, interest rate, maturity date, accrued interest, current value, and days remaining.
+
+    Args:
+        is_active_only: Whether to return only active FDs (default: True)
+    """
+    group = _get_group()
+    qs = FixedDeposit.objects.filter(group=group) if group else FixedDeposit.objects.all()
+    if is_active_only:
+        qs = qs.filter(is_active=True)
+    result = []
+    for fd in qs:
+        d = _model_to_dict(fd)
+        d['current_value'] = str(fd.current_value)
+        d['maturity_value'] = str(fd.maturity_value)
+        d['interest_accrued'] = str(fd.interest_accrued)
+        d['days_remaining'] = fd.days_remaining
+        result.append(d)
+    return _to_json(result)
+
+
+@mcp.tool()
+def get_cash_positions() -> str:
+    """Get all cash positions and bank account balances."""
+    return portfolio_cash()
+
+
+@mcp.tool()
+def get_bond_holdings() -> str:
+    """Get all bond holdings."""
+    return portfolio_bonds()
+
+
+@mcp.tool()
+def get_crypto_holdings() -> str:
+    """Get all crypto holdings with invested amount, current value, and P&L."""
+    return portfolio_crypto()
+
+
+@mcp.tool()
+def get_commodity_holdings() -> str:
+    """Get physical gold and silver commodity holdings with current market prices and value."""
+    return portfolio_commodities()
+
+
+@mcp.tool()
+def get_us_stock_holdings() -> str:
+    """Get US stock (RSU) holdings with INR values and P&L."""
+    return portfolio_us_stocks()
+
+
+@mcp.tool()
+def get_real_estate_holdings() -> str:
+    """Get all real estate property investments (plots, apartments, commercial, villas, agricultural) with measurements in Gaj/SqFt, acquisition costs, current valuation, and returns."""
+    return portfolio_real_estate()
+
+
+@mcp.tool()
+def get_real_estate_detail(holding_id: int) -> str:
+    """Get detailed structured data and LLM research metadata for a specific real estate property.
+
+    Args:
+        holding_id: ID of the RealEstateHolding record
+    """
+    group = _get_group()
+    try:
+        h = RealEstateHolding.objects.get(pk=holding_id, group=group) if group else RealEstateHolding.objects.get(pk=holding_id)
+    except RealEstateHolding.DoesNotExist:
+        return f"Error: RealEstateHolding #{holding_id} not found."
+
+    d = _model_to_dict(h)
+    d['area_in_gaj'] = str(h.area_in_gaj)
+    d['area_in_sqft'] = str(h.area_in_sqft)
+    d['area_display'] = h.area_display
+    d['total_cost_basis'] = str(h.total_cost_basis)
+    d['purchase_rate_per_gaj'] = str(h.purchase_rate_per_gaj)
+    d['current_rate_per_gaj'] = str(h.current_rate_per_gaj)
+    d['pnl'] = str(h.pnl)
+    d['pnl_pct'] = str(h.pnl_pct)
+    d['cagr_pct'] = str(h.cagr_pct)
+    d['annual_rental_income'] = str(h.annual_rental_income)
+    d['rental_yield_pct'] = str(h.rental_yield_pct)
+    d['location_summary'] = h.location_summary_for_llm
+    d['llm_research_prompt'] = h.get_llm_research_prompt()
+    return _to_json(d)
+
+
+@mcp.tool()
+def get_real_estate_llm_prompt(holding_id: int) -> str:
+    """Get a ready-to-run market research prompt for Gemini/LLMs to analyze circle rates, price growth, and catalysts for a property.
+
+    Args:
+        holding_id: ID of the RealEstateHolding record
+    """
+    group = _get_group()
+    try:
+        h = RealEstateHolding.objects.get(pk=holding_id, group=group) if group else RealEstateHolding.objects.get(pk=holding_id)
+    except RealEstateHolding.DoesNotExist:
+        return f"Error: RealEstateHolding #{holding_id} not found."
+
+    return h.get_llm_research_prompt()
+
+
+@mcp.tool()
+def get_portfolio_goals() -> str:
+    """Get portfolio milestone goals and progress."""
+    return portfolio_goals()
+
+
+@mcp.tool()
+def get_portfolio_snapshots(limit: int = 12) -> str:
+    """Get monthly portfolio snapshots to see net worth and returns growth over time.
+
+    Args:
+        limit: Number of monthly snapshots to return (default: 12)
+    """
+    limit = min(max(1, limit), 60)
+    group = _get_group()
+    qs = MonthlySnapshot.objects.filter(group=group) if group else MonthlySnapshot.objects.all()
+    result = []
+    for s in qs[:limit]:
+        d = _model_to_dict(s)
+        d['return_pct'] = str(s.return_pct)
+        result.append(d)
+    return _to_json(result)
+
+
+@mcp.tool()
+def get_ai_insights(limit: int = 1) -> str:
+    """Get the latest AI-generated portfolio insights. Returns the full structured analysis including
+    summary, portfolio health score (0-100), individual insights with severity and actions,
+    market context, and forward outlook.
+
+    Args:
+        limit: Number of insight records to return (default: 1 = latest only, max: 10)
+    """
+    limit = min(max(1, limit), 10)
+    group = _get_group()
+    qs = PortfolioInsight.objects.filter(group=group) if group else PortfolioInsight.objects.all()
+    qs = qs.order_by('-generated_at')[:limit]
+    result = []
+    for insight in qs:
+        entry = {
+            'id': insight.id,
+            'generated_at': insight.generated_at.isoformat(),
+            'model_used': insight.model_used,
+            'insights': insight.insights,
+        }
+        result.append(entry)
+    if not result:
+        return _to_json({'message': 'No AI insights have been generated yet. Use trigger_ai_insights to generate one.'})
+    return _to_json(result[0] if limit == 1 else result)
+
+
+@mcp.tool()
+def get_ai_insight_status() -> str:
+    """Check the AI insight generation cooldown status — whether a new generation
+    is allowed, when the last one was run, and the configured cooldown period.
+    Call this before trigger_ai_insights to verify availability."""
+    from django.utils import timezone as _tz
+    from django.conf import settings as _settings
+
+    group = _get_group()
+    is_debug = _settings.DEBUG
+
+    # Per-household cooldown; fall back to global
+    cooldown_days = 30
+    if group:
+        try:
+            cooldown_days = group.config.ai_cooldown_days
+        except Exception:
+            pass
+    else:
+        cooldown_days = InsightGenerationSettings.get_solo().cooldown_days
+
+    qs = PortfolioInsight.objects.filter(group=group) if group else PortfolioInsight.objects.all()
+    latest = qs.order_by('-generated_at').first()
+
+    if not latest:
+        return _to_json({
+            'can_generate': True,
+            'last_generated': None,
+            'cooldown_days': cooldown_days,
+            'cooldown_bypassed': is_debug,
+            'total_generations': 0,
+            'message': 'No insights generated yet. Ready to generate.',
+        })
+
+    now = _tz.now()
+    elapsed = now - latest.generated_at
+    elapsed_days = elapsed.days
+    elapsed_hours = (elapsed.total_seconds() % 86400) // 3600
+
+    if is_debug:
+        can_generate = True
+    else:
+        cooldown_td = datetime.timedelta(days=cooldown_days)
+        can_generate = elapsed >= cooldown_td
+
+    remaining_secs = 0
+    if not can_generate:
+        cooldown_td = datetime.timedelta(days=cooldown_days)
+        remaining = cooldown_td - elapsed
+        remaining_secs = max(0, int(remaining.total_seconds()))
+
+    remaining_days = remaining_secs // 86400
+    remaining_hours = (remaining_secs % 86400) // 3600
+
+    total = qs.count()
+
+    result = {
+        'can_generate': can_generate,
+        'last_generated': latest.generated_at.isoformat(),
+        'last_model_used': latest.model_used,
+        'elapsed_since_last': f'{elapsed_days}d {int(elapsed_hours)}h',
+        'cooldown_days': cooldown_days,
+        'cooldown_bypassed': is_debug,
+        'total_generations': total,
+    }
+    if can_generate:
+        result['message'] = 'Ready to generate new AI insights.'
+    else:
+        result['remaining'] = f'{remaining_days}d {remaining_hours}h'
+        result['message'] = f'Cooldown active. Try again in {remaining_days}d {remaining_hours}h.'
+
+    return _to_json(result)
+
+
+@mcp.tool()
+def trigger_ai_insights(force: bool = False) -> str:
+    """Generate new AI portfolio insights using Gemini. This performs a full portfolio
+    analysis including allocation, risk, tax optimization, real estate growth analysis,
+    and macro context. Respects the configured cooldown period unless force=True.
+
+    This operation may take 15-30 seconds as it calls Gemini with live macro data.
+
+    Args:
+        force: If True, bypass the cooldown check (use sparingly). Default: False.
+    """
+    from django.utils import timezone as _tz
+    from django.conf import settings as _settings
+
+    group = _get_group()
+
+    # ── Cooldown check (per-household) ──
+    if not force:
+        is_debug = _settings.DEBUG
+        cooldown_days = 30
+        if group:
+            try:
+                cooldown_days = group.config.ai_cooldown_days
+            except Exception:
+                cooldown_days = InsightGenerationSettings.get_solo().cooldown_days
+        else:
+            cooldown_days = InsightGenerationSettings.get_solo().cooldown_days
+
+        latest = PortfolioInsight.objects.filter(group=group).order_by('-generated_at').first() if group \
+            else PortfolioInsight.objects.order_by('-generated_at').first()
+
+        if latest and not is_debug:
+            cooldown_td = datetime.timedelta(days=cooldown_days)
+            elapsed = _tz.now() - latest.generated_at
+            if elapsed < cooldown_td:
+                remaining = cooldown_td - elapsed
+                remaining_secs = max(0, int(remaining.total_seconds()))
+                days = remaining_secs // 86400
+                hours = (remaining_secs % 86400) // 3600
+                return _to_json({
+                    'status': 'cooldown_active',
+                    'message': f'AI insights cooldown is {cooldown_days} day(s). '
+                               f'Try again in {days}d {hours}h, or use force=True to bypass.',
+                    'last_generated': latest.generated_at.isoformat(),
+                    'cooldown_days': cooldown_days,
+                })
+
+    # ── Generate insights ──
+    try:
+        summary = _fetch_portfolio_summary(group)
+        growth = _fetch_growth_data(group=group)
+        prompt_data = build_prompt_data(summary, growth, group)
+        result = call_gemini(prompt_data, group=group)
+        insight = PortfolioInsight.objects.create(
+            group=group,
+            model_used=result.model,
+            prompt_data=prompt_data,
+            insights=result.insights_dict,
+        )
+        return _to_json({
+            'status': 'success',
+            'id': insight.id,
+            'model_used': result.model,
+            'generated_at': insight.generated_at.isoformat(),
+            'score': result.insights_dict.get('score'),
+            'summary': result.insights_dict.get('summary'),
+            'insight_count': len(result.insights_dict.get('insights', [])),
+            'insights': result.insights_dict,
+        })
+    except Exception as e:
+        logger.exception('AI insight generation failed via MCP')
+        return _to_json({
+            'status': 'error',
+            'message': f'AI insight generation failed: {str(e)}',
+        })
+
+
+@mcp.tool()
+def get_transactions(
+    fy_year: str = "",
+    limit: int = 50,
+    category_name: str = "",
+    type: str = "",
+) -> str:
+    """Get transactions (savings, expenses, transfers, extra income) with optional filters.
+
+    Args:
+        fy_year: Optional financial year filter (e.g. '2025' for FY 2025-26)
+        limit: Max transactions to return (default: 50, max: 200)
+        category_name: Optional category name filter
+        type: Optional type filter (SAVINGS, EXPENSE, TRANSFER, EXTRA_INCOME)
+    """
+    limit = min(max(1, limit), 200)
+    user = _get_primary_user()
+    if not user:
+        return _to_json({'error': 'No primary user found.'})
+    qs = Transaction.objects.filter(user__group=user.group).select_related('category')
+    if fy_year:
+        try:
+            fy = int(fy_year)
+            start = datetime.date(fy, 4, 1)
+            end = datetime.date(fy + 1, 3, 31)
+            qs = qs.filter(date__gte=start, date__lte=end)
+        except ValueError:
+            return _to_json({'error': f'Invalid fy_year: {fy_year}. Use YYYY format (e.g. 2025).'})
+    if category_name:
+        qs = qs.filter(category__name__icontains=category_name)
+    if type:
+        qs = qs.filter(type=type.upper())
+    result = []
+    for t in qs[:limit]:
+        result.append({
+            'id': t.id,
+            'date': t.date.isoformat(),
+            'amount': str(t.amount),
+            'type': t.type,
+            'category': t.category.name if t.category else None,
+            'category_type': t.category.type if t.category else None,
+            'remarks': t.remarks,
+        })
+    return _to_json({'count': len(result), 'transactions': result})
+
+
+@mcp.tool()
+def get_hra_expenses(fy_year: str = "") -> str:
+    """Get House Rent Allowance (HRA) expenses.
+
+    Args:
+        fy_year: Optional financial year (e.g. '2025' for FY 2025-26)
+    """
+    user = _get_primary_user()
+    if not user:
+        return _to_json({'error': 'No primary user found.'})
+    qs = HRAExpense.objects.filter(user__group=user.group)
+    if fy_year:
+        try:
+            fy = int(fy_year)
+            start = datetime.date(fy, 4, 1)
+            end = datetime.date(fy + 1, 3, 31)
+            qs = qs.filter(date__gte=start, date__lte=end)
+        except ValueError:
+            return _to_json({'error': f'Invalid fy_year: {fy_year}.'})
+    return _to_json([_model_to_dict(h) for h in qs])
+
+
+@mcp.tool()
+def get_tracker_goals() -> str:
+    """Get monthly savings goals, increments, and adjustments."""
+    return tracker_goals()
+
+
+@mcp.tool()
+def get_notes(
+    limit: int = 50,
+    section: str = "",
+    pending_only: bool = False,
+) -> str:
+    """Get personal notes, todo items, or pending credit/debit trackers.
+
+    Args:
+        limit: Max notes to return (default: 50, max: 100)
+        section: Optional section filter (e.g. 'Savings', 'Tax', 'Goal')
+        pending_only: If true, only return notes with pending CREDIT/DEBIT amounts
+    """
+    limit = min(max(1, limit), 100)
+    user = _get_primary_user()
+    if not user:
+        return _to_json({'error': 'No primary user found.'})
+    qs = Note.objects.filter(user__group=user.group)
+    if section:
+        qs = qs.filter(section__icontains=section)
+    if pending_only:
+        qs = qs.filter(pending_type__in=['CREDIT', 'DEBIT']).exclude(pending_amount=0)
+    return _to_json([_model_to_dict(n) for n in qs[:limit]])
+
+
+@mcp.tool()
+def get_jewellery_items(
+    category: str = "",
+    metal_type: str = "",
+    location: str = "",
+) -> str:
+    """Get all jewellery items with weights, purity, locker/safe location, and estimated market values.
+
+    Args:
+        category: Optional filter (e.g. 'CHAIN', 'RING', 'BANGLE', 'COIN')
+        metal_type: Optional filter ('GOLD', 'SILVER', 'PLATINUM', 'DIAMOND_OTHER')
+        location: Optional filter ('BANK_LOCKER', 'HOME_SAFE')
+    """
+    group = _get_group()
+    qs = JewelleryItem.objects.filter(group=group) if group else JewelleryItem.objects.all()
+    if category:
+        qs = qs.filter(category=category.upper())
+    if metal_type:
+        qs = qs.filter(metal_type=metal_type.upper())
+    if location:
+        qs = qs.filter(location=location.upper())
+    qs = list(qs)
+    JewelleryItem.attach_rates(qs)
+    result = []
+    for item in qs:
+        d = _model_to_dict(item, exclude={'photo'})
+        d['display_label'] = item.display_label
+        d['estimated_value'] = str(item.estimated_value)
+        result.append(d)
     return _to_json(result)
 
 
@@ -548,6 +1112,57 @@ def add_transaction(
 
 
 @mcp.tool()
+def update_transaction(
+    txn_id: int,
+    amount: str = None,
+    date: str = None,
+    type: str = None,
+    category_name: str = None,
+    remarks: str = None,
+) -> str:
+    """Update an existing savings/expense/transfer/income transaction.
+
+    Args:
+        txn_id: ID of the transaction to update
+        amount: New transaction amount (optional)
+        date: New date in YYYY-MM-DD format (optional)
+        type: SAVINGS, EXPENSE, TRANSFER, or EXTRA_INCOME (optional)
+        category_name: Category name (optional)
+        remarks: Updated remarks (optional)
+    """
+    user = _get_primary_user()
+    try:
+        txn = Transaction.objects.get(pk=txn_id, user=user) if user else Transaction.objects.get(pk=txn_id)
+    except Transaction.DoesNotExist:
+        return f"Error: Transaction #{txn_id} not found."
+
+    old_data = serialize_instance(txn)
+    if amount is not None and amount != "":
+        txn.amount = _parse_decimal(amount)
+    if date is not None and date != "":
+        txn.date = _parse_date(date)
+    if type is not None and type != "":
+        valid_types = ['SAVINGS', 'TRANSFER', 'EXTRA_INCOME', 'EXPENSE']
+        if type.upper() not in valid_types:
+            return f"Error: type must be one of {valid_types}"
+        txn.type = type.upper()
+    if category_name is not None and category_name != "":
+        category = Category.objects.filter(user=txn.user, name__iexact=category_name).first()
+        if not category:
+            available = list(Category.objects.filter(user=txn.user).values_list('name', flat=True))
+            return f"Error: Category '{category_name}' not found. Available: {available}"
+        txn.category = category
+    elif category_name == "":
+        txn.category = None
+    if remarks is not None:
+        txn.remarks = remarks
+
+    txn.save()
+    log_update(txn, old_data, 'update_transaction')
+    return _to_json({'status': 'updated', 'id': txn.id, 'summary': str(txn)})
+
+
+@mcp.tool()
 def add_hra_entry(
     date: str,
     amount: str,
@@ -577,6 +1192,48 @@ def add_hra_entry(
         'id': entry.id,
         'summary': str(entry),
     })
+
+
+@mcp.tool()
+def update_hra_entry(
+    entry_id: int,
+    amount: str = "",
+    date: str = "",
+    expense_type: str = "",
+    mode_of_payment: str = "",
+    remarks: str = "",
+) -> str:
+    """Update an existing HRA rent or expense entry.
+
+    Args:
+        entry_id: ID of the HRA entry to update
+        amount: New amount (optional)
+        date: New date in YYYY-MM-DD format (optional)
+        expense_type: Description/type (optional)
+        mode_of_payment: Payment method (optional)
+        remarks: Updated remarks (optional)
+    """
+    user = _get_primary_user()
+    try:
+        entry = HRAExpense.objects.get(pk=entry_id, user=user) if user else HRAExpense.objects.get(pk=entry_id)
+    except HRAExpense.DoesNotExist:
+        return f"Error: HRA expense #{entry_id} not found."
+
+    old_data = serialize_instance(entry)
+    if amount:
+        entry.amount = _parse_decimal(amount)
+    if date:
+        entry.date = _parse_date(date)
+    if expense_type:
+        entry.expense_type = expense_type
+    if mode_of_payment:
+        entry.mode_of_payment = mode_of_payment
+    if remarks:
+        entry.remarks = remarks
+
+    entry.save()
+    log_update(entry, old_data, 'update_hra_entry')
+    return _to_json({'status': 'updated', 'id': entry.id, 'summary': str(entry)})
 
 
 @mcp.tool()
@@ -697,6 +1354,46 @@ def add_epf_entry(
 
 
 @mcp.tool()
+def update_epf_entry(
+    entry_id: int,
+    amount: str = "",
+    date: str = "",
+    entry_type: str = "",
+    remarks: str = "",
+) -> str:
+    """Update an existing EPF contribution or interest entry.
+
+    Args:
+        entry_id: ID of the EPF entry
+        amount: New amount in INR (optional)
+        date: New date in YYYY-MM-DD format (optional)
+        entry_type: CONTRIBUTION or INTEREST (optional)
+        remarks: Updated remarks (optional)
+    """
+    group = _get_group()
+    try:
+        entry = EPFEntry.objects.get(pk=entry_id, group=group) if group else EPFEntry.objects.get(pk=entry_id)
+    except EPFEntry.DoesNotExist:
+        return f"Error: EPF entry #{entry_id} not found."
+
+    old_data = serialize_instance(entry)
+    if amount:
+        entry.amount = _parse_decimal(amount)
+    if date:
+        entry.date = _parse_date(date)
+    if entry_type:
+        if entry_type.upper() not in ('CONTRIBUTION', 'INTEREST'):
+            return "Error: entry_type must be CONTRIBUTION or INTEREST"
+        entry.entry_type = entry_type.upper()
+    if remarks:
+        entry.remarks = remarks
+
+    entry.save()
+    log_update(entry, old_data, 'update_epf_entry')
+    return _to_json({'status': 'updated', 'id': entry.id, 'summary': str(entry)})
+
+
+@mcp.tool()
 def add_nps_entry(
     date: str,
     contribution: str,
@@ -728,6 +1425,48 @@ def add_nps_entry(
 
 
 @mcp.tool()
+def update_nps_entry(
+    entry_id: int,
+    date: str = "",
+    contribution: str = "",
+    interest_earned: str = "",
+    total_balance: str = "",
+    remarks: str = "",
+) -> str:
+    """Update an existing NPS snapshot entry.
+
+    Args:
+        entry_id: ID of the NPS entry
+        date: New date in YYYY-MM-DD format (optional)
+        contribution: Updated contribution amount (optional)
+        interest_earned: Updated returns/interest credited (optional)
+        total_balance: Updated total running balance (optional)
+        remarks: Updated remarks (optional)
+    """
+    group = _get_group()
+    try:
+        entry = NPSEntry.objects.get(pk=entry_id, group=group) if group else NPSEntry.objects.get(pk=entry_id)
+    except NPSEntry.DoesNotExist:
+        return f"Error: NPS entry #{entry_id} not found."
+
+    old_data = serialize_instance(entry)
+    if date:
+        entry.date = _parse_date(date)
+    if contribution:
+        entry.contribution = _parse_decimal(contribution)
+    if interest_earned:
+        entry.interest_earned = _parse_decimal(interest_earned)
+    if total_balance:
+        entry.total_balance = _parse_decimal(total_balance)
+    if remarks:
+        entry.remarks = remarks
+
+    entry.save()
+    log_update(entry, old_data, 'update_nps_entry')
+    return _to_json({'status': 'updated', 'id': entry.id, 'summary': str(entry)})
+
+
+@mcp.tool()
 def add_fixed_deposit(
     name: str,
     account_name: str,
@@ -749,7 +1488,7 @@ def add_fixed_deposit(
         start_date: Start date in YYYY-MM-DD format
         maturity_date: Maturity date in YYYY-MM-DD format
         compounding: SIMPLE, MONTHLY, QUARTERLY, or ANNUAL (default: QUARTERLY)
-        is_baby: Track in baby portfolio (default: false)
+        is_baby: Track in Child portfolio (default: false)
         remarks: Optional remarks
     """
     group = _get_group()
@@ -818,7 +1557,7 @@ def add_cash_position(
         name: Position name (e.g. 'Kanika Acc', 'Cash lent Reshu')
         amount: Amount in INR
         remarks: Optional remarks
-        is_baby: Track in baby portfolio (default: false)
+        is_baby: Track in Child portfolio (default: false)
     """
     group = _get_group()
     pos = CashPosition(
@@ -878,7 +1617,7 @@ def add_bond_holding(
         account_name: Account/platform name
         amount: Bond value in INR
         remarks: Optional remarks
-        is_baby: Track in baby portfolio (default: false)
+        is_baby: Track in Child portfolio (default: false)
     """
     group = _get_group()
     bond = BondHolding(
@@ -936,7 +1675,7 @@ def add_crypto_holding(
         amount_invested: Amount invested in INR
         current_value: Current value in INR
         remarks: Optional remarks
-        is_baby: Track in baby portfolio (default: false)
+        is_baby: Track in Child portfolio (default: false)
     """
     group = _get_group()
     crypto = CryptoHolding(
@@ -1001,7 +1740,7 @@ def add_commodity_holding(
         weight_grams: Weight in grams
         purchase_price_per_gram: Purchase price per gram in INR
         purity: For gold: 24k, 22k, 18k, 14k. For silver: 999, 925, 900, 800. Default: 24k
-        is_baby: Track in baby portfolio (default: false)
+        is_baby: Track in Child portfolio (default: false)
     """
     group = _get_group()
     if commodity_type.upper() not in ('GOLD', 'SILVER'):
@@ -1025,6 +1764,51 @@ def add_commodity_holding(
 
 
 @mcp.tool()
+def update_commodity_holding(
+    holding_id: int,
+    description: str = "",
+    weight_grams: str = "",
+    purchase_price_per_gram: str = "",
+    purity: str = "",
+    is_baby: bool = None,
+) -> str:
+    """Update an existing gold or silver commodity holding.
+
+    Args:
+        holding_id: ID of the commodity holding
+        description: Updated description (optional)
+        weight_grams: Updated weight in grams (optional)
+        purchase_price_per_gram: Updated purchase price per gram in INR (optional)
+        purity: Updated purity (24k, 22k, 18k, 14k, 999, 925, etc.) (optional)
+        is_baby: Track in Child portfolio vs Master portfolio (optional)
+    """
+    group = _get_group()
+    try:
+        holding = CommodityHolding.objects.get(pk=holding_id, group=group) if group else CommodityHolding.objects.get(pk=holding_id)
+    except CommodityHolding.DoesNotExist:
+        return f"Error: Commodity holding #{holding_id} not found."
+
+    old_data = serialize_instance(holding)
+    if description:
+        holding.description = description
+    if weight_grams:
+        holding.weight_grams = _parse_decimal(weight_grams)
+    if purchase_price_per_gram:
+        holding.purchase_price_per_gram = _parse_decimal(purchase_price_per_gram)
+    if purity:
+        holding.purity = purity
+    if is_baby is not None:
+        holding.is_baby = is_baby
+
+    holding.save()
+    log_update(holding, old_data, 'update_commodity_holding')
+    return _to_json({
+        'status': 'updated', 'id': holding.id, 'summary': str(holding),
+        'purchase_value': str(holding.purchase_value),
+    })
+
+
+@mcp.tool()
 def add_us_stock(
     symbol: str,
     units: str,
@@ -1039,7 +1823,7 @@ def add_us_stock(
         units: Number of shares
         purchase_value: Total purchase value in INR
         remarks: Optional remarks
-        is_baby: Track in baby portfolio (default: false)
+        is_baby: Track in Child portfolio (default: false)
     """
     group = _get_group()
 
@@ -1065,28 +1849,355 @@ def add_us_stock(
 
 
 @mcp.tool()
+def update_us_stock(
+    holding_id: int,
+    symbol: str = "",
+    units: str = "",
+    purchase_value: str = "",
+    remarks: str = "",
+    is_baby: bool = None,
+) -> str:
+    """Update an existing US stock (RSU) holding.
+
+    Args:
+        holding_id: ID of the US stock holding
+        symbol: Updated symbol (optional)
+        units: Updated share units (optional)
+        purchase_value: Updated purchase value in INR (optional)
+        remarks: Updated remarks (optional)
+        is_baby: Track in Child portfolio vs Master portfolio (optional)
+    """
+    group = _get_group()
+    try:
+        holding = USStockHolding.objects.get(pk=holding_id, group=group) if group else USStockHolding.objects.get(pk=holding_id)
+    except USStockHolding.DoesNotExist:
+        return f"Error: US stock holding #{holding_id} not found."
+
+    old_data = serialize_instance(holding)
+    if symbol:
+        holding.symbol = symbol.upper()
+    if units:
+        holding.units = _parse_decimal(units)
+    if purchase_value:
+        holding.purchase_value = _parse_decimal(purchase_value)
+    if remarks:
+        holding.remarks = remarks
+    if is_baby is not None:
+        holding.is_baby = is_baby
+
+    holding.save()
+    log_update(holding, old_data, 'update_us_stock')
+    return _to_json({
+        'status': 'updated', 'id': holding.id, 'summary': str(holding),
+        'purchase_value': str(holding.purchase_value),
+    })
+
+
+@mcp.tool()
+def add_real_estate_holding(
+    name: str,
+    area_value: str,
+    purchase_date: str,
+    purchase_price: str,
+    current_valuation: str,
+    property_type: str = "PLOT_LAND",
+    status: str = "VACANT_PLOT",
+    acquisition_type: str = "PURCHASED",
+    original_owner: str = "",
+    inherited_year: int = None,
+    area_unit: str = "GAJ",
+    locality: str = "",
+    city: str = "Noida",
+    state: str = "Uttar Pradesh",
+    landmark: str = "",
+    pincode: str = "",
+    micro_market_tag: str = "",
+    google_maps_url: str = "",
+    khasra_khata_number: str = "",
+    stamp_duty_charges: str = "0",
+    monthly_rental_income: str = "0",
+    is_baby: bool = False,
+    remarks: str = "",
+) -> str:
+    """Add a real estate property or land investment.
+
+    Args:
+        name: Name or description (e.g. 'Sector 150 Express Plot B-42')
+        area_value: Land or property size (e.g. 200)
+        purchase_date: Acquisition/registry date (YYYY-MM-DD)
+        purchase_price: Base purchase amount in INR
+        current_valuation: Current estimated market valuation in INR
+        property_type: PLOT_LAND, APARTMENT_FLAT, COMMERCIAL, VILLA_HOUSE, AGRICULTURAL, or OTHER
+        status: VACANT_PLOT, READY_SELF, RENTED, UNDER_CONSTRUCTION, or RESALE_PLANNED
+        acquisition_type: PURCHASED (self-acquired), INHERITED (ancestral/will), or GIFTED (default: PURCHASED)
+        original_owner: Original owner for inherited/gifted properties (e.g. 'Late Shri R. K. Sharma, Father')
+        inherited_year: Year of inheritance/gift for tax holding period reference (optional)
+        area_unit: GAJ (sq yards), SQFT, SQYD, ACRE, BIGHA, or SQMT (default: GAJ)
+        locality: Locality or sector (e.g. 'Sector 150')
+        city: City (default: 'Noida')
+        state: State (default: 'Uttar Pradesh')
+        landmark: Key landmark or proximity (optional)
+        pincode: Postal code (optional)
+        micro_market_tag: Micro-market tag or growth corridor (e.g. 'Yamuna Expressway')
+        google_maps_url: Direct Google Maps link (optional)
+        khasra_khata_number: Khasra / Khatauni / Registry document ID (optional)
+        stamp_duty_charges: Stamp duty and registration charges in INR (default: 0)
+        monthly_rental_income: Monthly rental yield in INR (default: 0)
+        is_baby: Track in Child portfolio (default: false)
+        remarks: Notes, builder info, tenant details (optional)
+    """
+    group = _get_group()
+    holding = RealEstateHolding(
+        group=group,
+        name=name,
+        property_type=property_type.upper(),
+        status=status.upper(),
+        acquisition_type=acquisition_type.upper(),
+        original_owner=original_owner,
+        inherited_year=inherited_year,
+        area_value=_parse_decimal(area_value),
+        area_unit=area_unit.upper(),
+        locality=locality,
+        city=city,
+        state=state,
+        landmark=landmark,
+        pincode=pincode,
+        micro_market_tag=micro_market_tag,
+        google_maps_url=google_maps_url,
+        khasra_khata_number=khasra_khata_number,
+        purchase_date=_parse_date(purchase_date),
+        purchase_price=_parse_decimal(purchase_price),
+        stamp_duty_charges=_parse_decimal(stamp_duty_charges),
+        current_valuation=_parse_decimal(current_valuation),
+        last_valuation_date=datetime.date.today(),
+        monthly_rental_income=_parse_decimal(monthly_rental_income),
+        is_baby=is_baby,
+        remarks=remarks,
+    )
+    holding.save()
+    log_create(holding, 'add_real_estate_holding')
+    return _to_json({
+        'status': 'created',
+        'id': holding.id,
+        'summary': str(holding),
+        'acquisition_type': holding.acquisition_type,
+        'area': holding.area_display,
+        'total_cost_basis': str(holding.total_cost_basis),
+        'current_valuation': str(holding.current_valuation),
+        'rate_per_gaj': str(holding.current_rate_per_gaj),
+    })
+
+
+@mcp.tool()
+def update_real_estate_holding(
+    holding_id: int,
+    name: str = None,
+    current_valuation: str = None,
+    monthly_rental_income: str = None,
+    status: str = None,
+    acquisition_type: str = None,
+    original_owner: str = None,
+    inherited_year: int = None,
+    landmark: str = None,
+    micro_market_tag: str = None,
+    google_maps_url: str = None,
+    khasra_khata_number: str = None,
+    remarks: str = None,
+) -> str:
+    """Update attributes or status of an existing real estate holding.
+
+    Args:
+        holding_id: Primary key of the RealEstateHolding
+        name: Updated name (optional)
+        current_valuation: Updated market price estimate in INR (optional)
+        monthly_rental_income: Updated monthly rent in INR (optional)
+        status: VACANT_PLOT, READY_SELF, RENTED, UNDER_CONSTRUCTION, RESALE_PLANNED (optional)
+        acquisition_type: PURCHASED, INHERITED, or GIFTED (optional)
+        original_owner: Original owner for inherited/gifted properties (optional)
+        inherited_year: Year of inheritance/gift (optional, set to 0 to clear)
+        landmark: Updated landmark (optional)
+        micro_market_tag: Updated micro market tag (optional)
+        google_maps_url: Updated Google Maps link (optional)
+        khasra_khata_number: Updated legal doc number (optional)
+        remarks: Updated notes (optional)
+    """
+    group = _get_group()
+    try:
+        holding = RealEstateHolding.objects.get(pk=holding_id, group=group) if group else RealEstateHolding.objects.get(pk=holding_id)
+    except RealEstateHolding.DoesNotExist:
+        return f"Error: RealEstateHolding #{holding_id} not found."
+
+    old_state = serialize_instance(holding)
+    if name is not None:
+        holding.name = name
+    if current_valuation is not None:
+        holding.current_valuation = _parse_decimal(current_valuation)
+        holding.last_valuation_date = datetime.date.today()
+    if monthly_rental_income is not None:
+        holding.monthly_rental_income = _parse_decimal(monthly_rental_income)
+    if status is not None:
+        holding.status = status.upper()
+    if acquisition_type is not None:
+        holding.acquisition_type = acquisition_type.upper()
+    if original_owner is not None:
+        holding.original_owner = original_owner
+    if inherited_year is not None:
+        holding.inherited_year = inherited_year if inherited_year > 0 else None
+    if landmark is not None:
+        holding.landmark = landmark
+    if micro_market_tag is not None:
+        holding.micro_market_tag = micro_market_tag
+    if google_maps_url is not None:
+        holding.google_maps_url = google_maps_url
+    if khasra_khata_number is not None:
+        holding.khasra_khata_number = khasra_khata_number
+    if remarks is not None:
+        holding.remarks = remarks
+
+    holding.save()
+    log_update(holding, old_state, 'update_real_estate_holding')
+    return _to_json({
+        'status': 'updated',
+        'id': holding.id,
+        'summary': str(holding),
+        'acquisition_type': holding.acquisition_type,
+        'current_valuation': str(holding.current_valuation),
+        'current_rate_per_gaj': str(holding.current_rate_per_gaj),
+    })
+
+
+@mcp.tool()
+def update_real_estate_valuation(
+    holding_id: int,
+    current_valuation: str,
+    valuation_date: str = "",
+    monthly_rental_income: str = None,
+    notes: str = "",
+) -> str:
+    """Quickly update the latest appraisal valuation and rental income for a real estate holding.
+
+    Args:
+        holding_id: Primary key of the RealEstateHolding
+        current_valuation: New market valuation estimate in INR
+        valuation_date: Date of valuation appraisal (YYYY-MM-DD, defaults to today)
+        monthly_rental_income: Optional updated monthly rental income in INR
+        notes: Context or notes regarding the market price adjustment
+    """
+    group = _get_group()
+    try:
+        holding = RealEstateHolding.objects.get(pk=holding_id, group=group) if group else RealEstateHolding.objects.get(pk=holding_id)
+    except RealEstateHolding.DoesNotExist:
+        return f"Error: RealEstateHolding #{holding_id} not found."
+
+    old_state = serialize_instance(holding)
+    holding.current_valuation = _parse_decimal(current_valuation)
+    holding.last_valuation_date = _parse_date(valuation_date) if valuation_date else datetime.date.today()
+    if monthly_rental_income is not None:
+        holding.monthly_rental_income = _parse_decimal(monthly_rental_income)
+    if notes:
+        holding.remarks = f"{holding.remarks}\n[Valuation {holding.last_valuation_date}]: {notes}".strip()
+
+    holding.save()
+    log_update(holding, old_state, 'update_real_estate_valuation')
+    return _to_json({
+        'status': 'updated',
+        'id': holding.id,
+        'name': holding.name,
+        'current_valuation': str(holding.current_valuation),
+        'current_rate_per_gaj': str(holding.current_rate_per_gaj),
+        'pnl': str(holding.pnl),
+        'pnl_pct': str(holding.pnl_pct),
+        'cagr_pct': str(holding.cagr_pct),
+    })
+
+
+@mcp.tool()
 def add_portfolio_goal(
     label: str,
     target_amount: str,
+    financial_year: str = "",
     notes: str = "",
 ) -> str:
-    """Add a portfolio financial goal (milestone).
+    """Add a portfolio net-worth goal for an Indian financial year.
 
     Args:
-        label: Goal label (e.g. '50L', '1Cr')
+        label: Goal label (e.g. 'FY 2026-27 Target', '1Cr')
         target_amount: Target portfolio value in INR
+        financial_year: 'FY 2026-27' style label, or 'Long Term' (optional; blank = long term)
         notes: Optional notes
     """
+    if financial_year and financial_year != PortfolioGoal.LONG_TERM and fy_start_from_label(financial_year) is None:
+        return "Error: financial_year must look like 'FY 2026-27' or 'Long Term'."
     group = _get_group()
     goal = PortfolioGoal(
         group=group,
         label=label,
         target_amount=_parse_decimal(target_amount),
+        financial_year=financial_year,
         notes=notes,
     )
     goal.save()
     log_create(goal, 'add_portfolio_goal')
     return _to_json({'status': 'created', 'id': goal.id, 'summary': str(goal)})
+
+
+@mcp.tool()
+def update_portfolio_goal(
+    goal_id: int,
+    label: str = None,
+    target_amount: str = None,
+    achieved_date: str = None,
+    is_achieved: bool = None,
+    notes: str = None,
+    financial_year: str = None,
+) -> str:
+    """Update a portfolio net-worth goal.
+
+    Args:
+        goal_id: ID of the PortfolioGoal
+        label: Updated milestone label (e.g. '50L', '1Cr') (optional)
+        target_amount: Updated target amount in INR (optional)
+        financial_year: 'FY 2026-27' style label or 'Long Term' (optional)
+        achieved_date: Achievement date in YYYY-MM-DD format (optional)
+        is_achieved: Mark as achieved (sets today's date) or unachieved (clears date) (optional)
+        notes: Updated notes (optional)
+    """
+    group = _get_group()
+    try:
+        goal = PortfolioGoal.objects.get(pk=goal_id, group=group) if group else PortfolioGoal.objects.get(pk=goal_id)
+    except PortfolioGoal.DoesNotExist:
+        return f"Error: PortfolioGoal #{goal_id} not found."
+
+    old_data = serialize_instance(goal)
+    if label is not None and label != "":
+        goal.label = label
+    if target_amount is not None and target_amount != "":
+        goal.target_amount = _parse_decimal(target_amount)
+    if notes is not None:
+        goal.notes = notes
+    if financial_year is not None:
+        if financial_year and financial_year != PortfolioGoal.LONG_TERM and fy_start_from_label(financial_year) is None:
+            return "Error: financial_year must look like 'FY 2026-27' or 'Long Term'."
+        if financial_year != goal.financial_year:
+            goal.financial_year = financial_year
+            goal.target_date = None
+            goal.closing_value = None
+    if achieved_date is not None and achieved_date != "":
+        goal.achieved_at = _parse_date(achieved_date)
+    elif is_achieved is not None:
+        goal.achieved_at = datetime.date.today() if is_achieved else None
+
+    goal.save()
+    log_update(goal, old_data, 'update_portfolio_goal')
+    return _to_json({
+        'status': 'updated',
+        'id': goal.id,
+        'summary': str(goal),
+        'label': goal.label,
+        'target_amount': str(goal.target_amount),
+        'achieved_at': str(goal.achieved_at) if goal.achieved_at else None,
+        'notes': goal.notes,
+    })
 
 
 @mcp.tool()
@@ -1140,6 +2251,69 @@ def add_jewellery_item(
 
 
 @mcp.tool()
+def update_jewellery_item(
+    item_id: int,
+    category: str = "",
+    metal_type: str = "",
+    weight_grams: str = "",
+    location: str = "",
+    purity: str = "",
+    purchase_price: str = "",
+    purchase_date: str = "",
+    notes: str = "",
+) -> str:
+    """Update an existing jewellery item.
+
+    Args:
+        item_id: ID of the jewellery item
+        category: CHAIN, LOCKET, NECKLACE, RING, BANGLE, BRACELET, EARRINGS, COIN, or OTHER (optional)
+        metal_type: GOLD, SILVER, PLATINUM, or DIAMOND_OTHER (optional)
+        weight_grams: Weight in grams (optional)
+        location: BANK_LOCKER or HOME_SAFE (optional)
+        purity: Gold/Silver purity tag (optional)
+        purchase_price: Total purchase price in INR (optional)
+        purchase_date: Purchase date in YYYY-MM-DD format (optional)
+        notes: Updated notes (optional)
+    """
+    group = _get_group()
+    try:
+        item = JewelleryItem.objects.get(pk=item_id, group=group) if group else JewelleryItem.objects.get(pk=item_id)
+    except JewelleryItem.DoesNotExist:
+        return f"Error: Jewellery item #{item_id} not found."
+
+    old_data = serialize_instance(item)
+    if category:
+        valid_cats = ['CHAIN', 'LOCKET', 'NECKLACE', 'RING', 'BANGLE',
+                      'BRACELET', 'EARRINGS', 'COIN', 'OTHER']
+        if category.upper() not in valid_cats:
+            return f"Error: category must be one of {valid_cats}"
+        item.category = category.upper()
+    if metal_type:
+        item.metal_type = metal_type.upper()
+    if weight_grams:
+        item.weight_grams = _parse_decimal(weight_grams)
+    if location:
+        item.location = location.upper()
+    if purity:
+        item.purity = purity
+    if purchase_price:
+        item.purchase_price = _parse_decimal(purchase_price)
+    if purchase_date:
+        item.purchase_date = _parse_date(purchase_date)
+    if notes:
+        item.notes = notes
+
+    item.save()
+    log_update(item, old_data, 'update_jewellery_item')
+    return _to_json({
+        'status': 'updated',
+        'id': item.id,
+        'label': item.display_label,
+        'estimated_value': str(item.estimated_value),
+    })
+
+
+@mcp.tool()
 def delete_record(
     model_name: str,
     record_id: int,
@@ -1157,6 +2331,7 @@ def delete_record(
         'portfolio.CashPosition', 'portfolio.BondHolding',
         'portfolio.CryptoHolding', 'portfolio.CommodityHolding',
         'portfolio.FinancialGoal', 'portfolio.USStockHolding',
+        'portfolio.RealEstateHolding',
         'jewellery.JewelleryItem',
     }
     if model_name not in allowed:
@@ -1167,8 +2342,16 @@ def delete_record(
     except (LookupError, ValueError) as exc:
         return f"Error: Cannot resolve model '{model_name}': {exc}"
 
+    group = _get_group()
+    field_names = {f.name for f in Model._meta.get_fields()}
+    if 'group' in field_names:
+        scope = {'group': group}
+    elif 'user' in field_names:
+        scope = {'user__group': group}
+    else:
+        return f"Error: '{model_name}' has no household scope."
     try:
-        obj = Model.objects.get(pk=record_id)
+        obj = Model.objects.get(pk=record_id, **scope)
     except Model.DoesNotExist:
         return f"Error: {model_name}#{record_id} not found."
 
@@ -1236,7 +2419,7 @@ def list_mcp_audit_log(
 @mcp.tool()
 def do_refresh_commodity_prices() -> str:
     """Trigger a refresh of gold and silver prices from external APIs."""
-    result = refresh_commodity_prices()
+    result = _refresh_commodity_prices()
     if result:
         return _to_json({'status': 'refreshed', 'prices': result})
     return _to_json({'status': 'failed', 'detail': 'Could not fetch commodity prices.'})
@@ -1246,7 +2429,7 @@ def do_refresh_commodity_prices() -> str:
 def do_refresh_us_stock_prices() -> str:
     """Trigger a refresh of US stock (RSU) prices and USD/INR rate."""
     group = _get_group()
-    result = refresh_us_stock_prices(group=group)
+    result = _refresh_us_stock_prices(group=group)
     if result:
         return _to_json({'status': 'refreshed', 'detail': result})
     return _to_json({'status': 'failed', 'detail': 'Could not fetch US stock prices.'})

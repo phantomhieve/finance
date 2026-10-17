@@ -28,16 +28,16 @@
     <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
       <div>
         <div class="text-[10px] font-bold uppercase tracking-widest opacity-40">EPF Balance</div>
-        <div class="text-3xl font-bold mt-1">₹{{ balance|floatformat:0|indian_number }}</div>
+        <div class="text-3xl font-bold mt-1">{{ balance|inr }}</div>
       </div>
       <div class="flex flex-wrap gap-3">
         <div class="stat-card stat-card-primary">
           <div class="text-[10px] uppercase tracking-wider opacity-50">Contributions</div>
-          <div class="text-lg font-bold mt-0.5">₹{{ total_contrib|floatformat:0|indian_number }}</div>
+          <div class="text-lg font-bold mt-0.5">{{ total_contrib|inr }}</div>
         </div>
         <div class="stat-card stat-card-success">
           <div class="text-[10px] uppercase tracking-wider opacity-50">Interest</div>
-          <div class="text-lg font-bold mt-0.5">₹{{ total_interest|floatformat:0|indian_number }}</div>
+          <div class="text-lg font-bold mt-0.5">{{ total_interest|inr }}</div>
         </div>
       </div>
     </div>
@@ -74,7 +74,7 @@
               <span class="badge badge-ghost badge-sm">{{ e.get_entry_type_display }}</span>
               {% endif %}
             </td>
-            <td class="text-right whitespace-nowrap font-semibold text-success" data-val="{{ e.amount }}">+₹{{ e.amount|floatformat:0|indian_number }}</td>
+            <td class="text-right whitespace-nowrap font-semibold text-success" data-val="{{ e.amount }}">+{{ e.amount|inr }}</td>
             <td class="opacity-60 text-sm">{{ e.remarks|default:"—" }}</td>
             <td class="text-right">
               <button type="button" class="btn btn-ghost btn-xs btn-square" data-edit-epf data-id="{{ e.id }}" data-date="{{ e.date|date:'Y-m-d' }}" data-type="{{ e.entry_type }}" data-amount="{{ e.amount }}" data-remarks="{{ e.remarks }}">
@@ -92,7 +92,7 @@
       <div class="table-card flex items-center justify-between gap-3">
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
-            <span class="font-semibold text-sm text-success">+₹{{ e.amount|floatformat:0|indian_number }}</span>
+            <span class="font-semibold text-sm text-success">+{{ e.amount|inr }}</span>
             {% if e.entry_type == 'CONTRIBUTION' %}<span class="badge badge-primary badge-xs">Contribution</span>{% else %}<span class="badge badge-ghost badge-xs">Interest</span>{% endif %}
           </div>
           <div class="text-xs opacity-50 mt-0.5 truncate">{{ e.date|date:"d M Y" }}{% if e.remarks %} · {{ e.remarks }}{% endif %}</div>

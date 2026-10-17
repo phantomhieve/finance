@@ -1,0 +1,147 @@
+{% extends "emails/_base.html" %}
+{% load indian_format %}
+
+{% block title %}Vault · {{ fy }} year in review{% endblock %}
+
+{% block preheader %}{% if verdict == 'achieved' %}Target achieved.{% elif verdict == 'partial' %}{{ goals_hit }} of {{ goals|length }} targets hit.{% elif verdict == 'missed' %}Target missed.{% endif %} Net worth closed {{ fy }} at {{ close_value|inr_short }}{% if year %} ({% if year.change >= 0 %}+{% endif %}{{ year.change_pct|floatformat:1 }}% for the year){% endif %}.{% endblock %}
+
+{% block eyebrow %}Year in review · {{ fy }}{% endblock %}
+
+{% block content %}
+
+{# ── Verdict ───────────────────────────────────────────────────── #}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+  <td style="border-radius:12px; padding:18px 20px; {% if verdict == 'achieved' %}background-color:#ecfdf5;{% elif verdict == 'partial' %}background-color:#fffbeb;{% elif verdict == 'missed' %}background-color:#fef2f2;{% else %}background-color:#eef2ff;{% endif %}">
+    <p style="margin:0; font-size:11px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; {% if verdict == 'achieved' %}color:#047857;{% elif verdict == 'partial' %}color:#b45309;{% elif verdict == 'missed' %}color:#b91c1c;{% else %}color:#4338ca;{% endif %}">{% if verdict == 'achieved' %}Target achieved{% elif verdict == 'partial' %}Partly achieved{% elif verdict == 'missed' %}Target missed{% else %}Year closed{% endif %}</p>
+    <p style="margin:6px 0 0 0; font-size:20px; line-height:27px; font-weight:800; color:#0f172a;">
+      {% if verdict == 'achieved' %}You hit {% if goals|length > 1 %}all {{ goals|length }} of your {{ fy }} targets{% else %}your {{ fy }} target{% endif %}.
+      {% elif verdict == 'partial' %}You hit {{ goals_hit }} of {{ goals|length }} targets in {{ fy }}.
+      {% elif verdict == 'missed' %}{% with g=goals|first %}You finished {{ g.diff|cut:'-'|inr_short }} short of your {{ fy }} target.{% endwith %}
+      {% else %}Here's how {{ fy }} went for your household.{% endif %}
+    </p>
+  </td>
+</tr></table>
+
+{# ── Closing net worth ─────────────────────────────────────────── #}
+<p class="em-muted" style="margin:24px 0 6px 0; font-size:13px; color:#64748b;">Net worth at {{ fy }} close{% if close_is_live %} (live — March snapshot missing){% endif %}</p>
+<p class="em-hero em-text num" style="margin:0; font-size:40px; line-height:46px; font-weight:800; color:#0f172a; letter-spacing:-0.5px;">{{ close_value|inr }}</p>
+{% if year %}
+<p style="margin:10px 0 0 0; font-size:14px; line-height:20px;">
+  <span class="num" style="display:inline-block; padding:3px 10px; border-radius:999px; font-weight:700; {% if year.change >= 0 %}background-color:#ecfdf5; color:#047857;{% else %}background-color:#fef2f2; color:#b91c1c;{% endif %}">{% if year.change >= 0 %}&#9650; +{% else %}&#9660; {% endif %}{{ year.change|inr_short }} ({% if year.change >= 0 %}+{% endif %}{{ year.change_pct|floatformat:1 }}%)</span>
+  <span class="em-muted" style="color:#64748b;">&nbsp;from {{ year.opening_value|inr_short }} at the start of the year</span>
+</p>
+{% endif %}
+
+{# ── Targets ───────────────────────────────────────────────────── #}
+{% if goals %}
+{% include "emails/_section.html" with title=fy|add:" targets" %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+  {% for g in goals %}
+  <tr>
+    <td class="em-line" style="padding:10px 0; border-bottom:1px solid #e2e8f0;">
+      <span class="em-text num" style="font-size:15px; font-weight:700; color:#0f172a;">{{ g.target|inr_short }}</span>
+      <span class="em-muted" style="font-size:13px; color:#64748b;">&nbsp;· {{ g.label }}</span><br>
+      <span class="em-muted num" style="font-size:12px; color:#64748b;">Closed at {{ g.pct|floatformat:0 }}% of target · {% if g.achieved %}+{{ g.diff|inr_short }} over{% else %}{{ g.diff|cut:'-'|inr_short }} short{% endif %}</span>
+    </td>
+    <td class="em-line" align="right" style="padding:10px 0; border-bottom:1px solid #e2e8f0;">
+      {% if g.achieved %}<span style="display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:700; background-color:#ecfdf5; color:#047857;">Achieved</span>{% else %}<span style="display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:700; background-color:#fef2f2; color:#b91c1c;">Missed</span>{% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+{# ── How the year was built ────────────────────────────────────── #}
+{% if year %}
+{% include "emails/_section.html" with title="How the year was built" %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr>
+    <td class="em-muted em-line" style="padding:10px 0; font-size:14px; color:#64748b; border-bottom:1px solid #e2e8f0;">Started the year at</td>
+    <td class="em-muted em-line num" align="right" style="padding:10px 0; font-size:14px; color:#64748b; border-bottom:1px solid #e2e8f0;">{{ year.opening_value|inr }}</td>
+  </tr>
+  <tr>
+    <td class="em-text em-line" style="padding:10px 0; font-size:14px; color:#0f172a; border-bottom:1px solid #e2e8f0;">Fresh money you added</td>
+    <td class="em-line num" align="right" style="padding:10px 0; font-size:14px; font-weight:600; border-bottom:1px solid #e2e8f0; color:{% if year.money_added >= 0 %}#0f172a{% else %}#b91c1c{% endif %};">{% if year.money_added >= 0 %}+{% endif %}{{ year.money_added|inr }}</td>
+  </tr>
+  <tr>
+    <td class="em-text em-line" style="padding:10px 0; font-size:14px; color:#0f172a; border-bottom:1px solid #e2e8f0;">Market &amp; valuation gains <span class="em-muted" style="color:#64748b;">({% if year.market >= 0 %}+{% endif %}{{ year.market_pct|floatformat:1 }}%)</span></td>
+    <td class="em-line num" align="right" style="padding:10px 0; font-size:14px; font-weight:600; border-bottom:1px solid #e2e8f0; color:{% if year.market >= 0 %}#047857{% else %}#b91c1c{% endif %};">{% if year.market >= 0 %}+{% endif %}{{ year.market|inr }}</td>
+  </tr>
+  <tr>
+    <td class="em-text" style="padding:10px 0; font-size:14px; font-weight:700; color:#0f172a;">Closed the year at</td>
+    <td class="em-text num" align="right" style="padding:10px 0; font-size:14px; font-weight:700; color:#0f172a;">{{ close_value|inr }}</td>
+  </tr>
+</table>
+{% endif %}
+
+{# ── Month by month ────────────────────────────────────────────── #}
+{% if path|length > 1 %}
+{% include "emails/_section.html" with title="Month by month" %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr>
+    {% for p in path %}
+    <td valign="bottom" align="center" height="96" style="height:96px; padding:0 2px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+        <td height="{% widthratio p.bar 100 90 %}" bgcolor="{% if forloop.last %}#4f46e5{% else %}#c7d2fe{% endif %}" style="height:{% widthratio p.bar 100 90 %}px; font-size:0; line-height:0; border-radius:3px 3px 0 0; background-color:{% if forloop.last %}#4f46e5{% else %}#c7d2fe{% endif %};">&nbsp;</td>
+      </tr></table>
+    </td>
+    {% endfor %}
+  </tr>
+  <tr>
+    {% for p in path %}<td class="em-muted" align="center" style="padding-top:6px; font-size:10px; color:#94a3b8;">{{ p.month|date:"M"|slice:":1" }}</td>{% endfor %}
+  </tr>
+</table>
+{% if best or worst %}
+<p class="em-muted" style="margin:12px 0 0 0; font-size:13px; line-height:20px; color:#475569;">
+  {% if best %}Best month: <strong class="em-text" style="color:#047857;">{{ best.month|date:"F" }}</strong> ({% if best.returns_this_month >= 0 %}+{% endif %}{{ best.returns_this_month|inr_short }} from markets){% endif %}{% if best and worst %} · {% endif %}{% if worst %}Toughest: <strong class="em-text" style="color:#b91c1c;">{{ worst.month|date:"F" }}</strong> ({{ worst.returns_this_month|inr_short }}){% endif %}
+</p>
+{% endif %}
+{% endif %}
+
+{# ── Asset classes ─────────────────────────────────────────────── #}
+{% if movers %}
+{% include "emails/_section.html" with title="What drove the change" %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+  {% for m in movers %}
+  <tr>
+    <td class="em-line" style="padding:9px 0; border-bottom:1px solid #e2e8f0;">
+      <span class="em-text" style="font-size:14px; font-weight:600; color:#0f172a;">{{ m.name }}</span><br>
+      <span class="em-muted num" style="font-size:12px; color:#64748b;">now {{ m.value|inr_short }}</span>
+    </td>
+    <td class="em-line num" align="right" style="padding:9px 0; font-size:14px; font-weight:700; border-bottom:1px solid #e2e8f0; color:{% if m.delta >= 0 %}#047857{% else %}#b91c1c{% endif %};">{% if m.delta >= 0 %}+{% endif %}{{ m.delta|inr_short }}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+{# ── Next year ─────────────────────────────────────────────────── #}
+{% include "emails/_section.html" with title="Looking ahead · "|add:next_fy %}
+{% if next_goals %}
+{% for g in next_goals %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:10px;"><tr><td class="em-soft" style="background-color:#f8fafc; border-radius:12px; padding:18px;">
+  <p class="em-text num" style="margin:0; font-size:18px; font-weight:800; color:#0f172a;">{{ g.target|inr_short }} <span class="em-muted" style="font-size:13px; font-weight:500; color:#64748b;">· {{ g.label }}</span></p>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:12px;"><tr>
+    <td width="34%" valign="top">
+      <p class="em-muted" style="margin:0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#64748b;">Gap</p>
+      <p class="em-text num" style="margin:2px 0 0 0; font-size:15px; font-weight:700; color:#0f172a;">{{ g.gap|inr_short }}</p>
+    </td>
+    <td width="33%" valign="top">
+      <p class="em-muted" style="margin:0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#64748b;">Needed / month</p>
+      <p class="em-text num" style="margin:2px 0 0 0; font-size:15px; font-weight:700; color:#0f172a;">{{ g.monthly|inr_short }}</p>
+    </td>
+    <td width="33%" valign="top">
+      <p class="em-muted" style="margin:0; font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#64748b;">Growth needed</p>
+      <p class="em-text num" style="margin:2px 0 0 0; font-size:15px; font-weight:700; color:#0f172a;">{{ g.growth_pct|floatformat:1 }}%</p>
+    </td>
+  </tr></table>
+</td></tr></table>
+{% endfor %}
+{% else %}
+<p class="em-text" style="margin:0; font-size:14px; line-height:21px; color:#0f172a;">No target set for {{ next_fy }} yet. A good time to set one is now, while this year's numbers are fresh.</p>
+{% endif %}
+
+<div style="height:16px; line-height:16px; font-size:0;">&nbsp;</div>
+{% endblock %}
+
+{% block cta_label %}{% if next_goals %}Review your goals{% else %}Set your {{ next_fy }} target{% endif %}{% endblock %}
+{% block footer_note %}{{ fy }} review generated on {{ as_of }} from your March closing snapshot.{% endblock %}

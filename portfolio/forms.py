@@ -3,10 +3,12 @@ from decimal import Decimal
 
 from django import forms
 
+from pftracker.utils import fy_label, fy_start_from_label, fy_start_year
+
 from .models import (
     EPFEntry, NPSEntry, FixedDeposit, CashPosition,
     BondHolding, CryptoHolding, CommodityHolding, FinancialGoal,
-    USStockHolding,
+    USStockHolding, RealEstateHolding,
 )
 
 
@@ -180,12 +182,118 @@ class USStockHoldingForm(forms.ModelForm):
         return val
 
 
+def _fy_choices(today=None):
+    """Rolling FY dropdown: two closed years for back-filling, current, five ahead, long term."""
+    cur = fy_start_year(today)
+    choices = [('', '— Select financial year —')]
+    for start in range(cur - 2, cur + 6):
+        label = fy_label(start)
+        if start < cur:
+            hint = 'closed'
+        elif start == cur:
+            hint = f'current · ends 31 Mar {start + 1}'
+        else:
+            hint = f'ends 31 Mar {start + 1}'
+        choices.append((label, f'{label} ({hint})'))
+    choices.append((FinancialGoal.LONG_TERM, 'Long term / custom horizon'))
+    return choices
+
+
 class FinancialGoalForm(forms.ModelForm):
+    financial_year = forms.CharField(max_length=30, required=False, widget=forms.Select())
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['financial_year'].widget.choices = _fy_choices()
+
+    def clean_financial_year(self):
+        value = (self.cleaned_data.get('financial_year') or '').strip()
+        if value and value != FinancialGoal.LONG_TERM and fy_start_from_label(value) is None:
+            raise forms.ValidationError('Use the format "FY 2026-27" or "Long Term".')
+        return value
+
+    def save(self, commit=True):
+        if {'financial_year', 'target_date'} & set(self.changed_data):
+            self.instance.closing_value = None
+        return super().save(commit=commit)
+
     class Meta:
         model = FinancialGoal
-        fields = ['label', 'target_amount', 'notes']
+        fields = ['financial_year', 'label', 'target_amount', 'target_date', 'notes']
         widgets = {
-            'label': forms.TextInput(attrs={'placeholder': 'e.g. 50L, 1Cr'}),
-            'target_amount': forms.NumberInput(attrs={'step': '1', 'placeholder': '5000000'}),
-            'notes': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Optional notes…'}),
+            'label': forms.TextInput(attrs={'placeholder': 'e.g. FY 2026-27 Target'}),
+            'target_amount': forms.NumberInput(attrs={'step': '1', 'placeholder': '45000000'}),
+            'target_date': forms.DateInput(attrs={'type': 'date'}),
+            'notes': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Strategic plan, allocation notes…'}),
         }
+
+
+class RealEstateHoldingForm(forms.ModelForm):
+    class Meta:
+        model = RealEstateHolding
+        fields = [
+            'name', 'property_type', 'status',
+            'acquisition_type', 'original_owner', 'inherited_year',
+            'area_value', 'area_unit',
+            'locality', 'city', 'state', 'landmark', 'pincode',
+            'micro_market_tag', 'google_maps_url', 'khasra_khata_number',
+            'purchase_date', 'purchase_price', 'stamp_duty_charges',
+            'current_valuation', 'last_valuation_date', 'monthly_rental_income',
+            'is_baby', 'remarks',
+        ]
+        widgets = {
+            'name': forms.TextInput(attrs={'placeholder': 'e.g. Sector 150 Express Plot B-42'}),
+            'property_type': forms.Select(),
+            'status': forms.Select(),
+            'acquisition_type': forms.Select(),
+            'original_owner': forms.TextInput(attrs={'placeholder': 'e.g. Late Shri R. K. Sharma, Father'}),
+            'inherited_year': forms.NumberInput(attrs={'placeholder': 'e.g. 2015'}),
+            'area_value': forms.NumberInput(attrs={'step': '0.01', 'placeholder': 'e.g. 200'}),
+            'area_unit': forms.Select(),
+            'locality': forms.TextInput(attrs={'placeholder': 'e.g. Sector 150, Express Corridor'}),
+            'city': forms.TextInput(attrs={'placeholder': 'e.g. Noida'}),
+            'state': forms.TextInput(attrs={'placeholder': 'e.g. Uttar Pradesh'}),
+            'landmark': forms.TextInput(attrs={'placeholder': 'e.g. Near Jewar Airport link / Sports City'}),
+            'pincode': forms.TextInput(attrs={'placeholder': 'e.g. 201310'}),
+            'micro_market_tag': forms.TextInput(attrs={'placeholder': 'e.g. Noida Expressway / Yamuna Expressway Corridor'}),
+            'google_maps_url': forms.URLInput(attrs={'placeholder': 'https://maps.app.goo.gl/...'}),
+            'khasra_khata_number': forms.TextInput(attrs={'placeholder': 'e.g. Khasra 412/1, Registry Doc #889'}),
+            'purchase_date': forms.DateInput(attrs={'type': 'date'}),
+            'purchase_price': forms.NumberInput(attrs={'step': '0.01', 'placeholder': 'Base purchase price in ₹'}),
+            'stamp_duty_charges': forms.NumberInput(attrs={'step': '0.01', 'placeholder': 'Stamp duty & registry fees in ₹'}),
+            'current_valuation': forms.NumberInput(attrs={'step': '0.01', 'placeholder': 'Current market price estimate in ₹'}),
+            'last_valuation_date': forms.DateInput(attrs={'type': 'date'}),
+            'monthly_rental_income': forms.NumberInput(attrs={'step': '0.01', 'placeholder': '0.00'}),
+            'remarks': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Registry notes, builder info, tenant details...'}),
+        }
+
+    def clean_purchase_price(self):
+        val = self.cleaned_data.get('purchase_price')
+        if val is None or val < 0:
+            raise forms.ValidationError("Purchase price must be zero or positive.")
+        return val
+
+    def clean_current_valuation(self):
+        val = self.cleaned_data.get('current_valuation')
+        if val is None or val < 0:
+            raise forms.ValidationError("Current valuation must be zero or positive.")
+        return val
+
+    def clean_area_value(self):
+        val = self.cleaned_data.get('area_value')
+        if val is None or val <= 0:
+            raise forms.ValidationError("Area value must be greater than zero.")
+        return val
+
+
+class RealEstateValuationForm(forms.ModelForm):
+    class Meta:
+        model = RealEstateHolding
+        fields = ['current_valuation', 'last_valuation_date', 'monthly_rental_income', 'remarks']
+        widgets = {
+            'current_valuation': forms.NumberInput(attrs={'step': '0.01', 'placeholder': 'Updated market price in ₹'}),
+            'last_valuation_date': forms.DateInput(attrs={'type': 'date', 'value': datetime.date.today().isoformat()}),
+            'monthly_rental_income': forms.NumberInput(attrs={'step': '0.01', 'placeholder': '0.00'}),
+            'remarks': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Reason for price update / market research notes...'}),
+        }
+

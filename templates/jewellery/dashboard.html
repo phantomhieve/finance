@@ -11,14 +11,17 @@
     <h1 class="text-xl lg:text-2xl font-extrabold">Jewellery Collection</h1>
     {% if is_primary %}
     <div class="flex flex-wrap items-center gap-3 mt-1 text-xs opacity-60">
-      {% if gold_rate %}<span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm text-warning">diamond</span>Gold ₹{{ gold_rate|floatformat:0|indian_number }}/g</span>{% endif %}
+      {% if gold_rate %}<span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm text-warning">diamond</span>Gold {{ gold_rate|inr }}/g</span>{% endif %}
       {% if gold_rate and silver_rate %}<span>&middot;</span>{% endif %}
-      {% if silver_rate %}<span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm opacity-60">toll</span>Silver ₹{{ silver_rate|floatformat:0|indian_number }}/g</span>{% endif %}
+      {% if silver_rate %}<span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm opacity-60">toll</span>Silver {{ silver_rate|inr }}/g</span>{% endif %}
+      {% if rates_as_of %}<span class="opacity-70" title="{{ rates_as_of|date:'d M Y, H:i' }}">· updated {{ rates_as_of|timesince }} ago</span>{% endif %}
     </div>
     {% endif %}
   </div>
   <div class="flex flex-wrap items-center justify-end gap-2 shrink-0">
+    {% if is_primary %}
     <button type="button" class="btn btn-primary btn-sm gap-1" onclick="openAddJewelleryModal()"><span class="material-symbols-outlined text-base">add</span><span class="hidden sm:inline">Add Item</span><span class="sm:hidden">Add</span></button>
+    {% endif %}
     {% if user.can_view_portfolio %}
     <a href="{% url 'portfolio_tracker' %}" class="btn btn-ghost btn-sm gap-1 hidden sm:inline-flex"><span class="material-symbols-outlined text-base">arrow_back</span>Portfolio</a>
     {% endif %}
@@ -34,24 +37,37 @@
   <div class="card-body p-4 lg:p-6">
     <div class="flex flex-col lg:flex-row lg:items-center gap-5 lg:gap-8">
       <div class="shrink-0">
-        <p class="text-[10px] font-bold uppercase tracking-widest opacity-40">Estimated Collection Value</p>
-        <p class="text-3xl lg:text-4xl font-extrabold mt-1">₹{{ total_estimated_value|floatformat:0|indian_number }}</p>
+        <p class="text-[10px] font-bold uppercase tracking-widest opacity-40">{% if is_filtered %}Estimated value · filtered{% else %}Estimated collection value{% endif %}</p>
+        <p class="text-3xl lg:text-4xl font-extrabold mt-1 tabular-nums">{{ total_estimated_value|inr }}</p>
+        <p class="text-[11px] opacity-40 mt-1">Metal value at today's rate, adjusted for purity</p>
       </div>
-      <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 flex-1 w-full">
+      <div class="grid grid-cols-3 gap-3 flex-1 w-full">
         <div class="stat-card">
-          <div class="text-[10px] uppercase tracking-wider opacity-50">Gold Weight</div>
-          <div class="text-base font-bold mt-0.5 text-warning">{{ total_weight_gold|floatformat:2 }}g</div>
+          <div class="text-[10px] uppercase tracking-wider opacity-50">Gold</div>
+          <div class="text-base font-bold mt-0.5 text-warning tabular-nums">{{ total_weight_gold|floatformat:2 }}g</div>
         </div>
         <div class="stat-card">
-          <div class="text-[10px] uppercase tracking-wider opacity-50">Silver Weight</div>
-          <div class="text-base font-bold mt-0.5">{{ total_weight_silver|floatformat:2 }}g</div>
+          <div class="text-[10px] uppercase tracking-wider opacity-50">Silver</div>
+          <div class="text-base font-bold mt-0.5 tabular-nums">{{ total_weight_silver|floatformat:2 }}g</div>
         </div>
         <div class="stat-card">
-          <div class="text-[10px] uppercase tracking-wider opacity-50">Total Items</div>
-          <div class="text-base font-bold mt-0.5">{{ all_items_count }}</div>
+          <div class="text-[10px] uppercase tracking-wider opacity-50">Items</div>
+          <div class="text-base font-bold mt-0.5 tabular-nums">{{ items|length }}{% if is_filtered %}<span class="text-xs font-medium opacity-50"> / {{ all_items_count }}</span>{% endif %}</div>
         </div>
       </div>
     </div>
+    {% if value_by_location|length > 1 %}
+    <div class="mt-4">
+      <div class="flex h-2 rounded-full overflow-hidden bg-base-content/10">
+        {% for loc in value_by_location %}<div class="{% if loc.value == 'BANK_LOCKER' %}bg-error/70{% else %}bg-warning/80{% endif %}" style="width: {{ loc.pct }}%"></div>{% endfor %}
+      </div>
+      <div class="flex flex-wrap justify-between gap-x-4 gap-y-1 mt-1.5 text-[11px]">
+        {% for loc in value_by_location %}
+        <span class="flex items-center gap-1.5"><span class="w-2 h-2 rounded-full {% if loc.value == 'BANK_LOCKER' %}bg-error/70{% else %}bg-warning/80{% endif %}"></span><span class="opacity-60">{{ loc.label }} · {{ loc.count }} item{{ loc.count|pluralize }}</span><span class="font-semibold tabular-nums">{{ loc.amount|inr }}</span><span class="opacity-40">({{ loc.pct }}%)</span></span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
   </div>
 </div>
 {% endif %}
@@ -123,7 +139,7 @@
     </div>
   </div>
 
-  {% if filter_metal or filter_location or filter_category or filter_search %}
+  {% if is_filtered %}
   <div class="flex items-center gap-2 mt-2 px-1">
     <a href="{% url 'jewellery_dashboard' %}" class="btn btn-ghost btn-xs gap-1 text-error/70 hover:text-error hover:bg-error/10">
       <span class="material-symbols-outlined text-sm">close</span>Clear all
@@ -146,7 +162,7 @@
       {# Colour tile + icon always present; photo (if any) overlays it and is removed on load error. #}
       <span class="icon-filled material-symbols-outlined jw-type-icon text-5xl lg:text-6xl opacity-80 group-hover:scale-110 transition-transform duration-500">{{ item.category_icon }}</span>
       {% if item.photo %}
-      <img src="{% url 'jewellery_photo' item.pk %}?t={{ item.updated_at.timestamp }}" alt="{{ item.display_label }}" onerror="this.remove()"
+      <img src="{% url 'jewellery_photo' item.pk %}?size=thumb&t={{ item.updated_at.timestamp }}" alt="{{ item.display_label }}" onerror="this.remove()"
            class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" loading="lazy" />
       {% endif %}
 
@@ -168,6 +184,12 @@
           <span class="text-[10px] lg:text-xs opacity-60 font-mono ml-auto">{{ item.weight_grams|floatformat:2 }}g</span>
         </div>
       </div>
+      {% if is_primary %}
+      <div class="flex items-baseline justify-between pt-2 border-t border-base-content/5">
+        <span class="text-[10px] uppercase tracking-wider opacity-40">Est. value</span>
+        <span class="text-sm font-bold text-primary tabular-nums">{% if item.estimated_value %}{{ item.estimated_value|inr }}{% else %}—{% endif %}</span>
+      </div>
+      {% endif %}
     </div>
   </a>
   {% endfor %}
@@ -182,7 +204,7 @@
         <span class="icon-filled material-symbols-outlined text-2xl">{{ item.category_icon }}</span>
       </span>
       {% if item.photo %}
-      <img src="{% url 'jewellery_photo' item.pk %}?t={{ item.updated_at.timestamp }}" alt="{{ item.display_label }}" onerror="this.remove()"
+      <img src="{% url 'jewellery_photo' item.pk %}?size=thumb&t={{ item.updated_at.timestamp }}" alt="{{ item.display_label }}" onerror="this.remove()"
            class="absolute inset-0 w-16 h-16 rounded-2xl object-cover" loading="lazy" />
       {% endif %}
     </span>
@@ -200,7 +222,7 @@
     </div>
     {% if is_primary %}
     <div class="text-right shrink-0">
-      <div class="text-sm font-bold text-primary">₹{{ item.estimated_value|floatformat:0|indian_number }}</div>
+      <div class="text-sm font-bold text-primary tabular-nums">{% if item.estimated_value %}{{ item.estimated_value|inr }}{% else %}—{% endif %}</div>
       <div class="text-[9px] opacity-35 uppercase tracking-wider">est.</div>
     </div>
     {% endif %}
@@ -218,18 +240,18 @@
   <div class="text-center">
     <p class="font-semibold opacity-60">No jewellery items found</p>
     <p class="text-xs opacity-35 mt-1">
-      {% if filter_metal or filter_location or filter_category or filter_search %}
+      {% if is_filtered %}
         Try adjusting your filters to see more items.
       {% else %}
         Add your first item to start building your secure catalog.
       {% endif %}
     </p>
   </div>
-  {% if filter_metal or filter_location or filter_category or filter_search %}
+  {% if is_filtered %}
   <a href="{% url 'jewellery_dashboard' %}" class="btn btn-ghost btn-sm gap-1 mt-2">
     <span class="material-symbols-outlined text-base">filter_alt_off</span>Clear Filters
   </a>
-  {% else %}
+  {% elif is_primary %}
   <button onclick="openAddJewelleryModal()" class="btn btn-primary btn-sm gap-1 mt-2">
     <span class="material-symbols-outlined text-base">add_circle</span>Add First Item
   </button>
@@ -284,8 +306,8 @@
         <label class="label py-1"><span class="label-text text-xs font-bold uppercase tracking-wider opacity-50">Location</span></label>
         <input type="hidden" name="location" id="ja_location" value="BANK_LOCKER" />
         <div class="grid grid-cols-2 gap-2" id="ja_location_chips">
-          <button type="button" data-loc="BANK_LOCKER" class="btn btn-sm btn-ghost border border-base-content/10 gap-1.5 justify-start">🏦 Bank Locker</button>
-          <button type="button" data-loc="HOME_SAFE" class="btn btn-sm btn-ghost border border-base-content/10 gap-1.5 justify-start">🏠 Home Safe</button>
+          <button type="button" data-loc="BANK_LOCKER" class="btn btn-sm btn-ghost border border-base-content/10 gap-1.5 justify-start"><span class="material-symbols-outlined text-base">account_balance</span>Bank Locker</button>
+          <button type="button" data-loc="HOME_SAFE" class="btn btn-sm btn-ghost border border-base-content/10 gap-1.5 justify-start"><span class="material-symbols-outlined text-base">home</span>Home Safe</button>
         </div>
       </div>
 
@@ -344,17 +366,19 @@ function setJFilter(inputId, val) {
 (function() {
   var searchInput = document.getElementById('filter_search');
   var searchResults = document.getElementById('search_results');
-  var acTimer;
+  var acTimer, acSeq = 0;
 
   searchInput.addEventListener('input', function() {
     clearTimeout(acTimer);
     var val = this.value.trim();
+    var seq = ++acSeq;
     if (!val) { searchResults.classList.add('hidden'); return; }
 
     acTimer = setTimeout(function() {
       fetch('/jewellery/api/search/?q=' + encodeURIComponent(val))
         .then(res => res.json())
         .then(data => {
+          if (seq !== acSeq) return;
           if (!data.results || data.results.length === 0) {
             searchResults.innerHTML = '<div class="p-3 text-xs opacity-50 text-center">No matches found</div>';
           } else {
@@ -363,15 +387,15 @@ function setJFilter(inputId, val) {
               var avatar = `<span class="jw-type-avatar absolute inset-0" style="--h:${item.hue};width:2.25rem;height:2.25rem;border-radius:0.5rem">
                      <span class="icon-filled material-symbols-outlined text-base">${item.icon}</span></span>`;
               var thumb = `<span class="relative w-9 h-9 shrink-0 block">${avatar}` +
-                (item.photo_url ? `<img src="${item.photo_url}" onerror="this.remove()" class="absolute inset-0 w-9 h-9 rounded-lg object-cover" />` : '') +
+                (item.photo_url ? `<img src="${escapeHtml(item.photo_url)}" onerror="this.remove()" class="absolute inset-0 w-9 h-9 rounded-lg object-cover" />` : '') +
                 `</span>`;
               html += `<li><a href="/jewellery/${item.id}/" class="flex items-center gap-2.5 py-1.5">
                          ${thumb}
                          <span class="flex-1 min-w-0">
-                           <span class="font-semibold text-xs block truncate">${item.label}</span>
-                           <span class="text-[10px] opacity-50">${item.category}</span>
+                           <span class="font-semibold text-xs block truncate">${escapeHtml(item.label)}</span>
+                           <span class="text-[10px] opacity-50">${escapeHtml(item.category)}</span>
                          </span>
-                         <span class="text-[9px] opacity-40 text-right shrink-0">${item.location}<br>${item.weight}</span>
+                         <span class="text-[9px] opacity-40 text-right shrink-0">${escapeHtml(item.location)}<br>${escapeHtml(item.weight)}</span>
                        </a></li>`;
             });
             html += '</ul>';

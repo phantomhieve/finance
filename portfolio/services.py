@@ -1,7 +1,7 @@
 import datetime
 import logging
 import re
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 import cloudscraper
 import requests
@@ -11,14 +11,14 @@ from django.utils import timezone
 
 from pftracker.utils import (
     ZERO as _ZERO, ROUND2 as _ROUND2, pct as _pct,
-    fy_start_year, fy_label, get_google_credentials_path,
+    fy_start_year, fy_label, get_google_credentials,
 )
 from .models import (
     ZerodhaAccount, StockHolding, MutualFundHolding,
     EPFEntry, NPSEntry, FixedDeposit, CashPosition,
     BondHolding, CryptoHolding, CommodityHolding,
     CommodityPrice, MonthlySnapshot, FinancialGoal,
-    USStockHolding,
+    USStockHolding, RealEstateHolding,
 )
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ def _parse_inr(value):
         return _ZERO
     try:
         return Decimal(cleaned)
-    except Exception:
+    except (InvalidOperation, TypeError, ValueError):
         return _ZERO
 
 
@@ -118,8 +118,226 @@ def _zerodha_account_sums(z_accounts, is_baby=False):
 
 
 # ---------------------------------------------------------------------------
+# FY goals roadmap
+# ---------------------------------------------------------------------------
+
+def _fy_opening_snapshot(group, fy_start):
+    """Snapshot closest to the start of an FY: prior March, else first snapshot inside the FY."""
+    qs = _gf(MonthlySnapshot.objects, group)
+    snap = qs.filter(month=datetime.date(fy_start, 3, 1)).first()
+    if snap is None:
+        snap = qs.filter(
+            month__gte=datetime.date(fy_start, 4, 1),
+            month__lte=datetime.date(fy_start + 1, 3, 1),
+        ).order_by('month').first()
+    return snap
+
+
+def get_fy_performance(group, total_value, total_invested, today=None, exclude_real_estate=False):
+    """FY-to-date change split into fresh money vs market gains (needs an opening snapshot)."""
+    today = today or datetime.date.today()
+    fy = fy_start_year(today)
+    opening = _fy_opening_snapshot(group, fy)
+    if opening is None:
+        return None
+    opening_value, opening_invested = opening.total_current_value, opening.total_invested
+    if exclude_real_estate:
+        re = (opening.data or {}).get('real_estate')
+        if not re or 'current' not in re:
+            return None  # totals-only snapshot: can't separate real estate out
+        opening_value -= Decimal(str(re.get('current', 0)))
+        opening_invested -= Decimal(str(re.get('invested', 0)))
+    change = total_value - opening_value
+    money_added = total_invested - opening_invested
+    market_gain = change - money_added
+    return {
+        'label': fy_label(fy),
+        'opening_value': opening_value,
+        'opening_month': opening.month,
+        'change': change,
+        'change_pct': _pct(change, opening_value),
+        'money_added': money_added,
+        'market_gain': market_gain,
+    }
+
+
+_PACE_BAND = 5  # progress-vs-time lead/lag (pct points) still counted as "on track"
+
+
+def _months_until(today, deadline):
+    return max(1, round((deadline - today).days / 30.44)) if deadline and deadline > today else 1
+
+
+def build_goal_roadmap(group, total_value, today=None):
+    """Group portfolio goals by Indian FY with a frozen achieved/missed verdict for closed years.
+
+    - Closed FY:  judged on ``closing_value`` (March snapshot), else on ``achieved_at`` ≤ FY end.
+    - Current FY: live value; pace compares progress since FY open against time elapsed.
+    - Future FY / Long term: live value, required monthly growth to the deadline.
+
+    Side effect: stamps ``achieved_at`` the first time an open goal is reached and clears it
+    if the portfolio falls back below target before the FY closes. Closed goals are never touched.
+    """
+    today = today or datetime.date.today()
+    total = float(total_value)
+    cur_fy = fy_start_year(today)
+    cur_start = datetime.date(cur_fy, 4, 1)
+    cur_end = datetime.date(cur_fy + 1, 3, 31)
+    total_days = (cur_end - cur_start).days + 1
+    time_pct = round(min(100.0, ((today - cur_start).days + 1) / total_days * 100), 1)
+    days_left = max(0, (cur_end - today).days)
+
+    goal_objs = list(_gf(FinancialGoal.objects, group))
+    march_close = {}
+    if any(g.fy_start is not None and g.fy_start < cur_fy and g.closing_value is None for g in goal_objs):
+        march_close = {
+            s.month.year - 1: s.total_current_value
+            for s in _gf(MonthlySnapshot.objects, group).filter(month__month=3)
+        }
+    opening_snap = _fy_opening_snapshot(group, cur_fy)
+    opening_value = float(opening_snap.total_current_value) if opening_snap else None
+
+    goals = []
+    for g in goal_objs:
+        target = float(g.target_amount)
+        fy_s = g.fy_start
+        if fy_s is None:
+            state, fy_name = 'long_term', FinancialGoal.LONG_TERM
+        else:
+            fy_name = fy_label(fy_s)
+            state = 'closed' if fy_s < cur_fy else 'current' if fy_s == cur_fy else 'future'
+
+        item = {
+            'id': g.id,
+            'label': g.label,
+            'target': target,
+            'target_date': g.target_date,
+            'fy': fy_name,
+            'fy_start': fy_s,
+            'state': state,
+            'notes': g.notes,
+            'achieved_at': g.achieved_at,
+        }
+
+        if state == 'closed':
+            closing = g.closing_value if g.closing_value is not None else march_close.get(fy_s)
+            if closing is not None:
+                achieved = float(closing) >= target
+                item['closing_value'] = float(closing)
+            else:
+                achieved = g.achieved_at is not None and g.achieved_at <= g.fy_end_date
+                item['closing_value'] = None
+            ref = item['closing_value'] if item['closing_value'] is not None else total
+            item['status'] = 'achieved' if achieved else 'missed'
+        else:
+            achieved = total >= target
+            ref = total
+            if achieved and g.achieved_at is None:
+                g.achieved_at = today
+                FinancialGoal.objects.filter(pk=g.pk).update(achieved_at=today)
+            elif not achieved and g.achieved_at is not None:
+                g.achieved_at = None
+                FinancialGoal.objects.filter(pk=g.pk).update(achieved_at=None)
+            item['achieved_at'] = g.achieved_at
+            item['status'] = 'achieved' if achieved else ('on_track' if state == 'current' else 'upcoming')
+
+        item['achieved'] = achieved
+        item['pct'] = round(min(ref / target * 100, 100), 1) if target else 0
+        item['remaining'] = max(0.0, target - ref)
+        item['surplus'] = max(0.0, ref - target)
+
+        if state != 'closed' and not achieved:
+            deadline = g.target_date or g.fy_end_date
+            if deadline:
+                item['months_left'] = _months_until(today, deadline)
+                item['monthly_needed'] = round(item['remaining'] / item['months_left'])
+
+        if state == 'current':
+            item['time_pct'] = time_pct
+            item['days_left'] = days_left
+            if opening_value is not None and target > opening_value:
+                progress = (total - opening_value) / (target - opening_value) * 100
+                item['fy_progress_pct'] = round(max(0.0, min(progress, 100.0)), 1)
+                item['expected_today'] = opening_value + (target - opening_value) * time_pct / 100
+                item['vs_expected'] = total - item['expected_today']
+            else:
+                item['fy_progress_pct'] = item['pct']
+            if not achieved:
+                lead = item['fy_progress_pct'] - time_pct
+                item['lead_pct'] = round(lead, 1)
+                if lead >= _PACE_BAND:
+                    item['status'] = 'ahead'
+                elif lead <= -_PACE_BAND:
+                    item['status'] = 'behind'
+        goals.append(item)
+
+    goals.sort(key=lambda x: (x['fy_start'] if x['fy_start'] is not None else 9999, x['target']))
+
+    years = {}
+    for item in goals:
+        years.setdefault(item['fy'], {'label': item['fy'], 'state': item['state'], 'fy_start': item['fy_start'], 'goals': []})['goals'].append(item)
+    for y in years.values():
+        y['achieved'] = sum(1 for x in y['goals'] if x['achieved'])
+        y['total'] = len(y['goals'])
+        y['top_target'] = max(x['target'] for x in y['goals'])
+        if y['state'] == 'closed':
+            y['closing_value'] = next((x['closing_value'] for x in y['goals'] if x.get('closing_value') is not None), None)
+            y['verdict'] = 'achieved' if y['achieved'] == y['total'] else 'partial' if y['achieved'] else 'missed'
+
+    current_year = next((y for y in years.values() if y['state'] == 'current'), None)
+    spotlight = None
+    if current_year:
+        pending = [x for x in current_year['goals'] if not x['achieved']]
+        spotlight = pending[0] if pending else current_year['goals'][-1]
+
+    closed = sorted((y for y in years.values() if y['state'] == 'closed'), key=lambda y: y['fy_start'], reverse=True)
+    upcoming = [y for y in years.values() if y['state'] in ('future', 'long_term')]
+
+    return {
+        'goals': goals,
+        'today': today,
+        'cur_fy_label': fy_label(cur_fy),
+        'cur_fy_end': cur_end,
+        'time_pct': time_pct,
+        'days_left': days_left,
+        'opening_value': opening_value,
+        'current_year': current_year,
+        'spotlight': spotlight,
+        'upcoming': upcoming,
+        'closed': closed,
+        'track_record': {
+            'hit': sum(y['achieved'] for y in closed),
+            'total': sum(y['total'] for y in closed),
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
 # Portfolio summary
 # ---------------------------------------------------------------------------
+
+def without_real_estate(summary, group):
+    """Re-base headline totals, allocation and FY performance on the portfolio minus real estate.
+
+    Goals are left on the full portfolio: their targets are net-worth targets.
+    """
+    total_value = summary['total_value'] - summary['real_estate_current']
+    total_invested = summary['total_invested'] - summary['real_estate_invested']
+    total_returns = total_value - total_invested
+    return {
+        **summary,
+        'total_value': total_value,
+        'total_invested': total_invested,
+        'total_returns': total_returns,
+        'return_pct': _pct(total_returns, total_invested),
+        'assets': [dict(a, pct=_pct(a['value'], total_value))
+                   for a in summary['assets'] if a['name'] != 'Real Estate'],
+        'consolidated': [dict(c, pct=_pct(c['value'], total_value))
+                         for c in summary['consolidated'] if c['name'] != 'Real Estate'],
+        'fy_performance': summary['fy_performance'] and get_fy_performance(
+            group, total_value, total_invested, exclude_real_estate=True),
+    }
+
 
 def get_portfolio_summary(group=None, is_baby=False):
     """Aggregate every asset class into a master portfolio summary dict, scoped to group."""
@@ -182,11 +400,11 @@ def get_portfolio_summary(group=None, is_baby=False):
     us_stocks_invested = sum((h.purchase_value for h in us_stocks), _ZERO)
     us_stocks_current = sum((h.current_value for h in us_stocks), _ZERO)
 
+    real_estate_holdings = list(_gf(RealEstateHolding.objects.filter(is_baby=is_baby), group).all())
+    real_estate_invested = sum((h.total_cost_basis for h in real_estate_holdings), _ZERO)
+    real_estate_current = sum((h.current_value for h in real_estate_holdings), _ZERO)
+
     comm = get_commodity_summary(group, is_baby=is_baby)
-    gold_rate = comm['gold_rate']
-    silver_rate = comm['silver_rate']
-    gold_weight = comm['gold_weight']
-    silver_weight = comm['silver_weight']
     gold_value = comm['gold_value']
     silver_value = comm['silver_value']
     commodity_total = comm['commodity_total']
@@ -206,6 +424,7 @@ def get_portfolio_summary(group=None, is_baby=False):
         {'name': 'FD', 'value': fd_current, 'icon': 'lock'},
         {'name': 'Bonds', 'value': bonds_total, 'icon': 'receipt_long'},
         {'name': 'US Stocks (RSU)', 'value': us_stocks_current, 'icon': 'work'},
+        {'name': 'Real Estate', 'value': real_estate_current, 'icon': 'domain'},
     ]
     total_value = sum(a['value'] for a in assets)
     for a in assets:
@@ -231,6 +450,7 @@ def get_portfolio_summary(group=None, is_baby=False):
     consolidated = [
         {'name': 'Equity', 'value': equity_total},
         {'name': 'Debt Instruments', 'value': debt_total},
+        {'name': 'Real Estate', 'value': real_estate_current},
         {'name': 'Cash', 'value': cash_total},
         {'name': 'Commodity', 'value': commodity_total},
         {'name': 'Crypto', 'value': crypto_current},
@@ -243,42 +463,13 @@ def get_portfolio_summary(group=None, is_baby=False):
         all_stocks_purchased + index_purchased + other_purchased
         + epf_total_contrib + nps_total_contrib
         + fd_principal + cash_total + bonds_total + crypto_invested
-        + commodity_invested + us_stocks_invested
+        + commodity_invested + us_stocks_invested + real_estate_invested
     )
     total_returns = total_value - total_invested
     return_pct = _pct(total_returns, total_invested)
 
-    # Financial goals
-    goals = []
-    for g in _gf(FinancialGoal.objects, group).all():
-        target = float(g.target_amount)
-        pct = min(float(total_value) / target * 100, 100) if target else 0
-        achieved = pct >= 100
-
-        # Auto-achieve: set the date when first reached
-        if achieved and g.achieved_at is None:
-            g.achieved_at = datetime.date.today()
-            g.save(update_fields=['achieved_at'])
-        # Auto-un-achieve: clear if portfolio drops below target
-        elif not achieved and g.achieved_at is not None:
-            g.achieved_at = None
-            g.save(update_fields=['achieved_at'])
-
-        goals.append({
-            'id': g.id,
-            'label': g.label,
-            'target': target,
-            'pct': round(pct, 1),
-            'achieved': achieved,
-            'achieved_at': g.achieved_at,
-            'notes': g.notes,
-        })
-
-    # Pre-computed goal buckets for mobile layout
-    achieved_goals = [g for g in goals if g['achieved']]
-    pending_goals = [g for g in goals if not g['achieved']]
-    current_goal = pending_goals[0] if pending_goals else None
-    upcoming_goals = pending_goals[1:] if len(pending_goals) > 1 else []
+    # Goals are household-level targets against the master portfolio only
+    roadmap = build_goal_roadmap(group, total_value) if not is_baby else None
 
     # Zerodha account summaries (prefetch totals to avoid N+1)
     z_accounts = _gf(ZerodhaAccount.objects, group).all() if group else ZerodhaAccount.objects.all()
@@ -312,10 +503,9 @@ def get_portfolio_summary(group=None, is_baby=False):
         'equity_invested': equity_invested,
         'equity_returns': equity_returns,
         'consolidated': consolidated,
-        'goals': goals,
-        'current_goal': current_goal,
-        'upcoming_goals': upcoming_goals,
-        'achieved_goals': achieved_goals,
+        'goals': roadmap['goals'] if roadmap else [],
+        'goal_roadmap': roadmap,
+        'fy_performance': None if is_baby else get_fy_performance(group, total_value, total_invested),
         'accounts': accounts,
         'epf_balance': epf_balance,
         'epf_total_contrib': epf_total_contrib,
@@ -347,6 +537,10 @@ def get_portfolio_summary(group=None, is_baby=False):
         'us_stocks_invested': us_stocks_invested,
         'us_stocks_current': us_stocks_current,
         'us_stocks_returns': us_stocks_current - us_stocks_invested,
+        'real_estate_holdings': real_estate_holdings,
+        'real_estate_invested': real_estate_invested,
+        'real_estate_current': real_estate_current,
+        'real_estate_returns': real_estate_current - real_estate_invested,
     }
 
 
@@ -364,7 +558,12 @@ def sync_zerodha_from_sheets(account=None, group=None):
     except ImportError:
         raise RuntimeError("gspread is not installed. Run: pip install gspread google-auth")
 
-    gc = gspread.service_account(filename=get_google_credentials_path())
+    # Per-household credential resolution
+    creds = get_google_credentials(group)
+    if isinstance(creds, dict):
+        gc = gspread.service_account_from_dict(creds)
+    else:
+        gc = gspread.service_account(filename=creds)
     if account:
         accounts = [account]
     else:
@@ -515,7 +714,7 @@ def _sync_mf(acct, spreadsheet, range_name, fund_type):
             continue
         try:
             units = Decimal(str(row[1]).replace(',', '').strip() or '0')
-        except Exception:
+        except (InvalidOperation, TypeError, ValueError):
             continue
         bulk.append(MutualFundHolding(
             account=acct, fund_name=fund_name, fund_type=fund_type,
@@ -789,6 +988,49 @@ def fetch_and_fill_us_stock_prices(holding):
 
 
 # ---------------------------------------------------------------------------
+# FY-end land appreciation
+# ---------------------------------------------------------------------------
+
+LAND_PROPERTY_TYPES = ('PLOT_LAND', 'AGRICULTURAL')
+_MANUAL_REVALUATION_GRACE_DAYS = 30
+
+
+def apply_annual_land_appreciation(pct=Decimal('6'), today=None, group=None, dry_run=False):
+    """Mark land up by ``pct`` once for the FY that just closed (meant to run on 1 April).
+
+    Idempotent via ``last_appreciated_fy``. Plots revalued by hand in the last 30 days are
+    treated as already reflecting the year-end price and are only marked as done.
+    """
+    today = today or datetime.date.today()
+    closing_fy = fy_label(fy_start_year(today) - 1)
+    factor = 1 + Decimal(str(pct)) / 100
+
+    qs = RealEstateHolding.objects.filter(property_type__in=LAND_PROPERTY_TYPES)
+    if group is not None:
+        qs = qs.filter(group=group)
+
+    results = []
+    for h in qs.exclude(last_appreciated_fy=closing_fy):
+        old = h.current_valuation
+        recent_manual = (
+            h.last_valuation_date is not None
+            and (today - h.last_valuation_date).days < _MANUAL_REVALUATION_GRACE_DAYS
+        )
+        new = old if recent_manual else (old * factor).quantize(Decimal('1'))
+        results.append({'holding': h, 'old': old, 'new': new, 'skipped': recent_manual})
+        if dry_run:
+            continue
+        h.last_appreciated_fy = closing_fy
+        fields = ['last_appreciated_fy', 'updated_at']
+        if not recent_manual:
+            h.current_valuation = new
+            h.last_valuation_date = today
+            fields += ['current_valuation', 'last_valuation_date']
+        h.save(update_fields=fields)
+    return closing_fy, results
+
+
+# ---------------------------------------------------------------------------
 # Monthly snapshots
 # ---------------------------------------------------------------------------
 
@@ -839,6 +1081,8 @@ def _take_snapshot_for_group(month, group):
         _sum_qs(MutualFundHolding.objects.filter(account__group=group, fund_type='OTHER'), 'purchase_value'))
     data.setdefault('crypto', {})['invested'] = float(summary['crypto_invested'])
     data.setdefault('fd', {})['principal'] = float(summary['fd_principal'])
+    data.setdefault('us_stocks', {})['invested'] = float(summary['us_stocks_invested'])
+    data.setdefault('real_estate', {})['invested'] = float(summary['real_estate_invested'])
 
     total_invested = summary['total_invested']
     total_current = summary['total_value']
@@ -863,6 +1107,10 @@ def _take_snapshot_for_group(month, group):
             'returns_this_month': returns_change,
         },
     )
+    if month.month == 3:
+        FinancialGoal.objects.filter(
+            group=group, financial_year=fy_label(month.year - 1),
+        ).update(closing_value=total_current.quantize(Decimal('1')))
     return snapshot, created
 
 

@@ -7,7 +7,7 @@ from .models import (
     BondHolding, CryptoHolding, CommodityHolding,
     CommodityPrice, MonthlySnapshot, FinancialGoal,
     PortfolioInsight, USStockHolding,
-    InsightGenerationSettings,
+    InsightGenerationSettings, RealEstateHolding,
 )
 
 
@@ -108,7 +108,7 @@ class MonthlySnapshotAdmin(ModelAdmin):
 
 @admin.register(FinancialGoal)
 class FinancialGoalAdmin(ModelAdmin):
-    list_display = ('label', 'group', 'target_amount', 'achieved_at')
+    list_display = ('label', 'financial_year', 'group', 'target_amount', 'achieved_at', 'closing_value')
     list_filter = ('group',)
     list_select_related = ('group',)
     ordering = ('target_amount',)
@@ -143,3 +143,17 @@ class PortfolioInsightAdmin(ModelAdmin):
     list_select_related = ('group',)
     ordering = ('-generated_at',)
     readonly_fields = ('generated_at', 'model_used', 'prompt_data', 'insights')
+
+
+@admin.register(RealEstateHolding)
+class RealEstateHoldingAdmin(ModelAdmin):
+    list_display = (
+        'name', 'property_type', 'acquisition_type', 'locality', 'city',
+        'area_display', 'purchase_price', 'current_valuation',
+        'rental_yield_pct', 'cagr_pct', 'group',
+    )
+    list_filter = ('property_type', 'status', 'acquisition_type', 'city', 'group', 'is_baby')
+    list_select_related = ('group',)
+    search_fields = ('name', 'locality', 'city', 'landmark', 'micro_market_tag', 'khasra_khata_number')
+    ordering = ('-current_valuation',)
+

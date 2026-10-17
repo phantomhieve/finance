@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 import dj_database_url
 from django.utils.csp import CSP
@@ -48,6 +49,7 @@ INSTALLED_APPS = [
     'tracker',
     'portfolio',
     'jewellery',
+    'expenses',
     'mcp_server',
     'oauth2_provider',
     'corsheaders',
@@ -123,11 +125,23 @@ UNFOLD = {
                     {"title": "Crypto", "icon": "currency_bitcoin", "link": f"{_ADMIN_PREFIX}/portfolio/cryptoholding/"},
                     {"title": "Commodities", "icon": "diamond", "link": f"{_ADMIN_PREFIX}/portfolio/commodityholding/"},
                     {"title": "US Stocks (RSU)", "icon": "work", "link": f"{_ADMIN_PREFIX}/portfolio/usstockholding/"},
+                    {"title": "Real Estate", "icon": "domain", "link": f"{_ADMIN_PREFIX}/portfolio/realestateholding/"},
                     {"title": "Commodity Prices", "icon": "price_change", "link": f"{_ADMIN_PREFIX}/portfolio/commodityprice/"},
                     {"title": "Snapshots", "icon": "photo_camera", "link": f"{_ADMIN_PREFIX}/portfolio/monthlysnapshot/"},
                     {"title": "Goals", "icon": "target", "link": f"{_ADMIN_PREFIX}/portfolio/financialgoal/"},
                     {"title": "AI Insights", "icon": "psychology", "link": f"{_ADMIN_PREFIX}/portfolio/portfolioinsight/"},
                     {"title": "AI insight cooldown", "icon": "schedule", "link": f"{_ADMIN_PREFIX}/portfolio/insightgenerationsettings/"},
+                ],
+            },
+            {
+                "title": "Expenses",
+                "items": [
+                    {"title": "Expenses", "icon": "receipt", "link": f"{_ADMIN_PREFIX}/expenses/expense/"},
+                    {"title": "Categories", "icon": "category", "link": f"{_ADMIN_PREFIX}/expenses/expensecategory/"},
+                    {"title": "Merchant Rules", "icon": "rule", "link": f"{_ADMIN_PREFIX}/expenses/merchantrule/"},
+                    {"title": "Cards & Accounts", "icon": "credit_card", "link": f"{_ADMIN_PREFIX}/expenses/paymentsource/"},
+                    {"title": "Card Statements", "icon": "request_quote", "link": f"{_ADMIN_PREFIX}/expenses/cardstatement/"},
+                    {"title": "Gmail Accounts", "icon": "mail", "link": f"{_ADMIN_PREFIX}/expenses/gmailaccount/"},
                 ],
             },
             {
@@ -177,6 +191,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'pftracker.context_processors.household_config',
             ],
             'loaders': [('django.template.loaders.cached.Loader', _TEMPLATE_LOADERS)]
             if not DEBUG else _TEMPLATE_LOADERS,
@@ -188,11 +203,11 @@ WSGI_APPLICATION = 'pftracker.wsgi.wsgi_application'
 
 
 # Database — uses DATABASE_URL env var if set, otherwise SQLite for local dev
-# conn_max_age: persistent connections for Postgres (reduces connect overhead; tune if max_connections is low)
+# conn_max_age defaults to 0 to prevent connection exhaustion across ASGI worker threads
 DATABASES = {
     'default': dj_database_url.config(
         default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
-        conn_max_age=600,
+        conn_max_age=int(os.environ.get('DJANGO_CONN_MAX_AGE', '0')),
     )
 }
 
@@ -243,7 +258,7 @@ ACCOUNT_LOGIN_METHODS = {'username', 'email'}
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'username*', 'password1*', 'password2*']
 ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'http' if DEBUG else 'https'
 SOCIALACCOUNT_ADAPTER = 'pftracker.adapters.PreExistingEmailAdapter'
-SOCIALACCOUNT_LOGIN_ON_GET = True
+SOCIALACCOUNT_LOGIN_ON_GET = False  # login button POSTs with CSRF token (prevents login CSRF)
 SOCIALACCOUNT_STORE_TOKENS = False
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
@@ -286,22 +301,19 @@ SECURE_CSP = {
 }
 
 # WebAuthn (FaceID / biometric unlock)
-WEBAUTHN_RP_ID = os.environ.get('WEBAUTHN_RP_ID', 'localhost')
 WEBAUTHN_RP_NAME = os.environ.get('WEBAUTHN_RP_NAME', 'Vault')
 WEBAUTHN_ORIGIN = os.environ.get(
     'WEBAUTHN_ORIGIN',
     os.environ.get('VAULT_PUBLIC_URL', 'http://localhost:8000'),
-)
+).rstrip('/')
+# Must equal (or be a registrable suffix of) the origin's host, or every ceremony fails.
+WEBAUTHN_RP_ID = os.environ.get('WEBAUTHN_RP_ID') or urlparse(WEBAUTHN_ORIGIN).hostname or 'localhost'
 
 # Google Sheets / GCS service account JSON (never commit the file)
 GOOGLE_SHEETS_CREDENTIALS = os.environ.get(
     'GOOGLE_SHEETS_CREDENTIALS',
     os.environ.get('GOOGLE_APPLICATION_CREDENTIALS', ''),
 )
-
-# Admin monitor: optional local health probe behind reverse proxy
-VAULT_HEALTH_CHECK_URL = os.environ.get('VAULT_HEALTH_CHECK_URL', '')
-VAULT_HEALTH_CHECK_HOST = os.environ.get('VAULT_HEALTH_CHECK_HOST', '')
 
 # Security hardening
 SESSION_COOKIE_HTTPONLY = True
@@ -372,10 +384,11 @@ LOGGING = {
 OAUTH2_PROVIDER = {
     'SCOPES': {'read': 'Read scope', 'write': 'Write scope'},
     'ACCESS_TOKEN_EXPIRE_SECONDS': 36000,
-    'PKCE_REQUIRED': False,
+    'PKCE_REQUIRED': True,  # MCP authorization spec mandates PKCE for all clients
+    'OAUTH2_VALIDATOR_CLASS': 'mcp_server.oauth.UserBoundGrantValidator',
     'DCR_ENABLED': True,
     'DCR_REGISTRATION_PERMISSION_CLASSES': (
-        'oauth2_provider.dcr.AllowAllDCRPermission',
+        'mcp_server.oauth.AuthorizationCodeOnlyDCRPermission',
     ),
     'CIMD_ENABLED': True,
 }
@@ -395,3 +408,45 @@ CORS_ALLOW_HEADERS = (
     'x-csrftoken',
     'x-requested-with',
 )
+
+# Email settings
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+VAULT_REPORT_EMAIL = os.environ.get('VAULT_REPORT_EMAIL', EMAIL_HOST_USER)
+
+if not EMAIL_HOST_USER:
+    # Fallback to console backend for local development if no email is configured
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# AI & Insights Settings (Vault AI Gateway)
+# Providers: 'shakti', 'gemini', or 'auto' (automatic multi-node failover)
+AI_PROVIDER = os.environ.get('AI_PROVIDER', 'shakti' if os.environ.get('SHAKTI_API_KEY') else 'gemini')
+AI_NODES = os.environ.get('AI_NODES', '')  # Optional structured JSON array of node definitions
+
+# Multi-key & Multi-node pools (comma-separated or single)
+SHAKTI_API_KEYS = os.environ.get('SHAKTI_API_KEYS', '')
+SHAKTI_API_KEY = os.environ.get('SHAKTI_API_KEY', '')
+SHAKTI_BASE_URLS = os.environ.get('SHAKTI_BASE_URLS', '')
+SHAKTI_BASE_URL = os.environ.get('SHAKTI_BASE_URL', 'https://http.prod-llm.shaktistudio.shakticloud.ai')
+SHAKTI_CLIENT_ID = os.environ.get('SHAKTI_CLIENT_ID', '')
+SHAKTI_MODEL = os.environ.get('SHAKTI_MODEL', 'deepseek-r1')
+SHAKTI_MAX_TOKENS = int(os.environ.get('SHAKTI_MAX_TOKENS', '8192'))
+SHAKTI_TIMEOUT = float(os.environ.get('SHAKTI_TIMEOUT', '300.0'))
+SHAKTI_TEMPERATURE = float(os.environ.get('SHAKTI_TEMPERATURE', '0.1'))
+SHAKTI_MAX_RETRIES = int(os.environ.get('SHAKTI_MAX_RETRIES', '3'))
+SHAKTI_RETRY_DELAY = int(os.environ.get('SHAKTI_RETRY_DELAY', '3'))
+
+GEMINI_API_KEYS = os.environ.get('GEMINI_API_KEYS', '')
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-4-argon')
+EXPENSES_GEMINI_MODEL = os.environ.get('EXPENSES_GEMINI_MODEL', 'gemini-3.8-flash')
+
+# Multi-Stage DAG Engine for Portfolio Insights
+ENABLE_PORTFOLIO_DAG = os.environ.get('ENABLE_PORTFOLIO_DAG', 'true').lower() in ('true', '1', 'yes')
+PORTFOLIO_DAG_CONCURRENCY = os.environ.get('PORTFOLIO_DAG_CONCURRENCY', 'true').lower() in ('true', '1', 'yes')
+
+

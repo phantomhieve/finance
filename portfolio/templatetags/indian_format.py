@@ -54,3 +54,33 @@ def indian_number(value):
         formatted = '-' + formatted
 
     return formatted
+
+
+def _to_float(value):
+    try:
+        return float(str(value).replace(',', ''))
+    except (TypeError, ValueError):
+        return 0.0
+
+
+@register.filter(name='inr')
+def inr(value):
+    """Whole rupees with Indian grouping and a typographic minus: ``−₹1,20,500``."""
+    n = round(_to_float(value))
+    return ('−' if n < 0 else '') + '₹' + _format_indian(str(abs(n)))
+
+
+@register.filter(name='inr_short')
+def inr_short(value):
+    """Compact lakh/crore form for headlines: ``₹1.24 Cr``, ``₹8.5 L``, ``₹42K``."""
+    n = _to_float(value)
+    sign, n = ('−' if n < 0 else ''), abs(n)
+    if n >= 1e7:
+        body = f'{n / 1e7:.2f} Cr'
+    elif n >= 1e5:
+        body = f'{n / 1e5:.1f} L'
+    elif n >= 1e3:
+        body = f'{n / 1e3:.0f}K'
+    else:
+        body = f'{n:.0f}'
+    return f'{sign}₹{body}'

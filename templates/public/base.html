@@ -1,0 +1,34 @@
+{% load static %}<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Vault{% endblock %}</title>
+  <meta name="description" content="{% block description %}Vault is a private personal finance dashboard for a single household.{% endblock %}">
+  <link rel="icon" href="{% static 'icons/icon-192.png' %}">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'css/public.css' %}">
+</head>
+<body>
+  <div class="glow glow-1"></div>
+  <div class="glow glow-2"></div>
+  <header class="nav">
+    <a href="{% url 'about' %}" class="brand"><img src="{% static 'icons/icon-192.png' %}" alt="Vault logo">VAULT</a>
+    <nav class="nav-links">
+      <a href="{% url 'about' %}" {% if page == 'about' %}class="active"{% endif %}>About</a>
+      <a href="{% url 'privacy' %}" {% if page == 'privacy' %}class="active"{% endif %}>Privacy</a>
+      <a href="{% url 'terms' %}" {% if page == 'terms' %}class="active"{% endif %}>Terms</a>
+      <a href="{% url 'login' %}" class="btn btn-primary" id="nav-signin">Sign in</a>
+    </nav>
+  </header>
+  <main>{% block content %}{% endblock %}</main>
+  <footer>
+    <a href="{% url 'about' %}">About</a>
+    <a href="{% url 'privacy' %}">Privacy Policy</a>
+    <a href="{% url 'terms' %}">Terms of Service</a>
+    <p style="margin-top:10px">&copy; {% now "Y" %} Vault &middot; Contact: <a href="mailto:{{ contact_email }}">{{ contact_email }}</a></p>
+  </footer>
+</body>
+</html>

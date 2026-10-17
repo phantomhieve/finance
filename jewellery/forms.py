@@ -100,7 +100,7 @@ class JewelleryItemForm(forms.ModelForm):
                 return new_photo
             except Exception as e:
                 logger.exception("Failed to convert HEIC to JPEG")
-                raise forms.ValidationError("Could not process the iPhone photo format.")
+                raise forms.ValidationError("Could not process the iPhone photo format.") from e
 
         # verify() leaves the file pointer consumed — rewind so save() works.
         photo.seek(0)

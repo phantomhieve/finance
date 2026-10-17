@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', function() {
     bodyColor: '#aaa',
     padding: 12,
     cornerRadius: 8,
-    callbacks: { label: function (c) { return ' \u20b9' + c.raw.toLocaleString('en-IN'); } }
+    callbacks: { label: function (c) { return ' \u20b9' + Math.round(c.raw).toLocaleString('en-IN'); } }
   };
 
   var legendDefault = {
@@ -18,8 +18,8 @@ document.addEventListener('DOMContentLoaded', function() {
   };
 
   var scaleOpts = {
-    x: { grid: { display: false }, ticks: { color: 'rgba(128,128,128,0.45)' }, border: { display: false } },
-    y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: 'rgba(128,128,128,0.45)', callback: function (v) { return v >= 1e7 ? '\u20b9' + (v / 1e7).toFixed(1) + 'Cr' : v >= 1e5 ? '\u20b9' + (v / 1e5).toFixed(1) + 'L' : '\u20b9' + v.toLocaleString('en-IN'); } }, border: { display: false } }
+    x: { grid: { display: false }, ticks: { color: 'rgba(128,128,128,0.45)', maxRotation: 0, autoSkipPadding: 6 }, border: { display: false } },
+    y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: 'rgba(128,128,128,0.45)', callback: function (v) { return v >= 1e7 ? '\u20b9' + (v / 1e7).toFixed(1) + 'Cr' : v >= 1e5 ? '\u20b9' + (v / 1e5).toFixed(1) + 'L' : v >= 1e3 ? '\u20b9' + Math.round(v / 1e3) + 'K' : '\u20b9' + v.toLocaleString('en-IN'); } }, border: { display: false } }
   };
 
   // 1. Master/Baby Portfolio Doughnut
@@ -97,7 +97,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (gVal) {
       new Chart(gVal, {
         type: 'line',
-        data: { labels: gcd.months, datasets: [{ label: '  Portfolio Value', data: gcd.values, borderColor: '#7c9ef8', backgroundColor: 'rgba(124,158,248,0.07)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#7c9ef8', pointBorderColor: '#0a0a14', pointBorderWidth: 2, tension: 0.35, fill: true }] },
+        data: { labels: gcd.months, datasets: [{ label: '  Portfolio Value', data: gcd.values, borderColor: '#7c9ef8', backgroundColor: 'rgba(124,158,248,0.07)', borderWidth: 2, pointRadius: 3, pointBackgroundColor: '#7c9ef8', pointBorderColor: '#0a0a14', pointBorderWidth: 2, tension: 0.35, fill: true, spanGaps: true }] },
         options: { animation: { duration: 1100 }, responsive: true, maintainAspectRatio: false, plugins: { legend: topLegend, tooltip: tooltipDefault }, scales: scaleOpts }
       });
     }
@@ -118,7 +118,7 @@ document.addEventListener('DOMContentLoaded', function() {
       if (yVal) {
         new Chart(yVal, {
           type: 'line',
-          data: { labels: gcd.yearly_labels, datasets: [{ label: '  Portfolio Value', data: gcd.yearly_values, borderColor: '#7c9ef8', backgroundColor: 'rgba(124,158,248,0.07)', borderWidth: 2, pointRadius: 4, pointBackgroundColor: '#7c9ef8', pointBorderColor: '#0a0a14', pointBorderWidth: 2, tension: 0.35, fill: true }] },
+          data: { labels: gcd.yearly_labels, datasets: [{ label: '  Portfolio Value', data: gcd.yearly_values, borderColor: '#7c9ef8', backgroundColor: 'rgba(124,158,248,0.07)', borderWidth: 2, pointRadius: 4, pointBackgroundColor: '#7c9ef8', pointBorderColor: '#0a0a14', pointBorderWidth: 2, tension: 0.35, fill: true, spanGaps: true }] },
           options: { animation: { duration: 1100 }, responsive: true, maintainAspectRatio: false, plugins: { legend: topLegend, tooltip: tooltipDefault }, scales: scaleOpts }
         });
       }

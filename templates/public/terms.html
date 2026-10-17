@@ -1,0 +1,42 @@
+{% extends 'public/base.html' %}
+{% block title %}Terms of Service — Vault{% endblock %}
+{% block description %}Terms governing use of Vault, a private household finance dashboard.{% endblock %}
+{% block content %}
+<article class="doc">
+  <h1>Terms of Service</h1>
+  <p class="updated">Last updated: {{ updated }}</p>
+
+  <h2>1. About Vault</h2>
+  <p>Vault ({{ site_url }}) is a private, invite-only personal finance dashboard operated for the members of one household.
+     By signing in, you agree to these terms and to our <a href="{% url 'privacy' %}">Privacy Policy</a>.</p>
+
+  <h2>2. Eligibility and accounts</h2>
+  <ul>
+    <li>Access is limited to people approved by the administrator. You sign in with your Google account.</li>
+    <li>You are responsible for keeping your Google account and devices secure.</li>
+  </ul>
+
+  <h2>3. Acceptable use</h2>
+  <p>Only connect email accounts and enter financial information that you own or are authorised to use. Do not try to access
+     other users' data or disrupt the service.</p>
+
+  <h2>4. No financial advice</h2>
+  <p>Figures, categorisations and AI-generated insights are provided for information only and may be incomplete or inaccurate.
+     They are not financial, tax or investment advice. Check important figures against your bank and card statements.</p>
+
+  <h2>5. Third-party services</h2>
+  <p>Vault uses Google services (Sign-In, Gmail API, Gemini, Cloud Storage). Your use of them is also subject to Google's terms.</p>
+
+  <h2>6. Availability</h2>
+  <p>Vault is provided "as is", without warranties of any kind. It may be changed, suspended or discontinued at any time.</p>
+
+  <h2>7. Limitation of liability</h2>
+  <p>To the extent permitted by law, the operator is not liable for any indirect or consequential loss arising from use of Vault.</p>
+
+  <h2>8. Termination</h2>
+  <p>You can stop using Vault and disconnect Gmail at any time. Access may be removed if these terms are breached.</p>
+
+  <h2>9. Contact</h2>
+  <p><a href="mailto:{{ contact_email }}">{{ contact_email }}</a></p>
+</article>
+{% endblock %}

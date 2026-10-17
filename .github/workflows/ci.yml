@@ -7,13 +7,21 @@ on:
     branches: [main, master]
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Never cancel a run on main mid-deploy (rsync/migrate); only superseded PR runs.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   check:
     runs-on: ubuntu-latest
+    env:
+      DJANGO_SECRET_KEY: ci-check-only-not-for-production
+      DJANGO_DEBUG: 'True'
+      DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
     steps:
       - uses: actions/checkout@v4
 
@@ -24,20 +32,31 @@ jobs:
           cache-dependency-path: requirements.txt
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.txt ruff==0.16.10 pip-audit==2.10.1
+
+      - name: Lint (pyflakes + syntax errors)
+        run: ruff check --select F,E9 .
 
       - name: Django system check
-        env:
-          DJANGO_SECRET_KEY: ci-check-only-not-for-production
-          DJANGO_DEBUG: 'True'
-          DJANGO_ALLOWED_HOSTS: localhost,127.0.0.1
         run: python manage.py check --fail-level WARNING
+
+      - name: Migrations are committed
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Tests
+        run: python manage.py test --noinput
+
+      - name: Dependency vulnerability audit
+        run: pip-audit -r requirements.txt
 
   deploy:
     needs: check
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: production
+    concurrency:
+      group: production-deploy
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
 
@@ -45,12 +64,19 @@ jobs:
         env:
           SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
           SSH_HOST: ${{ secrets.DEPLOY_HOST }}
+          SSH_PORT: ${{ secrets.DEPLOY_SSH_PORT }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
           printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          if [[ -n "$KNOWN_HOSTS" ]]; then
+            printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          else
+            echo "::warning::DEPLOY_KNOWN_HOSTS not set; trusting the host key on first use."
+            ssh-keyscan -4 -t ed25519,rsa -p "${SSH_PORT:-22}" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          fi
 
       - name: Deploy
         env:

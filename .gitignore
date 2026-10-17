@@ -15,6 +15,7 @@ __pycache__/
 *.pyo
 .venv/
 venv/
+.ruff_cache/
 
 # Django
 db.sqlite3
@@ -45,3 +46,6 @@ logs/
 node_modules/
 
 media/
+
+# CodeGraph local index
+.codegraph/

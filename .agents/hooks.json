@@ -1,0 +1,32 @@
+{
+  "vault-safety-gate": {
+    "enabled": true,
+    "PreToolUse": [
+      {
+        "matcher": "run_command|view_file|read_file|grep_search|write_to_file|replace_file_content|multi_replace_file_content",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ./scripts/safety_pre_tool.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  },
+  "codegraph-auto-sync": {
+    "enabled": true,
+    "PostToolUse": [
+      {
+        "matcher": "write_to_file|replace_file_content|multi_replace_file_content",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ./scripts/post_edit_sync.py",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -2,6 +2,7 @@ import inspect
 import json
 import time
 import datetime
+from decimal import Decimal
 import logging
 from collections import OrderedDict
 from functools import wraps
@@ -11,13 +12,13 @@ from django.conf import settings
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import HttpResponseForbidden, JsonResponse
+from django.http import Http404, HttpResponseForbidden, JsonResponse
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from tracker.models import WebAuthnCredential
 
-from pftracker.utils import ZERO as _ZERO, safe_redirect, pnl_pct as _pnl_pct
+from pftracker.utils import ZERO as _ZERO, feature_enabled, safe_redirect, pnl_pct as _pnl_pct
 
 from .models import (
     ZerodhaAccount, StockHolding, MutualFundHolding,
@@ -26,16 +27,18 @@ from .models import (
     CommodityHolding, USStockHolding,
     MonthlySnapshot, FinancialGoal,
     PortfolioInsight,
-    InsightGenerationSettings,
+    InsightGenerationSettings, RealEstateHolding,
 )
 from .forms import (
     EPFEntryForm, NPSEntryForm, FixedDepositForm,
     CashPositionForm, BondHoldingForm, CryptoHoldingForm,
     CommodityHoldingForm, FinancialGoalForm, USStockHoldingForm,
+    RealEstateHoldingForm, RealEstateValuationForm,
 )
 from tracker.services import parse_fy_param
 from .services import (
     get_portfolio_summary,
+    without_real_estate,
     get_commodity_summary,
     sync_zerodha_from_sheets,
     refresh_commodity_prices,
@@ -55,33 +58,28 @@ logger = logging.getLogger(__name__)
 
 _PORTFOLIO_UNLOCK_TTL = 1800  # 30 minutes
 
-def _require_portfolio(view_func):
-    """Only PRIMARY users can access portfolio views; always gate behind group password."""
-    @wraps(view_func)
-    def _wrapped(request, *args, **kwargs):
-        if not request.user.can_view_portfolio:
-            return HttpResponseForbidden('You do not have permission to view this page.')
-        unlocked_at = request.session.get('portfolio_unlocked_at')
-        if not unlocked_at or (time.time() - unlocked_at) > _PORTFOLIO_UNLOCK_TTL:
-            request.session.pop('portfolio_unlocked_at', None)
-            return redirect('/portfolio/unlock/?next=' + quote(request.get_full_path()))
-        request.portfolio_expires_at = int(unlocked_at + _PORTFOLIO_UNLOCK_TTL)
-        return view_func(request, *args, **kwargs)
-    return _wrapped
 
-def _require_jewellery(view_func):
-    """PRIMARY and ACCOUNT_HOLDER can access jewellery; gate behind group password."""
-    @wraps(view_func)
-    def _wrapped(request, *args, **kwargs):
-        if not getattr(request.user, 'can_view_jewellery', False):
-            return HttpResponseForbidden('You do not have permission to view this page.')
-        unlocked_at = request.session.get('portfolio_unlocked_at')
-        if not unlocked_at or (time.time() - unlocked_at) > _PORTFOLIO_UNLOCK_TTL:
-            request.session.pop('portfolio_unlocked_at', None)
-            return redirect('/portfolio/unlock/?next=' + quote(request.get_full_path()))
-        request.portfolio_expires_at = int(unlocked_at + _PORTFOLIO_UNLOCK_TTL)
-        return view_func(request, *args, **kwargs)
-    return _wrapped
+def _vault_gate(permission_attr, feature_name):
+    """Role check + household feature toggle + unlocked-session TTL shared by portfolio and jewellery."""
+    def decorator(view_func):
+        @wraps(view_func)
+        def _wrapped(request, *args, **kwargs):
+            if not getattr(request.user, permission_attr, False):
+                return HttpResponseForbidden('You do not have permission to view this page.')
+            if request.user.group is None or not feature_enabled(request.user, feature_name):
+                raise Http404
+            unlocked_at = request.session.get('portfolio_unlocked_at')
+            if not unlocked_at or (time.time() - unlocked_at) > _PORTFOLIO_UNLOCK_TTL:
+                request.session.pop('portfolio_unlocked_at', None)
+                return redirect('/portfolio/unlock/?next=' + quote(request.get_full_path()))
+            request.portfolio_expires_at = int(unlocked_at + _PORTFOLIO_UNLOCK_TTL)
+            return view_func(request, *args, **kwargs)
+        return _wrapped
+    return decorator
+
+
+_require_portfolio = _vault_gate('can_view_portfolio', 'portfolio')
+_require_jewellery = _vault_gate('can_view_jewellery', 'jewellery')
 
 
 _UNLOCK_ATTEMPT_KEY = '_portfolio_unlock_attempts'
@@ -102,7 +100,8 @@ def portfolio_unlock(request):
         remaining = int(lockout_until - time.time())
         messages.error(request, f'Too many failed attempts. Try again in {remaining // 60}m {remaining % 60}s.')
         return render(request, 'portfolio/unlock.html', {
-            'next': next_url, 'has_password': True, 'has_webauthn': False,
+            'next': next_url, 'has_password': True,
+            'has_webauthn': WebAuthnCredential.objects.filter(user=request.user).exists(),
         })
 
     group = request.user.group
@@ -277,6 +276,38 @@ add_commodity, edit_commodity, delete_commodity = _make_crud_views(
 add_goal, edit_goal, delete_goal = _make_crud_views(
     FinancialGoal, FinancialGoalForm, 'Financial goal')
 
+add_real_estate, edit_real_estate, delete_real_estate = _make_crud_views(
+    RealEstateHolding, RealEstateHoldingForm, 'Real estate property')
+
+
+@login_required
+@_require_portfolio
+@require_POST
+def update_real_estate_valuation(request, pk):
+    group = _user_group(request)
+    holding = get_object_or_404(RealEstateHolding, pk=pk, group=group)
+    form = RealEstateValuationForm(request.POST, instance=holding)
+    if form.is_valid():
+        form.save()
+        messages.success(request, f"Valuation for '{holding.name}' updated successfully.")
+    else:
+        logger.warning("Invalid real estate valuation form (pk=%s): %s", pk, form.errors.as_text())
+        messages.error(request, "Failed to update valuation. Please check entered values.")
+    return _safe_redirect(request)
+
+
+@login_required
+@_require_portfolio
+def get_real_estate_llm_prompt_json(request, pk):
+    group = _user_group(request)
+    holding = get_object_or_404(RealEstateHolding, pk=pk, group=group)
+    return JsonResponse({
+        'status': 'success',
+        'name': holding.name,
+        'prompt': holding.get_llm_research_prompt(),
+        'location_summary': holding.location_summary_for_llm,
+    })
+
 
 @login_required
 @_require_portfolio
@@ -323,18 +354,32 @@ def delete_us_stock(request, pk):
 # Page views
 # ---------------------------------------------------------------------------
 
-def _insight_cooldown_timedelta():
-    """Production uses DB-backed cooldown; DEBUG disables cooldown."""
+def _insight_cooldown_timedelta(group=None):
+    """Per-household cooldown; falls back to global InsightGenerationSettings; DEBUG disables."""
     if settings.DEBUG:
         return datetime.timedelta(0)
+    # Per-household override
+    if group:
+        try:
+            days = group.config.ai_cooldown_days
+            days = max(0, min(int(days), 366))
+            return datetime.timedelta(days=days)
+        except Exception:
+            pass
+    # Global fallback
     days = InsightGenerationSettings.get_solo().cooldown_days
     days = max(0, min(int(days), 366))
     return datetime.timedelta(days=days)
 
 
-def _insight_cooldown_hint():
+def _insight_cooldown_hint(group=None):
     if settings.DEBUG:
         return None
+    if group:
+        try:
+            return group.config.ai_cooldown_days
+        except Exception:
+            pass
     return InsightGenerationSettings.get_solo().cooldown_days
 
 
@@ -345,7 +390,7 @@ def _insight_can_generate(group):
     latest = qs.first()
     if not latest:
         return latest, True
-    cooldown = _insight_cooldown_timedelta()
+    cooldown = _insight_cooldown_timedelta(group)
     can = (_tz.now() - latest.generated_at) >= cooldown
     return latest, can
 
@@ -356,6 +401,12 @@ def master_portfolio(request):
     group = _user_group(request)
     _auto_snapshot(group)
     summary = get_portfolio_summary(group)
+    if request.GET.get('ex_re') in ('0', '1'):
+        request.session['pf_exclude_re'] = request.GET['ex_re'] == '1'
+    has_real_estate = summary['real_estate_current'] > 0
+    exclude_re = has_real_estate and request.session.get('pf_exclude_re', False)
+    if exclude_re:
+        summary = without_real_estate(summary, group)
     latest_insight, can_generate = _insight_can_generate(group)
     if latest_insight and latest_insight.insights.get('insights'):
         sev_order = {'critical': 0, 'warning': 1, 'info': 2, 'positive': 3}
@@ -372,7 +423,7 @@ def master_portfolio(request):
         **summary,
         'latest_insight': latest_insight,
         'can_generate_insight': can_generate,
-        'insight_cooldown_days_hint': _insight_cooldown_hint(),
+        'insight_cooldown_days_hint': _insight_cooldown_hint(group),
         'epf_form': EPFEntryForm(),
         'nps_form': NPSEntryForm(group=group),
         'fd_form': FixedDepositForm(),
@@ -381,8 +432,11 @@ def master_portfolio(request):
         'crypto_form': CryptoHoldingForm(),
         'commodity_form': CommodityHoldingForm(),
         'us_stock_form': USStockHoldingForm(),
+        'real_estate_form': RealEstateHoldingForm(),
         'goal_form': FinancialGoalForm(),
         'pf_chart_data': pf_chart_data,
+        'has_real_estate': has_real_estate,
+        'exclude_re': exclude_re,
         'webauthn_credentials': WebAuthnCredential.objects.filter(user=request.user),
     }
     return render(request, 'portfolio/master.html', ctx)
@@ -392,7 +446,7 @@ def master_portfolio(request):
 @_require_portfolio
 def zerodha_detail(request, slug):
     account = get_object_or_404(ZerodhaAccount, slug=slug, group=_user_group(request))
-    # Exclude holdings tracked in the Baby Portfolio — they belong there, not here
+    # Exclude holdings tracked in the Child Portfolio — they belong there, not here
     stocks = list(account.stock_holdings.filter(is_baby=False))
     index_mf = list(account.mf_holdings.filter(fund_type='INDEX', is_baby=False))
     other_mf = list(account.mf_holdings.filter(fund_type='OTHER', is_baby=False))
@@ -469,7 +523,7 @@ def zerodha_consolidated(request):
     group_accounts = ZerodhaAccount.objects.filter(group=group)
     acct_ids = group_accounts.values_list('id', flat=True)
 
-    # Exclude holdings tracked in the Baby Portfolio — they belong there, not here
+    # Exclude holdings tracked in the Child Portfolio — they belong there, not here
     all_stocks = list(StockHolding.objects.select_related('account').filter(account_id__in=acct_ids, is_baby=False))
     all_index = list(MutualFundHolding.objects.select_related('account').filter(account_id__in=acct_ids, fund_type='INDEX', is_baby=False))
     all_other = list(MutualFundHolding.objects.select_related('account').filter(account_id__in=acct_ids, fund_type='OTHER', is_baby=False))
@@ -682,15 +736,43 @@ def commodities_detail(request):
 
 @login_required
 @_require_portfolio
+def real_estate_detail(request):
+    group = _user_group(request)
+    holdings = list(RealEstateHolding.objects.filter(group=group, is_baby=False))
+    total_invested = sum((h.total_cost_basis for h in holdings), _ZERO)
+    total_current = sum((h.current_valuation for h in holdings), _ZERO)
+    total_rental = sum((h.monthly_rental_income for h in holdings), _ZERO)
+    total_pnl = total_current - total_invested
+    pnl_pct = (total_pnl / total_invested * 100).quantize(Decimal('0.01')) if total_invested else _ZERO
+    annual_rental = total_rental * Decimal('12')
+    portfolio_yield = (annual_rental / total_current * 100).quantize(Decimal('0.01')) if total_current else _ZERO
+
+    return render(request, 'portfolio/real_estate_detail.html', {
+        'holdings': holdings,
+        'total_invested': total_invested,
+        'total_current': total_current,
+        'total_rental': total_rental,
+        'annual_rental': annual_rental,
+        'portfolio_yield': portfolio_yield,
+        'total_pnl': total_pnl,
+        'pnl_pct': pnl_pct,
+        'form': RealEstateHoldingForm(),
+        'valuation_form': RealEstateValuationForm(),
+    })
+
+
+@login_required
+@_require_portfolio
 def portfolio_growth(request):
     group = _user_group(request)
     fy_year = parse_fy_param(request.GET.get('fy'), None)
     growth = get_growth_data(fy_year, group=group)
     growth['growth_chart_data'] = {
         'months': [m['name'] for m in growth['months']],
-        'values': [m['total_value'] for m in growth['months']],
-        'money_added': [m['money_added'] for m in growth['months']],
-        'returns_gained': [m['returns_gained'] for m in growth['months']],
+        # No snapshot → gap in the charts, not a plunge to ₹0.
+        'values': [m['total_value'] if m['snapshot'] else None for m in growth['months']],
+        'money_added': [m['money_added'] if m['snapshot'] else None for m in growth['months']],
+        'returns_gained': [m['returns_gained'] if m['snapshot'] else None for m in growth['months']],
         'yearly_labels': [y['label'] for y in growth['yearly']],
         'yearly_values': [y['total_value'] for y in growth['yearly']],
         'yearly_added': [y['money_added'] for y in growth['yearly']],
@@ -786,11 +868,12 @@ def generate_insights(request):
     from django.utils import timezone as _tz
     last, can = _insight_can_generate(group)
     if last and not can:
-        remaining = cooldown_td - (_tz.now() - last.generated_at)
+        cooldown = _insight_cooldown_timedelta(group)
+        remaining = cooldown - (_tz.now() - last.generated_at)
         secs = max(0, int(remaining.total_seconds()))
         days = secs // 86400
         hours = (secs % 86400) // 3600
-        cfg_days = InsightGenerationSettings.get_solo().cooldown_days
+        cfg_days = _insight_cooldown_hint(group) or InsightGenerationSettings.get_solo().cooldown_days
         messages.warning(
             request,
             f"AI insights cooldown is {cfg_days} day(s). Try again in {days}d {hours}h.",
@@ -800,7 +883,7 @@ def generate_insights(request):
         summary = get_portfolio_summary(group)
         growth = get_growth_data(group=group)
         prompt_data = build_prompt_data(summary, growth, group)
-        result = call_gemini(prompt_data)
+        result = call_gemini(prompt_data, group=group)
         PortfolioInsight.objects.create(
             group=group,
             model_used=result.model,
@@ -819,6 +902,19 @@ def generate_insights(request):
 # ---------------------------------------------------------------------------
 
 _MAX_WEBAUTHN_CREDENTIALS = 5
+_WEBAUTHN_CHALLENGE_TTL = 300
+
+
+def _store_challenge(request, key, challenge):
+    request.session[key] = {'c': challenge.hex(), 't': time.time()}
+
+
+def _pop_challenge(request, key):
+    """Single-use challenge from the session, or None if missing or older than the TTL."""
+    data = request.session.pop(key, None)
+    if not isinstance(data, dict) or time.time() - data.get('t', 0) > _WEBAUTHN_CHALLENGE_TTL:
+        return None
+    return bytes.fromhex(data['c'])
 
 
 @login_required
@@ -865,7 +961,7 @@ def webauthn_register_begin(request):
         exclude_credentials=exclude_creds,
     )
 
-    request.session['webauthn_reg_challenge'] = options.challenge.hex()
+    _store_challenge(request, 'webauthn_reg_challenge', options.challenge)
     return JsonResponse(json.loads(options_to_json(options)))
 
 
@@ -875,9 +971,12 @@ def webauthn_register_complete(request):
     """Complete biometric registration and store the credential."""
     if not getattr(request.user, 'can_view_jewellery', False):
         return JsonResponse({'error': 'Forbidden.'}, status=403)
-    challenge_hex = request.session.pop('webauthn_reg_challenge', None)
-    if not challenge_hex:
-        return JsonResponse({'error': 'No registration in progress.'}, status=400)
+    unlocked_at = request.session.get('portfolio_unlocked_at')
+    if not unlocked_at or (time.time() - unlocked_at) > _PORTFOLIO_UNLOCK_TTL:
+        return JsonResponse({'error': 'Vault must be unlocked first.'}, status=403)
+    challenge = _pop_challenge(request, 'webauthn_reg_challenge')
+    if not challenge:
+        return JsonResponse({'error': 'Registration expired. Please try again.'}, status=400)
 
     from webauthn import verify_registration_response
 
@@ -885,7 +984,7 @@ def webauthn_register_complete(request):
         body = json.loads(request.body)
         verification = verify_registration_response(
             credential=body,
-            expected_challenge=bytes.fromhex(challenge_hex),
+            expected_challenge=challenge,
             expected_origin=settings.WEBAUTHN_ORIGIN,
             expected_rp_id=settings.WEBAUTHN_RP_ID,
             require_user_verification=True,
@@ -933,7 +1032,7 @@ def webauthn_auth_begin(request):
         user_verification=UserVerificationRequirement.REQUIRED,
     )
 
-    request.session['webauthn_auth_challenge'] = options.challenge.hex()
+    _store_challenge(request, 'webauthn_auth_challenge', options.challenge)
     return JsonResponse(json.loads(options_to_json(options)))
 
 
@@ -943,9 +1042,9 @@ def webauthn_auth_complete(request):
     """Verify biometric authentication and unlock the portfolio/jewellery."""
     if not getattr(request.user, 'can_view_jewellery', False):
         return JsonResponse({'error': 'Forbidden.'}, status=403)
-    challenge_hex = request.session.pop('webauthn_auth_challenge', None)
-    if not challenge_hex:
-        return JsonResponse({'error': 'No authentication in progress.'}, status=400)
+    challenge = _pop_challenge(request, 'webauthn_auth_challenge')
+    if not challenge:
+        return JsonResponse({'error': 'Authentication expired. Please try again.'}, status=400)
 
     from webauthn import verify_authentication_response, base64url_to_bytes
 
@@ -953,13 +1052,13 @@ def webauthn_auth_complete(request):
         body = json.loads(request.body)
         raw_id = base64url_to_bytes(body['rawId'])
         cred = WebAuthnCredential.objects.get(credential_id=raw_id, user=request.user)
-    except (WebAuthnCredential.DoesNotExist, KeyError):
+    except (WebAuthnCredential.DoesNotExist, KeyError, TypeError, ValueError):
         return JsonResponse({'error': 'Authentication failed.'}, status=400)
 
     try:
         verification = verify_authentication_response(
             credential=body,
-            expected_challenge=bytes.fromhex(challenge_hex),
+            expected_challenge=challenge,
             expected_origin=settings.WEBAUTHN_ORIGIN,
             expected_rp_id=settings.WEBAUTHN_RP_ID,
             credential_public_key=bytes(cred.public_key),
@@ -983,7 +1082,7 @@ def webauthn_auth_complete(request):
 @require_POST
 def webauthn_remove(request):
     """Remove a registered biometric credential."""
-    if not request.user.can_view_portfolio:
+    if not getattr(request.user, 'can_view_jewellery', False):
         return JsonResponse({'error': 'Forbidden.'}, status=403)
     unlocked_at = request.session.get('portfolio_unlocked_at')
     if not unlocked_at or (time.time() - unlocked_at) > _PORTFOLIO_UNLOCK_TTL:
@@ -1039,6 +1138,7 @@ def baby_portfolio(request):
         'crypto_form': CryptoHoldingForm(initial={'is_baby': True}),
         'commodity_form': CommodityHoldingForm(initial={'is_baby': True}),
         'us_stock_form': USStockHoldingForm(initial={'is_baby': True}),
+        'real_estate_form': RealEstateHoldingForm(initial={'is_baby': True}),
         'goal_form': FinancialGoalForm(),
         'pf_chart_data': pf_chart_data,
         'webauthn_credentials': WebAuthnCredential.objects.filter(user=request.user),
@@ -1059,6 +1159,7 @@ def toggle_baby(request, model_name, pk):
         'cryptoholding': CryptoHolding,
         'commodityholding': CommodityHolding,
         'usstockholding': USStockHolding,
+        'realestateholding': RealEstateHolding,
     }
     model_class = model_map.get(model_name.lower())
     if not model_class:
@@ -1073,7 +1174,7 @@ def toggle_baby(request, model_name, pk):
     obj.is_baby = not obj.is_baby
     obj.save()
     
-    status_msg = "moved to Baby Portfolio" if obj.is_baby else "moved to Master Portfolio"
+    status_msg = "moved to Child Portfolio" if obj.is_baby else "moved to Master Portfolio"
     messages.success(request, f"{getattr(obj, 'symbol', getattr(obj, 'fund_name', getattr(obj, 'name', 'Asset')))} {status_msg}.")
     return _safe_redirect(request)
 

@@ -49,7 +49,7 @@
 
       <div id="passwordSection" {% if has_webauthn %}style="display:none"{% endif %}>
         <h2 class="card-title text-base">Enter Vault Password</h2>
-        <p class="text-xs opacity-50 mb-4">Access expires after 5 minutes of inactivity.</p>
+        <p class="text-xs opacity-50 mb-4">Access re-locks 30 minutes after unlocking.</p>
         <form method="post" class="w-full">
           {% csrf_token %}
           <input type="hidden" name="next" value="{{ next }}">
@@ -219,7 +219,7 @@ function _bytesToB64url(buf) {
 }
 function _getCsrf() {
   var c = document.cookie.match(/csrftoken=([^;]+)/);
-  return c ? c[1] : '';
+  return c ? c[1] : document.querySelector('[name=csrfmiddlewaretoken]').value;
 }
 
 async function registerBiometric() {
@@ -252,7 +252,9 @@ async function registerBiometric() {
       id: cred.id,
       rawId: _bytesToB64url(cred.rawId),
       type: cred.type,
-      device_name: navigator.platform || 'Device',
+      device_name: navigator.userAgent.match(/iPhone|iPad/) ? 'iPhone' :
+                   navigator.userAgent.match(/Android/) ? 'Android' :
+                   navigator.userAgent.match(/Mac/) ? 'Mac' : 'Device',
       response: {
         attestationObject: _bytesToB64url(cred.response.attestationObject),
         clientDataJSON: _bytesToB64url(cred.response.clientDataJSON),
