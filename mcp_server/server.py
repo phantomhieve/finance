@@ -154,15 +154,16 @@ def _model_to_dict(instance, exclude=None):
 # MCP Server
 # ---------------------------------------------------------------------------
 
+_public_url = os.environ.get("VAULT_PUBLIC_URL", "http://localhost:8000").rstrip("/")
 mcp = MCPServer(
     name="Vault Finance",
     title="Vault Finance",
     description="Personal Finance & Portfolio Tracker MCP Server",
     version="1.0.0",
-    website_url="https://localhost:8000",
+    website_url=_public_url,
     icons=[
         Icon(
-            src="https://localhost:8000/static/icons/icon-512.png",
+            src=f"{_public_url}/static/icons/icon-512.png",
             mime_type="image/png",
             sizes=["512x512"],
         )

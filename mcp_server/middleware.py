@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 
 from asgiref.sync import sync_to_async
 from starlette.datastructures import Headers
@@ -97,7 +98,7 @@ class OAuthBearerMiddleware:
         if auth_header and auth_header.lower().startswith("bearer "):
             token_string = auth_header[7:].strip()
 
-        server_host = headers.get("host", "localhost:8000")
+        server_host = headers.get("host") or os.environ.get("VAULT_HOST", "localhost:8000")
         scheme = "https" if headers.get("x-forwarded-proto") == "https" else scope.get("scheme", "https")
         base_url = f"{scheme}://{server_host}"
 

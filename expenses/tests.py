@@ -147,7 +147,7 @@ class ExpenseTestCase(TestCase):
         self.spouse = User.objects.create_user(username='riya', password='pw-123456', user_type='ACCOUNT_HOLDER',
                                                group=self.group, email='riya@example.com', first_name='Riya')
         self.cats = categories_by_name(self.group)
-        self.account = GmailAccount.objects.create(group=self.group, user=self.user, email='testuser@example.com')
+        self.account = GmailAccount.objects.create(group=self.group, user=self.user, email='testuser@gmail.com')
         self.account.refresh_token = 'rt'
         self.account.save()
 

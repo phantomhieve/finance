@@ -2,6 +2,7 @@ import json
 import os
 
 from pydantic import BaseModel
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.template.loader import render_to_string
 
@@ -32,12 +33,19 @@ class Command(BaseCommand):
                             help='Write the rendered HTML to PATH instead of sending.')
 
     def handle(self, *args, **options):
-        target_email = os.environ.get('VAULT_REPORT_EMAIL', 'admin@example.com')
         preview = options.get('preview')
 
         group = AccountGroup.objects.first()
         if not group:
             self.stdout.write(self.style.ERROR('No household group found.'))
+            return
+
+        target_email = os.environ.get('VAULT_REPORT_EMAIL')
+        if not target_email:
+            primary = group.members.filter(user_type='PRIMARY').first()
+            target_email = primary.email if primary and primary.email else getattr(settings, 'EMAIL_HOST_USER', '')
+        if not target_email and not preview:
+            self.stdout.write(self.style.ERROR('No recipient email configured. Set VAULT_REPORT_EMAIL in .env.'))
             return
 
         ctx = build_weekly_context(group)
