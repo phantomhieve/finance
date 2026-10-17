@@ -40,10 +40,14 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR('No household group found.'))
             return
 
-        target_email = os.environ.get('VAULT_REPORT_EMAIL')
+        target_email = (
+            os.environ.get('VAULT_REPORT_EMAIL')
+            or getattr(settings, 'VAULT_REPORT_EMAIL', '')
+            or getattr(settings, 'EMAIL_HOST_USER', '')
+        )
         if not target_email:
             primary = group.members.filter(user_type='PRIMARY').first()
-            target_email = primary.email if primary and primary.email else getattr(settings, 'EMAIL_HOST_USER', '')
+            target_email = primary.email if primary and primary.email else ''
         if not target_email and not preview:
             self.stdout.write(self.style.ERROR('No recipient email configured. Set VAULT_REPORT_EMAIL in .env.'))
             return

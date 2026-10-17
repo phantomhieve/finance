@@ -416,6 +416,7 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+VAULT_REPORT_EMAIL = os.environ.get('VAULT_REPORT_EMAIL', EMAIL_HOST_USER)
 
 if not EMAIL_HOST_USER:
     # Fallback to console backend for local development if no email is configured
