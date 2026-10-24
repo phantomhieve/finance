@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from django.db import transaction
@@ -98,14 +99,19 @@ def manual_merchant(expense: Expense) -> None:
 
 def _statement_paid_by(statement: CardStatement, debit: Expense, window: datetime.timedelta) -> bool:
     if (
-        statement.paid_amount == debit.amount
+        statement.paid_amount is not None
+        and abs(statement.paid_amount - debit.amount) <= Decimal('1.00')
         and statement.paid_at
         and abs((statement.paid_at - debit.txn_date).days) <= window.days
     ):
         return True
     issued = statement.statement_date or statement.created_at.date()
     due = statement.due_date or issued + datetime.timedelta(days=20)
-    return statement.total_due == debit.amount and issued - window <= debit.txn_date <= due + window
+    return (
+        statement.total_due is not None
+        and abs(statement.total_due - debit.amount) <= Decimal('1.00')
+        and issued - window <= debit.txn_date <= due + window
+    )
 
 
 @transaction.atomic
@@ -132,6 +138,7 @@ def settle_internal_movements(group: AccountGroup, since: datetime.date) -> list
 
     statements = list(
         CardStatement.objects.filter(group=group, created_at__date__gte=since - datetime.timedelta(days=60))
+        .exclude(status='DUPLICATE')
     )
     credits = list(open_rows.filter(direction='CREDIT', payment_source__isnull=False))
     settled: list[int] = []

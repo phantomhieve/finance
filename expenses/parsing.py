@@ -236,6 +236,18 @@ def classify(sender: str | None, subject: str | None, body: str | None) -> str:
     return 'IGNORED'
 
 
+_CARD_STATEMENT_WORDS = re.compile(r'credit\s*card|card\s+(?:ending|no\.?|number)|card\s+statement', re.I)
+
+
+def looks_like_card_statement(subject: str | None, body: str | None, has_pdf: bool) -> bool:
+    """A credit-card statement email whose totals live only in the attached PDF."""
+    return bool(
+        has_pdf
+        and _STATEMENT_SUBJECT.search(subject or '')
+        and _CARD_STATEMENT_WORDS.search(f'{subject}\n{body}')
+    )
+
+
 def _direction(text: str) -> str:
     """Determine DEBIT vs CREDIT. Bulletproofed against misleading 'received order' phrases."""
     # 1. Purchase/bill payment receipt ("we have received your payment of Rs 500 for Google Cloud") -> DEBIT
@@ -337,7 +349,8 @@ def parse_time(text: str | None) -> datetime.time | None:
 
 _LAST4_PATTERNS = [
     re.compile(r'ending\s*(?:with|in)?\s*(?:[xX*•.]+\s?)?(\d{4})(?!\d)', re.I),
-    re.compile(r'(?:[xX*•]{2,}|\.{3,})\s?(\d{4})(?!\d)'),
+    re.compile(r'(?:[xX*•]{2,}|\.{3,})[\s\-]*(\d{4})(?!\d)'),
+    re.compile(r'\b(?:a/c|ac|acct|account|card)\s*(?:no\.?|number)?\s*[:\-]?\s*[\dxX*•\s\-]*[xX*•]+[\s\-]*(\d{4})(?!\d)', re.I),
     re.compile(r'\b(?:a/c|ac|acct|account|card)\s*(?:no\.?|number)?\s*[:\-]?\s*[xX*•]*\s?(\d{4})(?!\d)', re.I),
 ]
 
@@ -742,7 +755,7 @@ _LINE_RE = re.compile(
     r'(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?'
     r'\s+(.+?)\s+'
     r'(?:[A-Z]{3}\s+[0-9,]+\.\d{2}\s+)?'
-    r'(?:₹\s?|Rs\.?\s?|INR\s?)?([0-9][0-9,]*\.\d{2})\s*(Cr|CR|C|Dr|DR|D)?\s*$'
+    r'(?:₹\s?|Rs\.?\s?|INR\s?)?(-?\s*[0-9][0-9,]*\.\d{2})\s*(Cr|CR|C|Dr|DR|D)?\s*$'
 )
 _SKIP_LINE = re.compile(
     r'(opening\s+balance|closing\s+balance|total\s+(?:amount\s+)?due|minimum\s+(?:amount\s+)?due|'
@@ -761,14 +774,14 @@ def parse_statement_lines(text: str | None) -> list[ParsedLine]:
         if not m:
             continue
         d = parse_date(m.group(1))
-        amount = to_decimal(m.group(3))
+        amount = to_decimal(m.group(3).replace(' ', ''))
         if not d or not amount:
             continue
         desc = re.sub(r'\s+', ' ', m.group(2)).strip()
-        is_credit = (m.group(4) or '').upper().startswith('C') or bool(
+        is_credit = amount < 0 or (m.group(4) or '').upper().startswith('C') or bool(
             re.search(r'payment\s+received|thank\s+you\s+for\s+(?:the\s+)?payment|refund|reversal', desc, re.I)
         )
-        lines.append(ParsedLine(txn_date=d, description=desc[:255], amount=amount, is_credit=is_credit))
+        lines.append(ParsedLine(txn_date=d, description=desc[:255], amount=abs(amount), is_credit=is_credit))
     return lines
 
 

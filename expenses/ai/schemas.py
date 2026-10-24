@@ -41,6 +41,19 @@ class ExtractedLines(BaseModel):
     lines: list[ExtractedLine]
 
 
+class LineMatch(BaseModel):
+    """AI verdict on whether a statement line is an already-recorded expense."""
+    line_id: int
+    expense_id: int | None = None
+    confidence: float = 0.0
+    reason: str = ""
+
+
+class LineMatchBatch(BaseModel):
+    """Batch of statement-line match verdicts."""
+    matches: list[LineMatch] = []
+
+
 class MonthlyNote(BaseModel):
     """Narrative monthly commentary for household spend email."""
     headline: str

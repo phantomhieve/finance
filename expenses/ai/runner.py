@@ -14,19 +14,24 @@ from .prompts import (
     ANOMALY_SYSTEM,
     CATEGORISE_SYSTEM,
     EXTRACT_SYSTEM,
+    MATCH_SYSTEM,
     MONTHLY_NOTE_SYSTEM,
     STATEMENT_SYSTEM,
     build_anomaly_prompt,
     build_categorise_prompt,
     build_extract_prompt,
+    build_match_prompt,
     build_monthly_note_prompt,
     build_statement_prompt,
+    chunk_statement_text,
 )
 from .schemas import (
     AnomalyBatchResult,
     CategoryBatch,
     ExtractedLines,
     ExtractedTxn,
+    LineMatch,
+    LineMatchBatch,
     MonthlyNote,
 )
 
@@ -34,6 +39,7 @@ logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
 MAX_BATCH = 40
+MATCH_BATCH = 20
 
 
 def ai_available(task: TaskType = TaskType.FAST) -> bool:
@@ -142,24 +148,66 @@ def extract_transaction(subject: str, body: str) -> ExtractedTxn | None:
 
 
 def extract_statement_lines(text: str) -> list[Any]:
-    """Fallback line-item extraction for statement PDFs the regex engine cannot parse."""
+    """AI line-item extraction for statement PDFs the regex engine cannot (fully) parse.
+
+    Long statements are processed in line-aligned chunks so later pages are not dropped.
+    """
     if not ai_available(TaskType.EXTRACTION) or not text:
         return []
 
-    prompt = build_statement_prompt(text)
-    try:
-        result = _generate(
-            prompt=prompt,
-            schema=ExtractedLines,
-            system=STATEMENT_SYSTEM,
-            task=TaskType.EXTRACTION,
-            temperature=0.0,
-        )
-    except Exception as exc:
-        logger.warning("AI statement extraction failed: %s", exc)
-        return []
+    out: list[Any] = []
+    for chunk in chunk_statement_text(text):
+        try:
+            result = _generate(
+                prompt=build_statement_prompt(chunk),
+                schema=ExtractedLines,
+                system=STATEMENT_SYSTEM,
+                task=TaskType.EXTRACTION,
+                temperature=0.0,
+            )
+        except Exception as exc:
+            logger.warning("AI statement extraction failed: %s", exc)
+            continue
+        out.extend(result.lines)
+    return out
 
-    return result.lines
+
+def match_statement_lines(items: list[dict[str, Any]]) -> dict[int, LineMatch]:
+    """Ask the model whether each statement line duplicates one of its candidate expenses.
+
+    Args:
+        items: [{'line_id', 'date', 'description', 'amount', 'direction',
+                 'candidates': [{'expense_id', 'date', 'merchant', 'raw', 'amount', 'currency', ...}]}]
+
+    Returns:
+        {line_id: LineMatch}. Verdicts pointing at an expense outside that line's candidates are dropped.
+    """
+    if not items or not ai_available(TaskType.EXTRACTION):
+        return {}
+
+    allowed = {it["line_id"]: {c["expense_id"] for c in it["candidates"]} for it in items}
+    out: dict[int, LineMatch] = {}
+    for start in range(0, len(items), MATCH_BATCH):
+        chunk = items[start:start + MATCH_BATCH]
+        try:
+            parsed = _generate(
+                prompt=build_match_prompt(chunk),
+                schema=LineMatchBatch,
+                system=MATCH_SYSTEM,
+                task=TaskType.EXTRACTION,
+                temperature=0.0,
+            )
+        except Exception as exc:
+            logger.warning("AI statement matching failed for %d lines: %s", len(chunk), exc)
+            continue
+        for verdict in parsed.matches:
+            if verdict.line_id not in allowed:
+                continue
+            if verdict.expense_id is not None and verdict.expense_id not in allowed[verdict.line_id]:
+                continue
+            verdict.confidence = max(0.0, min(1.0, float(verdict.confidence)))
+            out[verdict.line_id] = verdict
+    return out
 
 
 def monthly_commentary(summary_payload: dict[str, Any]) -> dict[str, Any] | None:

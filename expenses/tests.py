@@ -25,7 +25,8 @@ from .parsing import (
 from .services import (
     categories_by_name, fy_summary, learn_category, month_summary, monthly_trend, settle_internal_movements,
 )
-from .statements import due_reminders, reconcile, record_card_payment
+from .ai.schemas import LineMatch
+from .statements import due_reminders, find_duplicate, reconcile, record_card_payment, resolve_line
 from .sync import ingest_email, sync_account
 
 RECEIVED = datetime.datetime(2026, 3, 5, 10, 0, tzinfo=datetime.timezone.utc)
@@ -373,7 +374,7 @@ class AnomalyTests(ExpenseTestCase):
 
 class ReconcileTests(ExpenseTestCase):
     def make_statement(self):
-        card = PaymentSource.objects.get(group=self.group, last4='8066')
+        card, _ = PaymentSource.objects.get_or_create(group=self.group, kind='CREDIT_CARD', institution='HDFC Bank', last4='8066')
         st = CardStatement.objects.create(group=self.group, payment_source=card, status='PARSED',
                                           statement_date=datetime.date(2026, 3, 15),
                                           due_date=datetime.date(2026, 4, 2), total_due=Decimal('1898'))
@@ -410,6 +411,181 @@ class ReconcileTests(ExpenseTestCase):
         st.reminder_sent_on = datetime.date(2026, 4, 1)
         st.save()
         self.assertEqual(due_reminders(self.group, datetime.date(2026, 4, 1)), [])
+
+    def test_duplicate_statement_sha_and_period(self):
+        card, _ = PaymentSource.objects.get_or_create(group=self.group, kind='CREDIT_CARD', institution='HDFC Bank', last4='8066')
+        st1 = CardStatement.objects.create(
+            group=self.group, payment_source=card, status='PARSED',
+            pdf_sha256='sha256-sample-hash', statement_date=datetime.date(2026, 3, 15),
+            period_end=datetime.date(2026, 3, 15),
+        )
+        st2 = CardStatement(group=self.group, payment_source=card, pdf_sha256='sha256-sample-hash')
+        self.assertEqual(find_duplicate(st2), st1)
+
+        # Same period_end on same card family
+        st3 = CardStatement(group=self.group, payment_source=card, period_end=datetime.date(2026, 3, 15))
+        self.assertEqual(find_duplicate(st3), st1)
+
+    def test_reconcile_card_family_matching(self):
+        # Create an alert under an auto-created card with the same last4
+        alt_card = PaymentSource.objects.create(
+            group=self.group, kind='CREDIT_CARD', institution='HDFC', last4='8066', is_auto=True,
+        )
+        alert = Expense.objects.create(
+            group=self.group, amount=Decimal('1249.00'), direction='DEBIT',
+            merchant='Swiggy Instamart', merchant_key='SWIGGYINSTAMART',
+            txn_date=datetime.date(2026, 3, 4), payment_source=alt_card, source='EMAIL',
+        )
+        st = self.make_statement()
+        matched, added = reconcile(st)
+        self.assertGreaterEqual(matched, 1)
+        line = st.lines.get(amount=Decimal('1249.00'))
+        self.assertEqual(line.matched_expense, alert)
+        self.assertEqual(line.match_method, 'RULE')
+
+    def test_reconcile_ai_matching_and_parking(self):
+        card, _ = PaymentSource.objects.get_or_create(group=self.group, kind='CREDIT_CARD', institution='HDFC Bank', last4='8066')
+        # Existing expense from alert with different merchant spelling and slightly loose amount
+        alert = Expense.objects.create(
+            group=self.group, amount=Decimal('500.00'), direction='DEBIT',
+            merchant='Amazon Web Services', merchant_key='AWS',
+            txn_date=datetime.date(2026, 3, 1), payment_source=card, source='EMAIL',
+        )
+        st = CardStatement.objects.create(
+            group=self.group, payment_source=card, status='PARSED',
+            statement_date=datetime.date(2026, 3, 15),
+        )
+        line = StatementLine.objects.create(
+            statement=st, txn_date=datetime.date(2026, 3, 6),
+            description='AMZN AWS CLOUD SERVICES', amount=Decimal('500.00'), is_credit=False,
+        )
+
+        # 1. Test AI confident match
+        verdicts = {line.pk: LineMatch(line_id=line.pk, expense_id=alert.pk, confidence=0.95, reason='Amazon cloud service match')}
+        with mock.patch('expenses.ai.match_statement_lines', return_value=verdicts):
+            reconcile(st)
+        line.refresh_from_db()
+        self.assertEqual(line.matched_expense, alert)
+        self.assertEqual(line.match_method, 'AI')
+        self.assertFalse(line.needs_review)
+
+        # 2. Reset and test AI ambiguous / low confidence -> parked for review
+        line.matched_expense = None
+        line.match_method = ''
+        line.save()
+        low_verdicts = {line.pk: LineMatch(line_id=line.pk, expense_id=alert.pk, confidence=0.5, reason='Unsure if same transaction')}
+        with mock.patch('expenses.ai.match_statement_lines', return_value=low_verdicts):
+            reconcile(st)
+        line.refresh_from_db()
+        self.assertTrue(line.needs_review)
+        self.assertEqual(line.suggested_expense, alert)
+        st.refresh_from_db()
+        self.assertEqual(st.review_count, 1)
+
+    def test_resolve_line(self):
+        card, _ = PaymentSource.objects.get_or_create(group=self.group, kind='CREDIT_CARD', institution='HDFC Bank', last4='8066')
+        alert = Expense.objects.create(
+            group=self.group, amount=Decimal('999.00'), direction='DEBIT',
+            merchant='Hotstar', merchant_key='HOTSTAR',
+            txn_date=datetime.date(2026, 3, 1), payment_source=card, source='EMAIL',
+        )
+        st = CardStatement.objects.create(
+            group=self.group, payment_source=card, status='PARSED',
+            statement_date=datetime.date(2026, 3, 15),
+        )
+        line = StatementLine.objects.create(
+            statement=st, txn_date=datetime.date(2026, 3, 2),
+            description='DISNEY+ HOTSTAR', amount=Decimal('999.00'), is_credit=False,
+            needs_review=True, suggested_expense=alert,
+        )
+        st.review_count = 1
+        st.save()
+
+        # Link
+        ok = resolve_line(line, 'link')
+        self.assertTrue(ok)
+        line.refresh_from_db()
+        self.assertFalse(line.needs_review)
+        self.assertEqual(line.matched_expense, alert)
+        self.assertEqual(line.match_method, 'USER')
+        st.refresh_from_db()
+        self.assertEqual(st.review_count, 0)
+
+        # Add as new
+        line2 = StatementLine.objects.create(
+            statement=st, txn_date=datetime.date(2026, 3, 2),
+            description='NEW EXPENSE ENTRY', amount=Decimal('350.00'), is_credit=False,
+            needs_review=True, suggested_expense=alert,
+        )
+        ok2 = resolve_line(line2, 'add')
+        self.assertTrue(ok2)
+        line2.refresh_from_db()
+        self.assertFalse(line2.needs_review)
+        self.assertTrue(line2.was_added)
+        self.assertIsNotNone(line2.matched_expense)
+        self.assertEqual(line2.matched_expense.source, 'STATEMENT')
+
+    def test_partial_payment_accumulation(self):
+        st = self.make_statement()
+        # First partial payment
+        record_card_payment(self.group, Decimal('1000'), '8066', 'HDFC Bank', datetime.date(2026, 3, 20))
+        st.refresh_from_db()
+        self.assertFalse(st.is_paid)
+        self.assertEqual(st.paid_amount, Decimal('1000'))
+
+        # Second payment completing the total due
+        record_card_payment(self.group, Decimal('898'), '8066', 'HDFC', datetime.date(2026, 3, 25))
+        st.refresh_from_db()
+        self.assertTrue(st.is_paid)
+        self.assertEqual(st.paid_amount, Decimal('1898'))
+        self.assertEqual(st.paid_at, datetime.date(2026, 3, 25))
+
+    def test_resolve_line_enriches_orphan_expense(self):
+        card, _ = PaymentSource.objects.get_or_create(group=self.group, kind='CREDIT_CARD', institution='HDFC Bank', last4='8066')
+        # Expense without payment source
+        orphan = Expense.objects.create(
+            group=self.group, amount=Decimal('500.00'), direction='DEBIT',
+            merchant='Uber', merchant_key='UBER',
+            txn_date=datetime.date(2026, 3, 5), payment_source=None, source='MANUAL',
+        )
+        st = CardStatement.objects.create(
+            group=self.group, payment_source=card, status='PARSED',
+            statement_date=datetime.date(2026, 3, 15),
+        )
+        line = StatementLine.objects.create(
+            statement=st, txn_date=datetime.date(2026, 3, 5),
+            description='UBER TRIP', amount=Decimal('500.00'), is_credit=False,
+            needs_review=True, suggested_expense=orphan,
+        )
+        ok = resolve_line(line, 'link')
+        self.assertTrue(ok)
+        orphan.refresh_from_db()
+        self.assertEqual(orphan.payment_source, card)
+
+    def test_duplicate_statement_paid_and_reconcile_views(self):
+        card, _ = PaymentSource.objects.get_or_create(group=self.group, kind='CREDIT_CARD', institution='HDFC Bank', last4='8066')
+        orig = CardStatement.objects.create(
+            group=self.group, payment_source=card, status='PARSED',
+            statement_date=datetime.date(2026, 3, 15),
+        )
+        dup = CardStatement.objects.create(
+            group=self.group, payment_source=card, status='DUPLICATE',
+            duplicate_of=orig, statement_date=datetime.date(2026, 3, 15),
+        )
+        self.client.force_login(self.user)
+        from django.urls import reverse
+
+        # Toggle paid on the duplicate
+        resp = self.client.post(reverse('expenses_statement_paid', kwargs={'pk': dup.pk}))
+        self.assertEqual(resp.status_code, 302)
+        orig.refresh_from_db()
+        dup.refresh_from_db()
+        self.assertTrue(orig.is_paid)
+        self.assertTrue(dup.is_paid)
+
+        # Reconcile on duplicate forwards to original
+        resp = self.client.post(reverse('expenses_statement_reconcile', kwargs={'pk': dup.pk}))
+        self.assertRedirects(resp, reverse('expenses_statement_detail', kwargs={'pk': orig.pk}))
 
 
 def _gmail_message(sender, subject, body):
@@ -465,6 +641,42 @@ class SyncTests(ExpenseTestCase):
         self.assertFalse(self.account.is_active)
         self.assertTrue(self.account.needs_reconnect)
         self.assertEqual(result.error, 'revoked')
+
+    @mock.patch('expenses.sync.GmailClient')
+    def test_backfill_statements(self, client_cls):
+        client = client_cls.return_value
+        client.list_message_ids.return_value = ['st_msg_1']
+        msg = {
+            'id': 'st_msg_1', 'internalDate': '1772704800000',
+            'payload': {
+                'mimeType': 'multipart/mixed',
+                'headers': [
+                    {'name': 'From', 'value': STATEMENT[0]},
+                    {'name': 'Subject', 'value': STATEMENT[1]},
+                    {'name': 'Date', 'value': 'Thu, 05 Mar 2026 10:00:00 +0000'},
+                ],
+                'parts': [
+                    {'mimeType': 'text/plain', 'body': {'data': base64.urlsafe_b64encode(STATEMENT[2].encode()).decode()}},
+                    {'mimeType': 'application/pdf', 'filename': 'statement.pdf', 'body': {'attachmentId': 'att1'}},
+                ],
+            },
+        }
+        client.get_message.return_value = msg
+        client.get_attachment.return_value = b'%PDF-mock-data'
+
+        with mock.patch('expenses.statements.read_pdf') as mock_read:
+            def fake_read(st, data, password=''):
+                st.status = 'PARSED'
+                st.line_count = 2
+                st.matched_count = 1
+                st.added_count = 1
+                st.save()
+            mock_read.side_effect = fake_read
+
+            call_command('backfill_statements', since='2026-01-01', stdout=mock.MagicMock())
+            st = CardStatement.objects.get(gmail_message_id='st_msg_1')
+            self.assertEqual(st.status, 'PARSED')
+            self.assertEqual(st.line_count, 2)
 
 
 class ViewTests(ExpenseTestCase):
@@ -568,6 +780,36 @@ class ViewTests(ExpenseTestCase):
         self.client.post(reverse('expenses_statement_paid', args=[st.pk]))
         st.refresh_from_db()
         self.assertTrue(st.is_paid)
+
+    def test_statement_line_resolve_view(self):
+        st = CardStatement.objects.create(group=self.group, payment_source=self.expense.payment_source,
+                                          due_date=datetime.date(2026, 4, 2), total_due=Decimal('1249'))
+        line = StatementLine.objects.create(
+            statement=st, txn_date=datetime.date(2026, 3, 4),
+            description='Test Resolve Line', amount=Decimal('500.00'), is_credit=False,
+            needs_review=True, suggested_expense=self.expense,
+        )
+        st.review_count = 1
+        st.save()
+
+        # Link action
+        resp = self.client.post(reverse('expenses_statement_line_resolve', args=[line.pk]), {'action': 'link'})
+        self.assertRedirects(resp, reverse('expenses_statement_detail', args=[st.pk]))
+        line.refresh_from_db()
+        self.assertFalse(line.needs_review)
+        self.assertEqual(line.matched_expense, self.expense)
+
+        # Add action
+        line2 = StatementLine.objects.create(
+            statement=st, txn_date=datetime.date(2026, 3, 4),
+            description='Second Resolve Line', amount=Decimal('600.00'), is_credit=False,
+            needs_review=True, suggested_expense=self.expense,
+        )
+        resp2 = self.client.post(reverse('expenses_statement_line_resolve', args=[line2.pk]), {'action': 'add'})
+        self.assertRedirects(resp2, reverse('expenses_statement_detail', args=[st.pk]))
+        line2.refresh_from_db()
+        self.assertFalse(line2.needs_review)
+        self.assertTrue(line2.was_added)
 
 
 def _pdf(password=None, pages=1):

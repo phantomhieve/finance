@@ -29,4 +29,5 @@ urlpatterns = [
     path('statements/<int:pk>/unlock/', views.statement_unlock, name='expenses_statement_unlock'),
     path('statements/<int:pk>/paid/', views.statement_paid, name='expenses_statement_paid'),
     path('statements/<int:pk>/reconcile/', views.statement_reconcile, name='expenses_statement_reconcile'),
+    path('statements/lines/<int:pk>/resolve/', views.statement_line_resolve, name='expenses_statement_line_resolve'),
 ]

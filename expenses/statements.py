@@ -1,11 +1,28 @@
-"""Credit-card statements: read PDFs, reconcile line items against alerts, track due dates."""
+"""Credit-card statements: read PDFs, reconcile line items against alerts, track due dates.
+
+Back-filling a month from its statement must never double count, so reconciliation is staged:
+
+1. Rule match: same card (or a variant of it), amount within ₹1, date within 3 days, unambiguous.
+2. AI match: lines left over that still have *plausible* candidates (renamed merchants, late
+   postings, foreign-currency alerts, manual entries without a card) go to the model. A confident
+   "same transaction" links them; a confident "new" adds them; anything uncertain is parked for
+   review rather than risking a duplicate.
+3. Lines with no plausible candidate at all are added straight away.
+
+Statements themselves are de-duplicated by PDF hash, billing period and line overlap, so a
+statement that arrives by email *and* is uploaded by hand is only reconciled once.
+"""
 import datetime
 import difflib
+import hashlib
 import io
 import logging
+import re
+from collections import Counter
 from decimal import Decimal
 
 from django.db import transaction
+from django.db.models import Q
 
 from . import ai, crypto
 from .models import CardStatement, Expense, PaymentSource, StatementLine
@@ -21,7 +38,26 @@ AMOUNT_TOLERANCE = Decimal('1.00')
 MAX_PDF_BYTES = 10 * 1024 * 1024
 MAX_PDF_PAGES = 40
 MAX_PDF_TEXT = 400_000
+MAX_PDFS_PER_EMAIL = 3
 REMINDER_DAYS = (5, 1, 0)
+
+# Rule stage: accept the best candidate only when it is clearly the one.
+RULE_SIMILARITY = 0.55
+RULE_MARGIN = 0.25
+SINGLE_CANDIDATE_SIMILARITY = 0.3
+# AI stage: what counts as a plausible duplicate worth asking about.
+LOOSE_DATE_DAYS = 10
+LOOSE_AMOUNT_RATIO = Decimal('0.06')
+MAX_AI_CANDIDATES = 5
+AI_MATCH_CONFIDENCE = 0.8
+AI_NEW_CONFIDENCE = 0.7
+# Extraction / statement de-duplication.
+REGEX_COVERAGE = 0.8
+DUPLICATE_LINE_SHARE = 0.8
+
+_DATE_LED_ROW = re.compile(r'^\s*(?:\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{1,2}\s?[A-Za-z]{3}\s?\d{2,4})\b')
+_LINE_FIELDS = ['matched_expense', 'was_added', 'match_method', 'match_confidence', 'needs_review',
+                'suggested_expense', 'match_reason']
 
 
 class PdfPasswordRequired(Exception):
@@ -62,6 +98,28 @@ def get_or_create_card(group, institution, last4, owner=None):
                                         last4=last4 or '', owner=owner, is_auto=True)
 
 
+def card_family_ids(card):
+    """PaymentSource ids that may be this same physical card.
+
+    Alerts and statements spell banks differently and some alerts omit the last 4 digits, so the
+    same card can end up as several PaymentSource rows. Matching only on the exact row is what let
+    statement lines duplicate expenses that were already recorded.
+    """
+    kinds = ('CREDIT_CARD', 'OTHER')
+    q = Q(pk=card.pk)
+    if card.last4:
+        q |= Q(kind__in=kinds, last4=card.last4)
+    if card.institution:
+        stem = re.sub(r'\s+(Bank|Card)\b', '', card.institution, flags=re.I).strip()
+        inst_q = Q(institution__iexact=card.institution)
+        if stem and len(stem) >= 3:
+            inst_q |= Q(institution__icontains=stem)
+        q |= Q(kind__in=kinds, last4='') & inst_q
+        if not card.last4:
+            q |= Q(kind='CREDIT_CARD') & inst_q
+    return set(PaymentSource.objects.filter(group_id=card.group_id).filter(q).values_list('pk', flat=True))
+
+
 def _apply_summary(statement, summary):
     for field in ('statement_date', 'due_date', 'total_due', 'min_due', 'period_start', 'period_end'):
         value = getattr(summary, field)
@@ -69,22 +127,96 @@ def _apply_summary(statement, summary):
             setattr(statement, field, value)
 
 
-def _lines_from_text(text):
-    lines = parse_statement_lines(text)
-    if lines:
-        return lines
+# ---------------------------------------------------------------------------
+# Extraction
+# ---------------------------------------------------------------------------
+
+def _ai_lines(text):
     out = []
     for row in ai.extract_statement_lines(text):
         d = parse_date(row.date)
-        amount = to_decimal(row.amount)
+        amount = to_decimal(str(row.amount))
         if d and amount:
-            out.append(ParsedLine(txn_date=d, description=row.description[:255], amount=abs(amount),
-                                  is_credit=row.is_credit))
+            out.append(ParsedLine(txn_date=d, description=(row.description or '')[:255], amount=abs(amount),
+                                  is_credit=bool(row.is_credit) or amount < 0))
     return out
+
+
+def _lines_from_text(text):
+    """Regex first; AI when regex finds nothing or clearly misses rows (multi-line layouts)."""
+    lines = parse_statement_lines(text)
+    date_rows = sum(1 for row in text.splitlines() if _DATE_LED_ROW.match(row))
+    if lines and len(lines) >= REGEX_COVERAGE * date_rows:
+        return lines
+    ai_lines = _ai_lines(text)
+    return ai_lines if len(ai_lines) > len(lines) else lines
+
+
+# ---------------------------------------------------------------------------
+# Statement-level de-duplication
+# ---------------------------------------------------------------------------
+
+def find_duplicate(statement, lines=None):
+    """An already-parsed statement that is the same document / billing cycle as this one."""
+    if statement.pdf_sha256:
+        hit = CardStatement.objects.filter(
+            group_id=statement.group_id, pdf_sha256=statement.pdf_sha256
+        ).exclude(status='DUPLICATE').exclude(pk=statement.pk).first()
+        if hit:
+            return hit
+    others = CardStatement.objects.filter(group_id=statement.group_id, status='PARSED').exclude(pk=statement.pk)
+    family = others.filter(payment_source_id__in=card_family_ids(statement.payment_source))
+    end = statement.period_end or statement.statement_date
+    if end:
+        hit = family.filter(Q(period_end=end) | Q(statement_date=end)).first()
+        if hit:
+            return hit
+    if lines:
+        keys = Counter((ln.txn_date, ln.amount, ln.is_credit) for ln in lines)
+        lo, hi = min(ln.txn_date for ln in lines), max(ln.txn_date for ln in lines)
+        for other in family.filter(lines__txn_date__range=(lo, hi)).distinct()[:12]:
+            theirs = Counter(other.lines.values_list('txn_date', 'amount', 'is_credit'))
+            if sum((keys & theirs).values()) >= DUPLICATE_LINE_SHARE * sum(keys.values()):
+                return other
+    return None
+
+
+def _mark_duplicate(statement, original):
+    for field in ('due_date', 'total_due', 'min_due', 'period_start', 'period_end', 'statement_date'):
+        if getattr(original, field) is None and getattr(statement, field) is not None:
+            setattr(original, field, getattr(statement, field))
+    original.save()
+    statement.status = 'DUPLICATE'
+    statement.duplicate_of = original
+    statement.pdf_blob = None
+    statement.save()
+
+
+def _absorb_shells(statement):
+    """Retire totals-only / unreadable copies of this cycle so it is reminded and counted once."""
+    end = statement.period_end or statement.statement_date
+    if not end:
+        return
+    shells = (CardStatement.objects
+              .filter(group_id=statement.group_id, status__in=('BODY_ONLY', 'FAILED'),
+                      payment_source_id__in=card_family_ids(statement.payment_source))
+              .filter(Q(statement_date=end) | Q(period_end=end) | Q(due_date=statement.due_date, due_date__isnull=False))
+              .exclude(pk=statement.pk))
+    for shell in shells:
+        if shell.is_paid and not statement.is_paid:
+            statement.is_paid, statement.paid_at, statement.paid_amount = True, shell.paid_at, shell.paid_amount
+            statement.save(update_fields=['is_paid', 'paid_at', 'paid_amount'])
+        _mark_duplicate(shell, statement)
 
 
 def read_pdf(statement, data, password=''):
     """Parse a statement PDF into lines + totals. Keeps the PDF if a password is needed."""
+    if data:
+        statement.pdf_sha256 = hashlib.sha256(data).hexdigest()
+        duplicate = find_duplicate(statement)
+        if duplicate:
+            _mark_duplicate(statement, duplicate)
+            return statement
     password = password or statement.payment_source.statement_password
     try:
         text = pdf_text(data, password)
@@ -99,8 +231,31 @@ def read_pdf(statement, data, password=''):
         statement.save()
         return statement
 
-    _apply_summary(statement, parse_statement_summary('', '', text))
-    lines = _lines_from_text(text)
+    summary = parse_statement_summary('', '', text)
+    _apply_summary(statement, summary)
+    if summary.last4 and not statement.payment_source.last4:
+        existing_card = find_card(
+            statement.group, statement.payment_source.institution or summary.institution, summary.last4
+        )
+        if existing_card and existing_card.pk != statement.payment_source.pk:
+            statement.payment_source = existing_card
+            statement.save(update_fields=['payment_source'])
+        else:
+            statement.payment_source.last4 = summary.last4
+            if summary.institution and not statement.payment_source.institution:
+                statement.payment_source.institution = summary.institution
+                statement.payment_source.save(update_fields=['last4', 'institution'])
+            else:
+                statement.payment_source.save(update_fields=['last4'])
+
+    duplicate = find_duplicate(statement)
+    lines = [] if duplicate else _lines_from_text(text)
+    if not duplicate and lines:
+        duplicate = find_duplicate(statement, lines)
+    if duplicate:
+        _mark_duplicate(statement, duplicate)
+        return statement
+
     with transaction.atomic():
         statement.lines.all().delete()
         StatementLine.objects.bulk_create([
@@ -113,9 +268,29 @@ def read_pdf(statement, data, password=''):
         statement.pdf_blob = None
         statement.save()
     if lines:
+        _absorb_shells(statement)
         reconcile(statement)
     return statement
 
+
+def retry_locked_statements(group, card=None):
+    """Re-open password-locked PDFs once a password has been saved for their card."""
+    qs = (CardStatement.objects.filter(group=group, status='NEEDS_PASSWORD', pdf_blob__isnull=False)
+          .select_related('payment_source'))
+    if card is not None:
+        qs = qs.filter(payment_source=card)
+    opened = 0
+    for st in qs:
+        if not st.payment_source.statement_password:
+            continue
+        read_pdf(st, crypto.decrypt_bytes(st.pdf_blob))
+        opened += st.status != 'NEEDS_PASSWORD'
+    return opened
+
+
+# ---------------------------------------------------------------------------
+# Reconciliation
+# ---------------------------------------------------------------------------
 
 def _period(statement):
     lines = list(statement.lines.all())
@@ -127,87 +302,265 @@ def _period(statement):
     return end - datetime.timedelta(days=31), end
 
 
-def _best_match(line, candidates, used):
-    best, best_score = None, -1.0
-    _, line_key = normalize_merchant(line.description)
+def _similarity(line_key, expense):
+    key = expense.merchant_key or ''
+    if not line_key or not key:
+        return 0.0
+    if len(key) >= 4 and (key in line_key or line_key in key):
+        return 0.9
+    return difflib.SequenceMatcher(None, line_key, key).ratio()
+
+
+def _line_key(line):
+    return normalize_merchant(line.description)[1]
+
+
+def _rule_match(line, candidates, family):
+    """Best amount+date candidate, or None when it is not clearly the one."""
+    key = _line_key(line)
+    scored = []
     for e in candidates:
-        if e.pk in used:
-            continue
         if abs(e.amount - line.amount) > AMOUNT_TOLERANCE:
             continue
         gap = abs((e.txn_date - line.txn_date).days)
         if gap > DATE_TOLERANCE_DAYS:
             continue
-        similarity = difflib.SequenceMatcher(None, line_key, e.merchant_key or '').ratio() if line_key else 0
-        score = similarity + (1 - gap / (DATE_TOLERANCE_DAYS + 1)) + (1 if e.amount == line.amount else 0)
-        if score > best_score:
-            best, best_score = e, score
-    return best
+        sim = _similarity(key, e)
+        score = sim + (1 - gap / (DATE_TOLERANCE_DAYS + 1)) + (1 if e.amount == line.amount else 0)
+        scored.append((score, sim, e))
+    if not scored:
+        return None, 0.0
+    scored.sort(key=lambda s: s[0], reverse=True)
+    best_score, best_sim, best = scored[0]
+    confidence = round(min(1.0, best_score / 3), 2)
+    if len(scored) == 1:
+        # Same card + same amount + same few days is decisive; a card-less entry also needs a name hint.
+        if best.payment_source_id in family or best_sim >= SINGLE_CANDIDATE_SIMILARITY:
+            return best, confidence
+        return None, 0.0
+    if best_sim >= RULE_SIMILARITY and best_score - scored[1][0] >= RULE_MARGIN:
+        return best, confidence
+    return None, 0.0
+
+
+def _loose_candidates(line, candidates):
+    """Plausible duplicates the rules could not settle: near amount or foreign currency, nearby date."""
+    key = _line_key(line)
+    window = max(AMOUNT_TOLERANCE, line.amount * LOOSE_AMOUNT_RATIO)
+    ranked = []
+    for e in candidates:
+        gap = abs((e.txn_date - line.txn_date).days)
+        if gap > LOOSE_DATE_DAYS:
+            continue
+        close = abs(e.amount - line.amount) <= window
+        if not close and e.currency == 'INR':
+            continue
+        ranked.append((not close, -_similarity(key, e), gap, e))
+    ranked.sort(key=lambda r: r[:3])
+    return [r[3] for r in ranked[:MAX_AI_CANDIDATES]]
+
+
+def _ai_item(line, candidates):
+    return {
+        'line_id': line.pk,
+        'date': line.txn_date.isoformat(),
+        'description': line.description,
+        'amount': str(line.amount),
+        'direction': 'CREDIT' if line.is_credit else 'DEBIT',
+        'candidates': [
+            {
+                'expense_id': e.pk, 'date': e.txn_date.isoformat(), 'merchant': e.merchant,
+                'raw': (e.merchant_raw or '')[:80], 'amount': str(e.amount), 'currency': e.currency,
+                'channel': e.channel, 'recorded_from': e.source,
+            }
+            for e in candidates
+        ],
+    }
+
+
+def _link(line, expense, method, confidence=None, reason=''):
+    line.matched_expense = expense
+    # Re-reading a statement re-finds the rows it added earlier; they still count as "added".
+    line.was_added = expense.source == 'STATEMENT' and expense.statement_id == line.statement_id
+    line.match_method = method
+    line.match_confidence = confidence
+    line.needs_review = False
+    line.suggested_expense = None
+    line.match_reason = (reason or '')[:255]
+    line.save(update_fields=_LINE_FIELDS)
+    if not expense.payment_source_id:
+        expense.payment_source = line.statement.payment_source
+        expense.save(update_fields=['payment_source'])
+
+
+def _add_line(statement, line, cats, method='', confidence=None, reason=''):
+    from .anomaly import apply_flags
+    from .services import build_expense
+
+    card = statement.payment_source
+    direction = 'CREDIT' if line.is_credit else 'DEBIT'
+    display, key = normalize_merchant(line.description)
+    parsed = ParsedTransaction(
+        amount=line.amount, direction=direction, txn_date=line.txn_date, merchant=display or line.description,
+        merchant_raw=line.description, merchant_key=key, instrument='CREDIT_CARD', channel='CARD',
+        institution=card.institution, last4=card.last4,
+    )
+    expense, created = build_expense(
+        statement.group, parsed, source='STATEMENT', member=card.owner, statement=statement,
+        dedupe_key=f'st:{statement.pk}:{line.pk}', cats=cats,
+    )
+    if created:
+        expense.payment_source = card
+        expense.notes = 'Found on card statement — no email alert was received'
+        expense.save(update_fields=['payment_source', 'notes'])
+        apply_flags(expense)
+    line.matched_expense = expense
+    line.was_added = True
+    line.match_method = method
+    line.match_confidence = confidence
+    line.needs_review = False
+    line.suggested_expense = None
+    line.match_reason = (reason or '')[:255]
+    line.save(update_fields=_LINE_FIELDS)
+    return int(created)
+
+
+def _park(line, suggestion, verdict):
+    line.matched_expense = None
+    line.was_added = False
+    line.match_method = ''
+    line.needs_review = True
+    line.suggested_expense = suggestion
+    line.match_confidence = verdict.confidence if verdict else None
+    line.match_reason = ((verdict.reason if verdict and verdict.reason else '')
+                         or 'Looks like an expense already recorded — confirm before adding')[:255]
+    line.save(update_fields=_LINE_FIELDS)
+
+
+def _refresh_counts(statement):
+    lines = statement.lines
+    statement.line_count = lines.count()
+    statement.added_count = lines.filter(was_added=True).count()
+    statement.matched_count = lines.filter(matched_expense__isnull=False, was_added=False).count()
+    statement.review_count = lines.filter(needs_review=True).count()
+    statement.save(update_fields=['line_count', 'added_count', 'matched_count', 'review_count'])
 
 
 @transaction.atomic
 def reconcile(statement):
-    """Match statement lines to alert-based expenses; add the ones no alert ever reported."""
-    from .anomaly import apply_flags
-    from .services import build_expense, categories_by_name
+    """Match statement lines to recorded expenses and add only what is genuinely missing.
 
-    start, end = _period(statement)
+    Idempotent: lines already linked are left alone; unmatched and review lines are re-evaluated.
+    Returns (matched_count, added_this_run).
+    """
+    from .services import categories_by_name
+
     card = statement.payment_source
-    candidates = list(
-        Expense.objects.filter(
+    family = card_family_ids(card)
+    start, end = _period(statement)
+    lines = list(statement.lines.all())
+    claimed = set(StatementLine.objects.filter(statement__group=statement.group, matched_expense__isnull=False)
+                  .exclude(statement=statement).exclude(statement__status='DUPLICATE').values_list('matched_expense_id', flat=True))
+    used = claimed | {ln.matched_expense_id for ln in lines if ln.matched_expense_id}
+    window = datetime.timedelta(days=LOOSE_DATE_DAYS)
+    pool = [
+        e for e in Expense.objects.filter(
             group=statement.group, is_deleted=False,
-            txn_date__gte=start - datetime.timedelta(days=DATE_TOLERANCE_DAYS),
-            txn_date__lte=end + datetime.timedelta(days=DATE_TOLERANCE_DAYS),
-        ).filter(payment_source=card).exclude(source='STATEMENT')
-    )
-    already = set(StatementLine.objects.filter(statement__group=statement.group, matched_expense__isnull=False)
-                  .exclude(statement=statement).values_list('matched_expense_id', flat=True))
-    used = set(already)
+            txn_date__gte=start - window, txn_date__lte=end + window,
+        ).filter(Q(payment_source_id__in=family) | Q(payment_source__isnull=True))
+        if e.pk not in claimed
+    ]
     cats = categories_by_name(statement.group)
-    matched = added = 0
+    added = 0
 
-    for idx, line in enumerate(statement.lines.all()):
+    def free(direction):
+        return [e for e in pool if e.direction == direction and e.pk not in used]
+
+    # Pass 1 — deterministic matches for every line first, so ordering can't steal a match.
+    todo = []
+    for line in lines:
+        if line.matched_expense_id:
+            continue
         if line.is_credit and _is_payment(line.description):
+            if line.match_method != 'SKIP' or line.needs_review:
+                line.match_method, line.needs_review, line.suggested_expense = 'SKIP', False, None
+                line.save(update_fields=_LINE_FIELDS)
             continue
         direction = 'CREDIT' if line.is_credit else 'DEBIT'
-        match = _best_match(line, [c for c in candidates if c.direction == direction], used)
+        match, confidence = _rule_match(line, free(direction), family)
         if match:
             used.add(match.pk)
-            line.matched_expense = match
-            line.was_added = False
-            line.save(update_fields=['matched_expense', 'was_added'])
-            matched += 1
-            continue
-        display, key = normalize_merchant(line.description)
-        parsed = ParsedTransaction(
-            amount=line.amount, direction=direction, txn_date=line.txn_date, merchant=display or line.description,
-            merchant_raw=line.description, merchant_key=key, instrument='CREDIT_CARD', channel='CARD',
-            institution=card.institution, last4=card.last4,
-        )
-        expense, created = build_expense(
-            statement.group, parsed, source='STATEMENT', member=card.owner, statement=statement,
-            dedupe_key=f'st:{statement.pk}:{idx}', cats=cats,
-        )
-        if created:
-            expense.payment_source = card
-            expense.notes = 'Found on card statement — no email alert was received'
-            expense.save(update_fields=['payment_source', 'notes'])
-            apply_flags(expense)
-        line.matched_expense = expense
-        line.was_added = True
-        line.save(update_fields=['matched_expense', 'was_added'])
-        added += created
+            _link(line, match, 'RULE', confidence)
+        else:
+            todo.append(line)
 
-    statement.matched_count = matched
-    statement.added_count = statement.lines.filter(was_added=True).count()
-    statement.line_count = statement.lines.count()
-    statement.save(update_fields=['matched_count', 'added_count', 'line_count'])
-    return matched, added
+    # Pass 2 — leftovers: add the clearly new, ask AI about plausible duplicates.
+    pending = []
+    for line in todo:
+        candidates = _loose_candidates(line, free('CREDIT' if line.is_credit else 'DEBIT'))
+        if candidates:
+            pending.append((line, candidates))
+        else:
+            added += _add_line(statement, line, cats)
+
+    verdicts = ai.match_statement_lines([_ai_item(ln, cands) for ln, cands in pending]) if pending else {}
+    for line, candidates in pending:
+        verdict = verdicts.get(line.pk)
+        available = [e for e in candidates if e.pk not in used]
+        if verdict and verdict.expense_id and verdict.confidence >= AI_MATCH_CONFIDENCE:
+            match = next((e for e in available if e.pk == verdict.expense_id), None)
+            if match:
+                used.add(match.pk)
+                _link(line, match, 'AI', verdict.confidence, verdict.reason)
+                continue
+        if verdict and verdict.expense_id is None and verdict.confidence >= AI_NEW_CONFIDENCE:
+            added += _add_line(statement, line, cats, 'AI', verdict.confidence, verdict.reason)
+            continue
+        if not available:
+            added += _add_line(statement, line, cats)
+            continue
+        suggestion = next((e for e in available if verdict and e.pk == verdict.expense_id), available[0])
+        _park(line, suggestion, verdict)
+
+    _refresh_counts(statement)
+    return statement.matched_count, added
+
+
+@transaction.atomic
+def resolve_line(line, action):
+    """Human decision on a parked line: 'link' to the suggested expense, or 'add' it as new."""
+    from .services import categories_by_name
+
+    statement = line.statement
+    if action == 'link':
+        target = line.suggested_expense
+        if (not target or target.is_deleted
+                or StatementLine.objects.filter(matched_expense=target).exclude(pk=line.pk).exists()):
+            return False
+        _link(line, target, 'USER', 1.0, 'Confirmed as the same transaction')
+    elif action == 'add':
+        _add_line(statement, line, categories_by_name(statement.group), 'USER', 1.0,
+                  'Confirmed as a separate transaction')
+    else:
+        return False
+    _refresh_counts(statement)
+    return True
+
+
+_PAYMENT_DESC = re.compile(
+    r'\b(payment\s+received|thank\s+you(?:\s+for\s+the\s+payment)?|bbps\s+payment|'
+    r'autopay|auto\s+debit|autodebit|neft\s+payment|imps\s+payment|upi\s+payment|'
+    r'net\s?banking\s+payment|cheque\s+payment|chq\s+payment|billdesk|cred\s+payment)\b|'
+    r'payment\s*-\s*',
+    re.I,
+)
 
 
 def _is_payment(description):
     d = description.lower()
-    return any(w in d for w in ('payment received', 'thank you', 'payment - ', 'bbps payment', 'autopay', 'neft payment'))
+    if 'refund' in d or 'reversal' in d or 'chargeback' in d:
+        return False
+    return bool(_PAYMENT_DESC.search(d))
 
 
 def ingest_statement_email(group, account, message_id, sender, subject, body, pdfs, fetch_pdf):
@@ -218,11 +571,11 @@ def ingest_statement_email(group, account, message_id, sender, subject, body, pd
         group=group, gmail_message_id=message_id,
         defaults={'payment_source': card, 'gmail_account': account},
     )
-    if not created:
+    if not created and statement.status in ('PARSED', 'DUPLICATE'):
         return statement
     _apply_summary(statement, summary)
     statement.save()
-    for pdf in pdfs[:1]:
+    for pdf in pdfs[:MAX_PDFS_PER_EMAIL]:
         try:
             data = fetch_pdf(pdf)
         except Exception:
@@ -230,6 +583,12 @@ def ingest_statement_email(group, account, message_id, sender, subject, body, pd
             continue
         if data and len(data) <= MAX_PDF_BYTES:
             read_pdf(statement, data)
+            if statement.status in ('PARSED', 'DUPLICATE', 'NEEDS_PASSWORD'):
+                break
+    if statement.status == 'BODY_ONLY':
+        duplicate = find_duplicate(statement)
+        if duplicate:
+            _mark_duplicate(statement, duplicate)
     return statement
 
 
@@ -238,16 +597,20 @@ def record_card_payment(group, amount, last4, institution, paid_on):
     card = find_card(group, institution, last4)
     if not card or not amount:
         return None
-    statement = (CardStatement.objects.filter(group=group, payment_source=card, is_paid=False)
+    statement = (CardStatement.objects.filter(group=group, payment_source_id__in=card_family_ids(card), is_paid=False)
+                 .exclude(status='DUPLICATE')
                  .order_by('-statement_date', '-created_at').first())
     if not statement:
         return None
-    threshold = statement.min_due or statement.total_due or Decimal('0')
-    if amount >= threshold:
+    current_paid = (statement.paid_amount or Decimal('0')) + amount
+    statement.paid_amount = current_paid
+    target = statement.total_due or statement.min_due or Decimal('0')
+    if not target or current_paid >= target - AMOUNT_TOLERANCE:
         statement.is_paid = True
         statement.paid_at = paid_on
-        statement.paid_amount = amount
         statement.save(update_fields=['is_paid', 'paid_at', 'paid_amount'])
+    else:
+        statement.save(update_fields=['paid_amount'])
     return statement
 
 
@@ -257,6 +620,7 @@ def due_reminders(group, today=None):
     out = []
     for st in (CardStatement.objects.filter(group=group, is_paid=False, due_date__isnull=False,
                                             due_date__gte=today - datetime.timedelta(days=3))
+               .exclude(status='DUPLICATE')
                .select_related('payment_source')):
         days_left = (st.due_date - today).days
         if days_left in REMINDER_DAYS or days_left < 0:
@@ -272,5 +636,5 @@ def upcoming_dues(group, today=None, horizon_days=21):
             group=group, is_paid=False, due_date__isnull=False,
             due_date__gte=today - datetime.timedelta(days=7),
             due_date__lte=today + datetime.timedelta(days=horizon_days),
-        ).select_related('payment_source').order_by('due_date')
+        ).exclude(status='DUPLICATE').select_related('payment_source').order_by('due_date')
     )

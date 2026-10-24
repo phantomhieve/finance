@@ -30,7 +30,22 @@ card/account if visible. Never invent values."""
 STATEMENT_SYSTEM = """\
 Extract every transaction line from this Indian credit card statement.
 date as YYYY-MM-DD; is_credit true for payments, refunds and reversals.
-Skip totals, balances, reward points and summaries."""
+Skip totals, balances, reward points and summaries. If a transaction was in a foreign
+currency, amount is the INR amount billed. The text may be one part of a longer statement;
+only return lines that appear in this part."""
+
+MATCH_SYSTEM = """\
+You reconcile an Indian credit card statement against expenses a household already recorded
+(from bank email alerts or manual entry). For each statement line decide whether it is the SAME
+real-world transaction as one of its listed candidates.
+Signs of the same transaction: same merchant despite different spelling (AMZN Mktp = Amazon,
+SWIGGY*INSTAMART = Instamart, PYU*Zomato = Zomato), a posting date a few days after the alert
+date, an INR amount equal to a foreign-currency alert after conversion, or tiny rounding gaps.
+Different transactions: different merchants with the same amount, repeat purchases at the same
+merchant on clearly different days, EMI instalments vs the original purchase.
+Return one verdict per line: expense_id of the matching candidate, or null if none match.
+confidence 0-1 is how sure you are of your verdict (for null: how sure it is genuinely new).
+reason: under 12 words. Never pick an expense_id that is not in that line's candidates."""
 
 MONTHLY_NOTE_SYSTEM = """\
 You write a brief monthly spending note for an Indian household.
@@ -79,9 +94,35 @@ def build_extract_prompt(subject: str, body: str) -> str:
     return mask_sensitive(raw)[:2500]
 
 
+STATEMENT_CHUNK = 12000
+
+
 def build_statement_prompt(text: str) -> str:
     """Mask and slice statement text for fallback line item extraction."""
-    return mask_sensitive(text)[:12000]
+    return mask_sensitive(text)[:STATEMENT_CHUNK]
+
+
+def chunk_statement_text(text: str, size: int = STATEMENT_CHUNK, max_chunks: int = 6) -> list[str]:
+    """Split statement text on line boundaries so no transaction row is cut in half."""
+    chunks: list[str] = []
+    current: list[str] = []
+    length = 0
+    for row in (text or '').splitlines():
+        if current and length + len(row) + 1 > size:
+            chunks.append('\n'.join(current))
+            current, length = [], 0
+            if len(chunks) >= max_chunks:
+                return chunks
+        current.append(row[:size])
+        length += len(row) + 1
+    if current:
+        chunks.append('\n'.join(current))
+    return chunks[:max_chunks]
+
+
+def build_match_prompt(items: list[dict[str, Any]]) -> str:
+    """Serialise statement lines with their candidate expenses for AI matching."""
+    return mask_sensitive(f"Statement lines with candidates:\n{json.dumps(items, default=str)}")
 
 
 def build_monthly_note_prompt(summary_payload: dict[str, Any]) -> str:
