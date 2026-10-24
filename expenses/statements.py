@@ -201,12 +201,24 @@ def _mark_duplicate(statement, original):
 def _absorb_shells(statement):
     """Retire totals-only / unreadable copies of this cycle so it is reminded and counted once."""
     end = statement.period_end or statement.statement_date
+    if not end and statement.lines.exists():
+        dates = list(statement.lines.values_list('txn_date', flat=True))
+        if dates:
+            statement.period_start = min(dates)
+            statement.period_end = max(dates)
+            statement.statement_date = statement.period_end
+            statement.save(update_fields=['statement_date', 'period_start', 'period_end'])
+            end = statement.period_end
     if not end:
         return
     shells = (CardStatement.objects
               .filter(group_id=statement.group_id, status__in=('BODY_ONLY', 'FAILED'),
                       payment_source_id__in=card_family_ids(statement.payment_source))
-              .filter(Q(statement_date=end) | Q(period_end=end) | Q(due_date=statement.due_date, due_date__isnull=False))
+              .filter(
+                  Q(statement_date=end) | Q(period_end=end) |
+                  Q(due_date=statement.due_date, due_date__isnull=False) |
+                  Q(due_date__gte=end, due_date__lte=end + datetime.timedelta(days=35))
+              )
               .exclude(pk=statement.pk))
     for shell in shells:
         if shell.is_paid and not statement.is_paid:
