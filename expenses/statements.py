@@ -84,6 +84,9 @@ def find_card(group, institution, last4):
         if card:
             return card
     if institution:
+        card = qs.filter(institution=institution, last4='').first()
+        if card:
+            return card
         cards = list(qs.filter(institution=institution))
         if len(cards) == 1:
             return cards[0]
@@ -94,8 +97,11 @@ def get_or_create_card(group, institution, last4, owner=None):
     card = find_card(group, institution, last4)
     if card:
         return card
-    return PaymentSource.objects.create(group=group, kind='CREDIT_CARD', institution=institution or '',
-                                        last4=last4 or '', owner=owner, is_auto=True)
+    card, _ = PaymentSource.objects.get_or_create(
+        group=group, kind='CREDIT_CARD', institution=institution or '', last4=last4 or '',
+        defaults={'owner': owner, 'is_auto': True},
+    )
+    return card
 
 
 def card_family_ids(card):
@@ -217,19 +223,43 @@ def read_pdf(statement, data, password=''):
         if duplicate:
             _mark_duplicate(statement, duplicate)
             return statement
-    password = password or statement.payment_source.statement_password
-    try:
-        text = pdf_text(data, password)
-    except PdfPasswordRequired:
-        statement.pdf_blob = crypto.encrypt_bytes(data)
-        statement.status = 'NEEDS_PASSWORD'
-        statement.save()
-        return statement
-    except Exception:
-        logger.exception('Could not read statement PDF %s', statement.pk)
-        statement.status = 'FAILED'
-        statement.save()
-        return statement
+
+    passwords = []
+    if password:
+        passwords.append(password)
+    if statement.payment_source.statement_password:
+        passwords.append(statement.payment_source.statement_password)
+    for fid in card_family_ids(statement.payment_source):
+        if fid == statement.payment_source_id:
+            continue
+        fc = PaymentSource.objects.filter(pk=fid).first()
+        if fc and fc.statement_password and fc.statement_password not in passwords:
+            passwords.append(fc.statement_password)
+
+    text = None
+    if passwords:
+        for pw in passwords:
+            try:
+                text = pdf_text(data, pw)
+                break
+            except PdfPasswordRequired:
+                continue
+            except Exception:
+                break
+
+    if text is None:
+        try:
+            text = pdf_text(data, '')
+        except PdfPasswordRequired:
+            statement.pdf_blob = crypto.encrypt_bytes(data)
+            statement.status = 'NEEDS_PASSWORD'
+            statement.save()
+            return statement
+        except Exception:
+            logger.exception('Could not read statement PDF %s', statement.pk)
+            statement.status = 'FAILED'
+            statement.save()
+            return statement
 
     summary = parse_statement_summary('', '', text)
     _apply_summary(statement, summary)
@@ -274,15 +304,13 @@ def read_pdf(statement, data, password=''):
 
 
 def retry_locked_statements(group, card=None):
-    """Re-open password-locked PDFs once a password has been saved for their card."""
+    """Re-open password-locked PDFs once a password has been saved for their card or family."""
     qs = (CardStatement.objects.filter(group=group, status='NEEDS_PASSWORD', pdf_blob__isnull=False)
           .select_related('payment_source'))
     if card is not None:
         qs = qs.filter(payment_source=card)
     opened = 0
     for st in qs:
-        if not st.payment_source.statement_password:
-            continue
         read_pdf(st, crypto.decrypt_bytes(st.pdf_blob))
         opened += st.status != 'NEEDS_PASSWORD'
     return opened
