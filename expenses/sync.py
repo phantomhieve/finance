@@ -11,13 +11,13 @@ from django.utils import timezone
 from . import ai
 from .anomaly import ai_detect_anomalies_for_expenses
 from .gmail import GmailAuthError, GmailClient, GmailError, decode_body, message_parts
-from .models import Expense, GmailAccount, ProcessedEmail
+from .models import CardStatement, Expense, GmailAccount, ProcessedEmail
 from .parsing import (
-    ParsedTransaction, classify, mask_sensitive, normalize_merchant, parse_card_payment,
-    parse_date, parse_transaction, to_decimal,
+    ParsedTransaction, classify, looks_like_card_statement, mask_sensitive, normalize_merchant,
+    parse_card_payment, parse_date, parse_transaction, to_decimal,
 )
 from .services import ai_categorise_pending, build_expense, categories_by_name, settle_internal_movements
-from .statements import ingest_statement_email, record_card_payment
+from .statements import ingest_statement_email, record_card_payment, retry_locked_statements
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +30,12 @@ GMAIL_QUERY = (
 )
 OVERLAP_HOURS = 48
 MAX_MESSAGES = 500
+# Statement emails only — used to back-fill months the incremental sync never looked at.
+STATEMENT_QUERY = (
+    '{subject:statement subject:e-statement subject:estatement} has:attachment filename:pdf '
+    '-category:social -category:promotions -in:chats'
+)
+BACKFILL_MAX_MESSAGES = 300
 
 
 @dataclass
@@ -79,6 +85,8 @@ def ingest_email(account, message_id, sender, subject, body, received_at, pdfs=(
         return 'SEEN', None
 
     kind = classify(sender, subject, body)
+    if kind != 'STATEMENT' and looks_like_card_statement(subject, body, bool(pdfs)):
+        kind = 'STATEMENT'
     expense = None
     received_date = timezone.localtime(received_at).date() if timezone.is_aware(received_at) else received_at.date()
 
@@ -172,20 +180,112 @@ def sync_account(account, time_budget=None, max_messages=MAX_MESSAGES):
         return result
 
     if result.new_expense_ids or result.statements or result.payments:
-        ai_categorise_pending(account.group)
-        settled = settle_internal_movements(account.group, since.date())
-        affected = list(
-            Expense.objects.filter(pk__in=set(result.new_expense_ids) | set(settled))
-            .select_related('category', 'payment_source')
-        )
-        if affected:
-            ai_detect_anomalies_for_expenses(affected, group=account.group)
+        _post_ingest(account.group, since.date(), result.new_expense_ids)
+    else:
+        retry_locked_statements(account.group)
 
     account.last_sync_new = result.transactions
     account.last_error = ''
     if result.complete:
         account.last_synced_at = started_at
     account.save(update_fields=['last_synced_at', 'last_sync_new', 'last_error'])
+    return result
+
+
+def _post_ingest(group, since_date, new_expense_ids=()):
+    """Shared tail of every ingest: unlock PDFs, categorise, settle transfers, flag anomalies."""
+    if isinstance(since_date, datetime.datetime):
+        since_date = since_date.date()
+    retry_locked_statements(group)
+    ai_categorise_pending(group)
+    settled = settle_internal_movements(group, since_date)
+    affected = list(
+        Expense.objects.filter(pk__in=set(new_expense_ids) | set(settled))
+        .select_related('category', 'payment_source')
+    )
+    if affected:
+        ai_detect_anomalies_for_expenses(affected, group=group)
+
+
+@dataclass
+class BackfillResult:
+    scanned: int = 0
+    statements: int = 0
+    parsed: int = 0
+    duplicates: int = 0
+    locked: int = 0
+    lines_added: int = 0
+    lines_review: int = 0
+    errors: int = 0
+    complete: bool = True
+    error: str = ''
+
+
+def backfill_statements(account, since, time_budget=None, max_messages=BACKFILL_MAX_MESSAGES):
+    """Re-scan a mailbox for card statements since `since` (a date), ignoring the sync cursor.
+
+    Safe to repeat: statements are keyed by Gmail message id, duplicate cycles are detected, and
+    reconciliation only adds lines that no recorded expense accounts for.
+    """
+    result = BackfillResult()
+    started = time.monotonic()
+    group = account.group
+    after = int(datetime.datetime.combine(since, datetime.time.min, tzinfo=datetime.timezone.utc).timestamp())
+    client = GmailClient(account.refresh_token)
+    try:
+        ids = client.list_message_ids(f'{STATEMENT_QUERY} after:{after}', limit=max_messages)
+        known = set(CardStatement.objects.filter(
+            group=group, gmail_message_id__in=ids, status__in=('PARSED', 'DUPLICATE')
+        ).values_list('gmail_message_id', flat=True))
+        for message_id in ids:
+            if message_id in known:
+                continue
+            if time_budget and time.monotonic() - started > time_budget:
+                result.complete = False
+                break
+            result.scanned += 1
+            try:
+                message = client.get_message(message_id)
+                headers, body, pdfs = message_parts(message)
+                sender, subject = headers.get('from', ''), headers.get('subject', '')
+                if not pdfs or (classify(sender, subject, body) != 'STATEMENT'
+                                and not looks_like_card_statement(subject, body, True)):
+                    continue
+                statement = ingest_statement_email(
+                    group, account, message_id, sender, subject, body, list(pdfs),
+                    lambda pdf, mid=message_id: client.get_attachment(mid, pdf['attachment_id'])
+                    if pdf.get('attachment_id') else decode_body(pdf.get('data') or ''),
+                )
+            except GmailAuthError:
+                raise
+            except Exception:
+                logger.exception('Statement backfill failed for a message in account %s', account.pk)
+                result.errors += 1
+                continue
+            ProcessedEmail.objects.update_or_create(
+                gmail_account=account, message_id=message_id,
+                defaults={'kind': 'STATEMENT', 'subject': mask_sensitive(subject)[:255]},
+            )
+            result.statements += 1
+            result.parsed += statement.status == 'PARSED'
+            result.duplicates += statement.status == 'DUPLICATE'
+            result.locked += statement.status == 'NEEDS_PASSWORD'
+            result.lines_added += statement.added_count
+            result.lines_review += statement.review_count
+    except GmailAuthError as exc:
+        account.is_active = False
+        account.last_error = str(exc)[:500]
+        account.save(update_fields=['is_active', 'last_error'])
+        result.error, result.complete = str(exc), False
+        return result
+    except GmailError as exc:
+        account.last_error = str(exc)[:500]
+        account.save(update_fields=['last_error'])
+        result.error, result.complete = str(exc), False
+        return result
+
+    if result.statements:
+        _post_ingest(group, since)
     return result
 
 

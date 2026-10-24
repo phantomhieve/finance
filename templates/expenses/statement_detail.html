@@ -38,10 +38,13 @@
       </div>
 
       {% if statement.status == 'PARSED' %}
-      <div class="grid grid-cols-3 gap-2 mt-4">
+      <div class="grid {% if statement.review_count %}grid-cols-4{% else %}grid-cols-3{% endif %} gap-2 mt-4">
         <div class="stat-card"><div class="text-[10px] uppercase tracking-wider opacity-50">Lines</div><div class="text-base font-bold mt-0.5">{{ lines|length }}</div></div>
         <div class="stat-card"><div class="text-[10px] uppercase tracking-wider opacity-50">Matched</div><div class="text-base font-bold mt-0.5 text-success">{{ statement.matched_count }}</div></div>
         <div class="stat-card"><div class="text-[10px] uppercase tracking-wider opacity-50">Added</div><div class="text-base font-bold mt-0.5 text-info">{{ statement.added_count }}</div></div>
+        {% if statement.review_count %}
+        <div class="stat-card"><div class="text-[10px] uppercase tracking-wider opacity-50">Needs review</div><div class="text-base font-bold mt-0.5 text-warning">{{ statement.review_count }}</div></div>
+        {% endif %}
       </div>
       {% endif %}
     </div>
@@ -60,10 +63,31 @@
       </form>
     </div>
   </div>
+  {% elif statement.status == 'DUPLICATE' %}
+  <div class="card bg-base-200 border border-warning/30 shadow-sm animate-up">
+    <div class="card-body p-4">
+      <h2 class="font-semibold flex items-center gap-2"><span class="material-symbols-outlined text-warning">content_copy</span>Duplicate Statement</h2>
+      <p class="text-xs opacity-75">This statement PDF or billing cycle was already imported. All transactions are tracked under the primary statement to prevent duplicate expenses.</p>
+      {% if statement.duplicate_of %}
+      <div class="mt-2">
+        <a href="{% url 'expenses_statement_detail' statement.duplicate_of.pk %}" class="btn btn-primary btn-xs gap-1">
+          <span class="material-symbols-outlined text-sm">visibility</span>View original statement
+        </a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
   {% elif statement.status == 'BODY_ONLY' %}
   <p class="text-sm opacity-55">Only the totals were in the email — there was no PDF to match line items against. You can upload the PDF from the statements page.</p>
   {% elif statement.status == 'FAILED' %}
   <p class="text-sm text-error/80">The PDF opened but no transaction lines could be read from it.</p>
+  {% endif %}
+
+  {% if statement.review_count %}
+  <div class="alert alert-warning text-xs shadow-sm flex items-center gap-2 py-2.5">
+    <span class="material-symbols-outlined text-base">warning</span>
+    <span><strong>{{ statement.review_count }} line{{ statement.review_count|pluralize }}</strong> look like existing expenses. Please confirm if they are duplicates or new spending below.</span>
+  </div>
   {% endif %}
 
   {% if lines %}
@@ -74,18 +98,56 @@
         <button class="btn btn-ghost btn-xs gap-1"><span class="material-symbols-outlined text-sm">sync</span>Re-match</button>
       </form>
     </div>
-    <div class="flex flex-col gap-1.5">
+    <div class="flex flex-col gap-2">
       {% for ln in lines %}
-      <div class="table-card flex items-center gap-3 !py-2.5">
-        <span class="material-symbols-outlined text-lg shrink-0 {% if ln.was_added %}text-info{% elif ln.matched_expense %}text-success{% else %}opacity-30{% endif %}"
-              title="{% if ln.was_added %}No email alert — added from statement{% elif ln.matched_expense %}Matched an email alert{% else %}Credit / not tracked{% endif %}">
-          {% if ln.was_added %}add_circle{% elif ln.matched_expense %}check_circle{% else %}remove{% endif %}
-        </span>
-        <div class="flex-1 min-w-0">
-          <p class="text-sm truncate">{{ ln.description }}</p>
-          <p class="text-[11px] opacity-50">{{ ln.txn_date|date:"j M" }}{% if ln.matched_expense and ln.matched_expense.category %} · {{ ln.matched_expense.category.name }}{% endif %}{% if ln.was_added %} · <span class="text-info">added</span>{% endif %}</p>
+      <div class="table-card flex flex-col gap-2 !py-2.5 {% if ln.needs_review %}border border-warning/40 bg-warning/5{% endif %}">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined text-lg shrink-0 {% if ln.needs_review %}text-warning{% elif ln.was_added %}text-info{% elif ln.matched_expense %}text-success{% else %}opacity-30{% endif %}"
+                title="{% if ln.needs_review %}Possible duplicate — needs review{% elif ln.was_added %}No email alert — added from statement{% elif ln.matched_expense %}Matched an alert{% else %}Credit / not tracked{% endif %}">
+            {% if ln.needs_review %}help{% elif ln.was_added %}add_circle{% elif ln.matched_expense %}check_circle{% else %}remove{% endif %}
+          </span>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <p class="text-sm font-medium truncate">{{ ln.description }}</p>
+              {% if ln.match_method == 'RULE' %}<span class="badge badge-xs badge-success/20 text-success">Rule match</span>{% elif ln.match_method == 'AI' %}<span class="badge badge-xs badge-info/20 text-info">AI match</span>{% elif ln.match_method == 'USER' %}<span class="badge badge-xs badge-primary/20 text-primary">Confirmed</span>{% endif %}
+            </div>
+            <p class="text-[11px] opacity-50">
+              {{ ln.txn_date|date:"j M" }}
+              {% if ln.matched_expense and ln.matched_expense.category %} · {{ ln.matched_expense.category.name }}{% endif %}
+              {% if ln.was_added %} · <span class="text-info font-medium">added</span>{% endif %}
+            </p>
+          </div>
+          <span class="text-sm font-bold tabular-nums shrink-0 {% if ln.is_credit %}text-success{% endif %}">{% if ln.is_credit %}+{% endif %}{{ ln.amount|inr }}</span>
         </div>
-        <span class="text-sm font-bold tabular-nums shrink-0 {% if ln.is_credit %}text-success{% endif %}">{% if ln.is_credit %}+{% endif %}{{ ln.amount|inr }}</span>
+
+        {% if ln.needs_review and ln.suggested_expense %}
+        <div class="mt-1 p-2.5 rounded-lg bg-base-300/60 border border-warning/20 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div class="min-w-0">
+            <p class="font-semibold text-warning flex items-center gap-1">
+              <span class="material-symbols-outlined text-sm">psychology</span>{{ ln.match_reason|default:"Possible duplicate of existing expense" }}
+            </p>
+            <p class="opacity-75 mt-0.5 truncate">
+              Recorded on {{ ln.suggested_expense.txn_date|date:"j M Y" }}: <strong>{{ ln.suggested_expense.merchant }}</strong> · {{ ln.suggested_expense.amount|inr }} ({{ ln.suggested_expense.get_source_display }})
+            </p>
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <form method="post" action="{% url 'expenses_statement_line_resolve' ln.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="link">
+              <button class="btn btn-success btn-xs gap-1" title="Mark as the same expense so it won't be added again">
+                <span class="material-symbols-outlined text-xs">link</span>Same (Link)
+              </button>
+            </form>
+            <form method="post" action="{% url 'expenses_statement_line_resolve' ln.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="add">
+              <button class="btn btn-ghost btn-xs gap-1" title="Treat as a separate purchase and add to expenses">
+                <span class="material-symbols-outlined text-xs">add</span>New (Add)
+              </button>
+            </form>
+          </div>
+        </div>
+        {% endif %}
       </div>
       {% endfor %}
     </div>

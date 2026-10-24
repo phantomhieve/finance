@@ -31,7 +31,8 @@
       <p class="font-semibold text-sm truncate">{{ st.payment_source.display_name }}</p>
       <p class="text-[11px] opacity-55 truncate">
         {% if st.statement_date %}{{ st.statement_date|date:"j M Y" }}{% else %}Received {{ st.created_at|date:"j M Y" }}{% endif %}
-        {% if st.status == 'PARSED' %} · {{ st.matched_count }} matched{% if st.added_count %} · <span class="text-info">{{ st.added_count }} added</span>{% endif %}
+        {% if st.status == 'PARSED' %} · {{ st.matched_count }} matched{% if st.added_count %} · <span class="text-info">{{ st.added_count }} added</span>{% endif %}{% if st.review_count %} · <span class="text-warning font-semibold">{{ st.review_count }} review</span>{% endif %}
+        {% elif st.status == 'DUPLICATE' %} · <span class="opacity-50">duplicate (ignored)</span>
         {% elif st.status == 'NEEDS_PASSWORD' %} · <span class="text-warning">needs password</span>
         {% elif st.status == 'FAILED' %} · <span class="text-error">couldn't read PDF</span>
         {% else %} · totals only{% endif %}

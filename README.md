@@ -179,6 +179,7 @@ Clamped between 0 and 100.
 | `send_weekly_brief` | Generates and emails the Sunday Equity Intelligence Brief |
 | `send_fy_review` | Generates the annual FY close portfolio review email |
 | `sync_expenses [--email X]` | Ingests new bank/card alerts from connected Gmail accounts |
+| `backfill_statements [--since YYYY-MM] [--email X]` | Backfills card statements from Gmail with duplicate prevention and AI reconciliation |
 | `expense_reminders` | Emails credit card bill payment reminders (5-day, 1-day, due-day) |
 | `send_expense_summary` | Emails monthly household spending report |
 | `backup_db --bucket NAME` | Dumps PostgreSQL, gzips archive, and uploads to GCS |

@@ -19,12 +19,12 @@ from tracker.services import parse_fy_param
 from . import crypto, gmail
 from .anomaly import ai_audit_expenses, apply_flags, audit_cooldown_status
 from .forms import CategoryForm, ExpenseForm, PaymentSourceForm, StatementUploadForm
-from .models import CardStatement, Expense, ExpenseCategory, GmailAccount, MerchantRule, PaymentSource
+from .models import CardStatement, Expense, ExpenseCategory, GmailAccount, MerchantRule, PaymentSource, StatementLine
 from .services import (
     INVESTMENT_CATEGORY, available_fys, ensure_default_categories, fy_summary, learn_category,
     manual_merchant, month_summary, monthly_trend, shift_month,
 )
-from .statements import read_pdf, reconcile, upcoming_dues
+from .statements import read_pdf, reconcile, resolve_line, upcoming_dues
 from .sync import sync_account
 
 logger = logging.getLogger(__name__)
@@ -484,10 +484,13 @@ def statements_list(request):
 @_require_expenses
 def statement_detail(request, pk):
     group = _group(request)
-    statement = get_object_or_404(CardStatement.objects.select_related('payment_source'), pk=pk, group=group)
+    statement = get_object_or_404(CardStatement.objects.select_related('payment_source', 'duplicate_of'), pk=pk, group=group)
     return render(request, 'expenses/statement_detail.html', {
         'statement': statement,
-        'lines': list(statement.lines.select_related('matched_expense', 'matched_expense__category')),
+        'lines': list(statement.lines.select_related(
+            'matched_expense', 'matched_expense__category',
+            'suggested_expense', 'suggested_expense__category',
+        )),
         'today': timezone.localdate(),
     })
 
@@ -508,7 +511,8 @@ def statement_upload(request):
     statement = CardStatement.objects.create(group=group, payment_source=card)
     read_pdf(statement, form.cleaned_data['pdf'].read(), password)
     _statement_message(request, statement)
-    return redirect('expenses_statement_detail', pk=statement.pk)
+    target_pk = statement.duplicate_of_id if (statement.status == 'DUPLICATE' and statement.duplicate_of_id) else statement.pk
+    return redirect('expenses_statement_detail', pk=target_pk)
 
 
 @_require_expenses
@@ -521,7 +525,8 @@ def statement_unlock(request, pk):
         statement.payment_source.save(update_fields=['statement_password_enc'])
     read_pdf(statement, crypto.decrypt_bytes(statement.pdf_blob), password)
     _statement_message(request, statement)
-    return redirect('expenses_statement_detail', pk=statement.pk)
+    target_pk = statement.duplicate_of_id if (statement.status == 'DUPLICATE' and statement.duplicate_of_id) else statement.pk
+    return redirect('expenses_statement_detail', pk=target_pk)
 
 
 def _statement_message(request, statement):
@@ -529,26 +534,67 @@ def _statement_message(request, statement):
         messages.error(request, 'That password did not open the PDF.')
     elif statement.status == 'FAILED':
         messages.error(request, 'Could not read transactions from this PDF. Totals were saved if found.')
+    elif statement.status == 'DUPLICATE':
+        orig_date = f" from {statement.duplicate_of.statement_date}" if statement.duplicate_of and statement.duplicate_of.statement_date else ""
+        messages.info(request, f'This statement was already imported{orig_date}. Showing existing record.')
     else:
-        messages.success(request, f'Read {statement.line_count} lines: {statement.matched_count} matched email alerts, '
-                                  f'{statement.added_count} were missing and have been added.')
+        msg = (
+            f'Read {statement.line_count} lines: {statement.matched_count} matched email alerts, '
+            f'{statement.added_count} were missing and have been added.'
+        )
+        if statement.review_count:
+            msg += f' {statement.review_count} lines need your confirmation.'
+        messages.success(request, msg)
 
 
 @_require_expenses
 @require_POST
 def statement_paid(request, pk):
     statement = get_object_or_404(CardStatement, pk=pk, group=_group(request))
-    statement.is_paid = not statement.is_paid
-    statement.paid_at = timezone.localdate() if statement.is_paid else None
-    statement.save(update_fields=['is_paid', 'paid_at'])
-    messages.success(request, 'Marked as paid.' if statement.is_paid else 'Marked as unpaid.')
+    target = statement.duplicate_of if (statement.status == 'DUPLICATE' and statement.duplicate_of) else statement
+    target.is_paid = not target.is_paid
+    target.paid_at = timezone.localdate() if target.is_paid else None
+    target.save(update_fields=['is_paid', 'paid_at'])
+    if target.pk != statement.pk:
+        statement.is_paid = target.is_paid
+        statement.paid_at = target.paid_at
+        statement.save(update_fields=['is_paid', 'paid_at'])
+    messages.success(request, 'Marked as paid.' if target.is_paid else 'Marked as unpaid.')
     return safe_redirect(request, 'expenses_statements')
 
 
 @_require_expenses
 @require_POST
 def statement_reconcile(request, pk):
-    statement = get_object_or_404(CardStatement, pk=pk, group=_group(request), status='PARSED')
-    matched, added = reconcile(statement)
-    messages.success(request, f'Re-checked: {matched} matched, {added} newly added.')
-    return redirect('expenses_statement_detail', pk=statement.pk)
+    statement = get_object_or_404(CardStatement, pk=pk, group=_group(request))
+    target = statement.duplicate_of if (statement.status == 'DUPLICATE' and statement.duplicate_of) else statement
+    if target.status != 'PARSED':
+        messages.error(request, 'Only parsed statements can be reconciled.')
+        return redirect('expenses_statement_detail', pk=target.pk)
+    matched, added = reconcile(target)
+    msg = f'Re-checked: {matched} matched, {added} newly added.'
+    if target.review_count:
+        msg += f' {target.review_count} lines need your confirmation.'
+    messages.success(request, msg)
+    return redirect('expenses_statement_detail', pk=target.pk)
+
+
+@_require_expenses
+@require_POST
+def statement_line_resolve(request, pk):
+    group = _group(request)
+    line = get_object_or_404(StatementLine.objects.select_related('statement'), pk=pk, statement__group=group)
+    action = request.POST.get('action', '').strip().lower()
+    if action not in ('link', 'add'):
+        messages.error(request, 'Invalid action.')
+        return redirect('expenses_statement_detail', pk=line.statement_id)
+
+    ok = resolve_line(line, action)
+    if ok:
+        if action == 'link':
+            messages.success(request, f'Linked "{line.description}" to existing expense.')
+        else:
+            messages.success(request, f'Added "{line.description}" as a new expense.')
+    else:
+        messages.error(request, 'Could not resolve line: target expense may have been deleted or matched elsewhere.')
+    return redirect('expenses_statement_detail', pk=line.statement_id)

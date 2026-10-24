@@ -9,11 +9,13 @@ from .prompts import (
     ANOMALY_SYSTEM,
     CATEGORISE_SYSTEM,
     EXTRACT_SYSTEM,
+    MATCH_SYSTEM,
     MONTHLY_NOTE_SYSTEM,
     STATEMENT_SYSTEM,
     build_anomaly_prompt,
     build_categorise_prompt,
     build_extract_prompt,
+    build_match_prompt,
     build_monthly_note_prompt,
     build_statement_prompt,
 )
@@ -25,6 +27,7 @@ from .runner import (
     detect_anomalies,
     extract_statement_lines,
     extract_transaction,
+    match_statement_lines,
     monthly_commentary,
 )
 from .schemas import (
@@ -35,6 +38,8 @@ from .schemas import (
     ExtractedLine,
     ExtractedLines,
     ExtractedTxn,
+    LineMatch,
+    LineMatchBatch,
     MonthlyNote,
 )
 
@@ -45,6 +50,7 @@ __all__ = [
     "detect_anomalies",
     "extract_transaction",
     "extract_statement_lines",
+    "match_statement_lines",
     "monthly_commentary",
     "_generate",
     "MAX_BATCH",
@@ -54,6 +60,8 @@ __all__ = [
     "ExtractedTxn",
     "ExtractedLine",
     "ExtractedLines",
+    "LineMatch",
+    "LineMatchBatch",
     "MonthlyNote",
     "AnomalyItem",
     "AnomalyBatchResult",
@@ -61,11 +69,13 @@ __all__ = [
     "CATEGORISE_SYSTEM",
     "EXTRACT_SYSTEM",
     "STATEMENT_SYSTEM",
+    "MATCH_SYSTEM",
     "MONTHLY_NOTE_SYSTEM",
     "ANOMALY_SYSTEM",
     "build_categorise_prompt",
     "build_extract_prompt",
     "build_statement_prompt",
+    "build_match_prompt",
     "build_monthly_note_prompt",
     "build_anomaly_prompt",
 ]

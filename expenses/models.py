@@ -167,6 +167,7 @@ class CardStatement(models.Model):
         ('PARSED', 'Line items parsed'),
         ('NEEDS_PASSWORD', 'PDF needs password'),
         ('FAILED', 'Could not read PDF'),
+        ('DUPLICATE', 'Same statement already imported'),
     )
 
     group = models.ForeignKey('tracker.AccountGroup', on_delete=models.CASCADE, related_name='card_statements')
@@ -182,9 +183,13 @@ class CardStatement(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='BODY_ONLY')
     pdf_blob = models.BinaryField(null=True, blank=True, editable=False,
                                   help_text='Original PDF (encrypted) kept until it is parsed, so a password can be added later')
+    # SHA-256 of the original PDF bytes, so re-uploads / re-sent emails of the same file are recognised.
+    pdf_sha256 = models.CharField(max_length=64, blank=True, db_index=True)
+    duplicate_of = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
     line_count = models.PositiveIntegerField(default=0)
     matched_count = models.PositiveIntegerField(default=0)
     added_count = models.PositiveIntegerField(default=0)
+    review_count = models.PositiveIntegerField(default=0)
     is_paid = models.BooleanField(default=False)
     paid_at = models.DateField(null=True, blank=True)
     paid_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
@@ -324,6 +329,19 @@ class StatementLine(models.Model):
     is_credit = models.BooleanField(default=False)
     matched_expense = models.ForeignKey(Expense, on_delete=models.SET_NULL, null=True, blank=True, related_name='statement_lines')
     was_added = models.BooleanField(default=False, help_text='No email alert matched — added from the statement')
+    MATCH_METHOD_CHOICES = (
+        ('', 'Not matched'),
+        ('RULE', 'Amount + date rule'),
+        ('AI', 'AI'),
+        ('USER', 'Confirmed by you'),
+        ('SKIP', 'Card payment (not spend)'),
+    )
+    match_method = models.CharField(max_length=4, choices=MATCH_METHOD_CHOICES, blank=True, default='')
+    match_confidence = models.FloatField(null=True, blank=True)
+    # Possible duplicate the matcher wasn't sure about — nothing is added until someone decides.
+    needs_review = models.BooleanField(default=False)
+    suggested_expense = models.ForeignKey(Expense, on_delete=models.SET_NULL, null=True, blank=True, related_name='+')
+    match_reason = models.CharField(max_length=255, blank=True)
 
     class Meta:
         ordering = ['txn_date', 'id']
