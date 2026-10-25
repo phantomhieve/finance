@@ -1278,6 +1278,32 @@ class RefundAndEmiTrackingTests(TestCase):
         self.assertFalse(line.was_added)
         self.assertIsNone(line.matched_expense)
 
+    def test_toggle_emi_on_expense(self):
+        from .forms import ExpenseForm
+
+        e = Expense.objects.create(
+            group=self.group,
+            amount=Decimal('5000.00'),
+            direction='DEBIT',
+            txn_date=datetime.date(2026, 10, 15),
+            merchant='Some Store',
+            is_emi=True,
+            emi_component='PURCHASE',
+        )
+
+        # Toggle is_emi off via form edit
+        data = {
+            'amount': '5000.00',
+            'direction': 'DEBIT',
+            'txn_date': '2026-10-15',
+            'merchant': 'Some Store',
+            'is_emi': False,
+        }
+        form = ExpenseForm(data, instance=e, group=self.group)
+        self.assertTrue(form.is_valid())
+        saved = form.save()
+        self.assertFalse(saved.is_emi)
+
 
 
 

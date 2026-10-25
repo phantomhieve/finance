@@ -7,10 +7,11 @@ MAX_STATEMENT_BYTES = 10 * 1024 * 1024
 
 class ExpenseForm(forms.ModelForm):
     remember = forms.BooleanField(required=False, initial=False)
+    is_emi = forms.BooleanField(required=False, initial=False)
 
     class Meta:
         model = Expense
-        fields = ['amount', 'direction', 'txn_date', 'merchant', 'category', 'payment_source', 'member', 'notes']
+        fields = ['amount', 'direction', 'txn_date', 'merchant', 'category', 'payment_source', 'member', 'notes', 'is_emi']
         widgets = {'txn_date': forms.DateInput(attrs={'type': 'date'})}
 
     def __init__(self, *args, group=None, **kwargs):
@@ -18,7 +19,7 @@ class ExpenseForm(forms.ModelForm):
         self.fields['category'].queryset = ExpenseCategory.objects.filter(group=group)
         self.fields['payment_source'].queryset = PaymentSource.objects.filter(group=group)
         self.fields['member'].queryset = group.members.all() if group else self.fields['member'].queryset.none()
-        for name in ('category', 'payment_source', 'member', 'notes'):
+        for name in ('category', 'payment_source', 'member', 'notes', 'is_emi'):
             self.fields[name].required = False
         self.fields['merchant'].required = True
 

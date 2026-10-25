@@ -29,12 +29,17 @@
         </div>
       </div>
 
-      <div id="expEmiBox" class="alert alert-info alert-soft text-xs py-2 hidden items-center gap-2">
-        <span class="material-symbols-outlined text-base text-purple-400">event_repeat</span>
-        <div class="flex-1">
-          <span class="font-semibold text-purple-300">Credit Card EMI</span>
-          <p id="expEmiDetail" class="text-[11px] opacity-80"></p>
+      <div id="expEmiBox" class="alert alert-info alert-soft text-xs py-2 hidden items-center justify-between gap-2">
+        <div class="flex items-center gap-2 min-w-0">
+          <span class="material-symbols-outlined text-base text-purple-400">event_repeat</span>
+          <div class="min-w-0">
+            <span class="font-semibold text-purple-300">Credit Card EMI</span>
+            <p id="expEmiDetail" class="text-[11px] opacity-80 truncate"></p>
+          </div>
         </div>
+        <button type="button" id="expRemoveEmiBtn" class="btn btn-ghost btn-xs text-error/80 hover:text-error gap-1 shrink-0 cursor-pointer" onclick="Expenses.toggleEmi(false)" title="Mark this transaction as not an EMI">
+          <span class="material-symbols-outlined text-xs">close</span>Not an EMI
+        </button>
       </div>
 
       <div class="join w-full">
@@ -66,6 +71,17 @@
             {% for c in categories %}<option value="{{ c.pk }}">{{ c.name }}</option>{% endfor %}
           </select>
         </label>
+      </div>
+
+      <div class="flex items-center justify-between p-2.5 rounded-xl bg-base-200/50 border border-base-content/10">
+        <label for="expIsEmi" class="flex items-center gap-2 cursor-pointer flex-1">
+          <span class="material-symbols-outlined text-purple-400 text-lg">event_repeat</span>
+          <div>
+            <span class="text-xs font-semibold">Credit Card EMI</span>
+            <p class="text-[10px] opacity-60">Track as an installment or converted merchant purchase</p>
+          </div>
+        </label>
+        <input type="checkbox" name="is_emi" id="expIsEmi" class="toggle toggle-sm toggle-primary cursor-pointer">
       </div>
 
       <label class="flex items-start gap-2.5 cursor-pointer hidden p-2 rounded-lg bg-base-200/50 border border-base-content/10" id="expRememberRow">
