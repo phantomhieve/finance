@@ -83,8 +83,19 @@ def build_expense(
         dedupe_key=dedupe_key,
         statement=statement,
         member=member or (payment_source.owner if payment_source else None),
+        is_emi=parsed.is_emi,
+        emi_reference=parsed.emi_reference,
+        emi_installment_num=parsed.emi_installment_num,
+        emi_total_installments=parsed.emi_total_installments,
+        emi_component=parsed.emi_component,
+        refunded_amount=parsed.refunded_amount,
+        refund_date=parsed.refund_date,
     )
     categorise_expense(expense, cats)
+    if expense.is_emi and (not expense.category or expense.category.kind != 'SPEND'):
+        if cats and 'EMI & Loans' in cats:
+            expense.category = cats['EMI & Loans']
+            expense.category_source = 'RULE'
     expense.save()
     return expense, True
 

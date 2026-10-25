@@ -86,6 +86,12 @@ def _expense_payload(e):
         'category_source': e.get_category_source_display(), 'raw': e.merchant_raw,
         'subject': e.email_subject, 'flag_reasons': e.flag_reasons or [],
         'flagged': e.needs_review, 'reviewed': e.flag_reviewed,
+        'is_refunded': e.is_refunded, 'is_fully_refunded': e.is_fully_refunded,
+        'refunded_amount': str(e.refunded_amount),
+        'refund_date': e.refund_date.isoformat() if e.refund_date else '',
+        'net_amount': str(e.net_amount),
+        'is_emi': e.is_emi, 'emi_reference': e.emi_reference,
+        'emi_installment_num': e.emi_installment_num, 'emi_component': e.emi_component,
         'edit_url': reverse('expense_edit', args=[e.pk]), 'delete_url': reverse('expense_delete', args=[e.pk]),
         'review_url': reverse('expense_review', args=[e.pk]),
     }
@@ -107,9 +113,11 @@ def expenses_home(request):
     f_member = request.GET.get('member', '')
     f_source = request.GET.get('source', '')
     f_flagged = request.GET.get('flagged') == '1'
+    f_refunds = request.GET.get('refunds') == '1'
+    f_emis = request.GET.get('emis') == '1'
     f_query = request.GET.get('q', '').strip()
 
-    qs = (_expenses(request).filter(is_deleted=False, txn_date__gte=summary['start'], txn_date__lte=summary['end'])
+    qs = (_expenses(request).filter(is_deleted=False, refund_of__isnull=True, txn_date__gte=summary['start'], txn_date__lte=summary['end'])
           .select_related('category', 'payment_source', 'member'))
     if f_cat == 'none':
         qs = qs.filter(category__isnull=True)
@@ -121,12 +129,16 @@ def expenses_home(request):
         qs = qs.filter(source=f_source)
     if f_flagged:
         qs = qs.filter(is_flagged=True, flag_reviewed=False)
+    if f_refunds:
+        qs = qs.filter(Q(refunded_amount__gt=0) | Q(refund_date__isnull=False) | Q(direction='CREDIT'))
+    if f_emis:
+        qs = qs.filter(is_emi=True)
     if f_query:
         qs = qs.filter(Q(merchant__icontains=f_query) | Q(notes__icontains=f_query) | Q(merchant_raw__icontains=f_query))
     rows = list(qs)
     days = [{'date': d, 'items': list(items)} for d, items in groupby(rows, key=lambda e: e.txn_date)]
     for day in days:
-        day['spend'] = sum((e.amount for e in day['items'] if e.is_spend and e.currency == 'INR'), 0)
+        day['spend'] = sum((e.net_amount for e in day['items'] if e.is_spend and e.currency == 'INR'), 0)
 
     py, pm = shift_month(year, month, -1)
     ny, nm = shift_month(year, month, 1)
@@ -158,8 +170,9 @@ def expenses_home(request):
         'reconnect_needed': context_reconnect,
         'dues': dues,
         'pending_passwords': pending_passwords,
-        'f_cat': f_cat, 'f_member': f_member, 'f_source': f_source, 'f_flagged': f_flagged, 'f_query': f_query,
-        'is_filtered': bool(f_cat or f_member or f_source or f_flagged or f_query),
+        'f_cat': f_cat, 'f_member': f_member, 'f_source': f_source, 'f_flagged': f_flagged,
+        'f_refunds': f_refunds, 'f_emis': f_emis, 'f_query': f_query,
+        'is_filtered': bool(f_cat or f_member or f_source or f_flagged or f_refunds or f_emis or f_query),
         'today': today,
         'trend': trend,
         'open_flags': sum(1 for e in summary['flagged'] if not e.flag_reviewed),

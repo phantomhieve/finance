@@ -62,6 +62,23 @@ var Expenses = (function () {
       toggle('expFlagBox', current.flagged, 'flex');
       $('expReviewForm').action = current.review_url;
 
+      if (current.is_refunded) {
+        setText('expRefundDetail', 'Refunded on ' + (current.refund_date || 'card') + ' · ₹' + current.refunded_amount + ' refunded (Net: ₹' + current.net_amount + ')');
+        toggle('expRefundBox', true, 'flex');
+      } else {
+        toggle('expRefundBox', false);
+      }
+
+      if (current.is_emi) {
+        var emiTxt = 'Active EMI transaction';
+        if (current.emi_installment_num) emiTxt += ' · Installment #' + current.emi_installment_num;
+        if (current.emi_reference) emiTxt += ' (Loan ••' + current.emi_reference + ')';
+        setText('expEmiDetail', emiTxt);
+        toggle('expEmiBox', true, 'flex');
+      } else {
+        toggle('expEmiBox', false);
+      }
+
       setText('expMetaSource', current.source);
       setText('expMetaCat', current.category_source);
       setText('expMetaRaw', current.raw);
