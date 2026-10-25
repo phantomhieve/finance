@@ -62,8 +62,12 @@ var Expenses = (function () {
       toggle('expFlagBox', current.flagged, 'flex');
       $('expReviewForm').action = current.review_url;
 
-      if (current.is_refunded) {
-        setText('expRefundDetail', 'Refunded on ' + (current.refund_date || 'card') + ' · ₹' + current.refunded_amount + ' refunded (Net: ₹' + current.net_amount + ')');
+      if (current.is_refunded || current.direction === 'CREDIT') {
+        if (current.is_refunded) {
+          setText('expRefundDetail', 'Refunded on ' + (current.refund_date || 'card') + ' · ₹' + current.refunded_amount + ' refunded (Net: ₹' + current.net_amount + ')');
+        } else {
+          setText('expRefundDetail', 'Refund / reversal received on ' + (current.txn_date || 'card') + ' · ₹' + current.amount + ' credited back to your account');
+        }
         toggle('expRefundBox', true, 'flex');
       } else {
         toggle('expRefundBox', false);
