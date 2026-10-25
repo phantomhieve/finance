@@ -7,7 +7,8 @@ from collections import defaultdict
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
-from django.db.models import Count, Q, QuerySet, Sum
+from django.db import models
+from django.db.models import Case, Count, F, Q, QuerySet, Sum, When
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
 
@@ -32,8 +33,8 @@ def spend_q() -> Q:
 
 
 def live(group: AccountGroup) -> QuerySet[Expense]:
-    """Active non-deleted expenses for the household group."""
-    return Expense.objects.filter(group=group, is_deleted=False)
+    """Active non-deleted expenses for the household group (excluding absorbed refunds)."""
+    return Expense.objects.filter(group=group, is_deleted=False, refund_of__isnull=True)
 
 
 def month_bounds(year: int, month: int) -> tuple[datetime.date, datetime.date]:
@@ -48,13 +49,27 @@ def shift_month(year: int, month: int, delta: int) -> tuple[int, int]:
 
 
 def _sum(qs: QuerySet[Expense]) -> Decimal:
-    return qs.aggregate(t=Sum('amount'))['t'] or ZERO
+    """Net spend accounting for refunds: sum(amount - min(amount, refunded_amount))."""
+    res = qs.aggregate(
+        t=Sum(
+            Case(
+                When(refunded_amount__gte=F('amount'), then=ZERO),
+                When(refunded_amount__gt=ZERO, then=F('amount') - F('refunded_amount')),
+                default=F('amount'),
+                output_field=models.DecimalField(max_digits=12, decimal_places=2),
+            )
+        )
+    )['t']
+    return res or ZERO
 
 
 def _daily(qs: QuerySet[Expense], days: int) -> list[Decimal]:
     by_day = defaultdict(lambda: ZERO)
-    for d, amt in qs.values_list('txn_date', 'amount'):
-        by_day[d.day] += amt
+    for d, amt, ref in qs.values_list('txn_date', 'amount', 'refunded_amount'):
+        if ref and ref >= amt:
+            continue
+        net = amt - (ref or ZERO)
+        by_day[d.day] += net
     return [by_day.get(d, ZERO) for d in range(1, days + 1)]
 
 
@@ -168,6 +183,41 @@ def month_summary(
     frequent = (flexible.exclude(merchant='').values('merchant').annotate(total=Sum('amount'), count=Count('id'))
                 .filter(count__gte=2).order_by('-count', '-total').first())
 
+    gross_total = qs.filter(spend_q()).aggregate(t=Sum('amount'))['t'] or ZERO
+    refunded_total = spend_qs.filter(refunded_amount__gt=ZERO).aggregate(t=Sum('refunded_amount'))['t'] or ZERO
+    refund_count = month_all.filter(Q(refunded_amount__gt=ZERO) | Q(refund_date__isnull=False)).count()
+
+    # Credit card EMI metrics
+    emi_qs = month_all.filter(is_emi=True)
+    ongoing_by_loan = defaultdict(lambda: {'ref': '', 'num': None, 'principal': ZERO, 'interest': ZERO, 'total': ZERO, 'payment_source': None, 'items': []})
+    for e in emi_qs.filter(emi_component__in=('PRINCIPAL', 'INTEREST')):
+        key = (e.emi_reference, e.emi_installment_num)
+        rec = ongoing_by_loan[key]
+        rec['ref'] = e.emi_reference
+        rec['num'] = e.emi_installment_num
+        rec['payment_source'] = e.payment_source
+        if e.emi_component == 'PRINCIPAL':
+            rec['principal'] += e.amount
+        else:
+            rec['interest'] += e.amount
+        rec['total'] += e.amount
+        rec['items'].append(e)
+
+    ongoing_emis = sorted(ongoing_by_loan.values(), key=lambda x: -x['total'])
+    emi_installments_total = sum((x['total'] for x in ongoing_emis), ZERO)
+
+    converted_purchases = list(emi_qs.filter(emi_component='PURCHASE').select_related('payment_source').order_by('-amount'))
+    converted_total = sum((e.amount for e in converted_purchases), ZERO)
+
+    emi_summary = {
+        'count': emi_qs.count(),
+        'ongoing': ongoing_emis,
+        'ongoing_total': emi_installments_total,
+        'converted': converted_purchases,
+        'converted_total': converted_total,
+        'monthly_commitment': emi_installments_total,
+    }
+
     return {
         'year': year,
         'month': month,
@@ -176,6 +226,11 @@ def month_summary(
         'label': start.strftime('%B %Y'),
         'prev_label': p_start.strftime('%B'),
         'total': total,
+        'gross_total': gross_total,
+        'refunded_total': refunded_total,
+        'refund_count': refund_count,
+        'emi_summary': emi_summary,
+        'emi_count': emi_qs.count(),
         'prev_total': prev_total,
         'delta': total - prev_total,
         'delta_pct': round((total - prev_total) / prev_total * 100) if prev_total else None,

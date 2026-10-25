@@ -10,6 +10,7 @@ import html
 import re
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Text helpers & HTML Cleaning
@@ -609,6 +610,80 @@ def brand_icon(merchant_key: str, text: str = '') -> str | None:
     return None
 
 
+def parse_emi_details(raw: str | None) -> dict[str, Any]:
+    """Parse EMI components from bank statement line or email alert text.
+
+    Returns dict with keys:
+      is_emi: bool
+      component: 'PRINCIPAL' | 'INTEREST' | 'PURCHASE' | ''
+      installment_num: int | None
+      total_installments: int | None
+      reference: str
+      merchant: str
+    """
+    if not raw:
+        return {'is_emi': False, 'component': '', 'installment_num': None, 'total_installments': None, 'reference': '', 'merchant': ''}
+
+    s = raw.strip()
+    # 1. HDFC / Indian statement installment patterns:
+    # OFFUS EMI,PRIN NB:03,XXXXXXXXXX9861 or EMI,PRIN NB:03
+    prin_match = re.search(r'\b(?:OFFUS\s+)?EMI\s*,\s*PRIN\s+NB:(\d+)\s*,\s*([A-Za-z0-9]+)', s, re.I)
+    if prin_match:
+        ref = prin_match.group(2)[-4:]
+        num = int(prin_match.group(1))
+        return {
+            'is_emi': True,
+            'component': 'PRINCIPAL',
+            'installment_num': num,
+            'total_installments': None,
+            'reference': ref,
+            'merchant': f'Loan ••{ref} (Principal #{num})',
+        }
+
+    # 2. OFFUS EMI,INT NBR:03,XXXXXXXXXX9861 or EMI,INT NBR:03
+    int_match = re.search(r'\b(?:OFFUS\s+)?EMI\s*,\s*INT\s+NBR:(\d+)\s*,\s*([A-Za-z0-9]+)', s, re.I)
+    if int_match:
+        ref = int_match.group(2)[-4:]
+        num = int(int_match.group(1))
+        return {
+            'is_emi': True,
+            'component': 'INTEREST',
+            'installment_num': num,
+            'total_installments': None,
+            'reference': ref,
+            'merchant': f'Loan ••{ref} (Interest #{num})',
+        }
+
+    # 3. Standard installment pattern: EMI (MONTH|INSTALMENT|INSTALLMENT)? (\d+)\s*(?:OF|/)\s*(\d+)
+    inst_match = re.search(r'\b(?:EMI|INSTALLMENT|INSTALMENT)\s*(?:MONTH)?\s*(\d+)\s*(?:OF|/)\s*(\d+)', s, re.I)
+    if inst_match:
+        cur, tot = int(inst_match.group(1)), int(inst_match.group(2))
+        return {
+            'is_emi': True,
+            'component': 'PRINCIPAL',
+            'installment_num': cur,
+            'total_installments': tot,
+            'reference': '',
+            'merchant': f'EMI Installment ({cur}/{tot})',
+        }
+
+    # 4. Merchant purchase on EMI: EMI <Merchant> or <Merchant> EMI or SMARTEMI or FLEXIPAY
+    if re.search(r'^(?:EMI\s+|OFFUS\s+EMI\s+|SMARTEMI\s+|FLEXIPAY\s+)', s, re.I) or re.search(r'\b(?:NO\s+COST\s+EMI|SMARTEMI|FLEXIPAY)\b', s, re.I):
+        clean_m = re.sub(r'^(?:EMI|OFFUS\s+EMI|SMARTEMI|FLEXIPAY)\s+', '', s, flags=re.I).strip()
+        clean_m = re.sub(r'^(?:UPI-)', '', clean_m, flags=re.I).strip()
+        disp, _ = normalize_merchant(clean_m)
+        return {
+            'is_emi': True,
+            'component': 'PURCHASE',
+            'installment_num': None,
+            'total_installments': None,
+            'reference': '',
+            'merchant': f'{disp or clean_m} (EMI)',
+        }
+
+    return {'is_emi': False, 'component': '', 'installment_num': None, 'total_installments': None, 'reference': '', 'merchant': ''}
+
+
 # ---------------------------------------------------------------------------
 # Public Parse Results
 # ---------------------------------------------------------------------------
@@ -628,6 +703,13 @@ class ParsedTransaction:
     last4: str = ''
     institution: str = ''
     reference: str = ''
+    is_emi: bool = False
+    emi_reference: str = ''
+    emi_installment_num: int | None = None
+    emi_total_installments: int | None = None
+    emi_component: str = ''
+    refunded_amount: Decimal = Decimal('0.00')
+    refund_date: datetime.date | None = None
 
 
 @dataclass
@@ -693,6 +775,9 @@ def parse_transaction(
 
     # 3. Instrument, channel & details
     instrument = parse_instrument(full)
+    emi = parse_emi_details(full)
+    if emi['is_emi'] and emi['merchant'] and not display:
+        display = emi['merchant']
 
     return ParsedTransaction(
         amount=amount,
@@ -708,6 +793,11 @@ def parse_transaction(
         last4=parse_last4(full),
         institution=detect_institution(sender, full),
         reference=parse_reference(text),
+        is_emi=emi['is_emi'],
+        emi_reference=emi['reference'],
+        emi_installment_num=emi['installment_num'],
+        emi_total_installments=emi['total_installments'],
+        emi_component=emi['component'],
     )
 
 

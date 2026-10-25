@@ -43,6 +43,7 @@ from .ingestion import (
     resolve_payment_source,
     settle_internal_movements,
 )
+from .statements import reconcile_refunds
 
 __all__ = [
     # Analytics & Math constants
@@ -78,4 +79,5 @@ __all__ = [
     "resolve_payment_source",
     "build_expense",
     "manual_merchant",
+    "reconcile_refunds",
 ]

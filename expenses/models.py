@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.conf import settings
 from django.db import models
 from django.db.models import Q
@@ -268,6 +270,18 @@ class Expense(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='+',
     )
 
+    # Refunds & Returns linking
+    refunded_amount = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal('0.00'))
+    refund_date = models.DateField(null=True, blank=True)
+    refund_of = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='refund_entries')
+
+    # Credit Card EMI Tracking
+    is_emi = models.BooleanField(default=False, db_index=True)
+    emi_reference = models.CharField(max_length=64, blank=True)
+    emi_installment_num = models.PositiveSmallIntegerField(null=True, blank=True)
+    emi_total_installments = models.PositiveSmallIntegerField(null=True, blank=True)
+    emi_component = models.CharField(max_length=16, blank=True)
+
     is_flagged = models.BooleanField(default=False)
     flag_reasons = models.JSONField(default=list, blank=True)
     flag_reviewed = models.BooleanField(default=False)
@@ -282,6 +296,7 @@ class Expense(models.Model):
         indexes = [
             models.Index(fields=['group', 'txn_date']),
             models.Index(fields=['group', 'merchant_key']),
+            models.Index(fields=['group', 'is_emi']),
         ]
         constraints = [
             models.UniqueConstraint(
@@ -294,8 +309,26 @@ class Expense(models.Model):
         return f'{self.txn_date} {self.merchant or "—"} ₹{self.amount}'
 
     @property
+    def is_refunded(self):
+        return bool(self.refund_date or self.refunded_amount > 0 or self.refund_of_id)
+
+    @property
+    def is_fully_refunded(self):
+        return self.direction == 'DEBIT' and self.amount > 0 and self.refunded_amount >= self.amount
+
+    @property
+    def net_amount(self):
+        if self.direction == 'DEBIT':
+            return max(Decimal('0.00'), self.amount - self.refunded_amount)
+        return self.amount
+
+    @property
     def is_spend(self):
-        return self.direction == 'DEBIT' and (self.category is None or self.category.kind == 'SPEND')
+        if self.direction != 'DEBIT':
+            return False
+        if self.refunded_amount >= self.amount and self.amount > 0:
+            return False
+        return self.category is None or self.category.kind == 'SPEND'
 
     @property
     def needs_review(self):

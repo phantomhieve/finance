@@ -1113,4 +1113,171 @@ class ExpenseAuditCooldownTests(ExpenseTestCase):
         self.assertEqual(ExpenseAuditRun.objects.filter(group=self.group).count(), 1)
 
 
+class RefundAndEmiTrackingTests(TestCase):
+    def setUp(self):
+        from tracker.models import AccountGroup, User
+        self.group = AccountGroup.objects.create(name='Test Household')
+        self.user = User.objects.create_user(username='tester', email='t@example.com', password='pw')
+        self.group.members.add(self.user)
+        self.card = PaymentSource.objects.create(
+            group=self.group, kind='CREDIT_CARD', institution='HDFC Bank', last4='2555', owner=self.user,
+        )
+
+    def test_refund_matching_deducts_net_spend(self):
+        from .analytics import month_summary
+        from .models import Expense
+        from .statements import reconcile_refunds
+
+        # Purchase on Oct 16
+        debit = Expense.objects.create(
+            group=self.group,
+            amount=Decimal('82954.00'),
+            direction='DEBIT',
+            txn_date=datetime.date(2026, 10, 16),
+            merchant='MakeMyTrip',
+            merchant_key='MAKEMYTRIP',
+            payment_source=self.card,
+        )
+        # Refund on Oct 7
+        credit = Expense.objects.create(
+            group=self.group,
+            amount=Decimal('82954.00'),
+            direction='CREDIT',
+            txn_date=datetime.date(2026, 10, 7),
+            merchant='MakeMyTrip',
+            merchant_key='MAKEMYTRIP',
+            payment_source=self.card,
+        )
+
+        linked = reconcile_refunds(self.group)
+        self.assertEqual(linked, 1)
+
+        debit.refresh_from_db()
+        credit.refresh_from_db()
+
+        self.assertEqual(credit.refund_of_id, debit.pk)
+        self.assertEqual(debit.refunded_amount, Decimal('82954.00'))
+        self.assertEqual(debit.refund_date, datetime.date(2026, 10, 7))
+        self.assertTrue(debit.is_fully_refunded)
+        self.assertEqual(debit.net_amount, Decimal('0.00'))
+        self.assertFalse(debit.is_spend)
+
+        # In month_summary, net spend should be 0, and refunded_total should be 82954
+        summary = month_summary(self.group, 2026, 10)
+        self.assertEqual(summary['total'], Decimal('0.00'))
+        self.assertEqual(summary['gross_total'], Decimal('82954.00'))
+        self.assertEqual(summary['refunded_total'], Decimal('82954.00'))
+        self.assertEqual(summary['refund_count'], 1)
+
+    def test_partial_refund_calculates_net_spend(self):
+        from .analytics import month_summary
+        from .models import Expense
+        from .statements import reconcile_refunds
+
+        debit = Expense.objects.create(
+            group=self.group,
+            amount=Decimal('1000.00'),
+            direction='DEBIT',
+            txn_date=datetime.date(2026, 10, 5),
+            merchant='Meesho',
+            merchant_key='MEESHO',
+            payment_source=self.card,
+        )
+        Expense.objects.create(
+            group=self.group,
+            amount=Decimal('400.00'),
+            direction='CREDIT',
+            txn_date=datetime.date(2026, 10, 10),
+            merchant='Meesho',
+            merchant_key='MEESHO',
+            payment_source=self.card,
+        )
+
+        reconcile_refunds(self.group)
+        debit.refresh_from_db()
+
+        self.assertEqual(debit.refunded_amount, Decimal('400.00'))
+        self.assertEqual(debit.net_amount, Decimal('600.00'))
+        self.assertTrue(debit.is_spend)
+
+        summary = month_summary(self.group, 2026, 10)
+        self.assertEqual(summary['total'], Decimal('600.00'))
+        self.assertEqual(summary['gross_total'], Decimal('1000.00'))
+
+    def test_emi_parsing_and_analytics_grouping(self):
+        from .analytics import month_summary
+        from .models import Expense
+        from .parsing import parse_emi_details
+
+        p_info = parse_emi_details('OFFUS EMI,PRIN NB:03,XXXXXXXXXX9861 (Ref# 123)')
+        self.assertTrue(p_info['is_emi'])
+        self.assertEqual(p_info['component'], 'PRINCIPAL')
+        self.assertEqual(p_info['installment_num'], 3)
+        self.assertEqual(p_info['reference'], '9861')
+
+        i_info = parse_emi_details('OFFUS EMI,INT NBR:03,XXXXXXXXXX9861 (Ref# 124)')
+        self.assertTrue(i_info['is_emi'])
+        self.assertEqual(i_info['component'], 'INTEREST')
+        self.assertEqual(i_info['installment_num'], 3)
+
+        v_info = parse_emi_details('EMI VIJAY SALES INDIA PRI')
+        self.assertTrue(v_info['is_emi'])
+        self.assertEqual(v_info['component'], 'PURCHASE')
+
+        # Create EMI expense rows
+        Expense.objects.create(
+            group=self.group, amount=Decimal('3475.00'), direction='DEBIT',
+            txn_date=datetime.date(2026, 10, 23), merchant='Loan ••9861 (Principal #3)',
+            is_emi=True, emi_component='PRINCIPAL', emi_installment_num=3, emi_reference='9861',
+            payment_source=self.card,
+        )
+        Expense.objects.create(
+            group=self.group, amount=Decimal('395.00'), direction='DEBIT',
+            txn_date=datetime.date(2026, 10, 23), merchant='Loan ••9861 (Interest #3)',
+            is_emi=True, emi_component='INTEREST', emi_installment_num=3, emi_reference='9861',
+            payment_source=self.card,
+        )
+        Expense.objects.create(
+            group=self.group, amount=Decimal('83000.00'), direction='DEBIT',
+            txn_date=datetime.date(2026, 10, 19), merchant='Vijay Sales (EMI)',
+            is_emi=True, emi_component='PURCHASE',
+            payment_source=self.card,
+        )
+
+        summary = month_summary(self.group, 2026, 10)
+        emi_data = summary['emi_summary']
+        self.assertEqual(emi_data['count'], 3)
+        self.assertEqual(len(emi_data['ongoing']), 1)
+        # 3475 + 395 = 3870
+        self.assertEqual(emi_data['ongoing'][0]['total'], Decimal('3870.00'))
+        self.assertEqual(emi_data['monthly_commitment'], Decimal('3870.00'))
+        self.assertEqual(len(emi_data['converted']), 1)
+        self.assertEqual(emi_data['converted_total'], Decimal('83000.00'))
+
+    def test_bppy_cc_payments_skipped_in_reconcile(self):
+        from .models import CardStatement, StatementLine
+        from .statements import _is_payment, reconcile
+
+        self.assertTrue(_is_payment('BPPY CC PAYMENT DPXXXXXXXX3739S9aoA (Ref#STXXXXXXXXXXXXXXXXX6401)'))
+        self.assertTrue(_is_payment('UPICC-26-09-2026-XXXXXXXX6139 +'))
+        self.assertFalse(_is_payment('MAKEMYTRIP INDIA PVTNEW DELHI (Ref# VTXXXXXXXXXXXXXXXXX0134)'))
+        self.assertFalse(_is_payment('AtlysMumbai (Ref# VTXXXXXXXXXXXXXXXXX0075)'))
+
+        st = CardStatement.objects.create(
+            group=self.group, payment_source=self.card, statement_date=datetime.date(2026, 10, 23),
+            status='BODY_ONLY',
+        )
+        line = StatementLine.objects.create(
+            statement=st, txn_date=datetime.date(2026, 9, 25),
+            description='BPPY CC PAYMENT DPXXXXXXXX3739S9aoA',
+            amount=Decimal('50000.00'), is_credit=True,
+        )
+        reconcile(st)
+        line.refresh_from_db()
+        self.assertEqual(line.match_method, 'SKIP')
+        self.assertFalse(line.was_added)
+        self.assertIsNone(line.matched_expense)
+
+
+
 

@@ -17,7 +17,9 @@ from .parsing import (
     parse_card_payment, parse_date, parse_transaction, to_decimal,
 )
 from .services import ai_categorise_pending, build_expense, categories_by_name, settle_internal_movements
-from .statements import ingest_statement_email, record_card_payment, retry_locked_statements
+from .statements import (
+    ingest_statement_email, reconcile_refunds, record_card_payment, retry_locked_statements,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +199,7 @@ def _post_ingest(group, since_date, new_expense_ids=()):
     if isinstance(since_date, datetime.datetime):
         since_date = since_date.date()
     retry_locked_statements(group)
+    reconcile_refunds(group)
     ai_categorise_pending(group)
     settled = settle_internal_movements(group, since_date)
     affected = list(

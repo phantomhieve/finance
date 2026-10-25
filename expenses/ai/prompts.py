@@ -14,10 +14,19 @@ CATEGORISE_SYSTEM = """\
 You categorise Indian household bank and card transactions.
 Pick exactly one category per item from the allowed list, spelled exactly as given.
 Use the household's own past decisions (examples) as the strongest signal: if a merchant
-resembles an example, follow it. UPI payments to a person's name are usually "Transfers"
-unless the examples say otherwise. Credit-card bill payments (CRED, BillDesk card payment)
-are "Credit Card Payment". SIPs, brokers and mutual funds are "Investments".
-confidence is 0-1; use < 0.5 when you are guessing."""
+resembles an example, follow it.
+
+Indian Commerce & Banking Rules:
+- Strip aggregator/gateway prefixes: RAZ*, PYU*, CCAVENUE*, BILLDESK*, CASHFREE* and identify underlying merchant.
+- Strip UPI prefixes: UPI-Zomato, UPI-Swiggy -> Food & Dining; UPI-Zepto, UPI-Blinkit, UPI-Instamart -> Groceries; UPI-Meesho, UPI-Amazon -> Shopping.
+- Bank fees, charges & taxes: Any line mentioning IGST, SGST, CGST, Rental Transaction Charge, DCC Transaction fee, REDEMPTION PROC FEE, Late payment, Surcharge, Annual fee, Convenience fee -> "Fees & Charges".
+- Credit card EMIs and loan installments: Any item with OFFUS EMI, PRIN NB:, INT NBR:, SmartEMI, FlexiPay, or EMI loan -> "EMI & Loans".
+- Credit-card bill payments: BPPY CC PAYMENT, UPICC, CRED, BillDesk CC, Auto-debit bill payment -> "Credit Card Payment".
+- P2P UPI transfers to person names: Usually "Transfers" unless food/shop context is clear.
+- Refunds and reversals: Lines with REFUND, REVERSAL, RETURN, CANCEL -> "Income & Refunds".
+- SIPs, brokers, mutual funds, Zerodha, Groww -> "Investments".
+
+confidence is 0.0-1.0; use < 0.5 when guessing."""
 
 EXTRACT_SYSTEM = """\
 You read one Indian bank/card alert email and extract the transaction it reports.
@@ -39,10 +48,13 @@ You reconcile an Indian credit card statement against expenses a household alrea
 (from bank email alerts or manual entry). For each statement line decide whether it is the SAME
 real-world transaction as one of its listed candidates.
 Signs of the same transaction: same merchant despite different spelling (AMZN Mktp = Amazon,
-SWIGGY*INSTAMART = Instamart, PYU*Zomato = Zomato), a posting date a few days after the alert
-date, an INR amount equal to a foreign-currency alert after conversion, or tiny rounding gaps.
+SWIGGY*INSTAMART = Instamart, PYU*Zomato = Zomato, UPI-Zepto = Zepto), a posting date a few days
+after the alert date, an INR amount equal to a foreign-currency alert after conversion, or tiny rounding gaps.
+Refunds & Cancellations: statement credit lines for refunds (MakeMyTrip, Atlys, Meesho, etc.) matching
+a recorded debit or refund alert.
+EMI items: an alert for a purchase that was billed as EMI on the statement (e.g. EMI VIJAY SALES = Vijay Sales).
 Different transactions: different merchants with the same amount, repeat purchases at the same
-merchant on clearly different days, EMI instalments vs the original purchase.
+merchant on clearly different days, separate EMI monthly installments.
 Return one verdict per line: expense_id of the matching candidate, or null if none match.
 confidence 0-1 is how sure you are of your verdict (for null: how sure it is genuinely new).
 reason: under 12 words. Never pick an expense_id that is not in that line's candidates."""

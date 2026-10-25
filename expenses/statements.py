@@ -27,8 +27,8 @@ from django.db.models import Q
 from . import ai, crypto
 from .models import CardStatement, Expense, PaymentSource, StatementLine
 from .parsing import (
-    ParsedLine, ParsedTransaction, normalize_merchant, parse_date, parse_statement_lines,
-    parse_statement_summary, to_decimal,
+    ParsedLine, ParsedTransaction, normalize_merchant, parse_date, parse_emi_details,
+    parse_statement_lines, parse_statement_summary, to_decimal,
 )
 
 logger = logging.getLogger(__name__)
@@ -84,6 +84,9 @@ def find_card(group, institution, last4):
         if card:
             return card
     if institution:
+        card = qs.filter(institution=institution, last4='').first()
+        if card:
+            return card
         cards = list(qs.filter(institution=institution))
         if len(cards) == 1:
             return cards[0]
@@ -94,8 +97,11 @@ def get_or_create_card(group, institution, last4, owner=None):
     card = find_card(group, institution, last4)
     if card:
         return card
-    return PaymentSource.objects.create(group=group, kind='CREDIT_CARD', institution=institution or '',
-                                        last4=last4 or '', owner=owner, is_auto=True)
+    card, _ = PaymentSource.objects.get_or_create(
+        group=group, kind='CREDIT_CARD', institution=institution or '', last4=last4 or '',
+        defaults={'owner': owner, 'is_auto': True},
+    )
+    return card
 
 
 def card_family_ids(card):
@@ -195,12 +201,24 @@ def _mark_duplicate(statement, original):
 def _absorb_shells(statement):
     """Retire totals-only / unreadable copies of this cycle so it is reminded and counted once."""
     end = statement.period_end or statement.statement_date
+    if not end and statement.lines.exists():
+        dates = list(statement.lines.values_list('txn_date', flat=True))
+        if dates:
+            statement.period_start = min(dates)
+            statement.period_end = max(dates)
+            statement.statement_date = statement.period_end
+            statement.save(update_fields=['statement_date', 'period_start', 'period_end'])
+            end = statement.period_end
     if not end:
         return
     shells = (CardStatement.objects
               .filter(group_id=statement.group_id, status__in=('BODY_ONLY', 'FAILED'),
                       payment_source_id__in=card_family_ids(statement.payment_source))
-              .filter(Q(statement_date=end) | Q(period_end=end) | Q(due_date=statement.due_date, due_date__isnull=False))
+              .filter(
+                  Q(statement_date=end) | Q(period_end=end) |
+                  Q(due_date=statement.due_date, due_date__isnull=False) |
+                  Q(due_date__gte=end, due_date__lte=end + datetime.timedelta(days=35))
+              )
               .exclude(pk=statement.pk))
     for shell in shells:
         if shell.is_paid and not statement.is_paid:
@@ -217,19 +235,43 @@ def read_pdf(statement, data, password=''):
         if duplicate:
             _mark_duplicate(statement, duplicate)
             return statement
-    password = password or statement.payment_source.statement_password
-    try:
-        text = pdf_text(data, password)
-    except PdfPasswordRequired:
-        statement.pdf_blob = crypto.encrypt_bytes(data)
-        statement.status = 'NEEDS_PASSWORD'
-        statement.save()
-        return statement
-    except Exception:
-        logger.exception('Could not read statement PDF %s', statement.pk)
-        statement.status = 'FAILED'
-        statement.save()
-        return statement
+
+    passwords = []
+    if password:
+        passwords.append(password)
+    if statement.payment_source.statement_password:
+        passwords.append(statement.payment_source.statement_password)
+    for fid in card_family_ids(statement.payment_source):
+        if fid == statement.payment_source_id:
+            continue
+        fc = PaymentSource.objects.filter(pk=fid).first()
+        if fc and fc.statement_password and fc.statement_password not in passwords:
+            passwords.append(fc.statement_password)
+
+    text = None
+    if passwords:
+        for pw in passwords:
+            try:
+                text = pdf_text(data, pw)
+                break
+            except PdfPasswordRequired:
+                continue
+            except Exception:
+                break
+
+    if text is None:
+        try:
+            text = pdf_text(data, '')
+        except PdfPasswordRequired:
+            statement.pdf_blob = crypto.encrypt_bytes(data)
+            statement.status = 'NEEDS_PASSWORD'
+            statement.save()
+            return statement
+        except Exception:
+            logger.exception('Could not read statement PDF %s', statement.pk)
+            statement.status = 'FAILED'
+            statement.save()
+            return statement
 
     summary = parse_statement_summary('', '', text)
     _apply_summary(statement, summary)
@@ -274,15 +316,13 @@ def read_pdf(statement, data, password=''):
 
 
 def retry_locked_statements(group, card=None):
-    """Re-open password-locked PDFs once a password has been saved for their card."""
+    """Re-open password-locked PDFs once a password has been saved for their card or family."""
     qs = (CardStatement.objects.filter(group=group, status='NEEDS_PASSWORD', pdf_blob__isnull=False)
           .select_related('payment_source'))
     if card is not None:
         qs = qs.filter(payment_source=card)
     opened = 0
     for st in qs:
-        if not st.payment_source.statement_password:
-            continue
         read_pdf(st, crypto.decrypt_bytes(st.pdf_blob))
         opened += st.status != 'NEEDS_PASSWORD'
     return opened
@@ -399,11 +439,15 @@ def _add_line(statement, line, cats, method='', confidence=None, reason=''):
 
     card = statement.payment_source
     direction = 'CREDIT' if line.is_credit else 'DEBIT'
+    emi = parse_emi_details(line.description)
     display, key = normalize_merchant(line.description)
+    merchant = emi['merchant'] if (emi['is_emi'] and emi['merchant']) else (display or line.description)
     parsed = ParsedTransaction(
-        amount=line.amount, direction=direction, txn_date=line.txn_date, merchant=display or line.description,
+        amount=line.amount, direction=direction, txn_date=line.txn_date, merchant=merchant,
         merchant_raw=line.description, merchant_key=key, instrument='CREDIT_CARD', channel='CARD',
         institution=card.institution, last4=card.last4,
+        is_emi=emi['is_emi'], emi_reference=emi['reference'], emi_installment_num=emi['installment_num'],
+        emi_total_installments=emi['total_installments'], emi_component=emi['component'],
     )
     expense, created = build_expense(
         statement.group, parsed, source='STATEMENT', member=card.owner, statement=statement,
@@ -486,6 +530,38 @@ def reconcile(statement):
                 line.match_method, line.needs_review, line.suggested_expense = 'SKIP', False, None
                 line.save(update_fields=_LINE_FIELDS)
             continue
+
+        if line.is_credit:
+            # Check if this refund credit matches an existing CREDIT expense (e.g. from refund email)
+            c_match, c_conf = _rule_match(line, free('CREDIT'), family)
+            if c_match:
+                used.add(c_match.pk)
+                _link(line, c_match, 'RULE', c_conf)
+                d_cand = _find_refund_debit(line, free('DEBIT'), family)
+                if d_cand:
+                    c_match.refund_of = d_cand
+                    c_match.save(update_fields=['refund_of'])
+                    d_cand.refunded_amount = (d_cand.refunded_amount or Decimal('0.00')) + line.amount
+                    d_cand.refund_date = line.txn_date
+                    d_cand.save(update_fields=['refunded_amount', 'refund_date'])
+                continue
+
+            # Directly look for the matching purchase (DEBIT)
+            d_match = _find_refund_debit(line, free('DEBIT'), family)
+            if d_match:
+                d_match.refunded_amount = (d_match.refunded_amount or Decimal('0.00')) + line.amount
+                d_match.refund_date = line.txn_date
+                d_match.save(update_fields=['refunded_amount', 'refund_date'])
+                line.matched_expense = d_match
+                line.was_added = False
+                line.match_method = 'RULE'
+                line.match_confidence = 0.95
+                line.match_reason = f'Refund for {d_match.merchant} on {d_match.txn_date}'[:255]
+                line.needs_review = False
+                line.suggested_expense = None
+                line.save(update_fields=_LINE_FIELDS)
+                continue
+
         direction = 'CREDIT' if line.is_credit else 'DEBIT'
         match, confidence = _rule_match(line, free(direction), family)
         if match:
@@ -526,6 +602,93 @@ def reconcile(statement):
     return statement.matched_count, added
 
 
+def _find_refund_debit(line, debits, family):
+    """Find the original DEBIT purchase that corresponds to this credit/refund line."""
+    line_key = _line_key(line)
+    norm_disp, norm_key = normalize_merchant(line.description)
+    clean_desc = (line.description or '').lower()
+
+    # Pass 1: exact amount and matching merchant
+    for d in debits:
+        if d.amount != line.amount:
+            continue
+        sim = _similarity(line_key, d)
+        d_m = (d.merchant or '').lower()
+        if (
+            sim >= 0.6
+            or (norm_key and norm_key in (d.merchant_key or ''))
+            or (d.merchant_key and d.merchant_key in norm_key)
+            or (d_m and d_m in clean_desc)
+            or (norm_disp and norm_disp.lower() in d_m)
+        ):
+            return d
+
+    # Pass 2: partial refund (debit amount >= line amount) with strong merchant match within 60 days
+    for d in debits:
+        if d.amount < line.amount:
+            continue
+        sim = _similarity(line_key, d)
+        d_m = (d.merchant or '').lower()
+        if (
+            (sim >= 0.85 or (norm_key and norm_key == d.merchant_key) or (d_m and d_m in clean_desc))
+            and abs((line.txn_date - d.txn_date).days) <= 60
+        ):
+            return d
+
+    return None
+
+
+def reconcile_refunds(group):
+    """Pair unmatched CREDIT expenses (refunds/returns) with their original DEBIT purchases."""
+    credits = Expense.objects.filter(
+        group=group,
+        is_deleted=False,
+        direction='CREDIT',
+        refund_of__isnull=True,
+    ).exclude(category__name='Investments')
+
+    linked = 0
+    for c in credits:
+        if _is_payment(c.merchant_raw or c.merchant or c.email_subject):
+            continue
+        candidates = Expense.objects.filter(
+            group=group,
+            is_deleted=False,
+            direction='DEBIT',
+            txn_date__gte=c.txn_date - datetime.timedelta(days=90),
+            txn_date__lte=c.txn_date + datetime.timedelta(days=30),
+        )
+        if c.payment_source_id:
+            family = card_family_ids(c.payment_source)
+            candidates = candidates.filter(Q(payment_source_id__in=family) | Q(payment_source__isnull=True))
+
+        c_key = c.merchant_key or normalize_merchant(c.merchant or c.merchant_raw)[1]
+        c_m = (c.merchant or '').lower()
+        best_debit = None
+        for d in candidates:
+            d_key = d.merchant_key or normalize_merchant(d.merchant or d.merchant_raw)[1]
+            sim = 1.0 if (c_key and d_key and (c_key == d_key or c_key in d_key or d_key in c_key)) else 0.0
+            d_m = (d.merchant or '').lower()
+            if sim < 0.6 and c_m and d_m and (c_m in d_m or d_m in c_m):
+                sim = 0.8
+            if sim >= 0.6:
+                if d.amount == c.amount:
+                    best_debit = d
+                    break
+                elif d.amount >= c.amount and not best_debit:
+                    best_debit = d
+
+        if best_debit:
+            c.refund_of = best_debit
+            c.save(update_fields=['refund_of'])
+            best_debit.refunded_amount = (best_debit.refunded_amount or Decimal('0.00')) + c.amount
+            best_debit.refund_date = c.txn_date
+            best_debit.save(update_fields=['refunded_amount', 'refund_date'])
+            linked += 1
+
+    return linked
+
+
 @transaction.atomic
 def resolve_line(line, action):
     """Human decision on a parked line: 'link' to the suggested expense, or 'add' it as new."""
@@ -550,15 +713,19 @@ def resolve_line(line, action):
 _PAYMENT_DESC = re.compile(
     r'\b(payment\s+received|thank\s+you(?:\s+for\s+the\s+payment)?|bbps\s+payment|'
     r'autopay|auto\s+debit|autodebit|neft\s+payment|imps\s+payment|upi\s+payment|'
-    r'net\s?banking\s+payment|cheque\s+payment|chq\s+payment|billdesk|cred\s+payment)\b|'
-    r'payment\s*-\s*',
+    r'net\s?banking\s+payment|cheque\s+payment|chq\s+payment|billdesk|cred\s+payment|'
+    r'bppy\s+(?:cc\s+)?payment|bppy|billpay|upicc-\d{2}-\d{2}-\d{4}|cc\s+payment|'
+    r'credit\s+card\s+payment|cred\s+club|standing\s+instruction)\b|'
+    r'payment\s*-\s*|'
+    r'payment\s+ref|'
+    r'cr\s*-\s*payment',
     re.I,
 )
 
 
 def _is_payment(description):
     d = description.lower()
-    if 'refund' in d or 'reversal' in d or 'chargeback' in d:
+    if 'refund' in d or 'reversal' in d or 'chargeback' in d or 'cashback' in d or 'reward' in d or 'credit adj' in d:
         return False
     return bool(_PAYMENT_DESC.search(d))
 
