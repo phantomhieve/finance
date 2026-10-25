@@ -496,14 +496,33 @@ def statements_list(request):
 
 @_require_expenses
 def statement_detail(request, pk):
+    from decimal import Decimal
     group = _group(request)
     statement = get_object_or_404(CardStatement.objects.select_related('payment_source', 'duplicate_of'), pk=pk, group=group)
+    lines = list(statement.lines.select_related(
+        'matched_expense', 'matched_expense__category',
+        'suggested_expense', 'suggested_expense__category',
+    ))
+    debits = [l for l in lines if not l.is_credit]
+    payments = [l for l in lines if l.is_credit and l.match_method == 'SKIP']
+    refunds = [l for l in lines if l.is_credit and l.match_method != 'SKIP']
+    total_debits = sum((l.amount for l in debits), Decimal('0.00'))
+    total_payments = sum((l.amount for l in payments), Decimal('0.00'))
+    total_refunds = sum((l.amount for l in refunds), Decimal('0.00'))
+    net_new_spends = total_debits - total_refunds
+    math = {
+        'total_debits': total_debits,
+        'debit_count': len(debits),
+        'total_payments': total_payments,
+        'payment_count': len(payments),
+        'total_refunds': total_refunds,
+        'refund_count': len(refunds),
+        'net_new_spends': net_new_spends,
+    }
     return render(request, 'expenses/statement_detail.html', {
         'statement': statement,
-        'lines': list(statement.lines.select_related(
-            'matched_expense', 'matched_expense__category',
-            'suggested_expense', 'suggested_expense__category',
-        )),
+        'lines': lines,
+        'math': math,
         'today': timezone.localdate(),
     })
 

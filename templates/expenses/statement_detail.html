@@ -50,6 +50,40 @@
     </div>
   </div>
 
+  {% if statement.status == 'PARSED' and math %}
+  <div class="card bg-base-200/70 border border-base-content/10 shadow-sm animate-up">
+    <div class="card-body p-4">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-sm">calculate</span>Statement Bill Reconciliation
+        </h2>
+        <span class="text-xs font-extrabold tabular-nums text-primary">Statement Total: {{ statement.total_due|inr }}</span>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+        <div class="p-2.5 rounded-xl bg-base-300/50">
+          <div class="opacity-50 text-[10px] uppercase font-bold">New Purchases ({{ math.debit_count }})</div>
+          <div class="font-bold tabular-nums text-sm mt-0.5">{{ math.total_debits|inr }}</div>
+        </div>
+        <div class="p-2.5 rounded-xl bg-base-300/50">
+          <div class="opacity-50 text-[10px] uppercase font-bold text-emerald-400">Refunds ({{ math.refund_count }})</div>
+          <div class="font-bold tabular-nums text-sm mt-0.5 text-emerald-400">-{{ math.total_refunds|inr }}</div>
+        </div>
+        <div class="p-2.5 rounded-xl bg-base-300/50">
+          <div class="opacity-50 text-[10px] uppercase font-bold text-primary">Net Spends Due</div>
+          <div class="font-bold tabular-nums text-sm mt-0.5 text-primary">{{ math.net_new_spends|inr }}</div>
+        </div>
+        <div class="p-2.5 rounded-xl bg-base-300/50">
+          <div class="opacity-50 text-[10px] uppercase font-bold">Bill Payments ({{ math.payment_count }})</div>
+          <div class="font-bold tabular-nums text-sm mt-0.5 opacity-70">{{ math.total_payments|inr }}</div>
+        </div>
+      </div>
+      <p class="text-[11px] opacity-50 mt-2">
+        * Bill payments cleared the previous billing cycle balance. Total Due equals New Purchases minus Refunds.
+      </p>
+    </div>
+  </div>
+  {% endif %}
+
   {% if statement.status == 'NEEDS_PASSWORD' %}
   <div class="card bg-base-200 shadow-sm animate-up">
     <div class="card-body p-4">
@@ -102,22 +136,26 @@
       {% for ln in lines %}
       <div class="table-card flex flex-col gap-2 !py-2.5 {% if ln.needs_review %}border border-warning/40 bg-warning/5{% endif %}">
         <div class="flex items-center gap-3">
-          <span class="material-symbols-outlined text-lg shrink-0 {% if ln.needs_review %}text-warning{% elif ln.was_added %}text-info{% elif ln.matched_expense %}text-success{% else %}opacity-30{% endif %}"
-                title="{% if ln.needs_review %}Possible duplicate — needs review{% elif ln.was_added %}No email alert — added from statement{% elif ln.matched_expense %}Matched an alert{% else %}Credit / not tracked{% endif %}">
-            {% if ln.needs_review %}help{% elif ln.was_added %}add_circle{% elif ln.matched_expense %}check_circle{% else %}remove{% endif %}
+          <span class="material-symbols-outlined text-lg shrink-0 {% if ln.needs_review %}text-warning{% elif ln.match_method == 'SKIP' %}opacity-40{% elif ln.was_added %}text-info{% elif ln.matched_expense %}text-success{% else %}opacity-30{% endif %}"
+                title="{% if ln.needs_review %}Possible duplicate — needs review{% elif ln.match_method == 'SKIP' %}Bill payment / skipped{% elif ln.was_added %}No email alert — added from statement{% elif ln.matched_expense %}Matched an alert{% else %}Credit / not tracked{% endif %}">
+            {% if ln.needs_review %}help{% elif ln.match_method == 'SKIP' %}payments{% elif ln.was_added %}add_circle{% elif ln.matched_expense %}check_circle{% else %}remove{% endif %}
           </span>
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-1.5 flex-wrap">
               <p class="text-sm font-medium truncate">{{ ln.description }}</p>
-              {% if ln.match_method == 'RULE' %}<span class="badge badge-xs badge-success/20 text-success">Rule match</span>{% elif ln.match_method == 'AI' %}<span class="badge badge-xs badge-info/20 text-info">AI match</span>{% elif ln.match_method == 'USER' %}<span class="badge badge-xs badge-primary/20 text-primary">Confirmed</span>{% endif %}
+              {% if ln.match_method == 'RULE' %}<span class="badge badge-xs badge-success/20 text-success">Rule match</span>
+              {% elif ln.match_method == 'AI' %}<span class="badge badge-xs badge-info/20 text-info">AI match</span>
+              {% elif ln.match_method == 'USER' %}<span class="badge badge-xs badge-primary/20 text-primary">Confirmed</span>
+              {% elif ln.match_method == 'SKIP' %}<span class="badge badge-xs bg-base-300 text-base-content/60 border border-base-content/10">Bill payment</span>{% endif %}
             </div>
             <p class="text-[11px] opacity-50">
               {{ ln.txn_date|date:"j M" }}
               {% if ln.matched_expense and ln.matched_expense.category %} · {{ ln.matched_expense.category.name }}{% endif %}
-              {% if ln.was_added %} · <span class="text-info font-medium">added</span>{% endif %}
+              {% if ln.match_method == 'SKIP' %} · <span class="opacity-75">Paid previous bill</span>
+              {% elif ln.was_added %} · <span class="text-info font-medium">added</span>{% endif %}
             </p>
           </div>
-          <span class="text-sm font-bold tabular-nums shrink-0 {% if ln.is_credit %}text-success{% endif %}">{% if ln.is_credit %}+{% endif %}{{ ln.amount|inr }}</span>
+          <span class="text-sm font-bold tabular-nums shrink-0 {% if ln.is_credit %}text-emerald-400{% endif %}">{% if ln.is_credit %}+{% endif %}{{ ln.amount|inr }}</span>
         </div>
 
         {% if ln.needs_review and ln.suggested_expense %}
