@@ -125,13 +125,20 @@
           </div>
           {% endif %}
           <div class="stat-card stat-card-secondary">
-            <div class="text-[10px] uppercase tracking-wider opacity-60">Upcoming Dues</div>
+            <div class="text-[10px] uppercase tracking-wider opacity-60">Upcoming Card Bills</div>
             <div class="text-base font-bold mt-0.5 tabular-nums text-secondary">
-              {% if dues %}{{ dues.0.total_due|default:dues.0.min_due|default:0|inr_short }}{% else %}₹0{% endif %}
+              {% if total_dues_amount %}{{ total_dues_amount|inr_short }}{% elif dues %}{{ dues.0.total_due|default:dues.0.min_due|default:0|inr_short }}{% else %}₹0{% endif %}
             </div>
+            {% if dues %}
+            <div class="text-[10px] opacity-60 truncate mt-0.5">
+              {{ dues|length }} card{{ dues|length|pluralize }} due
+            </div>
+            {% endif %}
           </div>
         </div>
-        <p class="text-[10px] opacity-40 text-center lg:text-left mt-0.5">Transfers, card bill payments &amp; refunds are excluded from spend.</p>
+        <p class="text-[10px] opacity-50 text-center lg:text-left mt-0.5">
+          Card bills span cycles across months. Transactions charged before the 1st (like Netflix on 23 Sep) are recorded under their purchase date in <a href="?m={{ prev_month }}" class="underline hover:text-primary font-semibold">{{ summary.prev_label }}</a>.
+        </p>
       </div>
 
     </div>
