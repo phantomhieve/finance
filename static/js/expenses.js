@@ -82,6 +82,7 @@ var Expenses = (function () {
       } else {
         toggle('expEmiBox', false);
       }
+      if ($('expIsEmi')) $('expIsEmi').checked = !!current.is_emi;
 
       setText('expMetaSource', current.source);
       setText('expMetaCat', current.category_source);
@@ -100,7 +101,10 @@ var Expenses = (function () {
       $('expDate').value = new Date().toLocaleDateString('en-CA');
       var self = document.querySelector('#expMember option[data-self]');
       if (self) $('expMember').value = self.value;
+      if ($('expIsEmi')) $('expIsEmi').checked = false;
       toggle('expFlagBox', false, 'flex');
+      toggle('expRefundBox', false);
+      toggle('expEmiBox', false);
       toggle('expMeta', false);
       toggle('expDeleteBtn', false, 'inline-flex');
     }
@@ -339,11 +343,30 @@ var Expenses = (function () {
     });
   }
 
+  function toggleEmi(enable) {
+    var cb = $('expIsEmi');
+    if (cb) cb.checked = !!enable;
+    toggle('expEmiBox', !!enable, 'flex');
+    if (!enable) {
+      var cat = $('expCategory');
+      if (cat && cat.selectedOptions && cat.selectedOptions[0] && cat.selectedOptions[0].text.indexOf('EMI') !== -1) {
+        cat.value = '';
+      }
+    }
+  }
+
   document.addEventListener('DOMContentLoaded', function () {
     var merchant = $('expMerchant');
     var category = $('expCategory');
     if (merchant) merchant.addEventListener('input', syncRemember);
     if (category) category.addEventListener('change', syncRemember);
+
+    var isEmi = $('expIsEmi');
+    if (isEmi) {
+      isEmi.addEventListener('change', function () {
+        toggleEmi(this.checked);
+      });
+    }
 
     if (typeof Chart !== 'undefined') {
       var pace = readJson('expense-chart');
@@ -358,5 +381,5 @@ var Expenses = (function () {
     if (params.get('add') === '1') open();
   });
 
-  return { open: open, remove: remove };
+  return { open: open, remove: remove, toggleEmi: toggleEmi };
 })();

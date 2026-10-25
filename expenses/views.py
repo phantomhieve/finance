@@ -228,6 +228,11 @@ def _save_expense(request, form, previous_category=None, creating=False):
         obj.member = obj.member or request.user
     if 'merchant' in form.changed_data or creating:
         manual_merchant(obj)
+    if 'is_emi' in form.changed_data:
+        if obj.is_emi and not obj.emi_component:
+            obj.emi_component = 'PURCHASE'
+        elif not obj.is_emi:
+            obj.emi_component = ''
     new_category = obj.category
     obj.save()
     if new_category and (creating or new_category.pk != previous_category):
