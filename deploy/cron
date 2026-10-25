@@ -26,6 +26,9 @@ CRON_TZ=Asia/Kolkata
 # Expenses: pull bank / card alert emails from connected Gmail inboxes — hourly at :17
 17 * * * *  __APP_OWNER__  cd __APP_DIR__ && set -a && . ./.env && set +a && venv/bin/python manage.py sync_expenses >> __CRON_LOG__ 2>&1
 
+# Expenses: categorize yesterday's transactions with AI — 2:00 AM IST daily
+0 2 * * *  __APP_OWNER__  cd __APP_DIR__ && set -a && . ./.env && set +a && venv/bin/python manage.py ai_categorize_day >> __CRON_LOG__ 2>&1
+
 # Expenses: credit card bill reminders — 9:00 AM IST daily
 0 9 * * *  __APP_OWNER__  cd __APP_DIR__ && set -a && . ./.env && set +a && venv/bin/python manage.py expense_reminders >> __CRON_LOG__ 2>&1
 
