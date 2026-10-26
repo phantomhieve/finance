@@ -162,9 +162,26 @@ def settle_internal_movements(group: AccountGroup, since: datetime.date) -> list
         expense.save(update_fields=['category', 'category_source', 'category_confidence', 'updated_at'])
 
     for debit in debits:
-        if bill and any(_statement_paid_by(st, debit, window) for st in statements):
+        matching_st = next((st for st in statements if _statement_paid_by(st, debit, window)), None)
+        if bill and matching_st:
             refile(debit, bill)
             settled.append(debit.pk)
+            card_credit = next(
+                (
+                    c for c in credits
+                    if c.pk not in used_credits
+                    and c.amount == debit.amount
+                    and c.payment_source_id == matching_st.payment_source_id
+                    and abs((c.txn_date - debit.txn_date).days) <= 3
+                ),
+                None,
+            )
+            if card_credit:
+                used_credits.add(card_credit.pk)
+                refile(card_credit, bill)
+                if not card_credit.merchant or card_credit.merchant == 'Unknown merchant':
+                    card_credit.merchant = 'Credit Card Bill Payment'
+                    card_credit.save(update_fields=['merchant'])
             continue
         if not transfer or not debit.payment_source_id:
             continue

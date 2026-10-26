@@ -185,10 +185,23 @@ def month_summary(
 
     gross_total = qs.filter(spend_q()).aggregate(t=Sum('amount'))['t'] or ZERO
     debit_refunds = spend_qs.filter(refunded_amount__gt=ZERO).aggregate(t=Sum('refunded_amount'))['t'] or ZERO
-    credit_refunds = month_all.filter(direction='CREDIT', refund_of__isnull=True).aggregate(t=Sum('amount'))['t'] or ZERO
+    credit_refunds = (
+        month_all.filter(direction='CREDIT', refund_of__isnull=True)
+        .exclude(category__kind='TRANSFER')
+        .exclude(category__name__in=('Credit Card Payment', 'Transfers'))
+        .aggregate(t=Sum('amount'))['t'] or ZERO
+    )
     refunded_total = debit_refunds + credit_refunds
     total = max(ZERO, total - credit_refunds)
-    refund_count = month_all.filter(Q(refunded_amount__gt=ZERO) | Q(refund_date__isnull=False) | Q(direction='CREDIT')).count()
+    refund_count = month_all.filter(
+        Q(refunded_amount__gt=ZERO)
+        | Q(refund_date__isnull=False)
+        | (
+            Q(direction='CREDIT')
+            & ~Q(category__kind='TRANSFER')
+            & ~Q(category__name__in=('Credit Card Payment', 'Transfers'))
+        )
+    ).count()
 
     # Credit card EMI metrics
     emi_qs = month_all.filter(is_emi=True)

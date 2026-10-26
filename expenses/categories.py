@@ -94,7 +94,13 @@ def categorise_expense(expense: Expense, cats: dict[str, ExpenseCategory] | None
     if not name and expense.channel == 'ATM':
         name = 'Cash Withdrawal'
     if not name and expense.direction == 'CREDIT':
-        name = 'Income & Refunds'
+        combined = f'{expense.merchant} {expense.merchant_raw} {expense.email_subject} {expense.notes}'.lower()
+        if any(kw in combined for kw in ('credit card bill', 'card payment', 'bill payment', 'payment received', 'auto-debit', 'autopay', 'vpa club@axisb', 'cred')):
+            name = 'Credit Card Payment'
+            if not expense.merchant or expense.merchant == 'Unknown merchant':
+                expense.merchant = 'Credit Card Bill Payment'
+        else:
+            name = 'Income & Refunds'
 
     if name and name in cats:
         expense.category = cats[name]
