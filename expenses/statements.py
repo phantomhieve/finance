@@ -796,12 +796,101 @@ def due_reminders(group, today=None):
     return out
 
 
+def auto_track_statement_payments(group, since_days=60):
+    """Automatically track and reconcile credit card bill payments against statements.
+
+    Handles:
+    - Full payments: automatically marks statement as paid (is_paid=True).
+    - Multi-part / partial payments: tracks paid_amount and remaining due.
+    """
+    from .models import Expense
+    cutoff = datetime.date.today() - datetime.timedelta(days=since_days)
+    statements = list(
+        CardStatement.objects.filter(
+            group=group,
+            created_at__date__gte=cutoff,
+            total_due__isnull=False,
+            total_due__gt=0,
+        )
+        .exclude(status='DUPLICATE')
+        .select_related('payment_source')
+    )
+    if not statements:
+        return
+
+    for st in statements:
+        card = st.payment_source
+        if not card:
+            continue
+        start_date = st.statement_date or (st.due_date - datetime.timedelta(days=25) if st.due_date else None)
+        end_date = (st.due_date + datetime.timedelta(days=15)) if st.due_date else (start_date + datetime.timedelta(days=45) if start_date else None)
+        if not start_date or not end_date:
+            continue
+
+        # Look for credit transactions on this credit card (payment receipts)
+        card_credits = list(
+            Expense.objects.filter(
+                group=group,
+                payment_source=card,
+                direction='CREDIT',
+                txn_date__gte=start_date,
+                txn_date__lte=end_date,
+                is_deleted=False,
+            ).exclude(refund_of__isnull=False)
+        )
+
+        for c in card_credits:
+            if not c.merchant or c.merchant in ('Unknown merchant', 'Unknown'):
+                c.merchant = 'Credit Card Bill Payment'
+                c.save(update_fields=['merchant'])
+
+        total_paid = sum((c.amount for c in card_credits), Decimal('0.00'))
+
+        # Also check for debits explicitly referencing this card's last4 under Credit Card Payment
+        if card.last4:
+            debit_payments = list(
+                Expense.objects.filter(
+                    group=group,
+                    direction='DEBIT',
+                    category__name='Credit Card Payment',
+                    merchant_raw__icontains=card.last4,
+                    txn_date__gte=start_date,
+                    txn_date__lte=end_date,
+                    is_deleted=False,
+                )
+            )
+            for d in debit_payments:
+                if not any(abs(c.amount - d.amount) <= Decimal('1.00') for c in card_credits):
+                    total_paid += d.amount
+
+        if total_paid > Decimal('0.00'):
+            target_paid = total_paid >= (st.total_due - Decimal('1.00'))
+            latest_date = max((c.txn_date for c in card_credits), default=None)
+            updates = []
+            if st.paid_amount != total_paid:
+                st.paid_amount = total_paid
+                updates.append('paid_amount')
+            if target_paid and not st.is_paid:
+                st.is_paid = True
+                st.paid_at = latest_date or st.paid_at or datetime.date.today()
+                updates.extend(['is_paid', 'paid_at'])
+            if updates:
+                st.save(update_fields=updates)
+
+
 def upcoming_dues(group, today=None, horizon_days=21):
     today = today or datetime.date.today()
-    return list(
+    auto_track_statement_payments(group)
+    dues = list(
         CardStatement.objects.filter(
             group=group, is_paid=False, due_date__isnull=False,
             due_date__gte=today - datetime.timedelta(days=7),
             due_date__lte=today + datetime.timedelta(days=horizon_days),
         ).exclude(status='DUPLICATE').select_related('payment_source').order_by('due_date')
     )
+    for st in dues:
+        tot = st.total_due or st.min_due or Decimal('0.00')
+        paid = st.paid_amount or Decimal('0.00')
+        st.remaining_due = max(Decimal('0.00'), tot - paid)
+        st.is_partial = paid > Decimal('0.00') and st.remaining_due > Decimal('0.00')
+    return dues

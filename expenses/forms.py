@@ -11,7 +11,11 @@ class ExpenseForm(forms.ModelForm):
 
     class Meta:
         model = Expense
-        fields = ['amount', 'direction', 'txn_date', 'merchant', 'category', 'payment_source', 'member', 'notes', 'is_emi']
+        fields = [
+            'amount', 'direction', 'txn_date', 'merchant', 'category',
+            'payment_source', 'member', 'notes', 'is_emi',
+            'emi_installment_num', 'emi_total_installments',
+        ]
         widgets = {'txn_date': forms.DateInput(attrs={'type': 'date'})}
 
     def __init__(self, *args, group=None, **kwargs):
@@ -19,7 +23,7 @@ class ExpenseForm(forms.ModelForm):
         self.fields['category'].queryset = ExpenseCategory.objects.filter(group=group)
         self.fields['payment_source'].queryset = PaymentSource.objects.filter(group=group)
         self.fields['member'].queryset = group.members.all() if group else self.fields['member'].queryset.none()
-        for name in ('category', 'payment_source', 'member', 'notes', 'is_emi'):
+        for name in ('category', 'payment_source', 'member', 'notes', 'is_emi', 'emi_installment_num', 'emi_total_installments'):
             self.fields[name].required = False
         self.fields['merchant'].required = True
 

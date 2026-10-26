@@ -84,6 +84,22 @@
         <input type="checkbox" name="is_emi" id="expIsEmi" class="toggle toggle-sm toggle-primary cursor-pointer">
       </div>
 
+      <div id="expEmiFields" class="hidden p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 flex-col gap-2">
+        <div class="grid grid-cols-2 gap-2.5">
+          <label class="flex flex-col gap-1">
+            <span class="text-[11px] font-bold uppercase tracking-wider opacity-60">Installment #</span>
+            <input type="number" name="emi_installment_num" id="expEmiInstallmentNum" min="1" max="120"
+                   class="input input-bordered input-sm w-full font-bold tabular-nums" placeholder="e.g. 5" oninput="Expenses.syncEmiPending()">
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-[11px] font-bold uppercase tracking-wider opacity-60">Total Tenure (Months)</span>
+            <input type="number" name="emi_total_installments" id="expEmiTotalInstallments" min="1" max="120"
+                   class="input input-bordered input-sm w-full font-bold tabular-nums" placeholder="e.g. 12" oninput="Expenses.syncEmiPending()">
+          </label>
+        </div>
+        <div class="text-[11px] font-medium" id="expEmiPendingNote"></div>
+      </div>
+
       <label class="flex items-start gap-2.5 cursor-pointer hidden p-2 rounded-lg bg-base-200/50 border border-base-content/10" id="expRememberRow">
         <input type="checkbox" name="remember" id="expRemember" class="checkbox checkbox-sm checkbox-primary mt-0.5 cursor-pointer">
         <span class="text-xs leading-snug opacity-80">Also apply this category to other past and future transactions for <strong id="expRememberName">this merchant</strong></span>

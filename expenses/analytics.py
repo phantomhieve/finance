@@ -189,6 +189,7 @@ def month_summary(
         month_all.filter(direction='CREDIT', refund_of__isnull=True)
         .exclude(category__kind='TRANSFER')
         .exclude(category__name__in=('Credit Card Payment', 'Transfers'))
+        .exclude(payment_source__kind='CREDIT_CARD', merchant__in=('Credit Card Bill Payment', 'Unknown merchant', 'Unknown'))
         .aggregate(t=Sum('amount'))['t'] or ZERO
     )
     refunded_total = debit_refunds + credit_refunds
@@ -200,24 +201,45 @@ def month_summary(
             Q(direction='CREDIT')
             & ~Q(category__kind='TRANSFER')
             & ~Q(category__name__in=('Credit Card Payment', 'Transfers'))
+            & ~Q(payment_source__kind='CREDIT_CARD', merchant__in=('Credit Card Bill Payment', 'Unknown merchant', 'Unknown'))
         )
     ).count()
 
     # Credit card EMI metrics
     emi_qs = month_all.filter(is_emi=True)
-    ongoing_by_loan = defaultdict(lambda: {'ref': '', 'num': None, 'principal': ZERO, 'interest': ZERO, 'total': ZERO, 'payment_source': None, 'items': []})
-    for e in emi_qs.filter(emi_component__in=('PRINCIPAL', 'INTEREST')):
+    ongoing_by_loan = defaultdict(lambda: {
+        'ref': '', 'num': None, 'total_installments': None, 'pending_installments': None,
+        'principal': ZERO, 'interest': ZERO, 'total': ZERO, 'payment_source': None,
+        'item_id': None, 'items': []
+    })
+    for e in emi_qs.exclude(emi_component='PURCHASE'):
         key = (e.emi_reference, e.emi_installment_num)
         rec = ongoing_by_loan[key]
         rec['ref'] = e.emi_reference
         rec['num'] = e.emi_installment_num
+        if e.emi_total_installments and not rec['total_installments']:
+            rec['total_installments'] = e.emi_total_installments
+        if not rec['item_id']:
+            rec['item_id'] = e.pk
         rec['payment_source'] = e.payment_source
-        if e.emi_component == 'PRINCIPAL':
-            rec['principal'] += e.amount
-        else:
+        if e.emi_component == 'INTEREST':
             rec['interest'] += e.amount
+        else:
+            rec['principal'] += e.amount
         rec['total'] += e.amount
         rec['items'].append(e)
+
+    known_tenures = dict(
+        Expense.objects.filter(group=group, is_emi=True, emi_total_installments__isnull=False)
+        .exclude(emi_reference='')
+        .order_by('updated_at')
+        .values_list('emi_reference', 'emi_total_installments')
+    )
+    for rec in ongoing_by_loan.values():
+        if not rec['total_installments'] and rec['ref'] in known_tenures:
+            rec['total_installments'] = known_tenures[rec['ref']]
+        if rec['total_installments'] and rec['num'] is not None:
+            rec['pending_installments'] = max(0, rec['total_installments'] - rec['num'])
 
     ongoing_emis = sorted(ongoing_by_loan.values(), key=lambda x: -x['total'])
     emi_installments_total = sum((x['total'] for x in ongoing_emis), ZERO)

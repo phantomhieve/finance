@@ -75,7 +75,12 @@ var Expenses = (function () {
 
       if (current.is_emi) {
         var emiTxt = 'Active EMI transaction';
-        if (current.emi_installment_num) emiTxt += ' · Installment #' + current.emi_installment_num;
+        if (current.emi_installment_num && current.emi_total_installments) {
+          var pending = Math.max(0, current.emi_total_installments - current.emi_installment_num);
+          emiTxt = 'Installment #' + current.emi_installment_num + ' of ' + current.emi_total_installments + ' · ' + (pending === 0 ? 'Final installment' : (pending + ' pending'));
+        } else if (current.emi_installment_num) {
+          emiTxt = 'Installment #' + current.emi_installment_num + ' · Tenure unknown';
+        }
         if (current.emi_reference) emiTxt += ' (Loan ••' + current.emi_reference + ')';
         setText('expEmiDetail', emiTxt);
         toggle('expEmiBox', true, 'flex');
@@ -83,6 +88,10 @@ var Expenses = (function () {
         toggle('expEmiBox', false);
       }
       if ($('expIsEmi')) $('expIsEmi').checked = !!current.is_emi;
+      if ($('expEmiInstallmentNum')) $('expEmiInstallmentNum').value = current.emi_installment_num || '';
+      if ($('expEmiTotalInstallments')) $('expEmiTotalInstallments').value = current.emi_total_installments || '';
+      toggle('expEmiFields', !!current.is_emi, 'flex');
+      syncEmiPending();
 
       setText('expMetaSource', current.source);
       setText('expMetaCat', current.category_source);
@@ -102,6 +111,10 @@ var Expenses = (function () {
       var self = document.querySelector('#expMember option[data-self]');
       if (self) $('expMember').value = self.value;
       if ($('expIsEmi')) $('expIsEmi').checked = false;
+      if ($('expEmiInstallmentNum')) $('expEmiInstallmentNum').value = '';
+      if ($('expEmiTotalInstallments')) $('expEmiTotalInstallments').value = '';
+      toggle('expEmiFields', false);
+      setText('expEmiPendingNote', '');
       toggle('expFlagBox', false, 'flex');
       toggle('expRefundBox', false);
       toggle('expEmiBox', false);
@@ -347,11 +360,35 @@ var Expenses = (function () {
     var cb = $('expIsEmi');
     if (cb) cb.checked = !!enable;
     toggle('expEmiBox', !!enable, 'flex');
-    if (!enable) {
+    toggle('expEmiFields', !!enable, 'flex');
+    if (enable) {
+      syncEmiPending();
+    } else {
       var cat = $('expCategory');
       if (cat && cat.selectedOptions && cat.selectedOptions[0] && cat.selectedOptions[0].text.indexOf('EMI') !== -1) {
         cat.value = '';
       }
+    }
+  }
+
+  function syncEmiPending() {
+    var numEl = $('expEmiInstallmentNum');
+    var totEl = $('expEmiTotalInstallments');
+    var noteEl = $('expEmiPendingNote');
+    if (!numEl || !totEl || !noteEl) return;
+    var num = parseInt(numEl.value, 10);
+    var tot = parseInt(totEl.value, 10);
+    if (!isNaN(tot) && tot > 0) {
+      if (!isNaN(num) && num > 0) {
+        var pending = Math.max(0, tot - num);
+        noteEl.textContent = pending === 0 ? '✓ Final installment' : (pending + ' installment' + (pending === 1 ? '' : 's') + ' pending');
+        noteEl.className = 'text-[11px] font-semibold ' + (pending === 0 ? 'text-emerald-400' : 'text-purple-300');
+      } else {
+        noteEl.textContent = tot + ' total installments';
+        noteEl.className = 'text-[11px] font-semibold text-purple-300';
+      }
+    } else {
+      noteEl.textContent = '';
     }
   }
 
@@ -381,5 +418,5 @@ var Expenses = (function () {
     if (params.get('add') === '1') open();
   });
 
-  return { open: open, remove: remove, toggleEmi: toggleEmi };
+  return { open: open, remove: remove, toggleEmi: toggleEmi, syncEmiPending: syncEmiPending };
 })();
