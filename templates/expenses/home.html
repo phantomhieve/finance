@@ -342,16 +342,53 @@
         <div class="text-[10px] font-bold uppercase tracking-wider opacity-60 mb-1">Ongoing Monthly Installments</div>
         <div class="flex flex-col gap-1.5 mb-2.5">
           {% for emi in summary.emi_summary.ongoing %}
-          <div class="p-2.5 rounded-xl bg-base-300/60 border border-base-content/5 flex items-center justify-between gap-2">
-            <div class="min-w-0">
-              <div class="text-xs font-bold truncate">Loan ••{{ emi.ref }} <span class="text-[11px] font-semibold text-purple-300">Installment #{{ emi.num }}</span></div>
+          <div class="p-2.5 sm:p-3 rounded-xl bg-base-300/60 border border-base-content/5 flex items-center justify-between gap-2.5 hover:border-purple-500/30 transition-all">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center flex-wrap gap-1.5">
+                <span class="text-xs font-bold">Loan ••{{ emi.ref|default:"EMI" }}</span>
+                {% if emi.total_installments and emi.num %}
+                  <span class="text-[11px] font-semibold text-purple-300">Installment #{{ emi.num }} of {{ emi.total_installments }}</span>
+                  {% if emi.pending_installments > 0 %}
+                    <span class="badge badge-xs bg-purple-500/20 text-purple-300 border border-purple-500/30 font-semibold">{{ emi.pending_installments }} pending</span>
+                  {% else %}
+                    <span class="badge badge-xs bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-semibold">Final installment</span>
+                  {% endif %}
+                  <button type="button" class="text-purple-300/50 hover:text-purple-200 transition-colors cursor-pointer inline-flex items-center"
+                          onclick="openEmiTenureModal('{{ emi.ref }}', '{{ emi.item_id|default:'' }}', '{{ emi.num|default:'' }}', '{{ emi.total_installments }}')"
+                          title="Edit tenure for Loan ••{{ emi.ref }}">
+                    <span class="material-symbols-outlined text-[13px]">edit</span>
+                  </button>
+                {% elif emi.num %}
+                  <span class="text-[11px] font-semibold text-purple-300">Installment #{{ emi.num }}</span>
+                  <button type="button" class="badge badge-xs bg-amber-500/15 text-amber-300 border border-amber-500/30 font-medium hover:bg-amber-500/25 cursor-pointer gap-0.5"
+                          onclick="openEmiTenureModal('{{ emi.ref }}', '{{ emi.item_id|default:'' }}', '{{ emi.num }}', '')"
+                          title="Click to set total installments">
+                    <span class="material-symbols-outlined text-[11px]">pending_actions</span>
+                    <span>Tenure unknown · Tap to set</span>
+                  </button>
+                {% else %}
+                  <button type="button" class="badge badge-xs bg-amber-500/15 text-amber-300 border border-amber-500/30 font-medium hover:bg-amber-500/25 cursor-pointer gap-0.5"
+                          onclick="openEmiTenureModal('{{ emi.ref }}', '{{ emi.item_id|default:'' }}', '', '')"
+                          title="Click to set installments">
+                    <span class="material-symbols-outlined text-[11px]">pending_actions</span>
+                    <span>Installment details missing · Tap to set</span>
+                  </button>
+                {% endif %}
+              </div>
               <div class="text-[10px] opacity-60 truncate mt-0.5">
                 Principal: {{ emi.principal|inr }} + Interest: {{ emi.interest|inr }}
                 {% if emi.payment_source %} · {{ emi.payment_source.short_name }}{% endif %}
               </div>
             </div>
-            <div class="text-right shrink-0">
+            <div class="text-right shrink-0 flex flex-col items-end gap-1">
               <span class="text-xs font-bold tabular-nums text-purple-300">{{ emi.total|inr }}</span>
+              {% if not emi.total_installments %}
+              <button type="button"
+                      class="btn btn-xs btn-outline border-amber-500/40 text-amber-300 hover:bg-amber-500/20 gap-1 h-5 min-h-0 text-[10px] px-1.5"
+                      onclick="openEmiTenureModal('{{ emi.ref }}', '{{ emi.item_id|default:'' }}', '{{ emi.num|default:'' }}', '')">
+                <span class="material-symbols-outlined text-[11px]">edit_calendar</span> Set tenure
+              </button>
+              {% endif %}
             </div>
           </div>
           {% endfor %}
@@ -573,11 +610,137 @@
   <span class="material-symbols-outlined text-2xl">add</span>
 </button>
 
+{# Quick Modal to set/edit EMI tenure and installment count #}
+<dialog id="emiTenureModal" class="modal modal-bottom sm:modal-middle">
+  <div class="modal-box p-5 max-w-md bg-base-100 border border-purple-500/20 shadow-2xl">
+    <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-lg bg-purple-500/15 flex items-center justify-center text-purple-400">
+          <span class="material-symbols-outlined text-lg">event_repeat</span>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold" id="emiModalTitle">Set Loan EMI Tenure</h3>
+          <p class="text-[11px] opacity-60">Track pending installments and completion</p>
+        </div>
+      </div>
+      <button type="button" class="btn btn-ghost btn-xs btn-circle" onclick="closeModal('emiTenureModal')" aria-label="Close">✕</button>
+    </div>
+
+    <form method="post" action="{% url 'expense_set_emi_tenure' %}" id="emiTenureForm" class="flex flex-col gap-3">
+      {% csrf_token %}
+      <input type="hidden" name="ref" id="emiRefInput">
+      <input type="hidden" name="expense_id" id="emiExpenseIdInput">
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+      <div class="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs">
+        <div class="font-semibold text-purple-200" id="emiLoanNameDisplay">Loan Details</div>
+        <div class="text-[11px] opacity-75 mt-0.5">
+          Enter total tenure in months. All past and upcoming statements for this loan will automatically calculate pending installments.
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        <label class="flex flex-col gap-1">
+          <span class="text-xs font-bold uppercase tracking-wider opacity-60">Current Installment #</span>
+          <input type="number" name="installment_num" id="emiCurrentNumInput" min="1" max="120"
+                 class="input input-bordered input-sm w-full font-bold tabular-nums" placeholder="e.g. 5" oninput="calculateEmiPending()">
+        </label>
+        <label class="flex flex-col gap-1">
+          <span class="text-xs font-bold uppercase tracking-wider opacity-60">Total Installments</span>
+          <input type="number" name="total_installments" id="emiTotalNumInput" min="1" max="120" required
+                 class="input input-bordered input-sm w-full font-bold tabular-nums" placeholder="e.g. 12" oninput="calculateEmiPending()">
+        </label>
+      </div>
+
+      {# Quick Preset Buttons #}
+      <div>
+        <div class="text-[10px] font-bold uppercase tracking-wider opacity-50 mb-1.5">Common Tenure Presets</div>
+        <div class="flex flex-wrap gap-1.5">
+          <button type="button" class="btn btn-xs btn-outline hover:btn-primary" onclick="setTenurePreset(3)">3 mo</button>
+          <button type="button" class="btn btn-xs btn-outline hover:btn-primary" onclick="setTenurePreset(6)">6 mo</button>
+          <button type="button" class="btn btn-xs btn-outline hover:btn-primary" onclick="setTenurePreset(9)">9 mo</button>
+          <button type="button" class="btn btn-xs btn-outline hover:btn-primary" onclick="setTenurePreset(12)">12 mo</button>
+          <button type="button" class="btn btn-xs btn-outline hover:btn-primary" onclick="setTenurePreset(18)">18 mo</button>
+          <button type="button" class="btn btn-xs btn-outline hover:btn-primary" onclick="setTenurePreset(24)">24 mo</button>
+          <button type="button" class="btn btn-xs btn-outline hover:btn-primary" onclick="setTenurePreset(36)">36 mo</button>
+        </div>
+      </div>
+
+      {# Live Pending Preview #}
+      <div id="emiPendingPreviewBox" class="p-2.5 rounded-lg bg-base-200/70 border border-base-content/10 flex items-center justify-between text-xs">
+        <span class="opacity-70">Pending installments:</span>
+        <span class="font-bold text-purple-300" id="emiPendingResultText">—</span>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 pt-2">
+        <button type="button" class="btn btn-ghost btn-sm cursor-pointer" onclick="closeModal('emiTenureModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm px-4 cursor-pointer">Save Tenure</button>
+      </div>
+    </form>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
 {% include 'expenses/_expense_modal.html' %}
 {{ payload|json_script:"expense-data" }}
 {{ chart|json_script:"expense-chart" }}
 
 <script>
+function openEmiTenureModal(ref, expenseId, currentNum, totalNum) {
+  var refInput = document.getElementById('emiRefInput');
+  var expIdInput = document.getElementById('emiExpenseIdInput');
+  var currentInput = document.getElementById('emiCurrentNumInput');
+  var totalInput = document.getElementById('emiTotalNumInput');
+  var loanTitle = document.getElementById('emiLoanNameDisplay');
+
+  if (refInput) refInput.value = ref || '';
+  if (expIdInput) expIdInput.value = expenseId || '';
+  if (currentInput) currentInput.value = currentNum || '';
+  if (totalInput) totalInput.value = totalNum || '';
+
+  if (loanTitle) {
+    loanTitle.textContent = ref ? ('Loan ••' + ref) : 'Credit Card EMI';
+  }
+  calculateEmiPending();
+  openModal('emiTenureModal');
+}
+
+function setTenurePreset(months) {
+  var totalInput = document.getElementById('emiTotalNumInput');
+  if (totalInput) {
+    totalInput.value = months;
+    calculateEmiPending();
+  }
+}
+
+function calculateEmiPending() {
+  var currentInput = document.getElementById('emiCurrentNumInput');
+  var totalInput = document.getElementById('emiTotalNumInput');
+  var resultText = document.getElementById('emiPendingResultText');
+  if (!resultText) return;
+
+  var cur = parseInt(currentInput.value, 10);
+  var tot = parseInt(totalInput.value, 10);
+
+  if (!isNaN(tot) && tot > 0) {
+    if (!isNaN(cur) && cur > 0) {
+      var pending = Math.max(0, tot - cur);
+      if (pending === 0) {
+        resultText.textContent = '0 (Final installment)';
+        resultText.className = 'font-bold text-emerald-400';
+      } else {
+        resultText.textContent = pending + ' installment' + (pending === 1 ? '' : 's') + ' pending';
+        resultText.className = 'font-bold text-purple-300';
+      }
+    } else {
+      resultText.textContent = tot + ' total installments';
+      resultText.className = 'font-bold text-purple-300';
+    }
+  } else {
+    resultText.textContent = 'Enter total installments above';
+    resultText.className = 'opacity-50';
+  }
+}
 function toggleMoreCategories() {
   var el = document.getElementById('expMoreCategories');
   var icon = document.getElementById('expMoreCatIcon');

@@ -7,7 +7,7 @@ import secrets
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
-from django.http import Http404, HttpResponseForbidden
+from django.http import Http404, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -92,7 +92,9 @@ def _expense_payload(e):
         'refund_date': e.refund_date.isoformat() if e.refund_date else '',
         'net_amount': str(e.net_amount),
         'is_emi': e.is_emi, 'emi_reference': e.emi_reference,
-        'emi_installment_num': e.emi_installment_num, 'emi_component': e.emi_component,
+        'emi_installment_num': e.emi_installment_num,
+        'emi_total_installments': e.emi_total_installments,
+        'emi_component': e.emi_component,
         'edit_url': reverse('expense_edit', args=[e.pk]), 'delete_url': reverse('expense_delete', args=[e.pk]),
         'review_url': reverse('expense_review', args=[e.pk]),
     }
@@ -238,6 +240,10 @@ def _save_expense(request, form, previous_category=None, creating=False):
             obj.emi_component = ''
     new_category = obj.category
     obj.save()
+    if obj.is_emi and obj.emi_reference and obj.emi_total_installments:
+        Expense.objects.filter(
+            group=obj.group, is_emi=True, emi_reference=obj.emi_reference
+        ).exclude(pk=obj.pk).update(emi_total_installments=obj.emi_total_installments)
     if new_category and (creating or new_category.pk != previous_category):
         learned = learn_category(obj, new_category, request.user, apply_to_similar=remember)
         if learned:
@@ -299,6 +305,47 @@ def expense_review(request, pk):
     expense.save(update_fields=['flag_reviewed', 'updated_at'])
     messages.success(request, 'Marked as fine.' if expense.flag_reviewed else 'Flag reopened.')
     return safe_redirect(request, 'expenses_home')
+
+
+@_require_expenses
+@require_POST
+def expense_set_emi_tenure(request):
+    group = _group(request)
+    ref = request.POST.get('ref', '').strip()
+    expense_id = request.POST.get('expense_id')
+    total_raw = request.POST.get('total_installments', '').strip()
+    num_raw = request.POST.get('installment_num', '').strip()
+    next_url = request.POST.get('next') or reverse('expenses_home')
+
+    total_val = int(total_raw) if total_raw.isdigit() and int(total_raw) > 0 else None
+    num_val = int(num_raw) if num_raw.isdigit() and int(num_raw) > 0 else None
+
+    if total_val is not None:
+        if ref:
+            Expense.objects.filter(group=group, is_emi=True, emi_reference=ref).update(emi_total_installments=total_val)
+            if num_val is not None:
+                if expense_id:
+                    target = Expense.objects.filter(pk=expense_id, group=group).first()
+                    if target:
+                        Expense.objects.filter(
+                            group=group, is_emi=True, emi_reference=ref, txn_date=target.txn_date
+                        ).update(emi_installment_num=num_val)
+                else:
+                    Expense.objects.filter(group=group, is_emi=True, emi_reference=ref).update(emi_installment_num=num_val)
+            messages.success(request, f"Updated tenure for Loan ••{ref} to {total_val} installments.")
+        elif expense_id:
+            exp = get_object_or_404(Expense, pk=expense_id, group=group)
+            exp.emi_total_installments = total_val
+            if num_val is not None:
+                exp.emi_installment_num = num_val
+            exp.save(update_fields=['emi_total_installments', 'emi_installment_num', 'updated_at'])
+            if exp.emi_reference:
+                Expense.objects.filter(group=group, is_emi=True, emi_reference=exp.emi_reference).update(emi_total_installments=total_val)
+            messages.success(request, f"Updated tenure to {total_val} installments.")
+
+    if request.headers.get('x-requested-with') == 'XMLHttpRequest' or 'application/json' in request.headers.get('accept', ''):
+        return JsonResponse({'ok': True, 'total': total_val, 'num': num_val})
+    return redirect(next_url)
 
 
 @_require_expenses

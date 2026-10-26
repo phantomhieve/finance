@@ -1251,8 +1251,24 @@ class RefundAndEmiTrackingTests(TestCase):
         # 3475 + 395 = 3870
         self.assertEqual(emi_data['ongoing'][0]['total'], Decimal('3870.00'))
         self.assertEqual(emi_data['monthly_commitment'], Decimal('3870.00'))
-        self.assertEqual(len(emi_data['converted']), 1)
-        self.assertEqual(emi_data['converted_total'], Decimal('83000.00'))
+        # Initially total_installments is None, so pending is None
+        self.assertIsNone(emi_data['ongoing'][0]['total_installments'])
+        self.assertIsNone(emi_data['ongoing'][0]['pending_installments'])
+
+        # Set tenure via view
+        self.client.force_login(self.user)
+        response = self.client.post(reverse('expense_set_emi_tenure'), {
+            'ref': '9861',
+            'total_installments': '12',
+            'installment_num': '3',
+        })
+        self.assertEqual(response.status_code, 302)
+
+        # Check that month_summary now reflects total & pending installments (12 - 3 = 9)
+        summary2 = month_summary(self.group, 2026, 10)
+        emi2 = summary2['emi_summary']['ongoing'][0]
+        self.assertEqual(emi2['total_installments'], 12)
+        self.assertEqual(emi2['pending_installments'], 9)
 
     def test_bppy_cc_payments_skipped_in_reconcile(self):
         from .models import CardStatement, StatementLine

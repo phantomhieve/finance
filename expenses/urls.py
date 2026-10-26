@@ -9,6 +9,7 @@ urlpatterns = [
     path('<int:pk>/edit/', views.expense_edit, name='expense_edit'),
     path('<int:pk>/delete/', views.expense_delete, name='expense_delete'),
     path('<int:pk>/review/', views.expense_review, name='expense_review'),
+    path('emis/set-tenure/', views.expense_set_emi_tenure, name='expense_set_emi_tenure'),
     path('ai-audit/', views.expenses_ai_audit, name='expenses_ai_audit'),
 
     path('settings/', views.expenses_settings, name='expenses_settings'),
