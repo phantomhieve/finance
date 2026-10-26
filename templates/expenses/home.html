@@ -49,8 +49,8 @@
 {# ——— EXPENSES HERO CARD ——— #}
 {% with pace=summary.pace %}
 <div class="card hero-gradient-portfolio shadow-sm animate-up card-hover border border-base-content/10 mb-4">
-  <div class="card-body p-4 lg:p-6">
-    <div class="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-8">
+  <div class="card-body p-3.5 sm:p-5 lg:p-6">
+    <div class="flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-8">
       
       {# Left side: Big number, pace badge, and cumulative mini-chart #}
       <div class="flex-1 min-w-0">
@@ -70,25 +70,25 @@
 
         <p class="text-3xl lg:text-4xl font-extrabold tabular-nums mt-1 text-primary">{{ summary.total|inr }}</p>
         {% if summary.refunded_total > 0 %}
-        <p class="text-[11px] opacity-50 mt-1 tabular-nums">Gross spend {{ summary.gross_total|inr }} · {{ summary.refunded_total|inr }} returned/refunded</p>
+        <p class="text-[11px] opacity-50 mt-0.5 tabular-nums hidden sm:block">Gross spend {{ summary.gross_total|inr }} · {{ summary.refunded_total|inr }} returned/refunded</p>
         {% endif %}
 
         {% if pace %}
           {% if pace.prev_to_date %}
-          <div class="mt-2 flex flex-wrap items-center gap-2">
-            <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold {% if pace.delta > 0 %}bg-error/15 text-error border border-error/25{% else %}bg-success/15 text-success border border-success/25{% endif %}">
+          <div class="mt-1.5 flex flex-wrap items-center gap-2">
+            <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold {% if pace.delta > 0 %}bg-error/15 text-error border border-error/25{% else %}bg-success/15 text-success border border-success/25{% endif %}">
               <span class="material-symbols-outlined text-sm">{% if pace.delta > 0 %}arrow_upward{% else %}arrow_downward{% endif %}</span>
               {{ pace.gap|inr_short }} {% if pace.delta > 0 %}more{% else %}less{% endif %}
             </span>
-            <span class="text-xs opacity-60">than by {{ pace.day }} {{ summary.prev_label|slice:":3" }}</span>
+            <span class="text-xs opacity-60">vs {{ pace.day }} {{ summary.prev_label|slice:":3" }}</span>
           </div>
           {% endif %}
           {% if pace.projected %}
-          <p class="text-[11px] opacity-45 mt-1.5">On pace for ~{{ pace.projected|inr_short }} · {{ summary.prev_label }} ended at {{ summary.prev_total|inr_short }}</p>
+          <p class="text-[11px] opacity-45 mt-1 hidden sm:block">On pace for ~{{ pace.projected|inr_short }} · {{ summary.prev_label }} ended at {{ summary.prev_total|inr_short }}</p>
           {% endif %}
         {% elif summary.delta_pct is not None %}
-        <div class="mt-2 flex flex-wrap items-center gap-2">
-          <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold {% if summary.delta > 0 %}bg-error/15 text-error border border-error/25{% else %}bg-success/15 text-success border border-success/25{% endif %}">
+        <div class="mt-1.5 flex flex-wrap items-center gap-2">
+          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold {% if summary.delta > 0 %}bg-error/15 text-error border border-error/25{% else %}bg-success/15 text-success border border-success/25{% endif %}">
             <span class="material-symbols-outlined text-sm">{% if summary.delta > 0 %}arrow_upward{% else %}arrow_downward{% endif %}</span>
             {% if summary.delta > 0 %}+{% endif %}{{ summary.delta_pct }}%
           </span>
@@ -97,46 +97,48 @@
         {% endif %}
 
         {% if summary.total or summary.prev_total %}
-        <div class="mt-3 -mx-1" style="height:100px"><canvas id="paceChart" aria-label="Cumulative spend this month compared with last month"></canvas></div>
-        <div class="flex items-center gap-3 text-[10px] opacity-55 mt-1">
-          <span class="flex items-center gap-1"><span class="inline-block w-3 h-[3px] rounded bg-orange-400"></span>{{ summary.start|date:"M" }}</span>
-          <span class="flex items-center gap-1"><span class="inline-block w-3 border-t-2 border-dashed border-base-content/40"></span>{{ summary.prev_label|slice:":3" }}</span>
-          <span class="ml-auto">Cumulative trend</span>
+        <div class="hidden sm:block">
+          <div class="mt-3 -mx-1" style="height:100px"><canvas id="paceChart" aria-label="Cumulative spend this month compared with last month"></canvas></div>
+          <div class="flex items-center gap-3 text-[10px] opacity-55 mt-1">
+            <span class="flex items-center gap-1"><span class="inline-block w-3 h-[3px] rounded bg-orange-400"></span>{{ summary.start|date:"M" }}</span>
+            <span class="flex items-center gap-1"><span class="inline-block w-3 border-t-2 border-dashed border-base-content/40"></span>{{ summary.prev_label|slice:":3" }}</span>
+            <span class="ml-auto">Cumulative trend</span>
+          </div>
         </div>
         {% endif %}
       </div>
 
-      {# Right side: Stat-cards with Portfolio design system classes #}
-      <div class="flex flex-col gap-2 shrink-0 lg:w-72">
-        <div class="grid grid-cols-3 lg:grid-cols-1 gap-2.5">
-          <div class="stat-card stat-card-primary">
-            <div class="text-[10px] uppercase tracking-wider opacity-60">Spends Count</div>
-            <div class="text-base font-bold mt-0.5 tabular-nums text-primary">{{ summary.count }} transactions</div>
+      {# Right side: Stat-cards with compact mobile spacing #}
+      <div class="flex flex-col gap-2 shrink-0 lg:w-72 mt-1 lg:mt-0">
+        <div class="grid grid-cols-3 lg:grid-cols-1 gap-2">
+          <div class="stat-card stat-card-primary p-2.5 sm:p-3">
+            <div class="text-[9px] sm:text-[10px] uppercase tracking-wider opacity-60">Spends</div>
+            <div class="text-sm sm:text-base font-bold mt-0.5 tabular-nums text-primary">{{ summary.count }} <span class="hidden sm:inline font-normal text-xs opacity-75">txns</span></div>
           </div>
           {% if summary.emi_summary.count %}
-          <div class="stat-card stat-card-accent">
-            <div class="text-[10px] uppercase tracking-wider opacity-60">Active EMIs</div>
-            <div class="text-base font-bold mt-0.5 tabular-nums text-accent">{{ summary.emi_summary.monthly_commitment|inr_short }}/mo</div>
+          <div class="stat-card stat-card-accent p-2.5 sm:p-3">
+            <div class="text-[9px] sm:text-[10px] uppercase tracking-wider opacity-60">Active EMIs</div>
+            <div class="text-sm sm:text-base font-bold mt-0.5 tabular-nums text-accent">{{ summary.emi_summary.monthly_commitment|inr_short }}/mo</div>
           </div>
           {% else %}
-          <div class="stat-card stat-card-accent">
-            <div class="text-[10px] uppercase tracking-wider opacity-60">Invested / Saved</div>
-            <div class="text-base font-bold mt-0.5 tabular-nums text-accent">{{ summary.transfers|inr_short }}</div>
+          <div class="stat-card stat-card-accent p-2.5 sm:p-3">
+            <div class="text-[9px] sm:text-[10px] uppercase tracking-wider opacity-60">Saved</div>
+            <div class="text-sm sm:text-base font-bold mt-0.5 tabular-nums text-accent">{{ summary.transfers|inr_short }}</div>
           </div>
           {% endif %}
-          <div class="stat-card stat-card-secondary">
-            <div class="text-[10px] uppercase tracking-wider opacity-60">Upcoming Card Bills</div>
-            <div class="text-base font-bold mt-0.5 tabular-nums text-secondary">
-              {% if total_dues_amount %}{{ total_dues_amount|inr_short }}{% elif dues %}{{ dues.0.total_due|default:dues.0.min_due|default:0|inr_short }}{% else %}₹0{% endif %}
+          <div class="stat-card stat-card-secondary p-2.5 sm:p-3">
+            <div class="text-[9px] sm:text-[10px] uppercase tracking-wider opacity-60">Upcoming Dues</div>
+            <div class="text-sm sm:text-base font-bold mt-0.5 tabular-nums text-secondary" title="{{ total_dues_amount|inr }}">
+              {% if total_dues_amount %}{{ total_dues_amount|inr_short }}{% else %}₹0{% endif %}
             </div>
             {% if dues %}
-            <div class="text-[10px] opacity-60 truncate mt-0.5">
-              {{ dues|length }} card{{ dues|length|pluralize }} due
+            <div class="text-[9px] sm:text-[10px] opacity-60 truncate mt-0.5">
+              {{ dues|length }} card{{ dues|length|pluralize }} ({{ total_dues_amount|inr }})
             </div>
             {% endif %}
           </div>
         </div>
-        <p class="text-[10px] opacity-50 text-center lg:text-left mt-0.5">
+        <p class="text-[10px] opacity-45 text-center lg:text-left mt-0.5 hidden sm:block">
           Card bills span cycles across months. Transactions charged before the 1st (like Netflix on 23 Sep) are recorded under their purchase date in <a href="?m={{ prev_month }}" class="underline hover:text-primary font-semibold">{{ summary.prev_label }}</a>.
         </p>
       </div>
@@ -180,16 +182,6 @@
           <span class="material-symbols-outlined opacity-30">chevron_right</span>
         </a>
         {% endfor %}
-        {% for st in dues %}
-        <a href="{% url 'expenses_statement_detail' st.pk %}" class="exp-attn cursor-pointer">
-          <span class="exp-attn-icon {% if st.days_left < 0 %}text-error bg-error/10{% elif st.days_left <= 3 %}text-warning bg-warning/10{% else %}text-info bg-info/10{% endif %}"><span class="material-symbols-outlined">event</span></span>
-          <span class="flex-1 min-w-0">
-            <span class="block text-sm font-semibold truncate">{{ st.payment_source.short_name }} bill{% if st.total_due %} · {{ st.total_due|inr }}{% endif %}</span>
-            <span class="block text-[11px] {% if st.days_left < 0 %}text-error{% else %}opacity-55{% endif %}">{% if st.days_left < 0 %}Overdue since {{ st.due_date|date:"j M" }}{% elif st.days_left == 0 %}Due today{% else %}Due {{ st.due_date|date:"D, j M" }} · {{ st.days_left }} day{{ st.days_left|pluralize }} left{% endif %}</span>
-          </span>
-          <span class="material-symbols-outlined opacity-30">chevron_right</span>
-        </a>
-        {% endfor %}
         {% if pending_passwords %}
         <a href="{% url 'expenses_statements' %}" class="exp-attn cursor-pointer">
           <span class="exp-attn-icon text-info bg-info/10"><span class="material-symbols-outlined">lock</span></span>
@@ -201,29 +193,52 @@
     </div>
     {% endif %}
 
-    {# Highlight Chips Bento Row #}
+    {# Highlight Insights 2x2 Bento Grid #}
     {% if summary.count %}
-    <div class="flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 lg:mx-0 lg:px-0 lg:flex-wrap animate-up">
-      <div class="exp-chip" title="Average per day, leaving out rent, EMIs and insurance">
-        <span class="material-symbols-outlined text-orange-400">speed</span>
-        <span><span class="exp-chip-label">Day-to-day</span>{{ summary.per_day|inr }}/day</span>
+    <div class="grid grid-cols-2 gap-2 animate-up">
+      <div class="p-2.5 sm:p-3 rounded-xl bg-base-200/80 border border-base-content/10 flex items-center gap-2.5 min-w-0" title="Average per day, leaving out rent, EMIs and insurance">
+        <div class="w-8 h-8 rounded-lg bg-orange-400/15 text-orange-400 flex items-center justify-center shrink-0">
+          <span class="material-symbols-outlined text-lg">speed</span>
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="text-[9px] font-bold uppercase tracking-wider opacity-50 truncate">Day-to-day</div>
+          <div class="text-xs sm:text-sm font-bold tabular-nums truncate text-base-content mt-0.5">{{ summary.per_day|inr }}<span class="text-[10px] font-normal opacity-60">/day</span></div>
+        </div>
       </div>
+
       {% if summary.biggest %}
-      <button type="button" class="exp-chip cursor-pointer" onclick="Expenses.open({{ summary.biggest.pk }})">
-        <span class="material-symbols-outlined text-rose-400">vertical_align_top</span>
-        <span><span class="exp-chip-label">Biggest buy</span>{{ summary.biggest.merchant|truncatechars:16 }} · {{ summary.biggest.amount|inr_short }}</span>
+      <button type="button" class="p-2.5 sm:p-3 rounded-xl bg-base-200/80 border border-base-content/10 flex items-center gap-2.5 min-w-0 text-left hover:border-rose-400/40 transition-all cursor-pointer" onclick="Expenses.open({{ summary.biggest.pk }})">
+        <div class="w-8 h-8 rounded-lg bg-rose-400/15 text-rose-400 flex items-center justify-center shrink-0">
+          <span class="material-symbols-outlined text-lg">vertical_align_top</span>
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="text-[9px] font-bold uppercase tracking-wider opacity-50 truncate">Biggest buy</div>
+          <div class="text-xs sm:text-sm font-bold tabular-nums truncate text-base-content mt-0.5">{{ summary.biggest.amount|inr_short }} <span class="text-[10px] font-normal opacity-60 truncate">· {{ summary.biggest.merchant|truncatechars:10 }}</span></div>
+        </div>
       </button>
       {% endif %}
+
       {% if summary.frequent %}{% with m=summary.frequent %}
-      <a href="?m={{ month_param }}&q={{ m.merchant|urlencode }}" class="exp-chip cursor-pointer">
-        <span class="material-symbols-outlined text-sky-400">storefront</span>
-        <span><span class="exp-chip-label">Most visited</span>{{ m.merchant|truncatechars:14 }} · {{ m.count }}×</span>
+      <a href="?m={{ month_param }}&q={{ m.merchant|urlencode }}" class="p-2.5 sm:p-3 rounded-xl bg-base-200/80 border border-base-content/10 flex items-center gap-2.5 min-w-0 text-left hover:border-sky-400/40 transition-all cursor-pointer">
+        <div class="w-8 h-8 rounded-lg bg-sky-400/15 text-sky-400 flex items-center justify-center shrink-0">
+          <span class="material-symbols-outlined text-lg">storefront</span>
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="text-[9px] font-bold uppercase tracking-wider opacity-50 truncate">Most visited</div>
+          <div class="text-xs sm:text-sm font-bold tabular-nums truncate text-base-content mt-0.5">{{ m.count }}× <span class="text-[10px] font-normal opacity-60 truncate">· {{ m.merchant|truncatechars:10 }}</span></div>
+        </div>
       </a>
       {% endwith %}{% endif %}
+
       {% if summary.riser %}
-      <a href="?m={{ month_param }}&cat={{ summary.riser.id|default:'none' }}" class="exp-chip cursor-pointer">
-        <span class="material-symbols-outlined text-amber-400">trending_up</span>
-        <span><span class="exp-chip-label">Rising</span>{{ summary.riser.name }} +{{ summary.riser.delta|inr_short }}</span>
+      <a href="?m={{ month_param }}&cat={{ summary.riser.id|default:'none' }}" class="p-2.5 sm:p-3 rounded-xl bg-base-200/80 border border-base-content/10 flex items-center gap-2.5 min-w-0 text-left hover:border-amber-400/40 transition-all cursor-pointer">
+        <div class="w-8 h-8 rounded-lg bg-amber-400/15 text-amber-400 flex items-center justify-center shrink-0">
+          <span class="material-symbols-outlined text-lg">trending_up</span>
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="text-[9px] font-bold uppercase tracking-wider opacity-50 truncate">Rising</div>
+          <div class="text-xs sm:text-sm font-bold tabular-nums truncate text-amber-400 mt-0.5">+{{ summary.riser.delta|inr_short }} <span class="text-[10px] font-normal opacity-60 truncate">· {{ summary.riser.name|truncatechars:10 }}</span></div>
+        </div>
       </a>
       {% endif %}
     </div>
@@ -234,38 +249,74 @@
     <div class="card bg-base-200/70 shadow-sm border border-base-content/10 animate-up card-hover">
       <div class="card-body p-4">
         <div class="flex items-center justify-between">
-          <h2 class="text-xs font-bold uppercase tracking-widest opacity-50">Where it went</h2>
+          <div class="flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-base opacity-60">pie_chart</span>
+            <h2 class="text-xs font-bold uppercase tracking-widest opacity-60">Where it went</h2>
+          </div>
           {% if summary.uncategorised %}
           <a href="?m={{ month_param }}&cat=none" class="text-[11px] text-warning font-semibold cursor-pointer hover:underline">{{ summary.uncategorised }} uncategorised</a>
           {% endif %}
         </div>
-        <p class="text-[11px] opacity-45 mb-1.5">Change vs {% if summary.pace %}the same point in {{ summary.prev_label }}{% else %}{{ summary.prev_label }}{% endif %}</p>
-        <div class="flex flex-col gap-0.5">
+        <p class="text-[11px] opacity-45 mb-2">Change vs {% if summary.pace %}the same point in {{ summary.prev_label }}{% else %}{{ summary.prev_label }}{% endif %}</p>
+        
+        {# Top 5 categories #}
+        <div class="flex flex-col gap-1">
           {% for c in summary.categories %}
-          <a href="?m={{ month_param }}&cat={% if c.id %}{{ c.id }}{% else %}none{% endif %}"
-             class="exp-cat-row cursor-pointer {% if forloop.counter > 6 %}exp-cat-more hidden{% endif %} {% if f_cat == c.id|stringformat:'s' %}bg-primary/10 border border-primary/25{% endif %}">
-            <span class="jw-type-avatar shrink-0" style="--h:{{ c.hue }};width:2.25rem;height:2.25rem;border-radius:.75rem">
-              <span class="icon-filled material-symbols-outlined text-lg">{{ c.icon }}</span>
-            </span>
-            <div class="flex-1 min-w-0">
-              <div class="flex items-baseline justify-between gap-2">
-                <span class="text-sm font-semibold truncate">{{ c.name }}</span>
-                <span class="text-sm font-bold tabular-nums">{{ c.total|inr }}</span>
+            {% if forloop.counter <= 5 %}
+            <a href="?m={{ month_param }}&cat={% if c.id %}{{ c.id }}{% else %}none{% endif %}"
+               class="exp-cat-row cursor-pointer {% if f_cat == c.id|stringformat:'s' %}bg-primary/10 border border-primary/25{% endif %}">
+              <span class="jw-type-avatar shrink-0" style="--h:{{ c.hue }};width:2.25rem;height:2.25rem;border-radius:.75rem">
+                <span class="icon-filled material-symbols-outlined text-lg">{{ c.icon }}</span>
+              </span>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-baseline justify-between gap-2">
+                  <span class="text-sm font-semibold truncate">{{ c.name }}</span>
+                  <span class="text-sm font-bold tabular-nums">{{ c.total|inr }}</span>
+                </div>
+                <div class="flex items-center gap-2 mt-1">
+                  <div class="exp-bar flex-1" style="--h:{{ c.hue }}"><span style="width:{{ c.pct }}%"></span></div>
+                  <span class="text-[10px] opacity-50 tabular-nums">{{ c.pct }}%</span>
+                  <span class="text-[10px] font-semibold tabular-nums w-14 text-right {% if c.gap < 1 %}opacity-40{% elif c.delta > 0 %}text-error{% else %}text-success{% endif %}">
+                    {% if c.gap < 1 %}same{% elif c.delta > 0 %}▲ {{ c.gap|inr_short }}{% else %}▼ {{ c.gap|inr_short }}{% endif %}
+                  </span>
+                </div>
               </div>
-              <div class="flex items-center gap-2 mt-1">
-                <div class="exp-bar flex-1" style="--h:{{ c.hue }}"><span style="width:{{ c.pct }}%"></span></div>
-                <span class="text-[10px] opacity-50 tabular-nums">{{ c.pct }}%</span>
-                <span class="text-[10px] font-semibold tabular-nums w-14 text-right {% if c.gap < 1 %}opacity-40{% elif c.delta > 0 %}text-error{% else %}text-success{% endif %}">
-                  {% if c.gap < 1 %}same{% elif c.delta > 0 %}▲ {{ c.gap|inr_short }}{% else %}▼ {{ c.gap|inr_short }}{% endif %}
-                </span>
-              </div>
-            </div>
-          </a>
+            </a>
+            {% endif %}
           {% endfor %}
         </div>
-        {% if summary.categories|length > 6 %}
-        <button type="button" class="btn btn-ghost btn-xs mt-2 self-center cursor-pointer" onclick="document.querySelectorAll('.exp-cat-more').forEach(function(e){e.classList.toggle('hidden')});this.remove()">
-          Show all {{ summary.categories|length }} categories
+
+        {# Categories 6+ in Collapsible Dropdown #}
+        {% if summary.categories|length > 5 %}
+        <div id="expMoreCategories" class="flex flex-col gap-1 mt-1 hidden">
+          {% for c in summary.categories %}
+            {% if forloop.counter > 5 %}
+            <a href="?m={{ month_param }}&cat={% if c.id %}{{ c.id }}{% else %}none{% endif %}"
+               class="exp-cat-row cursor-pointer {% if f_cat == c.id|stringformat:'s' %}bg-primary/10 border border-primary/25{% endif %}">
+              <span class="jw-type-avatar shrink-0" style="--h:{{ c.hue }};width:2.25rem;height:2.25rem;border-radius:.75rem">
+                <span class="icon-filled material-symbols-outlined text-lg">{{ c.icon }}</span>
+              </span>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-baseline justify-between gap-2">
+                  <span class="text-sm font-semibold truncate">{{ c.name }}</span>
+                  <span class="text-sm font-bold tabular-nums">{{ c.total|inr }}</span>
+                </div>
+                <div class="flex items-center gap-2 mt-1">
+                  <div class="exp-bar flex-1" style="--h:{{ c.hue }}"><span style="width:{{ c.pct }}%"></span></div>
+                  <span class="text-[10px] opacity-50 tabular-nums">{{ c.pct }}%</span>
+                  <span class="text-[10px] font-semibold tabular-nums w-14 text-right {% if c.gap < 1 %}opacity-40{% elif c.delta > 0 %}text-error{% else %}text-success{% endif %}">
+                    {% if c.gap < 1 %}same{% elif c.delta > 0 %}▲ {{ c.gap|inr_short }}{% else %}▼ {{ c.gap|inr_short }}{% endif %}
+                  </span>
+                </div>
+              </div>
+            </a>
+            {% endif %}
+          {% endfor %}
+        </div>
+
+        <button type="button" id="expMoreCatBtn" class="btn btn-ghost btn-xs gap-1 mt-2 self-center cursor-pointer text-primary/80 hover:text-primary font-semibold" onclick="toggleMoreCategories()">
+          <span id="expMoreCatTxt" data-collapsed="Show all {{ summary.categories|length }} categories" data-expanded="Show top 5 only">Show all {{ summary.categories|length }} categories</span>
+          <span id="expMoreCatIcon" class="material-symbols-outlined text-base">expand_more</span>
         </button>
         {% endif %}
       </div>
@@ -322,20 +373,6 @@
     </div>
     {% endif %}
 
-    {# 6-month trend chart #}
-    <div class="card bg-base-200/70 shadow-sm border border-base-content/10 animate-up card-hover">
-      <div class="card-body p-4">
-        <div class="flex items-center justify-between">
-          <h2 class="text-xs font-bold uppercase tracking-widest opacity-50">Last 6 months</h2>
-          <a href="{% url 'expenses_year' %}?fy={{ fy_start }}" class="text-[11px] text-primary font-semibold flex items-center gap-0.5 cursor-pointer hover:underline">
-            Year view<span class="material-symbols-outlined text-sm">chevron_right</span>
-          </a>
-        </div>
-        <p class="text-[11px] opacity-45 -mt-0.5">{% if trend.avg %}Average {{ trend.avg|inr_short }} / month · tap a month to open it{% else %}Tap a month to open it{% endif %}</p>
-        <div class="mt-2" style="height:130px"><canvas id="trendChart" aria-label="Spend over the last six months"></canvas></div>
-      </div>
-    </div>
-
     {# Member breakdown #}
     {% if summary.members|length > 1 %}
     <div class="card bg-base-200/70 shadow-sm border border-base-content/10 animate-up card-hover">
@@ -356,6 +393,48 @@
     </div>
     {% endif %}
 
+    {# Credit Card Bills / Upcoming Dues at the Bottom #}
+    {% if dues %}
+    <div class="card bg-base-200/70 shadow-sm border border-base-content/10 animate-up card-hover">
+      <div class="card-body p-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-secondary text-lg">credit_card</span>
+            <h2 class="text-xs font-bold uppercase tracking-widest opacity-60">Credit Card Bills</h2>
+          </div>
+          <span class="badge badge-sm bg-secondary/15 text-secondary border border-secondary/30 font-bold tabular-nums">
+            {{ total_dues_amount|inr }}
+          </span>
+        </div>
+        <p class="text-[11px] opacity-45 -mt-0.5 mb-2.5">Upcoming statement payments due this cycle</p>
+
+        <div class="flex flex-col gap-2">
+          {% for st in dues %}
+          <a href="{% url 'expenses_statement_detail' st.pk %}" class="p-3 rounded-xl bg-base-300/60 border border-base-content/5 flex items-center justify-between gap-3 hover:border-secondary/30 transition-all cursor-pointer">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <span class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 {% if st.days_left < 0 %}bg-error/15 text-error{% elif st.days_left <= 3 %}bg-warning/15 text-warning{% else %}bg-secondary/15 text-secondary{% endif %}">
+                <span class="material-symbols-outlined text-base">credit_card</span>
+              </span>
+              <div class="min-w-0">
+                <div class="text-xs font-bold truncate">{{ st.payment_source.short_name }}</div>
+                <div class="text-[10px] {% if st.days_left < 0 %}text-error font-semibold{% else %}opacity-60{% endif %} mt-0.5">
+                  {% if st.days_left < 0 %}Overdue since {{ st.due_date|date:"j M" }}{% elif st.days_left == 0 %}Due today{% else %}Due {{ st.due_date|date:"D, j M" }} · {{ st.days_left }} day{{ st.days_left|pluralize }} left{% endif %}
+                </div>
+              </div>
+            </div>
+            <div class="text-right shrink-0">
+              <div class="text-xs font-bold tabular-nums text-secondary">{{ st.total_due|default:st.min_due|inr }}</div>
+              {% if st.min_due and st.min_due != st.total_due %}
+              <div class="text-[10px] opacity-50 tabular-nums">Min: {{ st.min_due|inr }}</div>
+              {% endif %}
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
   </div>
 
   {# ——— RIGHT COLUMN: Transactions Feed & Filtering ——— #}
@@ -364,19 +443,19 @@
     <div id="expFeedCard" class="card bg-base-200/70 shadow-sm border border-base-content/10 flex flex-col overflow-hidden min-h-0">
 
       {# Pinned Header: Search + Filter Pills + AI Audit #}
-      <div class="p-3 sm:p-4 border-b border-base-content/10 bg-base-200/90 backdrop-blur-md shrink-0 flex flex-col gap-2.5 z-10">
+      <div class="p-3 sm:p-4 border-b border-base-content/10 bg-base-200/90 backdrop-blur-md shrink-0 flex flex-col gap-2 z-10">
         <form method="get" id="expFilterForm">
           <input type="hidden" name="m" value="{{ month_param }}">
           {% if f_cat %}<input type="hidden" name="cat" value="{{ f_cat }}">{% endif %}
           {% if f_member %}<input type="hidden" name="member" value="{{ f_member }}">{% endif %}
           <div class="relative">
-            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-base-content/50"><span class="material-symbols-outlined text-[18px]">search</span></span>
+            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-base-content/50"><span class="material-symbols-outlined text-[17px]">search</span></span>
             <input type="search" name="q" value="{{ f_query }}" placeholder="Search merchant, notes, amount…" autocomplete="off"
-                   class="input w-full h-[40px] min-h-[40px] pl-10 bg-base-100 border border-base-content/10 rounded-xl text-sm transition-all focus:border-primary/50">
+                   class="input w-full h-[36px] min-h-[36px] sm:h-[40px] sm:min-h-[40px] pl-9 bg-base-100 border border-base-content/10 rounded-xl text-xs sm:text-sm transition-all focus:border-primary/50">
           </div>
         </form>
-        <div class="flex items-center justify-between gap-2">
-          <div class="flex gap-2 overflow-x-auto scrollbar-hide pb-0.5 flex-1">
+        <div class="flex items-center justify-between gap-1.5">
+          <div class="flex gap-1.5 overflow-x-auto scrollbar-hide py-0.5 flex-1 min-w-0 touch-pan-x">
             <a href="?m={{ month_param }}" class="filter-pill cursor-pointer {% if not is_filtered %}is-active{% endif %}">All</a>
             <a href="?m={{ month_param }}&flagged=1" class="filter-pill cursor-pointer {% if f_flagged %}is-active{% endif %}"><span class="material-symbols-outlined text-sm text-warning">flag</span>Flagged{% if open_flags %} · {{ open_flags }}{% endif %}</a>
             <a href="?m={{ month_param }}&refunds=1" class="filter-pill cursor-pointer {% if f_refunds %}is-active{% endif %}"><span class="material-symbols-outlined text-sm text-emerald-400">replay</span>Refunds{% if summary.refund_count %} · {{ summary.refund_count }}{% endif %}</a>
@@ -411,18 +490,18 @@
       </div>
 
       {# Scrollable Activity Feed Area #}
-      <div id="expFeedList" class="overflow-y-auto flex-1 min-h-0 p-3 sm:p-4 scrollbar-thin">
+      <div id="expFeedList" class="overflow-y-auto flex-1 min-h-0 p-2.5 sm:p-4 scrollbar-thin">
         {% if days %}
         <div class="flex flex-col gap-1">
           {% for day in days %}
-          <div class="exp-day-header flex items-center justify-between px-2 py-1.5 -mx-1 mb-1 rounded-lg">
+          <div class="exp-day-header flex items-center justify-between px-2.5 py-1.5 -mx-1 mb-1 rounded-lg">
             <span class="text-[11px] font-bold uppercase tracking-wider opacity-60">{% if day.date == today %}Today{% else %}{{ day.date|date:"D, j M" }}{% endif %}</span>
             {% if day.spend %}<span class="text-[11px] font-semibold opacity-60 tabular-nums">{{ day.spend|inr }}</span>{% endif %}
           </div>
           <div class="flex flex-col gap-1.5 mb-2.5">
             {% for e in day.items %}
             <button type="button"
-                    class="table-card cursor-pointer flex items-center gap-3.5 text-left w-full {% if e.needs_review %}border-warning/50 bg-warning/5{% endif %}"
+                    class="table-card cursor-pointer flex items-center gap-2.5 sm:gap-3.5 text-left w-full p-2.5 sm:p-3 {% if e.needs_review %}border-warning/50 bg-warning/5{% endif %}"
                     onclick="Expenses.open({{ e.pk }})">
               <span class="jw-type-avatar shrink-0" style="--h:{% if e.direction == 'CREDIT' %}160{% elif e.category %}{{ e.category.hue }}{% else %}40{% endif %}">
                 <span class="icon-filled material-symbols-outlined text-xl">{% if e.direction == 'CREDIT' %}replay{% else %}{{ e.icon }}{% endif %}</span>
@@ -515,9 +594,19 @@
 {% include 'expenses/_expense_modal.html' %}
 {{ payload|json_script:"expense-data" }}
 {{ chart|json_script:"expense-chart" }}
-{{ trend_chart|json_script:"expense-trend-chart" }}
 
 <script>
+function toggleMoreCategories() {
+  var el = document.getElementById('expMoreCategories');
+  var icon = document.getElementById('expMoreCatIcon');
+  var txt = document.getElementById('expMoreCatTxt');
+  if (!el || !icon || !txt) return;
+  var isHidden = el.classList.toggle('hidden');
+  icon.textContent = isHidden ? 'expand_more' : 'expand_less';
+  txt.textContent = isHidden ? txt.dataset.collapsed : txt.dataset.expanded;
+  if (typeof syncExpHeights === 'function') setTimeout(syncExpHeights, 50);
+}
+
 function switchExpMobileTab(tab) {
   var feedCol = document.getElementById('expFeedColumn');
   var insightsCol = document.getElementById('expInsightsColumn');

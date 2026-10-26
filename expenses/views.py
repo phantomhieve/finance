@@ -179,7 +179,7 @@ def expenses_home(request):
         'today': today,
         'trend': trend,
         'open_flags': sum(1 for e in summary['flagged'] if not e.flag_reviewed),
-        'attention_count': len(dues) + len(context_reconnect) + (1 if pending_passwords else 0),
+        'attention_count': len(context_reconnect) + (1 if pending_passwords else 0),
         'audit_status': audit_cooldown_status(group),
         'chart': {
             'daily': summary['daily'], 'prev_daily': summary['prev_daily'],
