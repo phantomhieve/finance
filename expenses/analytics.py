@@ -346,6 +346,187 @@ def monthly_trend(
     return {'months': out, 'avg': (sum(complete, ZERO) / len(complete)) if complete else ZERO}
 
 
+SUBSCRIPTION_BRANDS: dict[str, tuple[str, str]] = {
+    'NETFLIX': ('Netflix', 'tv'),
+    'SPOTIFY': ('Spotify', 'headphones'),
+    'HOTSTAR': ('Disney+ Hotstar', 'tv'),
+    'JIOHOTSTAR': ('JioHotstar', 'tv'),
+    'YOUTUBE': ('YouTube Premium', 'smart_display'),
+    'GOOGLEPLAY': ('Google Play', 'play_arrow'),
+    'APPLECOM': ('Apple', 'phone_iphone'),
+    'ITUNES': ('Apple', 'music_note'),
+    'OPENAI': ('OpenAI', 'smart_toy'),
+    'CHATGPT': ('OpenAI', 'smart_toy'),
+    'AMAZONPRIME': ('Amazon Prime', 'video_camera_front'),
+    'PRIMEVIDEO': ('Prime Video', 'video_camera_front'),
+    'ICLOUD': ('Apple iCloud', 'cloud'),
+    'MICROSOFT': ('Microsoft 365', 'laptop_mac'),
+    'SONYLIV': ('SonyLIV', 'tv'),
+    'ZEE5': ('ZEE5', 'tv'),
+    'AUDIBLE': ('Audible', 'auto_stories'),
+    'MEDIUM': ('Medium', 'article'),
+    'GITHUB': ('GitHub', 'terminal'),
+    'CLAUDE': ('Claude', 'smart_toy'),
+}
+
+
+def _resolve_subscription_service(e: Expense) -> tuple[str, str]:
+    """Resolve normalized service display name and icon for a subscription expense."""
+    m_key = (e.merchant_key or '').upper()
+    if m_key in SUBSCRIPTION_BRANDS:
+        return SUBSCRIPTION_BRANDS[m_key]
+
+    raw_text = f'{e.merchant} {e.merchant_raw}'.upper()
+    for brand_key, (name, icon) in SUBSCRIPTION_BRANDS.items():
+        if brand_key in raw_text:
+            return name, icon
+
+    if 'DISNEY' in raw_text:
+        return 'Disney+ Hotstar', 'tv'
+    if 'APPLE' in raw_text:
+        return 'Apple', 'phone_iphone'
+    if 'GOOGLE' in raw_text and ('PLAY' in raw_text or 'STORAGE' in raw_text or 'ONE' in raw_text):
+        return 'Google One', 'cloud'
+
+    name = e.merchant.strip() if e.merchant else ''
+    if not name and e.merchant_raw:
+        name = e.merchant_raw.strip()
+    if not name:
+        name = 'Subscription'
+    icon = e.icon or 'subscriptions'
+    return name, icon
+
+
+def subscription_summary(
+    group: AccountGroup,
+    fy_start: int,
+    qs: QuerySet[Expense] | None = None,
+    today: datetime.date | None = None,
+    month_keys: list[tuple[int, int]] | None = None,
+) -> dict[str, Any]:
+    """Month-wise recurring subscription metrics and cadence matrix across the Indian FY."""
+    today = today or timezone.localdate()
+    start = datetime.date(fy_start, 4, 1)
+    end = datetime.date(fy_start + 1, 3, 31)
+    if qs is None:
+        qs = _spend(group, start, end, mail_only=False)
+    if month_keys is None:
+        month_keys = [shift_month(fy_start, 4, i) for i in range(12)]
+
+    sub_q = Q(category__name__icontains='subscription') | Q(merchant_key__in=SUBSCRIPTION_BRANDS.keys())
+    for term in ('netflix', 'spotify', 'hotstar', 'youtube', 'openai', 'chatgpt', 'prime video', 'amazon prime'):
+        sub_q |= Q(merchant__icontains=term)
+
+    sub_expenses = list(
+        qs.filter(sub_q)
+        .exclude(refunded_amount__gte=F('amount'), amount__gt=ZERO)
+        .select_related('category', 'payment_source')
+        .order_by('txn_date', 'id')
+    )
+
+    by_month_items: dict[tuple[int, int], list[dict[str, Any]]] = defaultdict(list)
+    by_service: dict[str, dict[str, Any]] = defaultdict(lambda: {
+        'name': '',
+        'icon': 'subscriptions',
+        'total': ZERO,
+        'count': 0,
+        'latest_amount': ZERO,
+        'by_month': defaultdict(lambda: ZERO),
+    })
+
+    total_spend = ZERO
+    total_count = 0
+
+    for e in sub_expenses:
+        net = max(ZERO, e.amount - (e.refunded_amount or ZERO))
+        if net <= ZERO:
+            continue
+        svc_name, svc_icon = _resolve_subscription_service(e)
+        key = (e.txn_date.year, e.txn_date.month)
+        item = {
+            'id': e.pk,
+            'service': svc_name,
+            'merchant': e.merchant,
+            'icon': svc_icon,
+            'amount': net,
+            'txn_date': e.txn_date,
+            'day_label': e.txn_date.strftime('%d %b'),
+            'payment_source': e.payment_source.display_name if e.payment_source else '',
+        }
+        by_month_items[key].append(item)
+        total_spend += net
+        total_count += 1
+
+        rec = by_service[svc_name]
+        rec['name'] = svc_name
+        rec['icon'] = svc_icon
+        rec['total'] += net
+        rec['count'] += 1
+        rec['latest_amount'] = net
+        rec['by_month'][key] += net
+
+    months = []
+    for y, m in month_keys:
+        first = datetime.date(y, m, 1)
+        m_items = by_month_items.get((y, m), [])
+        m_total = sum((it['amount'] for it in m_items), ZERO)
+        months.append({
+            'year': y,
+            'month': m,
+            'param': f'{y:04d}-{m:02d}',
+            'label': first.strftime('%b'),
+            'full_label': first.strftime('%B %Y'),
+            'total': m_total,
+            'count': len(m_items),
+            'items': m_items,
+            'started': first <= today,
+            'partial': (y, m) == (today.year, today.month),
+        })
+
+    started_months = [m for m in months if m['started']]
+    active_months_count = max(1, len(started_months))
+    avg_month = (total_spend / Decimal(str(active_months_count))).quantize(Decimal('0.01')) if started_months else ZERO
+
+    services = []
+    for svc_name, rec in sorted(by_service.items(), key=lambda kv: -kv[1]['total']):
+        months_data = []
+        months_active = 0
+        for y, m in month_keys:
+            amt = rec['by_month'].get((y, m), ZERO)
+            is_paid = amt > ZERO
+            if is_paid:
+                months_active += 1
+            first = datetime.date(y, m, 1)
+            months_data.append({
+                'year': y,
+                'month': m,
+                'param': f'{y:04d}-{m:02d}',
+                'label': first.strftime('%b'),
+                'amount': amt,
+                'paid': is_paid,
+                'started': first <= today,
+            })
+        services.append({
+            'name': svc_name,
+            'icon': rec['icon'],
+            'total': rec['total'],
+            'count': rec['count'],
+            'latest_amount': rec['latest_amount'],
+            'months_active': months_active,
+            'months_data': months_data,
+        })
+
+    return {
+        'total': total_spend,
+        'count': total_count,
+        'services_count': len(services),
+        'avg_month': avg_month,
+        'months': months,
+        'services': services,
+        'has_subscriptions': total_spend > ZERO or len(sub_expenses) > 0,
+    }
+
+
 def fy_summary(group: AccountGroup, fy_start: int, today: datetime.date | None = None) -> dict[str, Any]:
     """Annual financial summary spanning the Indian FY (April to March)."""
     today = today or timezone.localdate()
@@ -427,6 +608,7 @@ def fy_summary(group: AccountGroup, fy_start: int, today: datetime.date | None =
     # Previous FY over the same stretch of the year, so a part-finished FY compares fairly.
     cutoff = min(end, today)
     prev_total = _sum(_spend(group, datetime.date(fy_start - 1, 4, 1), _same_day_last_year(cutoff), False))
+    subscriptions = subscription_summary(group, fy_start, qs=qs, today=today, month_keys=month_keys)
     return {
         'fy_start': fy_start,
         'label': fy_label(fy_start),
@@ -446,6 +628,7 @@ def fy_summary(group: AccountGroup, fy_start: int, today: datetime.date | None =
             qs.exclude(merchant='').values('merchant').annotate(total=Sum('amount'), count=Count('id'))
             .order_by('-total')[:10]
         ),
+        'subscriptions': subscriptions,
     }
 
 
