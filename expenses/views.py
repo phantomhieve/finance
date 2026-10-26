@@ -1,7 +1,8 @@
-import logging
-import secrets
+from decimal import Decimal
 from functools import wraps
 from itertools import groupby
+import logging
+import secrets
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -150,6 +151,7 @@ def expenses_home(request):
     dues = upcoming_dues(group, today)
     for st in dues:
         st.days_left = (st.due_date - today).days
+    total_dues_amount = sum(((st.total_due or st.min_due or Decimal('0.00')) for st in dues), Decimal('0.00'))
     context_reconnect = [a for a in accounts if a.needs_reconnect]
     pending_passwords = CardStatement.objects.filter(group=group, status='NEEDS_PASSWORD').count()
     trend = monthly_trend(group, year, month, today=today)
@@ -169,6 +171,7 @@ def expenses_home(request):
         'accounts': accounts,
         'reconnect_needed': context_reconnect,
         'dues': dues,
+        'total_dues_amount': total_dues_amount,
         'pending_passwords': pending_passwords,
         'f_cat': f_cat, 'f_member': f_member, 'f_source': f_source, 'f_flagged': f_flagged,
         'f_refunds': f_refunds, 'f_emis': f_emis, 'f_query': f_query,
@@ -176,7 +179,7 @@ def expenses_home(request):
         'today': today,
         'trend': trend,
         'open_flags': sum(1 for e in summary['flagged'] if not e.flag_reviewed),
-        'attention_count': len(dues) + len(context_reconnect) + (1 if pending_passwords else 0),
+        'attention_count': len(context_reconnect) + (1 if pending_passwords else 0),
         'audit_status': audit_cooldown_status(group),
         'chart': {
             'daily': summary['daily'], 'prev_daily': summary['prev_daily'],
