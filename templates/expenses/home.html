@@ -131,7 +131,11 @@
             </div>
             {% if dues %}
             <div class="text-[9px] sm:text-[10px] opacity-60 truncate mt-0.5">
-              {{ dues|length }} card{{ dues|length|pluralize }} ({{ total_dues_amount|inr }})
+              {% if dues|length == 1 and dues.0.is_partial %}
+                1 card ({{ total_dues_amount|inr }} left of {{ dues.0.total_due|inr }})
+              {% else %}
+                {{ dues|length }} card{{ dues|length|pluralize }} ({{ total_dues_amount|inr }})
+              {% endif %}
             </div>
             {% endif %}
           </div>
@@ -491,22 +495,6 @@
             <a href="?m={{ month_param }}&source=STATEMENT" class="filter-pill cursor-pointer {% if f_source == 'STATEMENT' %}is-active{% endif %}"><span class="material-symbols-outlined text-sm">request_quote</span>Statement</a>
             <a href="?m={{ month_param }}&source=MANUAL" class="filter-pill cursor-pointer {% if f_source == 'MANUAL' %}is-active{% endif %}"><span class="material-symbols-outlined text-sm">edit</span>Manual</a>
           </div>
-          {% if audit_status.can_audit %}
-          <form method="post" action="{% url 'expenses_ai_audit' %}" class="shrink-0">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-xs btn-outline btn-primary gap-1 font-semibold rounded-lg cursor-pointer" title="Run Gemini AI forensic audit across recent transactions (available once a week)">
-              <span class="material-symbols-outlined text-[15px]">auto_awesome</span>
-              <span class="hidden sm:inline">AI Audit</span>
-            </button>
-          </form>
-          {% else %}
-          <div class="tooltip tooltip-left sm:tooltip-bottom shrink-0" data-tip="AI audit is limited to once a week. Next available on {{ audit_status.next_available|date:'j M, g:i A' }} (in {% if audit_status.remaining_days %}{{ audit_status.remaining_days }}d {% endif %}{{ audit_status.remaining_hours }}h).">
-            <button type="button" class="btn btn-xs btn-outline btn-primary opacity-45 cursor-not-allowed gap-1 font-semibold rounded-lg" disabled>
-              <span class="material-symbols-outlined text-[15px]">auto_awesome</span>
-              <span class="hidden sm:inline">AI Audit ({% if audit_status.remaining_days %}{{ audit_status.remaining_days }}d{% else %}{{ audit_status.remaining_hours }}h{% endif %})</span>
-            </button>
-          </div>
-          {% endif %}
         </div>
         {% if is_filtered %}
         <div class="flex items-center justify-between pt-0.5 px-0.5">

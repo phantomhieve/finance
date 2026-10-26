@@ -1454,6 +1454,56 @@ class RefundAndEmiTrackingTests(TestCase):
         self.assertIn('st_grp_paid_due_idx', st_index_names)
         self.assertIn('st_grp_status_idx', st_index_names)
 
+    def test_partial_card_statement_payment_tracking(self):
+        from .categories import categories_by_name
+        from .models import CardStatement, Expense, PaymentSource
+        from .statements import upcoming_dues
+
+        card2 = PaymentSource.objects.create(
+            group=self.group, kind='CREDIT_CARD', institution='HDFC', last4='2555',
+        )
+        st = CardStatement.objects.create(
+            group=self.group, payment_source=card2, total_due=Decimal('571780.00'),
+            statement_date=datetime.date(2026, 9, 20), due_date=datetime.date(2026, 10, 10),
+            is_paid=False,
+        )
+
+        cats = categories_by_name(self.group)
+        transfer_cat = cats.get('Transfers')
+
+        # Credit of 4.3L received on card2 on 26 Oct (today)
+        credit = Expense.objects.create(
+            group=self.group, amount=Decimal('430000.00'), direction='CREDIT',
+            txn_date=datetime.date(2026, 10, 26), merchant='Unknown merchant',
+            payment_source=card2, category=transfer_cat,
+        )
+
+        # Debit from bank of 4.3L
+        Expense.objects.create(
+            group=self.group, amount=Decimal('430000.00'), direction='DEBIT',
+            txn_date=datetime.date(2026, 10, 26), merchant='VPA club@axisb',
+            category=transfer_cat,
+        )
+
+        dues = upcoming_dues(self.group, today=datetime.date(2026, 10, 26))
+        st.refresh_from_db()
+        credit.refresh_from_db()
+
+        self.assertEqual(st.paid_amount, Decimal('430000.00'))
+        self.assertFalse(st.is_paid)
+        self.assertEqual(len(dues), 1)
+        self.assertTrue(dues[0].is_partial)
+        self.assertEqual(dues[0].remaining_due, Decimal('141780.00'))
+        self.assertEqual(credit.merchant, 'Credit Card Bill Payment')
+        self.assertEqual(credit.category.name, 'Credit Card Payment')
+
+        self.client.force_login(self.user)
+        response = self.client.get(reverse('expenses_home') + '?m=2026-10')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['total_dues_amount'], Decimal('141780.00'))
+        self.assertNotContains(response, '>AI Audit</')
+
+
 
 
 

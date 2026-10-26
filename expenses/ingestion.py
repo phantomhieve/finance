@@ -197,8 +197,13 @@ def settle_internal_movements(group: AccountGroup, since: datetime.date) -> list
         )
         if twin:
             used_credits.add(twin.pk)
-            refile(debit, transfer)
-            refile(twin, transfer)
+            target_cat = bill if (bill and twin.payment_source and twin.payment_source.kind == 'CREDIT_CARD') else transfer
+            refile(debit, target_cat)
+            refile(twin, target_cat)
+            if target_cat == bill:
+                if not twin.merchant or twin.merchant in ('Unknown merchant', 'Unknown'):
+                    twin.merchant = 'Credit Card Bill Payment'
+                    twin.save(update_fields=['merchant'])
             settled.append(debit.pk)
 
     return settled

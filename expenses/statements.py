@@ -807,30 +807,35 @@ def auto_track_statement_payments(group, since_days=60):
     statements = list(
         CardStatement.objects.filter(
             group=group,
-            created_at__date__gte=cutoff,
             total_due__isnull=False,
             total_due__gt=0,
         )
+        .filter(Q(is_paid=False) | Q(created_at__date__gte=cutoff))
         .exclude(status='DUPLICATE')
         .select_related('payment_source')
     )
     if not statements:
         return
 
+    today_date = datetime.date.today()
     for st in statements:
         card = st.payment_source
         if not card:
             continue
-        start_date = st.statement_date or (st.due_date - datetime.timedelta(days=25) if st.due_date else None)
-        end_date = (st.due_date + datetime.timedelta(days=15)) if st.due_date else (start_date + datetime.timedelta(days=45) if start_date else None)
-        if not start_date or not end_date:
-            continue
+        family_ids = card_family_ids(card)
+        if card.last4:
+            family_ids |= set(PaymentSource.objects.filter(group=group, last4=card.last4).values_list('pk', flat=True))
+
+        start_date = (st.statement_date - datetime.timedelta(days=5)) if st.statement_date else (
+            st.due_date - datetime.timedelta(days=45) if st.due_date else (today_date - datetime.timedelta(days=60))
+        )
+        end_date = max(today_date, (st.due_date + datetime.timedelta(days=45)) if st.due_date else today_date)
 
         # Look for credit transactions on this credit card (payment receipts)
         card_credits = list(
             Expense.objects.filter(
                 group=group,
-                payment_source=card,
+                payment_source_id__in=family_ids,
                 direction='CREDIT',
                 txn_date__gte=start_date,
                 txn_date__lte=end_date,
@@ -839,9 +844,35 @@ def auto_track_statement_payments(group, since_days=60):
         )
 
         for c in card_credits:
+            updates_c = []
             if not c.merchant or c.merchant in ('Unknown merchant', 'Unknown'):
                 c.merchant = 'Credit Card Bill Payment'
-                c.save(update_fields=['merchant'])
+                updates_c.append('merchant')
+            if c.category and c.category.name == 'Transfers':
+                from .categories import categories_by_name
+                cats = categories_by_name(group)
+                if 'Credit Card Payment' in cats:
+                    c.category = cats['Credit Card Payment']
+                    updates_c.append('category')
+            if updates_c:
+                c.save(update_fields=updates_c)
+
+            # Heal twin debit if filed under Transfers
+            twin_debit = Expense.objects.filter(
+                group=group,
+                direction='DEBIT',
+                amount=c.amount,
+                category__name='Transfers',
+                txn_date__gte=c.txn_date - datetime.timedelta(days=2),
+                txn_date__lte=c.txn_date + datetime.timedelta(days=2),
+                is_deleted=False,
+            ).first()
+            if twin_debit:
+                from .categories import categories_by_name
+                cats = categories_by_name(group)
+                if 'Credit Card Payment' in cats:
+                    twin_debit.category = cats['Credit Card Payment']
+                    twin_debit.save(update_fields=['category'])
 
         total_paid = sum((c.amount for c in card_credits), Decimal('0.00'))
 
@@ -851,7 +882,7 @@ def auto_track_statement_payments(group, since_days=60):
                 Expense.objects.filter(
                     group=group,
                     direction='DEBIT',
-                    category__name='Credit Card Payment',
+                    category__name__in=('Credit Card Payment', 'Transfers'),
                     merchant_raw__icontains=card.last4,
                     txn_date__gte=start_date,
                     txn_date__lte=end_date,
@@ -871,7 +902,11 @@ def auto_track_statement_payments(group, since_days=60):
                 updates.append('paid_amount')
             if target_paid and not st.is_paid:
                 st.is_paid = True
-                st.paid_at = latest_date or st.paid_at or datetime.date.today()
+                st.paid_at = latest_date or st.paid_at or today_date
+                updates.extend(['is_paid', 'paid_at'])
+            elif not target_paid and st.is_paid:
+                st.is_paid = False
+                st.paid_at = None
                 updates.extend(['is_paid', 'paid_at'])
             if updates:
                 st.save(update_fields=updates)
@@ -883,7 +918,7 @@ def upcoming_dues(group, today=None, horizon_days=21):
     dues = list(
         CardStatement.objects.filter(
             group=group, is_paid=False, due_date__isnull=False,
-            due_date__gte=today - datetime.timedelta(days=7),
+            due_date__gte=today - datetime.timedelta(days=30),
             due_date__lte=today + datetime.timedelta(days=horizon_days),
         ).exclude(status='DUPLICATE').select_related('payment_source').order_by('due_date')
     )
