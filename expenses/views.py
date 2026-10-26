@@ -153,7 +153,7 @@ def expenses_home(request):
     dues = upcoming_dues(group, today)
     for st in dues:
         st.days_left = (st.due_date - today).days
-    total_dues_amount = sum(((st.total_due or st.min_due or Decimal('0.00')) for st in dues), Decimal('0.00'))
+    total_dues_amount = sum((getattr(st, 'remaining_due', st.total_due or st.min_due or Decimal('0.00')) for st in dues), Decimal('0.00'))
     context_reconnect = [a for a in accounts if a.needs_reconnect]
     pending_passwords = CardStatement.objects.filter(group=group, status='NEEDS_PASSWORD').count()
     trend = monthly_trend(group, year, month, today=today)

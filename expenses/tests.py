@@ -403,6 +403,37 @@ class ReconcileTests(ExpenseTestCase):
         st.refresh_from_db()
         self.assertTrue(st.is_paid)
 
+    def test_auto_track_statement_payments_multi_part(self):
+        from .statements import upcoming_dues
+        card, _ = PaymentSource.objects.get_or_create(group=self.group, kind='CREDIT_CARD', institution='HDFC', last4='1383')
+        st = CardStatement.objects.create(
+            group=self.group, payment_source=card, status='PARSED',
+            statement_date=datetime.date(2026, 10, 5), due_date=datetime.date(2026, 10, 25),
+            total_due=Decimal('20000.00'), is_paid=False,
+        )
+        # Part 1 payment: ₹8,000 credit on card
+        Expense.objects.create(
+            group=self.group, payment_source=card, direction='CREDIT', amount=Decimal('8000.00'),
+            txn_date=datetime.date(2026, 10, 10), merchant='Credit Card Bill Payment',
+        )
+        dues = upcoming_dues(self.group, datetime.date(2026, 10, 15))
+        st.refresh_from_db()
+        self.assertFalse(st.is_paid)
+        self.assertEqual(st.paid_amount, Decimal('8000.00'))
+        self.assertEqual(dues[0].remaining_due, Decimal('12000.00'))
+        self.assertTrue(dues[0].is_partial)
+
+        # Part 2 payment: ₹12,000 credit on card
+        Expense.objects.create(
+            group=self.group, payment_source=card, direction='CREDIT', amount=Decimal('12000.00'),
+            txn_date=datetime.date(2026, 10, 18), merchant='Credit Card Bill Payment',
+        )
+        dues2 = upcoming_dues(self.group, datetime.date(2026, 10, 19))
+        st.refresh_from_db()
+        self.assertTrue(st.is_paid)
+        self.assertEqual(st.paid_amount, Decimal('20000.00'))
+        self.assertEqual(len(dues2), 0)
+
     def test_due_reminders_windows(self):
         self.email_expense()
         st = self.make_statement()

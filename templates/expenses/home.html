@@ -57,8 +57,9 @@
         <div class="flex items-center gap-2">
           <p class="text-[10px] font-bold uppercase tracking-widest opacity-50">Net Spend in {{ summary.label }}</p>
           {% if summary.refunded_total > 0 %}
-          <span class="badge badge-xs bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 gap-1 font-semibold">
-            <span class="material-symbols-outlined text-[10px]">replay</span>{{ summary.refunded_total|inr_short }} refunded
+          <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 leading-none shrink-0">
+            <span class="material-symbols-outlined text-[11px] leading-none shrink-0">replay</span>
+            <span class="leading-none">{{ summary.refunded_total|inr_short }} refunded</span>
           </span>
           {% endif %}
           {% if pace %}
@@ -162,7 +163,7 @@
 <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 lg:gap-6 items-start">
 
   {# ——— LEFT COLUMN: Analytics, Categories & Attention items ——— #}
-  <div id="expInsightsColumn" class="lg:col-span-2 hidden lg:flex flex-col gap-4">
+  <div id="expInsightsColumn" class="lg:col-span-2 hidden lg:flex flex-col gap-4 space-y-4 lg:space-y-0">
 
     {# Needs attention alerts #}
     {% if not accounts or attention_count %}
@@ -434,16 +435,27 @@
                 <span class="material-symbols-outlined text-base">credit_card</span>
               </span>
               <div class="min-w-0">
-                <div class="text-xs font-bold truncate">{{ st.payment_source.short_name }}</div>
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span class="text-xs font-bold truncate">{{ st.payment_source.short_name }}</span>
+                  {% if st.is_partial %}
+                  <span class="badge badge-xs bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold">Partially paid</span>
+                  {% endif %}
+                </div>
                 <div class="text-[10px] {% if st.days_left < 0 %}text-error font-semibold{% else %}opacity-60{% endif %} mt-0.5">
                   {% if st.days_left < 0 %}Overdue since {{ st.due_date|date:"j M" }}{% elif st.days_left == 0 %}Due today{% else %}Due {{ st.due_date|date:"D, j M" }} · {{ st.days_left }} day{{ st.days_left|pluralize }} left{% endif %}
+                  {% if st.is_partial %} · {{ st.paid_amount|inr }} paid{% endif %}
                 </div>
               </div>
             </div>
             <div class="text-right shrink-0">
-              <div class="text-xs font-bold tabular-nums text-secondary">{{ st.total_due|default:st.min_due|inr }}</div>
-              {% if st.min_due and st.min_due != st.total_due %}
-              <div class="text-[10px] opacity-50 tabular-nums">Min: {{ st.min_due|inr }}</div>
+              {% if st.is_partial %}
+                <div class="text-xs font-bold tabular-nums text-secondary">{{ st.remaining_due|inr }} <span class="text-[9px] font-normal opacity-60">due</span></div>
+                <div class="text-[10px] opacity-50 tabular-nums">Total: {{ st.total_due|inr }}</div>
+              {% else %}
+                <div class="text-xs font-bold tabular-nums text-secondary">{{ st.total_due|default:st.min_due|inr }}</div>
+                {% if st.min_due and st.min_due != st.total_due %}
+                <div class="text-[10px] opacity-50 tabular-nums">Min: {{ st.min_due|inr }}</div>
+                {% endif %}
               {% endif %}
             </div>
           </a>
@@ -521,24 +533,27 @@
             <button type="button"
                     class="table-card cursor-pointer flex items-center gap-2.5 sm:gap-3.5 text-left w-full p-2.5 sm:p-3 {% if e.needs_review %}border-warning/50 bg-warning/5{% endif %}"
                     onclick="Expenses.open({{ e.pk }})">
-              <span class="jw-type-avatar shrink-0" style="--h:{% if e.direction == 'CREDIT' %}160{% elif e.category %}{{ e.category.hue }}{% else %}40{% endif %}">
-                <span class="icon-filled material-symbols-outlined text-xl">{% if e.direction == 'CREDIT' %}replay{% else %}{{ e.icon }}{% endif %}</span>
+              <span class="jw-type-avatar shrink-0" style="--h:{% if e.category.name == 'Credit Card Payment' or e.category.kind == 'TRANSFER' %}260{% elif e.direction == 'CREDIT' %}160{% elif e.category %}{{ e.category.hue }}{% else %}40{% endif %}">
+                <span class="icon-filled material-symbols-outlined text-lg">{% if e.category.name == 'Credit Card Payment' or e.category.kind == 'TRANSFER' %}credit_score{% elif e.direction == 'CREDIT' %}replay{% else %}{{ e.icon }}{% endif %}</span>
               </span>
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-1.5 flex-wrap">
                   <span class="font-bold text-sm truncate tracking-tight">{{ e.merchant|default:"Unknown" }}</span>
                   {% if e.is_refunded %}
-                  <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                    <span class="material-symbols-outlined text-xs">replay</span>Refunded
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide bg-emerald-500/12 text-emerald-400 border border-emerald-500/25 leading-none shrink-0">
+                    <span class="material-symbols-outlined text-[11px] leading-none shrink-0">replay</span>
+                    <span>Refunded</span>
                   </span>
                   {% elif e.direction == 'CREDIT' and e.category.kind != 'TRANSFER' and e.category.name != 'Credit Card Payment' %}
-                  <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                    <span class="material-symbols-outlined text-xs">replay</span>Refund
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide bg-emerald-500/12 text-emerald-300 border border-emerald-500/25 leading-none shrink-0">
+                    <span class="material-symbols-outlined text-[11px] leading-none shrink-0">replay</span>
+                    <span>Refund</span>
                   </span>
                   {% endif %}
                   {% if e.is_emi %}
-                  <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30">
-                    <span class="material-symbols-outlined text-xs">event_repeat</span>EMI{% if e.emi_installment_num %} #{{ e.emi_installment_num }}{% endif %}
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide bg-purple-500/12 text-purple-300 border border-purple-500/25 leading-none shrink-0">
+                    <span class="material-symbols-outlined text-[11px] leading-none shrink-0">schedule</span>
+                    <span>EMI{% if e.emi_installment_num %} #{{ e.emi_installment_num }}{% endif %}</span>
                   </span>
                   {% endif %}
                   {% if e.needs_review %}<span class="material-symbols-outlined text-[15px] text-warning icon-filled" title="Looks unusual">flag</span>{% endif %}
@@ -548,7 +563,11 @@
                   {% if e.is_refunded and e.refund_date %}
                     <span class="text-emerald-400 font-semibold">Purchased {{ e.txn_date|date:"d M" }} · Refunded on {{ e.refund_date|date:"d M" }}</span>
                   {% elif e.category.name == 'Credit Card Payment' or e.category.kind == 'TRANSFER' %}
-                    <span class="text-secondary font-semibold">Payment credited</span>{% if e.category %} · <span>{{ e.category.name }}</span>{% endif %}
+                    {% if e.direction == 'CREDIT' %}
+                      <span class="text-secondary font-semibold">Payment credited</span>{% if e.category %} · <span>{{ e.category.name }}</span>{% endif %}
+                    {% else %}
+                      <span class="text-secondary font-semibold">Payment sent</span>{% if e.category %} · <span>{{ e.category.name }}</span>{% endif %}
+                    {% endif %}
                   {% elif e.direction == 'CREDIT' %}
                     <span class="text-emerald-400/90 font-semibold">Refund received</span>{% if e.category %} · <span>{{ e.category.name }}</span>{% endif %}
                   {% else %}
@@ -761,6 +780,7 @@ function switchExpMobileTab(tab) {
   if (tab === 'insights') {
     feedCol.classList.add('hidden');
     insightsCol.classList.remove('hidden');
+    insightsCol.classList.add('flex');
     insightsBtn.classList.add('tab-active', 'font-bold', 'text-primary');
     insightsBtn.classList.remove('opacity-70');
     feedBtn.classList.remove('tab-active', 'font-bold', 'text-primary');
@@ -768,6 +788,7 @@ function switchExpMobileTab(tab) {
     setTimeout(function() { window.dispatchEvent(new Event('resize')); }, 60);
   } else {
     insightsCol.classList.add('hidden');
+    insightsCol.classList.remove('flex');
     feedCol.classList.remove('hidden');
     feedBtn.classList.add('tab-active', 'font-bold', 'text-primary');
     feedBtn.classList.remove('opacity-70');
