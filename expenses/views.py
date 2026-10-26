@@ -22,8 +22,8 @@ from .anomaly import ai_audit_expenses, apply_flags, audit_cooldown_status
 from .forms import CategoryForm, ExpenseForm, PaymentSourceForm, StatementUploadForm
 from .models import CardStatement, Expense, ExpenseCategory, GmailAccount, MerchantRule, PaymentSource, StatementLine
 from .services import (
-    INVESTMENT_CATEGORY, available_fys, ensure_default_categories, fy_summary, learn_category,
-    manual_merchant, month_summary, monthly_trend, shift_month,
+    INVESTMENT_CATEGORY, all_refunds_q, available_fys, ensure_default_categories, fy_summary,
+    learn_category, manual_merchant, month_summary, monthly_trend, shift_month,
 )
 from .statements import read_pdf, reconcile, resolve_line, upcoming_dues
 from .sync import sync_account
@@ -79,7 +79,7 @@ def _parse_month(raw, today):
     return today.year, today.month
 
 
-def _expense_payload(e):
+def _expense_payload(e, edit_tmpl=None, delete_tmpl=None, review_tmpl=None):
     return {
         'id': e.pk, 'amount': str(e.amount), 'direction': e.direction, 'txn_date': e.txn_date.isoformat(),
         'merchant': e.merchant, 'category': e.category_id or '', 'payment_source': e.payment_source_id or '',
@@ -95,8 +95,9 @@ def _expense_payload(e):
         'emi_installment_num': e.emi_installment_num,
         'emi_total_installments': e.emi_total_installments,
         'emi_component': e.emi_component,
-        'edit_url': reverse('expense_edit', args=[e.pk]), 'delete_url': reverse('expense_delete', args=[e.pk]),
-        'review_url': reverse('expense_review', args=[e.pk]),
+        'edit_url': edit_tmpl.replace('0', str(e.pk)) if edit_tmpl else reverse('expense_edit', args=[e.pk]),
+        'delete_url': delete_tmpl.replace('0', str(e.pk)) if delete_tmpl else reverse('expense_delete', args=[e.pk]),
+        'review_url': review_tmpl.replace('0', str(e.pk)) if review_tmpl else reverse('expense_review', args=[e.pk]),
     }
 
 
@@ -133,17 +134,7 @@ def expenses_home(request):
     if f_flagged:
         qs = qs.filter(is_flagged=True, flag_reviewed=False)
     if f_refunds:
-        qs = qs.filter(
-            Q(refunded_amount__gt=0)
-            | Q(refund_date__isnull=False)
-            | Q(direction='CREDIT')
-        ).exclude(
-            category__kind='TRANSFER'
-        ).exclude(
-            category__name__in=('Credit Card Payment', 'Transfers')
-        ).exclude(
-            payment_source__kind='CREDIT_CARD', merchant__in=('Credit Card Bill Payment', 'Unknown merchant', 'Unknown')
-        )
+        qs = qs.filter(all_refunds_q())
     if f_emis:
         qs = qs.filter(is_emi=True)
     if f_query:
@@ -151,7 +142,7 @@ def expenses_home(request):
     rows = list(qs)
     days = [{'date': d, 'items': list(items)} for d, items in groupby(rows, key=lambda e: e.txn_date)]
     for day in days:
-        day['spend'] = sum((e.net_amount for e in day['items'] if e.is_spend and e.currency == 'INR'), 0)
+        day['spend'] = sum((e.net_amount for e in day['items'] if e.is_spend and e.currency == 'INR'), Decimal('0.00'))
 
     py, pm = shift_month(year, month, -1)
     ny, nm = shift_month(year, month, 1)
@@ -167,11 +158,14 @@ def expenses_home(request):
     context_reconnect = [a for a in accounts if a.needs_reconnect]
     pending_passwords = CardStatement.objects.filter(group=group, status='NEEDS_PASSWORD').count()
     trend = monthly_trend(group, year, month, today=today)
+    edit_tmpl = reverse('expense_edit', args=[0])
+    delete_tmpl = reverse('expense_delete', args=[0])
+    review_tmpl = reverse('expense_review', args=[0])
     context = {
         'summary': summary,
         'days': days,
         'row_count': len(rows),
-        'payload': {str(e.pk): _expense_payload(e) for e in rows},
+        'payload': {str(e.pk): _expense_payload(e, edit_tmpl, delete_tmpl, review_tmpl) for e in rows},
         'month_param': f'{year:04d}-{month:02d}',
         'prev_month': f'{py:04d}-{pm:02d}',
         'next_month': f'{ny:04d}-{nm:02d}' if (ny, nm) <= (today.year, today.month) else '',
@@ -325,10 +319,9 @@ def expense_set_emi_tenure(request):
     expense_id = request.POST.get('expense_id')
     total_raw = request.POST.get('total_installments', '').strip()
     num_raw = request.POST.get('installment_num', '').strip()
-    next_url = request.POST.get('next') or reverse('expenses_home')
 
-    total_val = int(total_raw) if total_raw.isdigit() and int(total_raw) > 0 else None
-    num_val = int(num_raw) if num_raw.isdigit() and int(num_raw) > 0 else None
+    total_val = int(total_raw) if total_raw.isdigit() and 1 <= int(total_raw) <= 360 else None
+    num_val = int(num_raw) if num_raw.isdigit() and 1 <= int(num_raw) <= 360 else None
 
     if total_val is not None:
         if ref:
@@ -355,7 +348,7 @@ def expense_set_emi_tenure(request):
 
     if request.headers.get('x-requested-with') == 'XMLHttpRequest' or 'application/json' in request.headers.get('accept', ''):
         return JsonResponse({'ok': True, 'total': total_val, 'num': num_val})
-    return redirect(next_url)
+    return safe_redirect(request, 'expenses_home')
 
 
 @_require_expenses
@@ -561,7 +554,6 @@ def statements_list(request):
 
 @_require_expenses
 def statement_detail(request, pk):
-    from decimal import Decimal
     group = _group(request)
     statement = get_object_or_404(CardStatement.objects.select_related('payment_source', 'duplicate_of'), pk=pk, group=group)
     lines = list(statement.lines.select_related(

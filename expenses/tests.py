@@ -1374,6 +1374,137 @@ class RefundAndEmiTrackingTests(TestCase):
         self.assertIn(refund, items)
         self.assertNotIn(card_payment, items)
 
+    def test_modular_refund_q_and_aggregation(self):
+        from .analytics import all_refunds_q, credit_refunds_q, month_summary
+        from .models import Expense
+
+        refund_credit = Expense.objects.create(
+            group=self.group, amount=Decimal('500.00'), direction='CREDIT',
+            txn_date=datetime.date(2026, 10, 12), merchant='Amazon Return',
+        )
+        bill_credit = Expense.objects.create(
+            group=self.group, amount=Decimal('5000.00'), direction='CREDIT',
+            txn_date=datetime.date(2026, 10, 12), merchant='Credit Card Bill Payment',
+            payment_source=self.card,
+        )
+        self.card.kind = 'CREDIT_CARD'
+        self.card.save()
+
+        matched_credits = list(Expense.objects.filter(group=self.group).filter(credit_refunds_q()))
+        self.assertIn(refund_credit, matched_credits)
+        self.assertNotIn(bill_credit, matched_credits)
+
+        all_matched = list(Expense.objects.filter(group=self.group).filter(all_refunds_q()))
+        self.assertIn(refund_credit, all_matched)
+        self.assertNotIn(bill_credit, all_matched)
+
+        summary = month_summary(self.group, 2026, 10)
+        self.assertIn('gross_total', summary)
+        self.assertIn('refunded_total', summary)
+
+    def test_expense_set_emi_tenure_security_and_validation(self):
+        from .models import Expense
+        exp = Expense.objects.create(
+            group=self.group, amount=Decimal('1000.00'), direction='DEBIT',
+            txn_date=datetime.date(2026, 10, 1), merchant='EMI Test',
+            is_emi=True, emi_reference='SEC99',
+        )
+        self.client.force_login(self.user)
+
+        # 1. Open redirect attack attempt: should not redirect to external host
+        resp = self.client.post(reverse('expense_set_emi_tenure'), {
+            'ref': 'SEC99',
+            'expense_id': str(exp.pk),
+            'total_installments': '12',
+            'installment_num': '2',
+            'next': 'https://evil.com/phish',
+        })
+        self.assertEqual(resp.status_code, 302)
+        self.assertNotIn('evil.com', resp.url)
+        self.assertTrue(resp.url.endswith(reverse('expenses_home')))
+
+        # 2. Integer out of smallint bounds (e.g. 999999): should be rejected safely without 500 error
+        resp = self.client.post(reverse('expense_set_emi_tenure'), {
+            'ref': 'SEC99',
+            'expense_id': str(exp.pk),
+            'total_installments': '9999999',
+            'installment_num': '9999999',
+        })
+        self.assertEqual(resp.status_code, 302)
+        exp.refresh_from_db()
+        self.assertNotEqual(exp.emi_total_installments, 9999999)
+
+    def test_crypto_fernet_lru_caching(self):
+        from .crypto import _fernet, decrypt, encrypt
+
+        f1 = _fernet()
+        f2 = _fernet()
+        self.assertIs(f1, f2)
+        token = encrypt('secret-payload')
+        self.assertEqual(decrypt(token), 'secret-payload')
+
+    def test_model_meta_indexes(self):
+        from .models import CardStatement, Expense
+
+        exp_index_names = [idx.name for idx in Expense._meta.indexes]
+        self.assertIn('exp_grp_del_date_idx', exp_index_names)
+        self.assertIn('exp_grp_emi_ref_idx', exp_index_names)
+
+        st_index_names = [idx.name for idx in CardStatement._meta.indexes]
+        self.assertIn('st_grp_paid_due_idx', st_index_names)
+        self.assertIn('st_grp_status_idx', st_index_names)
+
+    def test_partial_card_statement_payment_tracking(self):
+        from .categories import categories_by_name
+        from .models import CardStatement, Expense, PaymentSource
+        from .statements import upcoming_dues
+
+        card2 = PaymentSource.objects.create(
+            group=self.group, kind='CREDIT_CARD', institution='HDFC', last4='2555',
+        )
+        st = CardStatement.objects.create(
+            group=self.group, payment_source=card2, total_due=Decimal('571780.00'),
+            statement_date=datetime.date(2026, 9, 20), due_date=datetime.date(2026, 10, 10),
+            is_paid=False,
+        )
+
+        cats = categories_by_name(self.group)
+        transfer_cat = cats.get('Transfers')
+
+        # Credit of 4.3L received on card2 on 26 Oct (today)
+        credit = Expense.objects.create(
+            group=self.group, amount=Decimal('430000.00'), direction='CREDIT',
+            txn_date=datetime.date(2026, 10, 26), merchant='Unknown merchant',
+            payment_source=card2, category=transfer_cat,
+        )
+
+        # Debit from bank of 4.3L
+        Expense.objects.create(
+            group=self.group, amount=Decimal('430000.00'), direction='DEBIT',
+            txn_date=datetime.date(2026, 10, 26), merchant='VPA club@axisb',
+            category=transfer_cat,
+        )
+
+        dues = upcoming_dues(self.group, today=datetime.date(2026, 10, 26))
+        st.refresh_from_db()
+        credit.refresh_from_db()
+
+        self.assertEqual(st.paid_amount, Decimal('430000.00'))
+        self.assertFalse(st.is_paid)
+        self.assertEqual(len(dues), 1)
+        self.assertTrue(dues[0].is_partial)
+        self.assertEqual(dues[0].remaining_due, Decimal('141780.00'))
+        self.assertEqual(credit.merchant, 'Credit Card Bill Payment')
+        self.assertEqual(credit.category.name, 'Credit Card Payment')
+
+        self.client.force_login(self.user)
+        response = self.client.get(reverse('expenses_home') + '?m=2026-10')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['total_dues_amount'], Decimal('141780.00'))
+        self.assertNotContains(response, '>AI Audit</')
+
+
+
 
 
 
