@@ -4,6 +4,7 @@ Key resolution: EXPENSES_ENCRYPTION_KEY (a Fernet key) if set, else derived from
 Rotating either invalidates stored values — users then reconnect Gmail / re-enter passwords.
 """
 import base64
+import functools
 import hashlib
 import os
 
@@ -11,6 +12,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from django.conf import settings
 
 
+@functools.lru_cache(maxsize=1)
 def _fernet():
     key = os.environ.get('EXPENSES_ENCRYPTION_KEY', '').strip()
     if not key:

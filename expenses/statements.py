@@ -803,7 +803,6 @@ def auto_track_statement_payments(group, since_days=60):
     - Full payments: automatically marks statement as paid (is_paid=True).
     - Multi-part / partial payments: tracks paid_amount and remaining due.
     """
-    from .models import Expense
     cutoff = datetime.date.today() - datetime.timedelta(days=since_days)
     statements = list(
         CardStatement.objects.filter(

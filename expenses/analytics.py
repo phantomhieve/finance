@@ -32,6 +32,25 @@ def spend_q() -> Q:
     return Q(direction='DEBIT') & (Q(category__isnull=True) | Q(category__kind='SPEND'))
 
 
+def credit_refunds_q() -> Q:
+    """Filter Q for incoming CREDIT transactions that qualify as refunds (excludes transfers and card bill payments)."""
+    return (
+        Q(direction='CREDIT')
+        & ~Q(category__kind='TRANSFER')
+        & ~Q(category__name__in=('Credit Card Payment', 'Transfers'))
+        & ~Q(payment_source__kind='CREDIT_CARD', merchant__in=('Credit Card Bill Payment', 'Unknown merchant', 'Unknown'))
+    )
+
+
+def all_refunds_q() -> Q:
+    """Filter Q matching either debit expenses that have been refunded or incoming credit refunds."""
+    return (
+        Q(refunded_amount__gt=ZERO)
+        | Q(refund_date__isnull=False)
+        | credit_refunds_q()
+    )
+
+
 def live(group: AccountGroup) -> QuerySet[Expense]:
     """Active non-deleted expenses for the household group (excluding absorbed refunds)."""
     return Expense.objects.filter(group=group, is_deleted=False, refund_of__isnull=True)
@@ -183,27 +202,26 @@ def month_summary(
     frequent = (flexible.exclude(merchant='').values('merchant').annotate(total=Sum('amount'), count=Count('id'))
                 .filter(count__gte=2).order_by('-count', '-total').first())
 
-    gross_total = qs.filter(spend_q()).aggregate(t=Sum('amount'))['t'] or ZERO
-    debit_refunds = spend_qs.filter(refunded_amount__gt=ZERO).aggregate(t=Sum('refunded_amount'))['t'] or ZERO
+    agg = spend_qs.aggregate(
+        gross=Sum('amount'),
+        debit_refunds=Sum(
+            Case(
+                When(refunded_amount__gt=ZERO, then=F('refunded_amount')),
+                default=ZERO,
+                output_field=models.DecimalField(max_digits=12, decimal_places=2),
+            )
+        ),
+    )
+    gross_total = agg['gross'] or ZERO
+    debit_refunds = agg['debit_refunds'] or ZERO
     credit_refunds = (
-        month_all.filter(direction='CREDIT', refund_of__isnull=True)
-        .exclude(category__kind='TRANSFER')
-        .exclude(category__name__in=('Credit Card Payment', 'Transfers'))
-        .exclude(payment_source__kind='CREDIT_CARD', merchant__in=('Credit Card Bill Payment', 'Unknown merchant', 'Unknown'))
+        month_all.filter(refund_of__isnull=True)
+        .filter(credit_refunds_q())
         .aggregate(t=Sum('amount'))['t'] or ZERO
     )
     refunded_total = debit_refunds + credit_refunds
     total = max(ZERO, total - credit_refunds)
-    refund_count = month_all.filter(
-        Q(refunded_amount__gt=ZERO)
-        | Q(refund_date__isnull=False)
-        | (
-            Q(direction='CREDIT')
-            & ~Q(category__kind='TRANSFER')
-            & ~Q(category__name__in=('Credit Card Payment', 'Transfers'))
-            & ~Q(payment_source__kind='CREDIT_CARD', merchant__in=('Credit Card Bill Payment', 'Unknown merchant', 'Unknown'))
-        )
-    ).count()
+    refund_count = month_all.filter(all_refunds_q()).count()
 
     # Credit card EMI metrics
     emi_qs = month_all.filter(is_emi=True)

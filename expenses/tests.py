@@ -1374,6 +1374,87 @@ class RefundAndEmiTrackingTests(TestCase):
         self.assertIn(refund, items)
         self.assertNotIn(card_payment, items)
 
+    def test_modular_refund_q_and_aggregation(self):
+        from .analytics import all_refunds_q, credit_refunds_q, month_summary
+        from .models import Expense
+
+        refund_credit = Expense.objects.create(
+            group=self.group, amount=Decimal('500.00'), direction='CREDIT',
+            txn_date=datetime.date(2026, 10, 12), merchant='Amazon Return',
+        )
+        bill_credit = Expense.objects.create(
+            group=self.group, amount=Decimal('5000.00'), direction='CREDIT',
+            txn_date=datetime.date(2026, 10, 12), merchant='Credit Card Bill Payment',
+            payment_source=self.card,
+        )
+        self.card.kind = 'CREDIT_CARD'
+        self.card.save()
+
+        matched_credits = list(Expense.objects.filter(group=self.group).filter(credit_refunds_q()))
+        self.assertIn(refund_credit, matched_credits)
+        self.assertNotIn(bill_credit, matched_credits)
+
+        all_matched = list(Expense.objects.filter(group=self.group).filter(all_refunds_q()))
+        self.assertIn(refund_credit, all_matched)
+        self.assertNotIn(bill_credit, all_matched)
+
+        summary = month_summary(self.group, 2026, 10)
+        self.assertIn('gross_total', summary)
+        self.assertIn('refunded_total', summary)
+
+    def test_expense_set_emi_tenure_security_and_validation(self):
+        from .models import Expense
+        exp = Expense.objects.create(
+            group=self.group, amount=Decimal('1000.00'), direction='DEBIT',
+            txn_date=datetime.date(2026, 10, 1), merchant='EMI Test',
+            is_emi=True, emi_reference='SEC99',
+        )
+        self.client.force_login(self.user)
+
+        # 1. Open redirect attack attempt: should not redirect to external host
+        resp = self.client.post(reverse('expense_set_emi_tenure'), {
+            'ref': 'SEC99',
+            'expense_id': str(exp.pk),
+            'total_installments': '12',
+            'installment_num': '2',
+            'next': 'https://evil.com/phish',
+        })
+        self.assertEqual(resp.status_code, 302)
+        self.assertNotIn('evil.com', resp.url)
+        self.assertTrue(resp.url.endswith(reverse('expenses_home')))
+
+        # 2. Integer out of smallint bounds (e.g. 999999): should be rejected safely without 500 error
+        resp = self.client.post(reverse('expense_set_emi_tenure'), {
+            'ref': 'SEC99',
+            'expense_id': str(exp.pk),
+            'total_installments': '9999999',
+            'installment_num': '9999999',
+        })
+        self.assertEqual(resp.status_code, 302)
+        exp.refresh_from_db()
+        self.assertNotEqual(exp.emi_total_installments, 9999999)
+
+    def test_crypto_fernet_lru_caching(self):
+        from .crypto import _fernet, decrypt, encrypt
+
+        f1 = _fernet()
+        f2 = _fernet()
+        self.assertIs(f1, f2)
+        token = encrypt('secret-payload')
+        self.assertEqual(decrypt(token), 'secret-payload')
+
+    def test_model_meta_indexes(self):
+        from .models import CardStatement, Expense
+
+        exp_index_names = [idx.name for idx in Expense._meta.indexes]
+        self.assertIn('exp_grp_del_date_idx', exp_index_names)
+        self.assertIn('exp_grp_emi_ref_idx', exp_index_names)
+
+        st_index_names = [idx.name for idx in CardStatement._meta.indexes]
+        self.assertIn('st_grp_paid_due_idx', st_index_names)
+        self.assertIn('st_grp_status_idx', st_index_names)
+
+
 
 
 

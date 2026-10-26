@@ -200,6 +200,10 @@ class CardStatement(models.Model):
 
     class Meta:
         ordering = ['-statement_date', '-created_at']
+        indexes = [
+            models.Index(fields=['group', 'is_paid', 'due_date'], name='st_grp_paid_due_idx'),
+            models.Index(fields=['group', 'status'], name='st_grp_status_idx'),
+        ]
         constraints = [
             models.UniqueConstraint(
                 fields=['group', 'gmail_message_id'], condition=~Q(gmail_message_id=''),
@@ -297,6 +301,8 @@ class Expense(models.Model):
             models.Index(fields=['group', 'txn_date']),
             models.Index(fields=['group', 'merchant_key']),
             models.Index(fields=['group', 'is_emi']),
+            models.Index(fields=['group', 'is_deleted', 'txn_date'], name='exp_grp_del_date_idx'),
+            models.Index(fields=['group', 'is_emi', 'emi_reference'], name='exp_grp_emi_ref_idx'),
         ]
         constraints = [
             models.UniqueConstraint(
