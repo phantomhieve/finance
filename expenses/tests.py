@@ -1351,6 +1351,29 @@ class RefundAndEmiTrackingTests(TestCase):
         saved = form.save()
         self.assertFalse(saved.is_emi)
 
+    def test_refunds_filter_excludes_credit_card_payments(self):
+        # Create an actual refund
+        refund = Expense.objects.create(
+            group=self.group, amount=Decimal('500.00'), direction='CREDIT',
+            txn_date=datetime.date(2026, 10, 10), merchant='Amazon Refund',
+        )
+        # Create a credit card bill payment credit receipt
+        card_payment = Expense.objects.create(
+            group=self.group, amount=Decimal('22958.00'), direction='CREDIT',
+            txn_date=datetime.date(2026, 10, 10), merchant='Credit Card Bill Payment',
+            payment_source=self.card,
+        )
+        cats = categories_by_name(self.group)
+        card_payment.category = cats.get('Credit Card Payment')
+        card_payment.save()
+
+        self.client.force_login(self.user)
+        response = self.client.get(reverse('expenses_home') + '?m=2026-10&refunds=1')
+        self.assertEqual(response.status_code, 200)
+        items = [e for day in response.context['days'] for e in day['items']]
+        self.assertIn(refund, items)
+        self.assertNotIn(card_payment, items)
+
 
 
 

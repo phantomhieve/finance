@@ -133,7 +133,17 @@ def expenses_home(request):
     if f_flagged:
         qs = qs.filter(is_flagged=True, flag_reviewed=False)
     if f_refunds:
-        qs = qs.filter(Q(refunded_amount__gt=0) | Q(refund_date__isnull=False) | Q(direction='CREDIT'))
+        qs = qs.filter(
+            Q(refunded_amount__gt=0)
+            | Q(refund_date__isnull=False)
+            | Q(direction='CREDIT')
+        ).exclude(
+            category__kind='TRANSFER'
+        ).exclude(
+            category__name__in=('Credit Card Payment', 'Transfers')
+        ).exclude(
+            payment_source__kind='CREDIT_CARD', merchant__in=('Credit Card Bill Payment', 'Unknown merchant', 'Unknown')
+        )
     if f_emis:
         qs = qs.filter(is_emi=True)
     if f_query:

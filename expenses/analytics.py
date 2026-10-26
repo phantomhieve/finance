@@ -189,6 +189,7 @@ def month_summary(
         month_all.filter(direction='CREDIT', refund_of__isnull=True)
         .exclude(category__kind='TRANSFER')
         .exclude(category__name__in=('Credit Card Payment', 'Transfers'))
+        .exclude(payment_source__kind='CREDIT_CARD', merchant__in=('Credit Card Bill Payment', 'Unknown merchant', 'Unknown'))
         .aggregate(t=Sum('amount'))['t'] or ZERO
     )
     refunded_total = debit_refunds + credit_refunds
@@ -200,6 +201,7 @@ def month_summary(
             Q(direction='CREDIT')
             & ~Q(category__kind='TRANSFER')
             & ~Q(category__name__in=('Credit Card Payment', 'Transfers'))
+            & ~Q(payment_source__kind='CREDIT_CARD', merchant__in=('Credit Card Bill Payment', 'Unknown merchant', 'Unknown'))
         )
     ).count()
 
