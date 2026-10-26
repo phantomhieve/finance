@@ -120,6 +120,167 @@
     {% endif %}
   </div>
 </div>
+
+<div class="card bg-base-200 shadow-sm mt-4 lg:mt-6 animate-up" style="animation-delay:.2s">
+  <div class="card-body p-4 lg:p-5">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-base-content/10">
+      <div class="flex items-center gap-3">
+        <span class="jw-type-avatar" style="--h:280;width:2.5rem;height:2.5rem;border-radius:.75rem">
+          <span class="icon-filled material-symbols-outlined text-xl">subscriptions</span>
+        </span>
+        <div>
+          <div class="flex items-center gap-2">
+            <h2 class="text-sm lg:text-base font-bold">Recurring Subscriptions</h2>
+            {% if summary.subscriptions.services_count %}
+            <span class="badge badge-sm badge-secondary badge-soft font-semibold">{{ summary.subscriptions.services_count }} service{{ summary.subscriptions.services_count|pluralize }}</span>
+            {% endif %}
+          </div>
+          <p class="text-[11px] opacity-50">Month-wise cadence across Indian FY (April → March)</p>
+        </div>
+      </div>
+      
+      <div class="flex items-center gap-4">
+        <div>
+          <div class="text-[10px] font-bold uppercase tracking-wider opacity-40">Annual spend</div>
+          <div class="text-base lg:text-xl font-extrabold tabular-nums text-secondary">{% if summary.subscriptions.total %}{{ summary.subscriptions.total|inr }}{% else %}₹0{% endif %}</div>
+        </div>
+        <div class="divider divider-horizontal my-0 mx-0"></div>
+        <div>
+          <div class="text-[10px] font-bold uppercase tracking-wider opacity-40">Monthly avg</div>
+          <div class="text-sm lg:text-base font-bold tabular-nums opacity-90">{% if summary.subscriptions.avg_month %}{{ summary.subscriptions.avg_month|inr }}/mo{% else %}₹0/mo{% endif %}</div>
+        </div>
+      </div>
+    </div>
+
+    {% if summary.subscriptions.has_subscriptions %}
+    <div class="mt-4">
+      <div class="flex items-center justify-between mb-2.5">
+        <span class="text-xs font-bold uppercase tracking-wider opacity-50">Month-by-month breakdown</span>
+        <span class="text-[11px] opacity-40">Tap any month to view details</span>
+      </div>
+      
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+        {% for m in summary.subscriptions.months %}
+        <div class="rounded-xl border {% if m.total %}border-secondary/25 bg-secondary/5 hover:border-secondary/50{% elif m.started %}border-base-content/10 bg-base-300/40{% else %}border-dashed border-base-content/10 opacity-40{% endif %} p-2.5 flex flex-col justify-between transition-all">
+          <div class="flex items-center justify-between gap-1 mb-1.5">
+            <a href="{% url 'expenses_home' %}?m={{ m.param }}" class="text-xs font-bold hover:underline flex items-center gap-0.5">
+              <span>{{ m.label }}</span>
+              <span class="text-[9px] opacity-40 font-normal">'{{ m.year|stringformat:"d"|slice:"2:" }}</span>
+            </a>
+            {% if m.count %}
+            <span class="badge badge-xs badge-secondary font-semibold">{{ m.count }}</span>
+            {% elif m.started %}
+            <span class="text-[9px] opacity-30">—</span>
+            {% else %}
+            <span class="text-[9px] opacity-40 uppercase">Soon</span>
+            {% endif %}
+          </div>
+          
+          <div class="mb-2">
+            <div class="text-sm font-extrabold tabular-nums {% if m.total %}text-secondary{% else %}opacity-30{% endif %}">
+              {% if m.total %}{{ m.total|inr }}{% else %}₹0{% endif %}
+            </div>
+          </div>
+          
+          <div class="flex flex-col gap-1 min-h-[2.5rem]">
+            {% for item in m.items %}
+            <div class="flex items-center justify-between text-[11px] bg-base-100/70 rounded-md px-1.5 py-1 gap-1" title="{{ item.service }} · ₹{{ item.amount }} on {{ item.day_label }}">
+              <div class="flex items-center gap-1 min-w-0">
+                <span class="material-symbols-outlined text-[13px] opacity-70 shrink-0">{{ item.icon }}</span>
+                <span class="truncate font-medium">{{ item.service }}</span>
+              </div>
+              <span class="tabular-nums font-semibold shrink-0">{{ item.amount|inr_short }}</span>
+            </div>
+            {% empty %}
+            {% if m.started %}
+            <span class="text-[10px] opacity-30 italic self-center my-auto">No charges</span>
+            {% else %}
+            <span class="text-[10px] opacity-25 italic self-center my-auto">Upcoming</span>
+            {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% if summary.subscriptions.services %}
+    <div class="mt-6 pt-4 border-t border-base-content/10">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h3 class="text-xs font-bold uppercase tracking-wider opacity-60">Service Cadence &amp; FY Spend Matrix</h3>
+          <p class="text-[11px] opacity-45">Track billing continuity across all 12 months</p>
+        </div>
+        <span class="badge badge-sm badge-ghost text-[10px] opacity-60">12 months (Apr - Mar)</span>
+      </div>
+
+      <div class="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
+        <table class="table table-xs w-full">
+          <thead>
+            <tr class="text-[10px] opacity-40 border-b border-base-content/10">
+              <th class="py-2 pl-2">Service</th>
+              <th class="py-2 text-right">Latest / Rate</th>
+              <th class="py-2 text-right">FY Total</th>
+              <th class="py-2 text-center">Cadence</th>
+              {% for m in summary.subscriptions.months %}
+              <th class="py-2 text-center w-8 px-0.5">{{ m.label|slice:":1" }}<span class="hidden sm:inline">{{ m.label|slice:"1:" }}</span></th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in summary.subscriptions.services %}
+            <tr class="hover:bg-base-content/5 border-b border-base-content/5">
+              <td class="py-2 pl-2">
+                <div class="flex items-center gap-2">
+                  <div class="w-6 h-6 rounded-lg bg-secondary/15 flex items-center justify-center shrink-0">
+                    <span class="material-symbols-outlined text-xs text-secondary">{{ s.icon }}</span>
+                  </div>
+                  <span class="font-semibold text-xs truncate max-w-[120px] sm:max-w-[160px]">{{ s.name }}</span>
+                </div>
+              </td>
+              <td class="py-2 text-right tabular-nums text-xs font-medium opacity-75">
+                {{ s.latest_amount|inr_short }}{% if s.months_active > 1 %}/mo{% endif %}
+              </td>
+              <td class="py-2 text-right tabular-nums text-xs font-bold text-secondary">
+                {{ s.total|inr }}
+              </td>
+              <td class="py-2 text-center">
+                <span class="badge badge-xs font-medium {% if s.months_active == 12 %}badge-success badge-soft{% else %}badge-ghost{% endif %}">
+                  {{ s.months_active }}/12 mo
+                </span>
+              </td>
+              {% for mv in s.months_data %}
+              <td class="py-2 text-center px-0.5">
+                {% if mv.paid %}
+                <div class="tooltip tooltip-top" data-tip="{{ mv.label }}: {{ mv.amount|inr }}">
+                  <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-secondary/20 text-secondary text-[10px] font-bold">✓</span>
+                </div>
+                {% elif mv.started %}
+                <span class="inline-block w-1.5 h-1.5 rounded-full bg-base-content/15"></span>
+                {% else %}
+                <span class="inline-block w-1.5 h-1.5 rounded-full bg-base-content/5"></span>
+                {% endif %}
+              </td>
+              {% endfor %}
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="flex flex-col items-center justify-center py-8 text-center gap-2">
+      <div class="w-12 h-12 rounded-xl bg-secondary/10 flex items-center justify-center">
+        <span class="material-symbols-outlined text-2xl text-secondary opacity-60">subscriptions</span>
+      </div>
+      <p class="text-xs font-medium opacity-60">No recurring subscriptions recorded for {{ summary.label }} yet</p>
+      <p class="text-[11px] opacity-40">Expenses under Subscriptions or brands like Netflix, Spotify, and YouTube will appear here month-by-month.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
 {% else %}
 <div class="flex flex-col items-center justify-center py-16 gap-3 text-center">
   <div class="w-16 h-16 rounded-2xl bg-orange-400/10 border border-orange-400/20 flex items-center justify-center">

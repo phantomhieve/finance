@@ -24,6 +24,7 @@ from .parsing import (
 )
 from .services import (
     categories_by_name, fy_summary, learn_category, month_summary, monthly_trend, settle_internal_movements,
+    subscription_summary,
 )
 from .ai.schemas import LineMatch
 from .statements import due_reminders, find_duplicate, reconcile, record_card_payment, resolve_line
@@ -302,6 +303,58 @@ class TrendTests(ExpenseTestCase):
         self.assertEqual(s['stack'][0]['values'][1], 3000.0)
         shopping = s['categories'][0]
         self.assertEqual(shopping['avg_month'], Decimal('1500'))
+
+    def test_fy_summary_subscriptions_month_wise(self):
+        # Add subscription expenses in different months
+        self.add('649', 'NETFLIX', datetime.date(2026, 4, 15), 'Subscriptions')
+        self.add('649', 'Netflix Mumbai', datetime.date(2026, 5, 15), 'Subscriptions')
+        self.add('119', 'SPOTIFY', datetime.date(2026, 4, 20), 'Subscriptions')
+        self.add('1999', 'OpenAI ChatGPT', datetime.date(2026, 5, 2), 'Subscriptions')
+        # Non-subscription expense should not be included
+        self.add('2500', 'Grocery Mart', datetime.date(2026, 4, 5), 'Groceries')
+
+        s = fy_summary(self.group, 2026, today=datetime.date(2026, 6, 1))
+        subs = s['subscriptions']
+        direct_subs = subscription_summary(self.group, 2026, today=datetime.date(2026, 6, 1))
+        self.assertEqual(direct_subs['total'], subs['total'])
+        self.assertTrue(subs['has_subscriptions'])
+        self.assertEqual(subs['total'], Decimal('3416.00'))
+        self.assertEqual(subs['count'], 4)
+        self.assertEqual(subs['services_count'], 3)
+
+        # April should have Netflix (649) + Spotify (119) = 768
+        apr = next(m for m in subs['months'] if m['param'] == '2026-04')
+        self.assertEqual(apr['total'], Decimal('768.00'))
+        self.assertEqual(apr['count'], 2)
+        apr_services = [it['service'] for it in apr['items']]
+        self.assertIn('Netflix', apr_services)
+        self.assertIn('Spotify', apr_services)
+
+        # May should have Netflix (649) + OpenAI (1999) = 2648
+        may = next(m for m in subs['months'] if m['param'] == '2026-05')
+        self.assertEqual(may['total'], Decimal('2648.00'))
+        self.assertEqual(may['count'], 2)
+
+        # Services matrix
+        svc_names = [svc['name'] for svc in subs['services']]
+        self.assertIn('Netflix', svc_names)
+        self.assertIn('OpenAI', svc_names)
+        self.assertIn('Spotify', svc_names)
+
+        netflix_svc = next(svc for svc in subs['services'] if svc['name'] == 'Netflix')
+        self.assertEqual(netflix_svc['total'], Decimal('1298.00'))
+        self.assertEqual(netflix_svc['count'], 2)
+        self.assertEqual(netflix_svc['months_active'], 2)
+        self.assertEqual(netflix_svc['icon'], 'tv')
+
+        # Test view renders subscriptions section
+        self.client.force_login(self.user)
+        resp = self.client.get(reverse('expenses_year') + '?fy=2026')
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'Recurring Subscriptions')
+        self.assertContains(resp, 'Service Cadence &amp; FY Spend Matrix')
+        self.assertContains(resp, 'Netflix')
+        self.assertContains(resp, 'Spotify')
 
 
 class SettlementTests(ExpenseTestCase):

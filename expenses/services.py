@@ -27,6 +27,7 @@ from .analytics import (
     monthly_trend,
     shift_month,
     spend_q,
+    subscription_summary,
 )
 from .categories import (
     DEFAULT_CATEGORIES,
@@ -67,6 +68,7 @@ __all__ = [
     "month_summary",
     "monthly_trend",
     "fy_summary",
+    "subscription_summary",
     "available_fys",
     # Categories & Learning
     "DEFAULT_CATEGORIES",
