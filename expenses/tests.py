@@ -1577,12 +1577,28 @@ class RefundAndEmiTrackingTests(TestCase):
         self.assertEqual(resp_del.status_code, 404)
         self.assertTrue(ExpenseCategory.objects.filter(pk=inv_cat.pk).exists())
 
-        resp_save = self.client.post(reverse('expenses_category_save', args=[inv_cat.pk]), {
+        resp_save = self.client.post(reverse('expenses_category_edit', args=[inv_cat.pk]), {
             'name': 'Renamed Inv', 'kind': 'TRANSFER',
         })
         self.assertEqual(resp_save.status_code, 404)
         inv_cat.refresh_from_db()
         self.assertEqual(inv_cat.name, 'Investments')
+
+        # Spouse learning a category for a merchant must not re-file existing Investments transactions
+        shopping_cat = ExpenseCategory.objects.get(group=self.group, name='Shopping')
+        inv_exp = Expense.objects.create(
+            group=self.group, amount=Decimal('50000.00'), direction='DEBIT',
+            txn_date=datetime.date(2026, 10, 1), merchant='Zerodha', merchant_key='ZERODHA',
+            category=inv_cat, category_source='KEYWORD',
+        )
+        spouse_exp = Expense.objects.create(
+            group=self.group, amount=Decimal('500.00'), direction='DEBIT',
+            txn_date=datetime.date(2026, 10, 2), merchant='Zerodha', merchant_key='ZERODHA',
+            category=shopping_cat, category_source='NONE',
+        )
+        learn_category(spouse_exp, shopping_cat, spouse, apply_to_similar=True)
+        inv_exp.refresh_from_db()
+        self.assertEqual(inv_exp.category, inv_cat)
 
 
 

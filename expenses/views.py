@@ -744,7 +744,14 @@ def statement_reconcile(request, pk):
 @require_POST
 def statement_line_resolve(request, pk):
     group = _group(request)
-    line = get_object_or_404(StatementLine.objects.select_related('statement'), pk=pk, statement__group=group)
+    line = get_object_or_404(
+        StatementLine.objects.select_related('statement', 'matched_expense__category', 'suggested_expense__category'),
+        pk=pk, statement__group=group,
+    )
+    if _hides_investments(request):
+        for exp in (line.matched_expense, line.suggested_expense):
+            if exp and exp.category and exp.category.name == INVESTMENT_CATEGORY:
+                raise Http404
     action = request.POST.get('action', '').strip().lower()
     if action not in ('link', 'add'):
         messages.error(request, 'Invalid action.')

@@ -181,9 +181,11 @@
               </span>
             </td>
             <td class="text-right">
-              <a href="{% url 'toggle_baby' 'stockholding' s.id %}" class="btn btn-ghost btn-xs btn-square text-warning" title="Remove from Child Portfolio">
-                <span class="material-symbols-outlined text-base">assignment_return</span>
-              </a>
+              <form method="post" action="{% url 'toggle_baby' 'stockholding' s.id %}" class="inline">{% csrf_token %}
+                <button type="submit" class="btn btn-ghost btn-xs btn-square text-warning" title="Remove from Child Portfolio">
+                  <span class="material-symbols-outlined text-base">assignment_return</span>
+                </button>
+              </form>
             </td>
           </tr>
           {% endfor %}
@@ -202,9 +204,11 @@
           </div>
           <div class="flex items-center gap-2">
             <span class="text-xs opacity-50">{{ s.quantity }} qty</span>
-            <a href="{% url 'toggle_baby' 'stockholding' s.id %}" class="btn btn-ghost btn-xs btn-square text-warning" title="Remove from Child Portfolio">
-              <span class="material-symbols-outlined text-base">assignment_return</span>
-            </a>
+            <form method="post" action="{% url 'toggle_baby' 'stockholding' s.id %}" class="inline">{% csrf_token %}
+              <button type="submit" class="btn btn-ghost btn-xs btn-square text-warning" title="Remove from Child Portfolio">
+                <span class="material-symbols-outlined text-base">assignment_return</span>
+              </button>
+            </form>
           </div>
         </div>
         <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
@@ -260,9 +264,11 @@
               </span>
             </td>
             <td class="text-right">
-              <a href="{% url 'toggle_baby' 'mutualfundholding' m.id %}" class="btn btn-ghost btn-xs btn-square text-warning" title="Remove from Child Portfolio">
-                <span class="material-symbols-outlined text-base">assignment_return</span>
-              </a>
+              <form method="post" action="{% url 'toggle_baby' 'mutualfundholding' m.id %}" class="inline">{% csrf_token %}
+                <button type="submit" class="btn btn-ghost btn-xs btn-square text-warning" title="Remove from Child Portfolio">
+                  <span class="material-symbols-outlined text-base">assignment_return</span>
+                </button>
+              </form>
             </td>
           </tr>
           {% endfor %}
@@ -281,9 +287,11 @@
           </div>
           <div class="flex items-center gap-2">
             <span class="text-xs opacity-50">{{ m.units|floatformat:3 }} units</span>
-            <a href="{% url 'toggle_baby' 'mutualfundholding' m.id %}" class="btn btn-ghost btn-xs btn-square text-warning" title="Remove from Child Portfolio">
-              <span class="material-symbols-outlined text-base">assignment_return</span>
-            </a>
+            <form method="post" action="{% url 'toggle_baby' 'mutualfundholding' m.id %}" class="inline">{% csrf_token %}
+              <button type="submit" class="btn btn-ghost btn-xs btn-square text-warning" title="Remove from Child Portfolio">
+                <span class="material-symbols-outlined text-base">assignment_return</span>
+              </button>
+            </form>
           </div>
         </div>
         <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
@@ -339,9 +347,11 @@
               </span>
             </td>
             <td class="text-right">
-              <a href="{% url 'toggle_baby' 'mutualfundholding' m.id %}" class="btn btn-ghost btn-xs btn-square text-warning" title="Remove from Child Portfolio">
-                <span class="material-symbols-outlined text-base">assignment_return</span>
-              </a>
+              <form method="post" action="{% url 'toggle_baby' 'mutualfundholding' m.id %}" class="inline">{% csrf_token %}
+                <button type="submit" class="btn btn-ghost btn-xs btn-square text-warning" title="Remove from Child Portfolio">
+                  <span class="material-symbols-outlined text-base">assignment_return</span>
+                </button>
+              </form>
             </td>
           </tr>
           {% endfor %}
@@ -360,9 +370,11 @@
           </div>
           <div class="flex items-center gap-2">
             <span class="text-xs opacity-50">{{ m.units|floatformat:3 }} units</span>
-            <a href="{% url 'toggle_baby' 'mutualfundholding' m.id %}" class="btn btn-ghost btn-xs btn-square text-warning" title="Remove from Child Portfolio">
-              <span class="material-symbols-outlined text-base">assignment_return</span>
-            </a>
+            <form method="post" action="{% url 'toggle_baby' 'mutualfundholding' m.id %}" class="inline">{% csrf_token %}
+              <button type="submit" class="btn btn-ghost btn-xs btn-square text-warning" title="Remove from Child Portfolio">
+                <span class="material-symbols-outlined text-base">assignment_return</span>
+              </button>
+            </form>
           </div>
         </div>
         <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
@@ -407,7 +419,7 @@
             <span class="flex items-center gap-1">
               <span class="opacity-50">{{ h.weight_grams|floatformat:0 }}g</span>
               <button class="btn btn-ghost btn-xs btn-square" data-edit-baby-commodity data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}" data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}"><span class="material-symbols-outlined text-base">edit</span></button>
-              <a href="{% url 'toggle_baby' 'commodityholding' h.id %}?next={% url 'baby_portfolio' %}" class="btn btn-ghost btn-xs btn-square text-warning" title="Remove from Child Portfolio"><span class="material-symbols-outlined text-base">assignment_return</span></a>
+              <form method="post" action="{% url 'toggle_baby' 'commodityholding' h.id %}?next={% url 'baby_portfolio' %}" class="inline">{% csrf_token %}<button type="submit" class="btn btn-ghost btn-xs btn-square text-warning" title="Remove from Child Portfolio"><span class="material-symbols-outlined text-base">assignment_return</span></button></form>
             </span>
           </div>
           {% endfor %}
@@ -430,7 +442,7 @@
             <span class="flex items-center gap-1">
               <span class="opacity-50">{{ h.weight_grams|floatformat:0 }}g</span>
               <button class="btn btn-ghost btn-xs btn-square" data-edit-baby-commodity data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}" data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}"><span class="material-symbols-outlined text-base">edit</span></button>
-              <a href="{% url 'toggle_baby' 'commodityholding' h.id %}?next={% url 'baby_portfolio' %}" class="btn btn-ghost btn-xs btn-square text-warning" title="Remove from Child Portfolio"><span class="material-symbols-outlined text-base">assignment_return</span></a>
+              <form method="post" action="{% url 'toggle_baby' 'commodityholding' h.id %}?next={% url 'baby_portfolio' %}" class="inline">{% csrf_token %}<button type="submit" class="btn btn-ghost btn-xs btn-square text-warning" title="Remove from Child Portfolio"><span class="material-symbols-outlined text-base">assignment_return</span></button></form>
             </span>
           </div>
           {% endfor %}
@@ -478,11 +490,13 @@
                 <div class="text-xs opacity-50">{{ s.account.name }} · {{ s.quantity }} qty · {{ s.current_value|inr }}</div>
               </div>
             </div>
-            <a href="{% url 'toggle_baby' 'stockholding' s.id %}?next={% url 'baby_portfolio' %}"
-               class="btn btn-sm btn-square {% if s.is_baby %}btn-warning text-warning-content{% else %}btn-ghost opacity-50 hover:opacity-100{% endif %}"
-               title="{% if s.is_baby %}Remove from Child Portfolio{% else %}Add to Child Portfolio{% endif %}">
-              <span class="material-symbols-outlined text-base">{% if s.is_baby %}assignment_return{% else %}child_care{% endif %}</span>
-            </a>
+            <form method="post" action="{% url 'toggle_baby' 'stockholding' s.id %}?next={% url 'baby_portfolio' %}" class="inline">{% csrf_token %}
+              <button type="submit"
+                 class="btn btn-sm btn-square {% if s.is_baby %}btn-warning text-warning-content{% else %}btn-ghost opacity-50 hover:opacity-100{% endif %}"
+                 title="{% if s.is_baby %}Remove from Child Portfolio{% else %}Add to Child Portfolio{% endif %}">
+                <span class="material-symbols-outlined text-base">{% if s.is_baby %}assignment_return{% else %}child_care{% endif %}</span>
+              </button>
+            </form>
           </div>
           {% endfor %}
         </div>
@@ -507,11 +521,13 @@
                 <div class="text-xs opacity-50">{{ m.account.name }} · {{ m.units|floatformat:2 }} units · {{ m.current_value|inr }}</div>
               </div>
             </div>
-            <a href="{% url 'toggle_baby' 'mutualfundholding' m.id %}?next={% url 'baby_portfolio' %}"
-               class="btn btn-sm btn-square {% if m.is_baby %}btn-warning text-warning-content{% else %}btn-ghost opacity-50 hover:opacity-100{% endif %}"
-               title="{% if m.is_baby %}Remove from Child Portfolio{% else %}Add to Child Portfolio{% endif %}">
-              <span class="material-symbols-outlined text-base">{% if m.is_baby %}assignment_return{% else %}child_care{% endif %}</span>
-            </a>
+            <form method="post" action="{% url 'toggle_baby' 'mutualfundholding' m.id %}?next={% url 'baby_portfolio' %}" class="inline">{% csrf_token %}
+              <button type="submit"
+                 class="btn btn-sm btn-square {% if m.is_baby %}btn-warning text-warning-content{% else %}btn-ghost opacity-50 hover:opacity-100{% endif %}"
+                 title="{% if m.is_baby %}Remove from Child Portfolio{% else %}Add to Child Portfolio{% endif %}">
+                <span class="material-symbols-outlined text-base">{% if m.is_baby %}assignment_return{% else %}child_care{% endif %}</span>
+              </button>
+            </form>
           </div>
           {% endfor %}
         </div>
@@ -536,11 +552,13 @@
                 <div class="text-xs opacity-50">{{ m.account.name }} · {{ m.units|floatformat:2 }} units · {{ m.current_value|inr }}</div>
               </div>
             </div>
-            <a href="{% url 'toggle_baby' 'mutualfundholding' m.id %}?next={% url 'baby_portfolio' %}"
-               class="btn btn-sm btn-square {% if m.is_baby %}btn-warning text-warning-content{% else %}btn-ghost opacity-50 hover:opacity-100{% endif %}"
-               title="{% if m.is_baby %}Remove from Child Portfolio{% else %}Add to Child Portfolio{% endif %}">
-              <span class="material-symbols-outlined text-base">{% if m.is_baby %}assignment_return{% else %}child_care{% endif %}</span>
-            </a>
+            <form method="post" action="{% url 'toggle_baby' 'mutualfundholding' m.id %}?next={% url 'baby_portfolio' %}" class="inline">{% csrf_token %}
+              <button type="submit"
+                 class="btn btn-sm btn-square {% if m.is_baby %}btn-warning text-warning-content{% else %}btn-ghost opacity-50 hover:opacity-100{% endif %}"
+                 title="{% if m.is_baby %}Remove from Child Portfolio{% else %}Add to Child Portfolio{% endif %}">
+                <span class="material-symbols-outlined text-base">{% if m.is_baby %}assignment_return{% else %}child_care{% endif %}</span>
+              </button>
+            </form>
           </div>
           {% endfor %}
         </div>

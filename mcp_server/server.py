@@ -517,9 +517,12 @@ def jewellery_items() -> str:
 @mcp.resource("vault://mcp/audit-log")
 def mcp_audit_log() -> str:
     """Recent MCP audit log entries (last 50)."""
-    entries = MCPAuditLog.objects.all()[:50]
+    from .audit import _entry_belongs_to_group
+    group = _get_group()
     result = []
-    for e in entries:
+    for e in MCPAuditLog.objects.all()[:150]:
+        if group is not None and not _entry_belongs_to_group(e, group):
+            continue
         result.append({
             'id': e.id,
             'timestamp': e.timestamp.isoformat(),
@@ -533,6 +536,8 @@ def mcp_audit_log() -> str:
             'data_before': e.data_before,
             'data_after': e.data_after,
         })
+        if len(result) >= 50:
+            break
     return _to_json(result)
 
 
@@ -1972,6 +1977,13 @@ def add_real_estate_holding(
         remarks: Notes, builder info, tenant details (optional)
     """
     group = _get_group()
+    if google_maps_url:
+        from django.core.exceptions import ValidationError
+        from django.core.validators import URLValidator
+        try:
+            URLValidator(schemes=['http', 'https'])(google_maps_url)
+        except ValidationError:
+            return "Error: google_maps_url must be a valid http/https URL."
     holding = RealEstateHolding(
         group=group,
         name=name,
@@ -2073,6 +2085,13 @@ def update_real_estate_holding(
     if micro_market_tag is not None:
         holding.micro_market_tag = micro_market_tag
     if google_maps_url is not None:
+        if google_maps_url:
+            from django.core.exceptions import ValidationError
+            from django.core.validators import URLValidator
+            try:
+                URLValidator(schemes=['http', 'https'])(google_maps_url)
+            except ValidationError:
+                return "Error: google_maps_url must be a valid http/https URL."
         holding.google_maps_url = google_maps_url
     if khasra_khata_number is not None:
         holding.khasra_khata_number = khasra_khata_number
