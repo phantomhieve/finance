@@ -1555,6 +1555,35 @@ class RefundAndEmiTrackingTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['total_dues_amount'], Decimal('141780.00'))
         self.assertNotContains(response, '>AI Audit</')
+        # Only Leg 1 (DEBIT) is shown in the activity feed; Leg 2 (CREDIT) is collapsed into it
+        feed_items = [e for day in response.context['days'] for e in day['items']]
+        self.assertEqual(len(feed_items), 1)
+        self.assertEqual(feed_items[0].direction, 'DEBIT')
+        self.assertEqual(feed_items[0].paired_source, card2)
+
+    def test_spouse_cannot_delete_or_rename_investments_category(self):
+        from .categories import ensure_default_categories
+        ensure_default_categories(self.group)
+        inv_cat = ExpenseCategory.objects.get(group=self.group, name='Investments')
+        spouse = User.objects.create_user(
+            username='spouse_sec', email='s@example.com', password='pw',
+            user_type='ACCOUNT_HOLDER', group=self.group,
+        )
+        self.group.config.feature_expenses = True
+        self.group.config.save()
+        self.client.force_login(spouse)
+
+        resp_del = self.client.post(reverse('expenses_category_delete', args=[inv_cat.pk]))
+        self.assertEqual(resp_del.status_code, 404)
+        self.assertTrue(ExpenseCategory.objects.filter(pk=inv_cat.pk).exists())
+
+        resp_save = self.client.post(reverse('expenses_category_save', args=[inv_cat.pk]), {
+            'name': 'Renamed Inv', 'kind': 'TRANSFER',
+        })
+        self.assertEqual(resp_save.status_code, 404)
+        inv_cat.refresh_from_db()
+        self.assertEqual(inv_cat.name, 'Investments')
+
 
 
 

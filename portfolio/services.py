@@ -1074,11 +1074,11 @@ def _take_snapshot_for_group(month, group):
         'interest': float(summary['epf_total_interest']),
     }
     data.setdefault('index_funds', {})['invested'] = float(
-        _sum_qs(MutualFundHolding.objects.filter(account__group=group, fund_type='INDEX'), 'purchase_value'))
+        _sum_qs(MutualFundHolding.objects.filter(account__group=group, fund_type='INDEX', is_baby=False), 'purchase_value'))
     data.setdefault('individual_stocks', {})['invested'] = float(
-        _sum_qs(StockHolding.objects.filter(account__group=group), 'purchase_value'))
+        _sum_qs(StockHolding.objects.filter(account__group=group, is_baby=False), 'purchase_value'))
     data.setdefault('other_mutual_funds', {})['invested'] = float(
-        _sum_qs(MutualFundHolding.objects.filter(account__group=group, fund_type='OTHER'), 'purchase_value'))
+        _sum_qs(MutualFundHolding.objects.filter(account__group=group, fund_type='OTHER', is_baby=False), 'purchase_value'))
     data.setdefault('crypto', {})['invested'] = float(summary['crypto_invested'])
     data.setdefault('fd', {})['principal'] = float(summary['fd_principal'])
     data.setdefault('us_stocks', {})['invested'] = float(summary['us_stocks_invested'])

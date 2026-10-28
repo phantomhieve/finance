@@ -100,9 +100,14 @@ def get_google_credentials(group=None):
     if group:
         try:
             config = group.config
-            if config.google_credentials_json and config.google_credentials_json.strip():
-                import json as _json
-                return _json.loads(config.google_credentials_json)
+            raw = (config.google_credentials_json or '').strip()
+            if raw:
+                if not raw.startswith('{'):
+                    from expenses.crypto import decrypt
+                    raw = decrypt(raw).strip()
+                if raw:
+                    import json as _json
+                    return _json.loads(raw)
         except Exception:
             pass  # fall through to global
     return get_google_credentials_path()

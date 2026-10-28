@@ -101,7 +101,21 @@ def log_delete(instance, tool_name):
 # Revert
 # ---------------------------------------------------------------------------
 
-def revert_entry(entry: MCPAuditLog) -> str:
+def _entry_belongs_to_group(entry: MCPAuditLog, group) -> bool:
+    if group is None:
+        return True
+    snap = entry.data_before or entry.data_after or {}
+    if not isinstance(snap, dict):
+        return False
+    if 'group_id' in snap:
+        return snap['group_id'] == group.pk
+    if 'user_id' in snap:
+        from tracker.models import User
+        return User.objects.filter(pk=snap['user_id'], group=group).exists()
+    return True
+
+
+def revert_entry(entry: MCPAuditLog, group=None) -> str:
     """
     Undo the change described by an MCPAuditLog entry.
 
@@ -113,15 +127,25 @@ def revert_entry(entry: MCPAuditLog) -> str:
     """
     if entry.reverted:
         return f"Entry #{entry.pk} has already been reverted."
+    if group is not None and not _entry_belongs_to_group(entry, group):
+        return f"Error: Entry #{entry.pk} not found."
 
     try:
         Model = apps.get_model(entry.model_name)
     except (LookupError, ValueError) as exc:
         return f"Cannot resolve model '{entry.model_name}': {exc}"
 
+    scope = {}
+    if group is not None:
+        field_names = {f.name for f in Model._meta.get_fields()}
+        if 'group' in field_names:
+            scope = {'group': group}
+        elif 'user' in field_names:
+            scope = {'user__group': group}
+
     if entry.action == 'CREATE':
         try:
-            obj = Model.objects.get(pk=entry.object_id)
+            obj = Model.objects.get(pk=entry.object_id, **scope)
             obj.delete()
             msg = f"Deleted {entry.model_name}#{entry.object_id} (reverted CREATE)."
         except Model.DoesNotExist:
@@ -134,7 +158,7 @@ def revert_entry(entry: MCPAuditLog) -> str:
         if not entry.data_before:
             return f"No data_before snapshot for entry #{entry.pk}; cannot revert."
         try:
-            obj = Model.objects.get(pk=entry.object_id)
+            obj = Model.objects.get(pk=entry.object_id, **scope)
         except Model.DoesNotExist:
             return f"{entry.model_name}#{entry.object_id} no longer exists."
         _apply_snapshot(obj, entry.data_before)

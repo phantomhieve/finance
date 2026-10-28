@@ -1,5 +1,6 @@
 from django import forms
 
+from .analytics import INVESTMENT_CATEGORY
 from .models import Expense, ExpenseCategory, PaymentSource
 
 MAX_STATEMENT_BYTES = 10 * 1024 * 1024
@@ -18,9 +19,12 @@ class ExpenseForm(forms.ModelForm):
         ]
         widgets = {'txn_date': forms.DateInput(attrs={'type': 'date'})}
 
-    def __init__(self, *args, group=None, **kwargs):
+    def __init__(self, *args, group=None, hide_investments=False, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['category'].queryset = ExpenseCategory.objects.filter(group=group)
+        cats = ExpenseCategory.objects.filter(group=group)
+        if hide_investments:
+            cats = cats.exclude(name=INVESTMENT_CATEGORY)
+        self.fields['category'].queryset = cats
         self.fields['payment_source'].queryset = PaymentSource.objects.filter(group=group)
         self.fields['member'].queryset = group.members.all() if group else self.fields['member'].queryset.none()
         for name in ('category', 'payment_source', 'member', 'notes', 'is_emi', 'emi_installment_num', 'emi_total_installments'):

@@ -537,13 +537,17 @@ def reconcile(statement):
             if c_match:
                 used.add(c_match.pk)
                 _link(line, c_match, 'RULE', c_conf)
-                d_cand = _find_refund_debit(line, free('DEBIT'), family)
-                if d_cand:
-                    c_match.refund_of = d_cand
-                    c_match.save(update_fields=['refund_of'])
-                    d_cand.refunded_amount = (d_cand.refunded_amount or Decimal('0.00')) + line.amount
-                    d_cand.refund_date = line.txn_date
-                    d_cand.save(update_fields=['refunded_amount', 'refund_date'])
+                if not c_match.refund_of_id:
+                    d_cand = _find_refund_debit(line, free('DEBIT'), family)
+                    if d_cand:
+                        c_match.refund_of = d_cand
+                        c_match.save(update_fields=['refund_of'])
+                        d_cand.refunded_amount = min(
+                            d_cand.amount,
+                            (d_cand.refunded_amount or Decimal('0.00')) + line.amount,
+                        )
+                        d_cand.refund_date = line.txn_date
+                        d_cand.save(update_fields=['refunded_amount', 'refund_date'])
                 continue
 
             # Directly look for the matching purchase (DEBIT)
@@ -666,22 +670,28 @@ def reconcile_refunds(group):
         c_m = (c.merchant or '').lower()
         best_debit = None
         for d in candidates:
+            rem = d.amount - (d.refunded_amount or Decimal('0.00'))
+            if rem < c.amount:
+                continue
             d_key = d.merchant_key or normalize_merchant(d.merchant or d.merchant_raw)[1]
             sim = 1.0 if (c_key and d_key and (c_key == d_key or c_key in d_key or d_key in c_key)) else 0.0
             d_m = (d.merchant or '').lower()
             if sim < 0.6 and c_m and d_m and (c_m in d_m or d_m in c_m):
                 sim = 0.8
             if sim >= 0.6:
-                if d.amount == c.amount:
+                if rem == c.amount:
                     best_debit = d
                     break
-                elif d.amount >= c.amount and not best_debit:
+                elif rem >= c.amount and not best_debit:
                     best_debit = d
 
         if best_debit:
             c.refund_of = best_debit
             c.save(update_fields=['refund_of'])
-            best_debit.refunded_amount = (best_debit.refunded_amount or Decimal('0.00')) + c.amount
+            best_debit.refunded_amount = min(
+                best_debit.amount,
+                (best_debit.refunded_amount or Decimal('0.00')) + c.amount,
+            )
             best_debit.refund_date = c.txn_date
             best_debit.save(update_fields=['refunded_amount', 'refund_date'])
             linked += 1
@@ -857,16 +867,19 @@ def auto_track_statement_payments(group, since_days=60):
             if updates_c:
                 c.save(update_fields=updates_c)
 
-            # Heal twin debit if filed under Transfers
-            twin_debit = Expense.objects.filter(
-                group=group,
-                direction='DEBIT',
-                amount=c.amount,
-                category__name='Transfers',
-                txn_date__gte=c.txn_date - datetime.timedelta(days=2),
-                txn_date__lte=c.txn_date + datetime.timedelta(days=2),
-                is_deleted=False,
-            ).first()
+            # Heal twin debit if filed under Transfers or uncategorised
+            twin_debit = (
+                Expense.objects.filter(
+                    group=group,
+                    direction='DEBIT',
+                    amount=c.amount,
+                    txn_date__gte=c.txn_date - datetime.timedelta(days=4),
+                    txn_date__lte=c.txn_date + datetime.timedelta(days=4),
+                    is_deleted=False,
+                )
+                .filter(Q(category__name='Transfers') | Q(category__isnull=True))
+                .first()
+            )
             if twin_debit:
                 from .categories import categories_by_name
                 cats = categories_by_name(group)

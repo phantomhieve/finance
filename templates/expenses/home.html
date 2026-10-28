@@ -563,7 +563,7 @@
                       <span class="text-warning font-semibold">Tap to categorise</span>
                     {% endif %}
                   {% endif %}
-                  {% if e.payment_source %}<span class="opacity-40">·</span> {{ e.payment_source.short_name }}{% endif %}
+                  {% if e.payment_source %}<span class="opacity-40">·</span> {{ e.payment_source.short_name }}{% if e.paired_source %} → {{ e.paired_source.short_name }}{% endif %}{% elif e.paired_source %}<span class="opacity-40">·</span> {{ e.paired_source.short_name }}{% endif %}
                 </div>
               </div>
               <div class="text-right shrink-0">

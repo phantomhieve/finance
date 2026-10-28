@@ -341,7 +341,7 @@ def _make_tracker_crud(model_class, form_class, label, redirect_to='dashboard',
     @_require_role(*allowed_roles)
     def edit_view(request, pk):
         gf = group_user_filter(request.user)
-        obj = get_object_or_404(model_class, pk=pk, **_gf_kwargs(gf))
+        obj = get_object_or_404(model_class.objects.filter(gf), pk=pk)
         form = form_class(request.POST, instance=obj)
         if form.is_valid():
             form.save()
@@ -355,7 +355,7 @@ def _make_tracker_crud(model_class, form_class, label, redirect_to='dashboard',
     @_require_role(*allowed_roles)
     def delete_view(request, pk):
         gf = group_user_filter(request.user)
-        obj = get_object_or_404(model_class, pk=pk, **_gf_kwargs(gf))
+        obj = get_object_or_404(model_class.objects.filter(gf), pk=pk)
         amt = obj.amount
         obj.delete()
         messages.success(request, f'{label} entry deleted: ₹{amt:,.0f}')
@@ -389,7 +389,7 @@ def add_goal_increment(request):
     gf = group_user_filter(request.user)
     inc_id = request.POST.get('increment_id')
     if inc_id:
-        instance = GoalIncrement.objects.filter(gf, id=inc_id).first()
+        instance = get_object_or_404(GoalIncrement.objects.filter(gf), id=inc_id)
         form = GoalIncrementForm(request.POST, instance=instance)
         action_msg = 'updated'
     else:
@@ -398,7 +398,8 @@ def add_goal_increment(request):
 
     if form.is_valid():
         inc = form.save(commit=False)
-        inc.user = request.user
+        if not inc.pk:
+            inc.user = request.user
         inc.save()
         messages.success(
             request,
@@ -469,7 +470,7 @@ def add_goal_adjustment(request):
     gf = group_user_filter(request.user)
     adj_id = request.POST.get('adjustment_id')
     if adj_id:
-        instance = MonthlyGoalAdjustment.objects.filter(gf, id=adj_id).first()
+        instance = get_object_or_404(MonthlyGoalAdjustment.objects.filter(gf), id=adj_id)
         form = MonthlyGoalAdjustmentForm(request.POST, instance=instance)
         action_msg = 'updated'
     else:
@@ -478,8 +479,19 @@ def add_goal_adjustment(request):
 
     if form.is_valid():
         adj = form.save(commit=False)
-        adj.user = request.user
-        adj.save()
+        if not adj.pk:
+            existing = MonthlyGoalAdjustment.objects.filter(gf, month=adj.month).first()
+            if existing:
+                existing.adjustment_amount = adj.adjustment_amount
+                existing.reason = adj.reason
+                existing.save(update_fields=['adjustment_amount', 'reason'])
+                adj = existing
+                action_msg = 'updated'
+            else:
+                adj.user = request.user
+                adj.save()
+        else:
+            adj.save()
         messages.success(
             request,
             f'One-off adjustment of ₹{adj.adjustment_amount:,.0f} {action_msg} for {adj.month.strftime("%b %Y")}.',
