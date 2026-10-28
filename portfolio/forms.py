@@ -169,6 +169,13 @@ class USStockHoldingForm(forms.ModelForm):
             'remarks': forms.TextInput(attrs={'placeholder': 'e.g. Q1 2026 RSU vest'}),
         }
 
+    def clean_symbol(self):
+        import re
+        symbol = (self.cleaned_data.get('symbol') or '').strip().upper()
+        if not re.fullmatch(r'[A-Z0-9.\-]{1,15}', symbol):
+            raise forms.ValidationError("Enter a valid stock ticker symbol (e.g. UBER, GOOGL).")
+        return symbol
+
     def clean_purchase_price_usd(self):
         val = self.cleaned_data.get('purchase_price_usd')
         if val is None:

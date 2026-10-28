@@ -90,12 +90,18 @@ _LOCKOUT_SECONDS = 300
 
 @login_required
 def portfolio_unlock(request):
+    from django.core.cache import cache
     next_url = request.GET.get('next', request.POST.get('next', '/portfolio/'))
     allowed = url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()})
     if not allowed:
         next_url = '/portfolio/'
 
-    lockout_until = request.session.get(_UNLOCK_LOCKOUT_KEY, 0)
+    group = request.user.group
+    cache_prefix = f"vault_unlock_{group.pk if group else request.user.pk}"
+    attempt_cache_key = f"{cache_prefix}_attempts"
+    lockout_cache_key = f"{cache_prefix}_lockout"
+
+    lockout_until = max(request.session.get(_UNLOCK_LOCKOUT_KEY, 0), cache.get(lockout_cache_key, 0))
     if lockout_until and time.time() < lockout_until:
         remaining = int(lockout_until - time.time())
         messages.error(request, f'Too many failed attempts. Try again in {remaining // 60}m {remaining % 60}s.')
@@ -104,13 +110,13 @@ def portfolio_unlock(request):
             'has_webauthn': WebAuthnCredential.objects.filter(user=request.user).exists(),
         })
 
-    group = request.user.group
     has_password = bool(group and group.portfolio_password)
     if request.method == 'POST' and has_password:
         password = request.POST.get('password', '')
         if group.check_portfolio_password(password):
             request.session.pop(_UNLOCK_ATTEMPT_KEY, None)
             request.session.pop(_UNLOCK_LOCKOUT_KEY, None)
+            cache.delete_many([attempt_cache_key, lockout_cache_key])
             request.session['portfolio_unlocked_at'] = time.time()
             
             # If they don't have Face ID and can register, ask them to register instead of redirecting immediately.
@@ -126,11 +132,15 @@ def portfolio_unlock(request):
                 })
                 
             return redirect(next_url)
-        attempts = request.session.get(_UNLOCK_ATTEMPT_KEY, 0) + 1
+        attempts = max(request.session.get(_UNLOCK_ATTEMPT_KEY, 0), cache.get(attempt_cache_key, 0)) + 1
         request.session[_UNLOCK_ATTEMPT_KEY] = attempts
+        cache.set(attempt_cache_key, attempts, timeout=_LOCKOUT_SECONDS)
         if attempts >= _MAX_UNLOCK_ATTEMPTS:
-            request.session[_UNLOCK_LOCKOUT_KEY] = time.time() + _LOCKOUT_SECONDS
+            lock_until = time.time() + _LOCKOUT_SECONDS
+            request.session[_UNLOCK_LOCKOUT_KEY] = lock_until
             request.session[_UNLOCK_ATTEMPT_KEY] = 0
+            cache.set(lockout_cache_key, lock_until, timeout=_LOCKOUT_SECONDS)
+            cache.delete(attempt_cache_key)
             messages.error(request, f'Too many failed attempts. Locked for {_LOCKOUT_SECONDS // 60} minutes.')
         else:
             messages.error(request, 'Incorrect portfolio password.')

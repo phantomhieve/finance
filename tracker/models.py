@@ -391,6 +391,13 @@ class HouseholdConfig(models.Model):
         """Check if a feature is enabled: has_feature('savings'), has_feature('portfolio'), etc."""
         return getattr(self, f'feature_{name}', True)
 
+    def save(self, *args, **kwargs):
+        raw = (self.google_credentials_json or '').strip()
+        if raw.startswith('{'):
+            from expenses.crypto import encrypt
+            self.google_credentials_json = encrypt(raw)
+        super().save(*args, **kwargs)
+
 
 @receiver(post_save, sender=AccountGroup)
 def ensure_household_config(sender, instance, created, **kwargs):

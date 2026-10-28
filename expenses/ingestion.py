@@ -191,7 +191,7 @@ def settle_internal_movements(group: AccountGroup, since: datetime.date) -> list
                 if c.pk not in used_credits
                 and c.amount == debit.amount
                 and c.payment_source_id != debit.payment_source_id
-                and abs((c.txn_date - debit.txn_date).days) <= 1
+                and abs((c.txn_date - debit.txn_date).days) <= 3
             ),
             None,
         )

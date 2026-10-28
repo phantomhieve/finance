@@ -1,3 +1,4 @@
+import datetime
 from decimal import Decimal
 from functools import wraps
 from itertools import groupby
@@ -101,6 +102,63 @@ def _expense_payload(e, edit_tmpl=None, delete_tmpl=None, review_tmpl=None):
     }
 
 
+def _is_transfer_row(e: Expense) -> bool:
+    if e.category and (e.category.kind == 'TRANSFER' or e.category.name in ('Credit Card Payment', 'Transfers')):
+        return True
+    if e.payment_source and e.payment_source.kind == 'CREDIT_CARD' and e.merchant == 'Credit Card Bill Payment':
+        return True
+    return False
+
+
+def _collapse_transfer_legs(rows: list[Expense], group, start, end) -> list[Expense]:
+    """Suppress the redundant CREDIT leg (Leg 2) of internal transfers and credit card bill payments
+    when a matching DEBIT leg (Leg 1) exists within ±4 days, and attach `paired_source` to Leg 1."""
+    credit_legs = [e for e in rows if e.direction == 'CREDIT' and _is_transfer_row(e)]
+    if not credit_legs:
+        return rows
+
+    row_debits = [e for e in rows if e.direction == 'DEBIT']
+    row_debit_ids = {e.pk for e in row_debits}
+    boundary_debits = list(
+        Expense.objects.filter(
+            group=group,
+            is_deleted=False,
+            refund_of__isnull=True,
+            direction='DEBIT',
+            txn_date__gte=start - datetime.timedelta(days=4),
+            txn_date__lte=end + datetime.timedelta(days=4),
+        )
+        .exclude(pk__in=row_debit_ids)
+        .select_related('category', 'payment_source')
+    )
+    all_debits = row_debits + boundary_debits
+
+    used_debits: set[int] = set()
+    hidden_credits: set[int] = set()
+
+    for c in credit_legs:
+        candidates = [
+            d for d in all_debits
+            if d.pk not in used_debits
+            and d.amount == c.amount
+            and d.currency == c.currency
+            and abs((d.txn_date - c.txn_date).days) <= 4
+            and (d.payment_source_id != c.payment_source_id or d.payment_source_id is None)
+        ]
+        if not candidates:
+            continue
+        candidates.sort(key=lambda d: (0 if _is_transfer_row(d) else 1, abs((d.txn_date - c.txn_date).days), d.pk))
+        match_d = candidates[0]
+        used_debits.add(match_d.pk)
+        hidden_credits.add(c.pk)
+        if c.payment_source:
+            match_d.paired_source = c.payment_source
+
+    if not hidden_credits:
+        return rows
+    return [e for e in rows if e.pk not in hidden_credits]
+
+
 # ---------------------------------------------------------------------------
 # Month / year views
 # ---------------------------------------------------------------------------
@@ -139,7 +197,7 @@ def expenses_home(request):
         qs = qs.filter(is_emi=True)
     if f_query:
         qs = qs.filter(Q(merchant__icontains=f_query) | Q(notes__icontains=f_query) | Q(merchant_raw__icontains=f_query))
-    rows = list(qs)
+    rows = _collapse_transfer_legs(list(qs), group, summary['start'], summary['end'])
     days = [{'date': d, 'items': list(items)} for d, items in groupby(rows, key=lambda e: e.txn_date)]
     for day in days:
         day['spend'] = sum((e.net_amount for e in day['items'] if e.is_spend and e.currency == 'INR'), Decimal('0.00'))
@@ -264,7 +322,7 @@ def _save_expense(request, form, previous_category=None, creating=False):
 @require_POST
 def expense_add(request):
     group = _group(request)
-    form = ExpenseForm(request.POST, group=group)
+    form = ExpenseForm(request.POST, group=group, hide_investments=_hides_investments(request))
     if form.is_valid():
         obj = _save_expense(request, form, creating=True)
         messages.success(request, f'Added ₹{obj.amount:,.0f} at {obj.merchant}.')
@@ -279,7 +337,7 @@ def expense_edit(request, pk):
     group = _group(request)
     expense = get_object_or_404(_expenses(request), pk=pk, is_deleted=False)
     previous_category = expense.category_id  # is_valid() copies the POSTed values onto the instance
-    form = ExpenseForm(request.POST, instance=expense, group=group)
+    form = ExpenseForm(request.POST, instance=expense, group=group, hide_investments=_hides_investments(request))
     if form.is_valid():
         obj = _save_expense(request, form, previous_category)
         messages.success(request, f'Updated {obj.merchant}.')
@@ -490,9 +548,14 @@ def gmail_disconnect(request, pk):
 @require_POST
 def category_save(request, pk=None):
     group = _group(request)
-    instance = get_object_or_404(ExpenseCategory, pk=pk, group=group) if pk else ExpenseCategory(group=group)
+    cats = ExpenseCategory.objects.filter(group=group)
+    if _hides_investments(request):
+        cats = cats.exclude(name=INVESTMENT_CATEGORY)
+    instance = get_object_or_404(cats, pk=pk) if pk else ExpenseCategory(group=group)
     form = CategoryForm(request.POST, instance=instance, group=group)
     if form.is_valid():
+        if _hides_investments(request) and form.cleaned_data.get('name', '').strip().lower() == INVESTMENT_CATEGORY.lower():
+            return HttpResponseForbidden('You cannot create or modify the Investments category.')
         form.save()
         messages.success(request, f'Saved category {form.instance.name}.')
     else:
@@ -503,7 +566,10 @@ def category_save(request, pk=None):
 @_require_expenses
 @require_POST
 def category_delete(request, pk):
-    category = get_object_or_404(ExpenseCategory, pk=pk, group=_group(request))
+    cats = ExpenseCategory.objects.filter(group=_group(request))
+    if _hides_investments(request):
+        cats = cats.exclude(name=INVESTMENT_CATEGORY)
+    category = get_object_or_404(cats, pk=pk)
     category.expenses.update(category=None, category_source='NONE')
     name = category.name
     category.delete()
@@ -556,10 +622,16 @@ def statements_list(request):
 def statement_detail(request, pk):
     group = _group(request)
     statement = get_object_or_404(CardStatement.objects.select_related('payment_source', 'duplicate_of'), pk=pk, group=group)
-    lines = list(statement.lines.select_related(
+    lines_qs = statement.lines.select_related(
         'matched_expense', 'matched_expense__category',
         'suggested_expense', 'suggested_expense__category',
-    ))
+    )
+    if _hides_investments(request):
+        lines_qs = lines_qs.exclude(
+            Q(matched_expense__category__name=INVESTMENT_CATEGORY)
+            | Q(suggested_expense__category__name=INVESTMENT_CATEGORY)
+        )
+    lines = list(lines_qs)
     debits = [l for l in lines if not l.is_credit]
     payments = [l for l in lines if l.is_credit and l.match_method == 'SKIP']
     refunds = [l for l in lines if l.is_credit and l.match_method != 'SKIP']

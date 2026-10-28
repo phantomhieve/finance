@@ -1299,8 +1299,9 @@ def update_note(
         amount: New amount (leave empty to keep current)
         is_done: Mark as done (for todo-type notes)
     """
+    group = _get_group()
     try:
-        note = Note.objects.get(pk=note_id)
+        note = Note.objects.get(pk=note_id, user__group=group) if group else Note.objects.get(pk=note_id)
     except Note.DoesNotExist:
         return f"Error: Note #{note_id} not found."
 
@@ -1530,8 +1531,9 @@ def update_fixed_deposit(
         is_active: Set to false to mark as matured/closed
         remarks: Updated remarks
     """
+    group = _get_group()
     try:
-        fd = FixedDeposit.objects.get(pk=fd_id)
+        fd = FixedDeposit.objects.get(pk=fd_id, group=group) if group else FixedDeposit.objects.get(pk=fd_id)
     except FixedDeposit.DoesNotExist:
         return f"Error: FD #{fd_id} not found."
 
@@ -1587,8 +1589,9 @@ def update_cash_position(
         name: New name (leave empty to keep current)
         remarks: New remarks (leave empty to keep current)
     """
+    group = _get_group()
     try:
-        pos = CashPosition.objects.get(pk=position_id)
+        pos = CashPosition.objects.get(pk=position_id, group=group) if group else CashPosition.objects.get(pk=position_id)
     except CashPosition.DoesNotExist:
         return f"Error: Cash position #{position_id} not found."
 
@@ -1645,8 +1648,9 @@ def update_bond_holding(
         amount: New amount (leave empty to keep current)
         remarks: New remarks (leave empty to keep current)
     """
+    group = _get_group()
     try:
-        bond = BondHolding.objects.get(pk=bond_id)
+        bond = BondHolding.objects.get(pk=bond_id, group=group) if group else BondHolding.objects.get(pk=bond_id)
     except BondHolding.DoesNotExist:
         return f"Error: Bond #{bond_id} not found."
 
@@ -1706,8 +1710,9 @@ def update_crypto_holding(
         amount_invested: New invested amount (leave empty to keep current)
         remarks: New remarks (leave empty to keep current)
     """
+    group = _get_group()
     try:
-        crypto = CryptoHolding.objects.get(pk=crypto_id)
+        crypto = CryptoHolding.objects.get(pk=crypto_id, group=group) if group else CryptoHolding.objects.get(pk=crypto_id)
     except CryptoHolding.DoesNotExist:
         return f"Error: Crypto #{crypto_id} not found."
 
@@ -1811,35 +1816,47 @@ def update_commodity_holding(
 @mcp.tool()
 def add_us_stock(
     symbol: str,
-    units: str,
-    purchase_value: str,
+    quantity: int,
+    vest_date: str = "",
+    purchase_price_usd: str = "0",
+    purchase_usd_inr: str = "0",
+    company_name: str = "Employer Corp",
     remarks: str = "",
     is_baby: bool = False,
 ) -> str:
     """Add a US stock (RSU) holding.
 
     Args:
-        symbol: Stock symbol (e.g. 'GOOG')
-        units: Number of shares
-        purchase_value: Total purchase value in INR
+        symbol: Stock symbol (e.g. 'UBER', 'GOOG')
+        quantity: Number of shares
+        vest_date: Vest date in YYYY-MM-DD format (defaults to today)
+        purchase_price_usd: Stock price per share in USD at vest date (auto-fetched if 0)
+        purchase_usd_inr: USD/INR exchange rate at vest date (auto-fetched if 0)
+        company_name: Employer / company name
         remarks: Optional remarks
         is_baby: Track in Child portfolio (default: false)
     """
+    import re
+    clean_sym = (symbol or "").strip().upper()
+    if not re.fullmatch(r'[A-Z0-9.\-]{1,15}', clean_sym):
+        return "Error: Invalid stock ticker symbol."
     group = _get_group()
 
     holding = USStockHolding(
         group=group,
-        symbol=symbol.upper(),
-        units=_parse_decimal(units),
-        purchase_value=_parse_decimal(purchase_value),
+        symbol=clean_sym,
+        company_name=company_name,
+        quantity=max(0, int(quantity)),
+        vest_date=_parse_date(vest_date) if vest_date else datetime.date.today(),
+        purchase_price_usd=_parse_decimal(purchase_price_usd),
+        purchase_usd_inr=_parse_decimal(purchase_usd_inr),
         remarks=remarks,
         is_baby=is_baby,
     )
-    # Refresh current rate from DB if available (or it syncs later)
-    rate = CommodityPrice.objects.filter(commodity_type='USD_INR').first()
-    if rate:
-        holding.current_usd_rate = rate.rate_per_gram  # USD_INR uses this field
-    
+    if not holding.purchase_price_usd or not holding.purchase_usd_inr:
+        from portfolio.services import fetch_and_fill_us_stock_prices
+        fetch_and_fill_us_stock_prices(holding)
+
     holding.save()
     log_create(holding, 'add_us_stock')
     return _to_json({
@@ -1852,8 +1869,9 @@ def add_us_stock(
 def update_us_stock(
     holding_id: int,
     symbol: str = "",
-    units: str = "",
-    purchase_value: str = "",
+    quantity: int = None,
+    purchase_price_usd: str = "",
+    purchase_usd_inr: str = "",
     remarks: str = "",
     is_baby: bool = None,
 ) -> str:
@@ -1862,11 +1880,13 @@ def update_us_stock(
     Args:
         holding_id: ID of the US stock holding
         symbol: Updated symbol (optional)
-        units: Updated share units (optional)
-        purchase_value: Updated purchase value in INR (optional)
+        quantity: Updated share count (optional)
+        purchase_price_usd: Updated purchase price in USD (optional)
+        purchase_usd_inr: Updated USD/INR rate at purchase (optional)
         remarks: Updated remarks (optional)
         is_baby: Track in Child portfolio vs Master portfolio (optional)
     """
+    import re
     group = _get_group()
     try:
         holding = USStockHolding.objects.get(pk=holding_id, group=group) if group else USStockHolding.objects.get(pk=holding_id)
@@ -1875,11 +1895,16 @@ def update_us_stock(
 
     old_data = serialize_instance(holding)
     if symbol:
-        holding.symbol = symbol.upper()
-    if units:
-        holding.units = _parse_decimal(units)
-    if purchase_value:
-        holding.purchase_value = _parse_decimal(purchase_value)
+        clean_sym = symbol.strip().upper()
+        if not re.fullmatch(r'[A-Z0-9.\-]{1,15}', clean_sym):
+            return "Error: Invalid stock ticker symbol."
+        holding.symbol = clean_sym
+    if quantity is not None:
+        holding.quantity = max(0, int(quantity))
+    if purchase_price_usd:
+        holding.purchase_price_usd = _parse_decimal(purchase_price_usd)
+    if purchase_usd_inr:
+        holding.purchase_usd_inr = _parse_decimal(purchase_usd_inr)
     if remarks:
         holding.remarks = remarks
     if is_baby is not None:
@@ -2378,7 +2403,7 @@ def revert_mcp_change(audit_log_id: int) -> str:
     except MCPAuditLog.DoesNotExist:
         return f"Error: Audit log entry #{audit_log_id} not found."
 
-    result = revert_entry(entry)
+    result = revert_entry(entry, group=_get_group())
     return _to_json({'status': 'reverted', 'detail': result})
 
 
@@ -2395,14 +2420,18 @@ def list_mcp_audit_log(
         action: Filter by action: CREATE, UPDATE, or DELETE (optional)
         model_name: Filter by model name like 'portfolio.FixedDeposit' (optional)
     """
+    from .audit import _entry_belongs_to_group
     limit = min(max(1, limit), 100)
+    group = _get_group()
     qs = MCPAuditLog.objects.all()
     if action:
         qs = qs.filter(action=action.upper())
     if model_name:
         qs = qs.filter(model_name=model_name)
     entries = []
-    for e in qs[:limit]:
+    for e in qs[:limit * 3]:
+        if group is not None and not _entry_belongs_to_group(e, group):
+            continue
         entries.append({
             'id': e.id,
             'timestamp': e.timestamp.isoformat(),
@@ -2413,6 +2442,8 @@ def list_mcp_audit_log(
             'tool_name': e.tool_name,
             'reverted': e.reverted,
         })
+        if len(entries) >= limit:
+            break
     return _to_json({'count': len(entries), 'entries': entries})
 
 
