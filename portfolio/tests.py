@@ -254,7 +254,14 @@ class RealEstateMcpServerTests(TestCase):
         self.assertEqual(val_res['status'], 'updated')
         self.assertEqual(Decimal(val_res['current_valuation']), Decimal('25000000'))
 
-        # 5. Delete record via generic delete_record MCP tool
+        # 5. Reject unsafe javascript: URL in google_maps_url
+        bad_url_res = mcp_srv.update_real_estate_holding(
+            holding_id=holding_id,
+            google_maps_url="javascript:alert(1)",
+        )
+        self.assertIn("Error", bad_url_res)
+
+        # 6. Delete record via generic delete_record MCP tool
         del_res = json.loads(mcp_srv.delete_record(
             model_name="portfolio.RealEstateHolding",
             record_id=holding_id,

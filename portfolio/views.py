@@ -1082,6 +1082,10 @@ def webauthn_auth_complete(request):
     cred.sign_count = verification.new_sign_count
     cred.save(update_fields=['sign_count'])
 
+    from django.core.cache import cache
+    group = request.user.group
+    cache_prefix = f"vault_unlock_{group.pk if group else request.user.pk}"
+    cache.delete_many([f"{cache_prefix}_attempts", f"{cache_prefix}_lockout"])
     request.session.pop(_UNLOCK_ATTEMPT_KEY, None)
     request.session.pop(_UNLOCK_LOCKOUT_KEY, None)
     request.session['portfolio_unlocked_at'] = time.time()
@@ -1158,6 +1162,7 @@ def baby_portfolio(request):
 
 @login_required
 @_require_portfolio
+@require_POST
 def toggle_baby(request, model_name, pk):
     from django.http import HttpResponseBadRequest
     model_map = {

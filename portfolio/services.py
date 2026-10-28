@@ -50,9 +50,9 @@ def _parse_inr(value):
 # ---------------------------------------------------------------------------
 
 def _gf(model_qs, group):
-    """Filter a queryset by group. If group is None, return unfiltered (backward compat)."""
+    """Filter a queryset by group. Fail closed if group is None."""
     if group is None:
-        return model_qs
+        return model_qs.none()
     return model_qs.filter(group=group)
 
 
@@ -342,15 +342,10 @@ def without_real_estate(summary, group):
 def get_portfolio_summary(group=None, is_baby=False):
     """Aggregate every asset class into a master portfolio summary dict, scoped to group."""
 
-    acct_ids = ZerodhaAccount.objects.filter(group=group).values_list('id', flat=True) if group else None
-    if acct_ids is not None:
-        stocks_qs = StockHolding.objects.filter(account_id__in=acct_ids, is_baby=is_baby)
-        index_mf_qs = MutualFundHolding.objects.filter(account_id__in=acct_ids, fund_type='INDEX', is_baby=is_baby)
-        other_mf_qs = MutualFundHolding.objects.filter(account_id__in=acct_ids, fund_type='OTHER', is_baby=is_baby)
-    else:
-        stocks_qs = StockHolding.objects.filter(is_baby=is_baby)
-        index_mf_qs = MutualFundHolding.objects.filter(fund_type='INDEX', is_baby=is_baby)
-        other_mf_qs = MutualFundHolding.objects.filter(fund_type='OTHER', is_baby=is_baby)
+    acct_ids = ZerodhaAccount.objects.filter(group=group).values_list('id', flat=True) if group else []
+    stocks_qs = StockHolding.objects.filter(account_id__in=acct_ids, is_baby=is_baby)
+    index_mf_qs = MutualFundHolding.objects.filter(account_id__in=acct_ids, fund_type='INDEX', is_baby=is_baby)
+    other_mf_qs = MutualFundHolding.objects.filter(account_id__in=acct_ids, fund_type='OTHER', is_baby=is_baby)
 
     all_stocks_purchased = _sum_qs(stocks_qs, 'purchase_value')
     all_stocks_current = _sum_qs(stocks_qs, 'current_value')
@@ -472,7 +467,7 @@ def get_portfolio_summary(group=None, is_baby=False):
     roadmap = build_goal_roadmap(group, total_value) if not is_baby else None
 
     # Zerodha account summaries (prefetch totals to avoid N+1)
-    z_accounts = _gf(ZerodhaAccount.objects, group).all() if group else ZerodhaAccount.objects.all()
+    z_accounts = _gf(ZerodhaAccount.objects, group).all()
     acct_sums = _zerodha_account_sums(z_accounts, is_baby=is_baby)
     accounts = []
     for acct in z_accounts:

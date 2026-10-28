@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 from django.db import transaction
 
 from . import ai
+from .analytics import INVESTMENT_CATEGORY
 from .knowledge import record_ai_brand
 from .models import Expense, ExpenseCategory, MerchantRule
 from .parsing import brand_category
@@ -180,11 +181,23 @@ def ai_categorise_pending(group: AccountGroup, limit: int = 200) -> int:
 @transaction.atomic
 def learn_category(expense: Expense, category: ExpenseCategory, user: User, apply_to_similar: bool = False) -> int:
     """User picked a category: remember it for this merchant and re-file past non-user rows."""
+    hides_investments = bool(user and not getattr(user, 'can_view_portfolio', False))
+    if hides_investments and category.name == INVESTMENT_CATEGORY:
+        return 0
+    if hides_investments and expense.category_id and expense.category.name == INVESTMENT_CATEGORY:
+        return 0
+
     expense.category = category
     expense.category_source = 'USER'
     expense.category_confidence = 1.0
     expense.save(update_fields=['category', 'category_source', 'category_confidence', 'updated_at'])
     if not expense.merchant_key or not apply_to_similar:
+        return 0
+
+    existing_rule = MerchantRule.objects.filter(
+        group=expense.group, merchant_key=expense.merchant_key,
+    ).select_related('category').first()
+    if hides_investments and existing_rule and existing_rule.category.name == INVESTMENT_CATEGORY:
         return 0
 
     record_ai_brand(
@@ -203,9 +216,11 @@ def learn_category(expense: Expense, category: ExpenseCategory, user: User, appl
             'merchant_label': expense.merchant or expense.merchant_key,
         },
     )
-    return (
+    similar_qs = (
         Expense.objects.filter(group=expense.group, merchant_key=expense.merchant_key)
         .exclude(pk=expense.pk)
         .exclude(category_source__in=('USER', 'MATCH'))
-        .update(category=category, category_source='RULE', category_confidence=1.0)
     )
+    if hides_investments or category.name != INVESTMENT_CATEGORY:
+        similar_qs = similar_qs.exclude(category__name=INVESTMENT_CATEGORY)
+    return similar_qs.update(category=category, category_source='RULE', category_confidence=1.0)

@@ -2,7 +2,8 @@ import asyncio
 import json
 from unittest import mock
 
-from django.test import SimpleTestCase, TransactionTestCase
+from asgiref.sync import async_to_sync
+from django.test import SimpleTestCase, TestCase
 
 from mcp_server import middleware as mw
 
@@ -73,7 +74,7 @@ class OAuthScopeMiddlewareTests(SimpleTestCase):
         self.assertEqual(status, 200)
 
 
-class OAuthTenancyTests(TransactionTestCase):
+class OAuthTenancyTests(TestCase):
     """Anonymous clients must not obtain usable tokens; tokens are bound to the served household."""
 
     def setUp(self):
@@ -94,7 +95,7 @@ class OAuthTenancyTests(TransactionTestCase):
                                           scope=scope, expires=timezone.now() + datetime.timedelta(hours=1))
 
     def _scopes(self, token):
-        return asyncio.run(mw.get_token_scopes(token.token))
+        return async_to_sync(mw.get_token_scopes)(token.token)
 
     def test_dcr_rejects_client_credentials_registration(self):
         resp = self.client.post('/o/register/', data=json.dumps({
