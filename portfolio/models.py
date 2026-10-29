@@ -180,6 +180,50 @@ class EPFEntry(models.Model):
         return f"EPF {self.get_entry_type_display()} {self.date} — ₹{self.amount:,.0f}"
 
 
+class PFEntry(models.Model):
+    """Provident Fund / Public Provident Fund (PF / PPF) entry per family member."""
+    ENTRY_TYPES = (
+        ('CONTRIBUTION', 'Contribution'),
+        ('INTEREST', 'Interest'),
+    )
+    group = models.ForeignKey(
+        'tracker.AccountGroup', on_delete=models.CASCADE,
+        related_name='pf_entries', null=True, blank=True,
+    )
+    account_name = models.CharField(
+        max_length=100,
+        default='Atul',
+        help_text="Family member / PF account holder (e.g. Atul, Kanika)",
+    )
+    date = models.DateField()
+    entry_type = models.CharField(max_length=15, choices=ENTRY_TYPES, default='CONTRIBUTION')
+    amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    remarks = models.CharField(max_length=255, blank=True)
+    is_baby = models.BooleanField(
+        default=False,
+        help_text="Track in Child portfolio instead of master portfolio",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date', '-created_at']
+        verbose_name = 'PF Entry'
+        verbose_name_plural = 'PF Entries'
+        indexes = [
+            Index(fields=['group', '-date']),
+            Index(fields=['group', 'account_name']),
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.account_name:
+            self.account_name = self.account_name.strip()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"PF ({self.account_name}) {self.get_entry_type_display()} {self.date} — ₹{self.amount:,.0f}"
+
+
+
 class NPSEntry(models.Model):
     """Each row is an update event. Latest row by date = current NPS state."""
     group = models.ForeignKey(

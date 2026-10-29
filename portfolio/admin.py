@@ -3,7 +3,7 @@ from unfold.admin import ModelAdmin
 
 from .models import (
     ZerodhaAccount, StockHolding, MutualFundHolding,
-    EPFEntry, NPSEntry, FixedDeposit, CashPosition,
+    EPFEntry, PFEntry, NPSEntry, FixedDeposit, CashPosition,
     BondHolding, CryptoHolding, CommodityHolding,
     CommodityPrice, MonthlySnapshot, FinancialGoal,
     PortfolioInsight, USStockHolding,
@@ -44,6 +44,15 @@ class EPFEntryAdmin(ModelAdmin):
     list_display = ('date', 'entry_type', 'amount', 'group', 'remarks')
     list_filter = ('entry_type', 'group')
     list_select_related = ('group',)
+    ordering = ('-date',)
+
+
+@admin.register(PFEntry)
+class PFEntryAdmin(ModelAdmin):
+    list_display = ('account_name', 'date', 'entry_type', 'amount', 'is_baby', 'group', 'remarks')
+    list_filter = ('account_name', 'entry_type', 'is_baby', 'group')
+    list_select_related = ('group',)
+    search_fields = ('account_name', 'remarks')
     ordering = ('-date',)
 
 

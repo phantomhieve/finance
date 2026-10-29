@@ -127,7 +127,7 @@
     <div class="card-body p-4">
       <h2 class="card-title text-base mb-2 flex items-center gap-1.5"><span class="material-symbols-outlined text-primary text-lg">route</span>Upcoming &amp; milestones</h2>
       {% if rm.upcoming %}
-      <div class="space-y-2">
+      <div class="space-y-2 max-h-64 overflow-y-auto pf-scroll-box">
         {% for y in rm.upcoming %}{% for g in y.goals %}
         <div class="table-card cursor-pointer" {% include 'portfolio/_goal_edit_attrs.html' %}>
           <div class="flex items-center justify-between gap-2">
@@ -162,7 +162,7 @@
         {% if rm.track_record.total %}<span class="badge badge-ghost badge-sm">{{ rm.track_record.hit }}/{{ rm.track_record.total }} targets hit</span>{% endif %}
       </div>
       {% if rm.closed %}
-      <div class="hidden md:block overflow-x-auto"><table class="table table-sm">
+      <div class="hidden md:block overflow-x-auto max-h-64 overflow-y-auto pf-scroll-box"><table class="table table-sm">
         <thead><tr><th>FY</th><th class="text-right">Target</th><th class="text-right">Closed at</th><th class="text-right">Result</th></tr></thead>
         <tbody>
         {% for y in rm.closed %}{% for g in y.goals %}
@@ -175,7 +175,7 @@
         {% endfor %}{% endfor %}
         </tbody>
       </table></div>
-      <div class="md:hidden space-y-2">
+      <div class="md:hidden space-y-2 max-h-64 overflow-y-auto pf-scroll-box">
         {% for y in rm.closed %}{% for g in y.goals %}
         <div class="table-card flex items-center justify-between gap-3" {% include 'portfolio/_goal_edit_attrs.html' %}>
           <div class="min-w-0">

@@ -194,7 +194,7 @@
     </div>
     
     {# Mobile #}
-    <div class="md:hidden space-y-2">
+    <div class="md:hidden space-y-2 max-h-72 overflow-y-auto pf-scroll-box">
       {% for s in baby_stocks %}
       <div class="table-card">
         <div class="flex items-center justify-between gap-2">
@@ -277,7 +277,7 @@
     </div>
     
     {# Mobile #}
-    <div class="md:hidden space-y-2">
+    <div class="md:hidden space-y-2 max-h-72 overflow-y-auto pf-scroll-box">
       {% for m in baby_index_mf %}
       <div class="table-card">
         <div class="flex items-center justify-between gap-2">
@@ -360,7 +360,7 @@
     </div>
     
     {# Mobile #}
-    <div class="md:hidden space-y-2">
+    <div class="md:hidden space-y-2 max-h-72 overflow-y-auto pf-scroll-box">
       {% for m in baby_other_mf %}
       <div class="table-card">
         <div class="flex items-center justify-between gap-2">
@@ -412,7 +412,7 @@
           <div class="font-bold">{{ gold_value|inr }}</div>
         </div>
         {% if gold_holdings %}
-        <div class="space-y-1 max-h-44 overflow-y-auto text-sm">
+        <div class="space-y-1 max-h-44 overflow-y-auto pf-scroll-box text-sm">
           {% for h in gold_holdings %}
           <div class="flex justify-between items-center">
             <span>{{ h.description }}</span>
@@ -435,7 +435,7 @@
           <div class="font-bold">{{ silver_value|inr }}</div>
         </div>
         {% if silver_holdings %}
-        <div class="space-y-1 max-h-44 overflow-y-auto text-sm">
+        <div class="space-y-1 max-h-44 overflow-y-auto pf-scroll-box text-sm">
           {% for h in silver_holdings %}
           <div class="flex justify-between items-center">
             <span>{{ h.description }}</span>
@@ -457,7 +457,7 @@
 {% endif %}{# end if empty #}
 
 {% comment %}SELECT HOLDINGS MODAL — shows all master portfolio Zerodha holdings with toggle buttons{% endcomment %}
-<dialog class="modal" id="selectHoldingsModal">
+<dialog class="modal modal-bottom sm:modal-middle" id="selectHoldingsModal">
   <div class="modal-box max-w-2xl w-full">
     <div class="flex items-center justify-between mb-1">
       <h3 class="font-bold text-lg flex items-center gap-2">
@@ -470,7 +470,7 @@
     </div>
     <p class="text-xs opacity-50 mb-4">Tap the icon on any holding to add or remove it from the Child Portfolio.</p>
 
-    <div class="space-y-4 max-h-[65vh] overflow-y-auto pr-1">
+    <div class="space-y-4 max-h-[65vh] overflow-y-auto pf-scroll-box pr-1">
 
       {# Individual Stocks #}
       {% if all_stocks %}

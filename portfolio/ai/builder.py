@@ -145,6 +145,21 @@ def build_prompt_data(summary, growth, group):
         'interest': float(summary['epf_total_interest']),
     }
 
+    pf = {
+        'balance': float(summary.get('pf_balance', 0)),
+        'contributions': float(summary.get('pf_total_contrib', 0)),
+        'interest': float(summary.get('pf_total_interest', 0)),
+        'accounts': [
+            {
+                'account_name': m['account_name'],
+                'contributions': float(m['contrib']),
+                'interest': float(m['interest']),
+                'balance': float(m['balance']),
+            }
+            for m in summary.get('pf_accounts', [])
+        ],
+    }
+
     nps_latest = summary['nps_latest']
     nps = {
         'balance': float(nps_latest.total_balance) if nps_latest else 0,
@@ -326,6 +341,7 @@ def build_prompt_data(summary, growth, group):
             'pnl_inr': float(summary.get('us_stocks_returns', 0)),
         },
         'epf': epf,
+        'pf': pf,
         'nps': nps,
         'fixed_deposits': fixed_deposits,
         'commodities': commodities,
