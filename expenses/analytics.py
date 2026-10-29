@@ -527,23 +527,46 @@ def subscription_summary(
     }
 
 
-def fy_summary(group: AccountGroup, fy_start: int, today: datetime.date | None = None) -> dict[str, Any]:
+def fy_summary(
+    group: AccountGroup,
+    fy_start: int,
+    today: datetime.date | None = None,
+    hide_investments: bool = False,
+) -> dict[str, Any]:
     """Annual financial summary spanning the Indian FY (April to March)."""
     today = today or timezone.localdate()
     start, end = datetime.date(fy_start, 4, 1), datetime.date(fy_start + 1, 3, 31)
     qs = _spend(group, start, end, mail_only=False)
+    if hide_investments:
+        qs = qs.exclude(category__name=INVESTMENT_CATEGORY)
     month_keys = [shift_month(fy_start, 4, i) for i in range(12)]
 
     by_cat_month = defaultdict(lambda: defaultdict(lambda: ZERO))
+    month_counts: dict[tuple[int, int], int] = defaultdict(int)
+    month_cat_totals: dict[tuple[int, int], list[tuple[Decimal, str, str, int]]] = defaultdict(list)
     meta: dict[str, dict[str, Any]] = {}
-    for row in (qs.values('txn_date__year', 'txn_date__month', 'category__name', 'category__icon', 'category__hue')
-                .annotate(t=Sum('amount'), n=Count('id'))):
+    for row in (
+        qs.values(
+            'txn_date__year',
+            'txn_date__month',
+            'category__id',
+            'category__name',
+            'category__icon',
+            'category__hue',
+        ).annotate(t=Sum('amount'), n=Count('id'))
+    ):
         name = row['category__name'] or 'Uncategorised'
-        by_cat_month[name][(row['txn_date__year'], row['txn_date__month'])] += row['t']
+        key = (row['txn_date__year'], row['txn_date__month'])
+        icon = row['category__icon'] or 'help'
+        hue = row['category__hue'] if row['category__hue'] is not None else 230
+        by_cat_month[name][key] += row['t']
+        month_counts[key] += row['n']
+        month_cat_totals[key].append((row['t'], name, icon, hue))
         info = meta.setdefault(name, {
-            'icon': row['category__icon'] or 'help',
+            'id': row['category__id'],
+            'icon': icon,
             'count': 0,
-            'hue': row['category__hue'] if row['category__hue'] is not None else 230,
+            'hue': hue,
         })
         info['count'] += row['n']
 
@@ -552,25 +575,56 @@ def fy_summary(group: AccountGroup, fy_start: int, today: datetime.date | None =
         for key, amount in per_month.items():
             by_month[key] += amount
     total = sum(by_month.values(), ZERO)
+    total_count = sum(month_counts.values())
 
     months = []
     for y, m in month_keys:
         first = datetime.date(y, m, 1)
+        m_total = by_month.get((y, m), ZERO)
+        cat_candidates = month_cat_totals.get((y, m), [])
+        top_c = max(cat_candidates, key=lambda x: x[0]) if cat_candidates else None
         months.append({
             'year': y,
             'month': m,
             'param': f'{y:04d}-{m:02d}',
             'label': first.strftime('%b'),
             'full_label': first.strftime('%B %Y'),
-            'total': by_month.get((y, m), ZERO),
+            'total': m_total,
+            'count': month_counts.get((y, m), 0),
             'started': first <= today,
             'partial': (y, m) == (today.year, today.month),
+            'top_cat': top_c[1] if top_c else '',
+            'top_cat_icon': top_c[2] if top_c else '',
+            'top_cat_hue': top_c[3] if top_c else 230,
         })
     started = [m for m in months if m['started'] and m['total']]
     complete = [m for m in started if not m['partial']]
     peak = max((m['total'] for m in months), default=ZERO)
+    avg_month_val = (
+        (sum((m['total'] for m in complete), ZERO) / len(complete))
+        if complete
+        else (started[0]['total'] if started else ZERO)
+    )
     for m in months:
         m['bar'] = round(m['total'] / peak * 100) if peak else 0
+        m['is_peak'] = bool(peak > ZERO and m['total'] == peak)
+        m['vs_avg_pct'] = (
+            round((m['total'] - avg_month_val) / avg_month_val * 100)
+            if (avg_month_val > ZERO and m['started'] and m['total'] > ZERO)
+            else None
+        )
+
+    # Previous FY over the same stretch of the year, so a part-finished FY compares fairly.
+    cutoff = min(end, today)
+    prev_qs = _spend(group, datetime.date(fy_start - 1, 4, 1), _same_day_last_year(cutoff), False)
+    if hide_investments:
+        prev_qs = prev_qs.exclude(category__name=INVESTMENT_CATEGORY)
+    prev_total = _sum(prev_qs)
+    prev_by_cat = {
+        (name or 'Uncategorised'): amt
+        for name, amt in prev_qs.values_list('category__name').annotate(t=Sum('amount'))
+        if amt
+    }
 
     # Average over months since tracking began this FY, so a late start doesn't dilute it.
     first_data = next((i for i, m in enumerate(months) if m['total']), 0)
@@ -580,6 +634,18 @@ def fy_summary(group: AccountGroup, fy_start: int, today: datetime.date | None =
         cat_total = sum(per_month.values(), ZERO)
         series = [per_month.get(k, ZERO) for k in month_keys]
         top = max(series) or 1
+        prev_cat = prev_by_cat.get(name, ZERO)
+        delta_cat = cat_total - prev_cat
+        spark_months = []
+        for (y, m), v in zip(month_keys, series):
+            first = datetime.date(y, m, 1)
+            spark_months.append({
+                'label': first.strftime('%b'),
+                'param': f'{y:04d}-{m:02d}',
+                'amount': v,
+                'pct': round(v / top * 100) if v else 0,
+                'started': first <= today,
+            })
         categories.append({
             'name': name,
             **meta[name],
@@ -587,6 +653,11 @@ def fy_summary(group: AccountGroup, fy_start: int, today: datetime.date | None =
             'pct': round(cat_total / total * 100) if total else 0,
             'avg_month': cat_total / months_elapsed,
             'spark': [round(v / top * 100) for v in series],
+            'spark_months': spark_months,
+            'active_months': sum(1 for v in series if v > ZERO),
+            'prev': prev_cat,
+            'delta': delta_cat,
+            'gap': abs(delta_cat),
         })
 
     stack_names = [c['name'] for c in categories[:STACK_CATEGORIES]]
@@ -605,29 +676,124 @@ def fy_summary(group: AccountGroup, fy_start: int, today: datetime.date | None =
     if any(rest):
         stack.append({'label': 'Everything else', 'hue': None, 'values': rest})
 
-    # Previous FY over the same stretch of the year, so a part-finished FY compares fairly.
-    cutoff = min(end, today)
-    prev_total = _sum(_spend(group, datetime.date(fy_start - 1, 4, 1), _same_day_last_year(cutoff), False))
+    # Annual highlight insights (day-to-day burn, biggest buy, most visited, top riser)
+    flexible = qs.exclude(category__name__in=FIXED_CATEGORIES)
+    elapsed_days = max(1, (min(end, today) - start).days + 1) if today >= start else 1
+    per_day = (_sum(flexible) / Decimal(str(elapsed_days))) if total > ZERO else ZERO
+    biggest = (
+        flexible.select_related('category').order_by('-amount').first()
+        or qs.select_related('category').order_by('-amount').first()
+    )
+    frequent = (
+        flexible.exclude(merchant='')
+        .values('merchant')
+        .annotate(total=Sum('amount'), count=Count('id'), latest_date=models.Max('txn_date'))
+        .filter(count__gte=2)
+        .order_by('-count', '-total')
+        .first()
+    )
+    if frequent and frequent.get('latest_date'):
+        frequent['month_param'] = frequent['latest_date'].strftime('%Y-%m')
+    risers = [c for c in categories if c['prev'] > ZERO and c['delta'] >= RISER_FLOOR]
+    riser = max(risers, key=lambda c: c['delta']) if risers else None
+
+    raw_merchants = list(
+        qs.exclude(merchant='')
+        .values('merchant')
+        .annotate(total=Sum('amount'), count=Count('id'), latest_date=models.Max('txn_date'))
+        .order_by('-total')[:10]
+    )
+    top_merchant_total = raw_merchants[0]['total'] if raw_merchants else ZERO
+    merchants = []
+    for m_row in raw_merchants:
+        m_tot = m_row['total'] or ZERO
+        m_cnt = m_row['count'] or 1
+        latest_dt = m_row.get('latest_date')
+        merchants.append({
+            'merchant': m_row['merchant'],
+            'total': m_tot,
+            'count': m_cnt,
+            'avg': (m_tot / Decimal(str(m_cnt))).quantize(Decimal('1')),
+            'pct': round(m_tot / total * 100) if total else 0,
+            'bar': round(m_tot / top_merchant_total * 100) if top_merchant_total else 0,
+            'month_param': latest_dt.strftime('%Y-%m') if latest_dt else f'{fy_start:04d}-04',
+        })
+
+    # Payment sources & household members breakdown
+    source_rows = list(
+        qs.values('payment_source__id')
+        .annotate(total=Sum('amount'), count=Count('id'))
+        .order_by('-total')
+    )
+    source_map = PaymentSource.objects.in_bulk([r['payment_source__id'] for r in source_rows if r['payment_source__id']])
+    top_source_total = source_rows[0]['total'] if source_rows else ZERO
+    sources = []
+    for row in source_rows:
+        ps = source_map.get(row['payment_source__id'])
+        s_tot = row['total'] or ZERO
+        sources.append({
+            'name': ps.display_name if ps else 'Manual / Cash & UPI',
+            'short_name': ps.short_name if ps else 'Manual / UPI',
+            'icon': ps.icon if ps else 'wallet',
+            'kind': ps.kind if ps else 'MANUAL',
+            'total': s_tot,
+            'count': row['count'],
+            'pct': round(s_tot / total * 100) if total else 0,
+            'bar': round(s_tot / top_source_total * 100) if top_source_total else 0,
+        })
+
+    members = []
+    for row in (
+        qs.values('member__id', 'member__first_name', 'member__username')
+        .annotate(total=Sum('amount'), count=Count('id'))
+        .order_by('-total')
+    ):
+        m_tot = row['total'] or ZERO
+        members.append({
+            'id': row['member__id'],
+            'name': row['member__first_name'] or row['member__username'] or 'Shared / unassigned',
+            'total': m_tot,
+            'count': row['count'],
+            'pct': round(m_tot / total * 100) if total else 0,
+        })
+
     subscriptions = subscription_summary(group, fy_start, qs=qs, today=today, month_keys=month_keys)
+    subscriptions['share_pct'] = round(float(subscriptions['total'] / total * 100), 1) if total > ZERO else 0
+    low_candidates = complete if len(complete) >= 2 else (started if len(started) >= 2 else [])
+    low_month = min(low_candidates, key=lambda m: m['total']) if low_candidates else None
+    latest_active_month = started[-1]['param'] if started else f'{fy_start:04d}-04'
+
     return {
         'fy_start': fy_start,
+        'start': start,
+        'end': end,
         'label': fy_label(fy_start),
         'total': total,
+        'count': total_count,
         'months': months,
+        'started_months_count': len([m for m in months if m['started']]),
+        'active_months_count': len(started),
+        'complete_months_count': len(complete),
+        'latest_month_param': latest_active_month,
         'categories': categories,
         'stack': stack,
-        'avg_month': (sum((m['total'] for m in complete), ZERO) / len(complete)) if complete else (
-            started[0]['total'] if started else ZERO
-        ),
+        'avg_month': avg_month_val,
         'top_month': max(started, key=lambda m: m['total']) if started else None,
+        'low_month': low_month,
+        'per_day': per_day,
+        'biggest': biggest,
+        'biggest_month_param': biggest.txn_date.strftime('%Y-%m') if biggest else latest_active_month,
+        'frequent': frequent,
+        'riser': riser,
         'prev_label': fy_label(fy_start - 1),
         'prev_total': prev_total,
+        'prev_delta': total - prev_total,
+        'prev_gap': abs(total - prev_total),
         'prev_delta_pct': round((total - prev_total) / prev_total * 100) if prev_total else None,
         'in_progress': start <= today <= end,
-        'merchants': list(
-            qs.exclude(merchant='').values('merchant').annotate(total=Sum('amount'), count=Count('id'))
-            .order_by('-total')[:10]
-        ),
+        'merchants': merchants,
+        'sources': sources,
+        'members': members,
         'subscriptions': subscriptions,
     }
 
