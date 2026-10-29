@@ -118,6 +118,7 @@ UNFOLD = {
                     {"title": "Stocks", "icon": "trending_up", "link": f"{_ADMIN_PREFIX}/portfolio/stockholding/"},
                     {"title": "Mutual Funds", "icon": "pie_chart", "link": f"{_ADMIN_PREFIX}/portfolio/mutualfundholding/"},
                     {"title": "EPF Entries", "icon": "savings", "link": f"{_ADMIN_PREFIX}/portfolio/epfentry/"},
+                    {"title": "PF Entries", "icon": "savings", "link": f"{_ADMIN_PREFIX}/portfolio/pfentry/"},
                     {"title": "NPS Entries", "icon": "elderly", "link": f"{_ADMIN_PREFIX}/portfolio/npsentry/"},
                     {"title": "Fixed Deposits", "icon": "lock", "link": f"{_ADMIN_PREFIX}/portfolio/fixeddeposit/"},
                     {"title": "Cash", "icon": "payments", "link": f"{_ADMIN_PREFIX}/portfolio/cashposition/"},

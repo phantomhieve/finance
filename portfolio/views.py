@@ -22,7 +22,7 @@ from pftracker.utils import ZERO as _ZERO, feature_enabled, safe_redirect, pnl_p
 
 from .models import (
     ZerodhaAccount, StockHolding, MutualFundHolding,
-    EPFEntry, NPSEntry, FixedDeposit,
+    EPFEntry, PFEntry, NPSEntry, FixedDeposit,
     CashPosition, BondHolding, CryptoHolding,
     CommodityHolding, USStockHolding,
     MonthlySnapshot, FinancialGoal,
@@ -30,7 +30,7 @@ from .models import (
     InsightGenerationSettings, RealEstateHolding,
 )
 from .forms import (
-    EPFEntryForm, NPSEntryForm, FixedDepositForm,
+    EPFEntryForm, PFEntryForm, NPSEntryForm, FixedDepositForm,
     CashPositionForm, BondHoldingForm, CryptoHoldingForm,
     CommodityHoldingForm, FinancialGoalForm, USStockHoldingForm,
     RealEstateHoldingForm, RealEstateValuationForm,
@@ -38,6 +38,7 @@ from .forms import (
 from tracker.services import parse_fy_param
 from .services import (
     get_portfolio_summary,
+    get_pf_summary,
     without_real_estate,
     get_commodity_summary,
     sync_zerodha_from_sheets,
@@ -265,6 +266,9 @@ def _make_crud_views(model_class, form_class, label):
 add_epf_entry, edit_epf_entry, delete_epf_entry = _make_crud_views(
     EPFEntry, EPFEntryForm, 'EPF entry')
 
+add_pf_entry, edit_pf_entry, delete_pf_entry = _make_crud_views(
+    PFEntry, PFEntryForm, 'PF entry')
+
 add_nps_entry, edit_nps_entry, delete_nps_entry = _make_crud_views(
     NPSEntry, NPSEntryForm, 'NPS entry')
 
@@ -405,6 +409,21 @@ def _insight_can_generate(group):
     return latest, can
 
 
+def _pf_member_names(group):
+    """Return suggested family member names for PF entries (from existing entries + household users)."""
+    from tracker.models import User as TrackerUser
+    names = {'Atul', 'Kanika'}
+    if group:
+        for n in PFEntry.objects.filter(group=group).values_list('account_name', flat=True).distinct():
+            if n and n.strip():
+                names.add(n.strip())
+        for first_name, username in TrackerUser.objects.filter(group=group).values_list('first_name', 'username'):
+            label = (first_name or '').strip() or (username or '').strip().title()
+            if label:
+                names.add(label)
+    return sorted(names)
+
+
 @login_required
 @_require_portfolio
 def master_portfolio(request):
@@ -435,6 +454,8 @@ def master_portfolio(request):
         'can_generate_insight': can_generate,
         'insight_cooldown_days_hint': _insight_cooldown_hint(group),
         'epf_form': EPFEntryForm(),
+        'pf_form': PFEntryForm(),
+        'pf_member_names': _pf_member_names(group),
         'nps_form': NPSEntryForm(group=group),
         'fd_form': FixedDepositForm(),
         'cash_form': CashPositionForm(),
@@ -635,6 +656,40 @@ def epf_detail(request):
         'entries': entries, 'total_contrib': contrib,
         'total_interest': interest, 'balance': contrib + interest,
         'form': EPFEntryForm(),
+    })
+
+
+@login_required
+@_require_portfolio
+def pf_detail(request):
+    group = _user_group(request)
+    pf = get_pf_summary(group, is_baby=False)
+    selected_member = (request.GET.get('member') or '').strip()
+    qs = PFEntry.objects.filter(group=group, is_baby=False) if group else PFEntry.objects.none()
+    if selected_member:
+        qs = qs.filter(account_name__iexact=selected_member)
+    entries = list(qs)
+    if selected_member:
+        contrib = sum((e.amount for e in entries if e.entry_type == 'CONTRIBUTION'), _ZERO)
+        interest = sum((e.amount for e in entries if e.entry_type == 'INTEREST'), _ZERO)
+        balance = contrib + interest
+    else:
+        contrib = pf['pf_total_contrib']
+        interest = pf['pf_total_interest']
+        balance = pf['pf_balance']
+
+    return render(request, 'portfolio/pf_detail.html', {
+        'entries': entries,
+        'total_contrib': contrib,
+        'total_interest': interest,
+        'balance': balance,
+        'overall_balance': pf['pf_balance'],
+        'overall_contrib': pf['pf_total_contrib'],
+        'overall_interest': pf['pf_total_interest'],
+        'pf_accounts': pf['pf_accounts'],
+        'selected_member': selected_member,
+        'pf_member_names': _pf_member_names(group),
+        'form': PFEntryForm(initial={'account_name': selected_member or 'Atul'}),
     })
 
 
@@ -1145,6 +1200,8 @@ def baby_portfolio(request):
         'all_index_mf': MutualFundHolding.objects.filter(account_id__in=acct_ids, fund_type='INDEX').select_related('account').order_by('fund_name'),
         'all_other_mf': MutualFundHolding.objects.filter(account_id__in=acct_ids, fund_type='OTHER').select_related('account').order_by('fund_name'),
         'epf_form': EPFEntryForm(),
+        'pf_form': PFEntryForm(initial={'is_baby': True}),
+        'pf_member_names': _pf_member_names(group),
         'nps_form': NPSEntryForm(group=group),
         'fd_form': FixedDepositForm(initial={'is_baby': True}),
         'cash_form': CashPositionForm(initial={'is_baby': True}),
@@ -1168,6 +1225,7 @@ def toggle_baby(request, model_name, pk):
     model_map = {
         'stockholding': StockHolding,
         'mutualfundholding': MutualFundHolding,
+        'pfentry': PFEntry,
         'fixeddeposit': FixedDeposit,
         'cashposition': CashPosition,
         'bondholding': BondHolding,

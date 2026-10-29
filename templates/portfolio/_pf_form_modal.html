@@ -1,0 +1,70 @@
+<dialog class="modal modal-bottom sm:modal-middle" id="addPfModal">
+  <div class="modal-box max-w-md w-full max-h-[90vh] overflow-y-auto overscroll-contain">
+    <div class="flex items-start justify-between gap-2 mb-4">
+      <h3 id="pfModalTitle" class="font-bold text-lg flex items-center gap-2">
+        <span class="material-symbols-outlined text-primary">savings</span> Add PF Entry
+      </h3>
+      <button type="button" class="btn btn-ghost btn-xs btn-square" onclick="closeModal('addPfModal')" aria-label="Close">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
+    <form id="pfForm" method="post" action="{% url 'add_pf_entry' %}" data-add-url="{% url 'add_pf_entry' %}" data-edit-url="{% url 'edit_pf_entry' pk=0 %}" data-delete-url="{% url 'delete_pf_entry' pk=0 %}">{% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <div class="space-y-3">
+        <div class="form-field">
+          <div class="flex items-center justify-between gap-2 mb-1">
+            <label class="label text-xs font-semibold p-0">Family Member / Account</label>
+            <div class="flex flex-wrap gap-1" id="pfMemberQuickPills">
+              {% for m_name in pf_member_names|default:'' %}
+              <button type="button" class="badge badge-sm badge-outline hover:badge-primary cursor-pointer transition-colors" onclick="var inp = document.querySelector('#pfForm [name=account_name]'); if (inp) { inp.value = '{{ m_name|escapejs }}'; inp.focus(); }">{{ m_name }}</button>
+              {% empty %}
+              <button type="button" class="badge badge-sm badge-outline hover:badge-primary cursor-pointer transition-colors" onclick="var inp = document.querySelector('#pfForm [name=account_name]'); if (inp) { inp.value = 'Atul'; }">Atul</button>
+              <button type="button" class="badge badge-sm badge-outline hover:badge-primary cursor-pointer transition-colors" onclick="var inp = document.querySelector('#pfForm [name=account_name]'); if (inp) { inp.value = 'Kanika'; }">Kanika</button>
+              {% endfor %}
+            </div>
+          </div>
+          {{ form_obj.account_name }}
+          <datalist id="pfMemberList">
+            {% for m_name in pf_member_names %}
+            <option value="{{ m_name }}"></option>
+            {% endfor %}
+          </datalist>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="form-field">
+            <label class="label text-xs font-semibold">Date</label>
+            {{ form_obj.date }}
+          </div>
+          <div class="form-field">
+            <label class="label text-xs font-semibold">Type</label>
+            {{ form_obj.entry_type }}
+          </div>
+        </div>
+        <div class="form-field">
+          <label class="label text-xs font-semibold">Amount (₹)</label>
+          {{ form_obj.amount }}
+        </div>
+        <div class="form-field">
+          <label class="label text-xs font-semibold">Remarks <span class="opacity-40 font-normal">optional</span></label>
+          {{ form_obj.remarks }}
+        </div>
+        <div class="form-field flex flex-row items-center gap-2.5 pt-1">
+          {{ form_obj.is_baby }}
+          <label class="label text-xs font-semibold cursor-pointer p-0" for="{{ form_obj.is_baby.id_for_label }}">Track in Child Portfolio</label>
+        </div>
+      </div>
+      <div class="modal-action flex-wrap gap-2 mt-6">
+        <button type="button" id="pfDeleteBtn" class="btn btn-error btn-sm gap-1 mr-auto hidden" onclick="confirmDelete('deletePfForm')">
+          <span class="material-symbols-outlined text-base">delete</span>Delete
+        </button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addPfModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm gap-1">
+          <span class="material-symbols-outlined text-base">save</span>Save
+        </button>
+      </div>
+    </form>
+    <form id="deletePfForm" method="post" action="" class="hidden">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form>
+  </div>
+  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+

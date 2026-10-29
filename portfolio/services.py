@@ -15,7 +15,7 @@ from pftracker.utils import (
 )
 from .models import (
     ZerodhaAccount, StockHolding, MutualFundHolding,
-    EPFEntry, NPSEntry, FixedDeposit, CashPosition,
+    EPFEntry, PFEntry, NPSEntry, FixedDeposit, CashPosition,
     BondHolding, CryptoHolding, CommodityHolding,
     CommodityPrice, MonthlySnapshot, FinancialGoal,
     USStockHolding, RealEstateHolding,
@@ -54,6 +54,41 @@ def _gf(model_qs, group):
     if group is None:
         return model_qs.none()
     return model_qs.filter(group=group)
+
+
+def get_pf_summary(group=None, is_baby=False):
+    """Aggregate PF (Provident Fund) entries into overall and per-member balances."""
+    qs = _gf(PFEntry.objects.filter(is_baby=is_baby), group)
+    rows = qs.values('account_name', 'entry_type').annotate(total=Sum('amount'))
+    member_map = {}
+    for row in rows:
+        raw_name = (row['account_name'] or 'Primary').strip()
+        key = raw_name.lower()
+        rec = member_map.setdefault(key, {
+            'account_name': raw_name,
+            'contrib': _ZERO,
+            'interest': _ZERO,
+            'balance': _ZERO,
+        })
+        amt = row['total'] or _ZERO
+        if row['entry_type'] == 'CONTRIBUTION':
+            rec['contrib'] += amt
+        elif row['entry_type'] == 'INTEREST':
+            rec['interest'] += amt
+        rec['balance'] = rec['contrib'] + rec['interest']
+
+    pf_accounts = sorted(member_map.values(), key=lambda x: x['balance'], reverse=True)
+    pf_total_contrib = sum((m['contrib'] for m in pf_accounts), _ZERO)
+    pf_total_interest = sum((m['interest'] for m in pf_accounts), _ZERO)
+    pf_balance = pf_total_contrib + pf_total_interest
+    for m in pf_accounts:
+        m['pct'] = _pct(m['balance'], pf_balance)
+    return {
+        'pf_total_contrib': pf_total_contrib,
+        'pf_total_interest': pf_total_interest,
+        'pf_balance': pf_balance,
+        'pf_accounts': pf_accounts,
+    }
 
 
 def get_commodity_summary(group=None, is_baby=False):
@@ -380,6 +415,12 @@ def get_portfolio_summary(group=None, is_baby=False):
         nps_total_contrib = _ZERO
         nps_total_interest = _ZERO
 
+    pf = get_pf_summary(group, is_baby=is_baby)
+    pf_total_contrib = pf['pf_total_contrib']
+    pf_total_interest = pf['pf_total_interest']
+    pf_balance = pf['pf_balance']
+    pf_accounts = pf['pf_accounts']
+
     active_fds = list(_gf(FixedDeposit.objects.filter(is_active=True, is_baby=is_baby), group))
     fd_principal = sum(fd.principal for fd in active_fds)
     fd_current = sum(fd.current_value for fd in active_fds)
@@ -408,6 +449,7 @@ def get_portfolio_summary(group=None, is_baby=False):
     # Asset-class list
     assets = [
         {'name': 'EPF', 'value': epf_balance, 'icon': 'account_balance'},
+        {'name': 'PF', 'value': pf_balance, 'icon': 'savings'},
         {'name': 'Index Funds', 'value': index_current, 'icon': 'trending_up'},
         {'name': 'Cash', 'value': cash_total, 'icon': 'payments'},
         {'name': 'Individual Stocks', 'value': all_stocks_current, 'icon': 'candlestick_chart'},
@@ -441,7 +483,7 @@ def get_portfolio_summary(group=None, is_baby=False):
         e['pct'] = _pct(e['value'], equity_total)
 
     # Consolidated portfolio
-    debt_total = epf_balance + fd_current + bonds_total
+    debt_total = epf_balance + pf_balance + fd_current + bonds_total
     consolidated = [
         {'name': 'Equity', 'value': equity_total},
         {'name': 'Debt Instruments', 'value': debt_total},
@@ -456,7 +498,7 @@ def get_portfolio_summary(group=None, is_baby=False):
     # Invested vs returns
     total_invested = (
         all_stocks_purchased + index_purchased + other_purchased
-        + epf_total_contrib + nps_total_contrib
+        + epf_total_contrib + pf_total_contrib + nps_total_contrib
         + fd_principal + cash_total + bonds_total + crypto_invested
         + commodity_invested + us_stocks_invested + real_estate_invested
     )
@@ -505,6 +547,10 @@ def get_portfolio_summary(group=None, is_baby=False):
         'epf_balance': epf_balance,
         'epf_total_contrib': epf_total_contrib,
         'epf_total_interest': epf_total_interest,
+        'pf_balance': pf_balance,
+        'pf_total_contrib': pf_total_contrib,
+        'pf_total_interest': pf_total_interest,
+        'pf_accounts': pf_accounts,
         'nps_latest': nps_latest,
         'nps_total_contrib': nps_total_contrib,
         'nps_total_interest': nps_total_interest,
@@ -527,6 +573,7 @@ def get_portfolio_summary(group=None, is_baby=False):
             'gold_price_obj', 'silver_price_obj',
         )},
         'epf_entries': [] if is_baby else _gf(EPFEntry.objects, group).all()[:10],
+        'pf_entries': _gf(PFEntry.objects.filter(is_baby=is_baby), group).all()[:10],
         'nps_entries': [] if is_baby else _gf(NPSEntry.objects, group).all()[:10],
         'us_stocks': us_stocks,
         'us_stocks_invested': us_stocks_invested,
@@ -1067,6 +1114,20 @@ def _take_snapshot_for_group(month, group):
         'invested': float(summary['epf_total_contrib']),
         'current': float(summary['epf_balance']),
         'interest': float(summary['epf_total_interest']),
+    }
+    data['pf'] = {
+        'invested': float(summary['pf_total_contrib']),
+        'current': float(summary['pf_balance']),
+        'interest': float(summary['pf_total_interest']),
+        'accounts': [
+            {
+                'account_name': m['account_name'],
+                'invested': float(m['contrib']),
+                'interest': float(m['interest']),
+                'current': float(m['balance']),
+            }
+            for m in summary['pf_accounts']
+        ],
     }
     data.setdefault('index_funds', {})['invested'] = float(
         _sum_qs(MutualFundHolding.objects.filter(account__group=group, fund_type='INDEX', is_baby=False), 'purchase_value'))

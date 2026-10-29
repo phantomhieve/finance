@@ -12,6 +12,7 @@ urlpatterns = [
 
     # Detail pages ("View All")
     path('epf/', views.epf_detail, name='epf_detail'),
+    path('pf/', views.pf_detail, name='pf_detail'),
     path('nps/', views.nps_detail, name='nps_detail'),
     path('fd/', views.fd_detail, name='fd_detail'),
     path('cash/', views.cash_detail, name='cash_detail'),
@@ -30,6 +31,11 @@ urlpatterns = [
     path('epf/add/', views.add_epf_entry, name='add_epf_entry'),
     path('epf/<int:pk>/edit/', views.edit_epf_entry, name='edit_epf_entry'),
     path('epf/<int:pk>/delete/', views.delete_epf_entry, name='delete_epf_entry'),
+
+    # PF (Provident Fund per member)
+    path('pf/add/', views.add_pf_entry, name='add_pf_entry'),
+    path('pf/<int:pk>/edit/', views.edit_pf_entry, name='edit_pf_entry'),
+    path('pf/<int:pk>/delete/', views.delete_pf_entry, name='delete_pf_entry'),
 
     # NPS
     path('nps/add/', views.add_nps_entry, name='add_nps_entry'),

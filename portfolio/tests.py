@@ -879,3 +879,116 @@ class PortfolioInsightsDAGTests(TestCase):
             self.assertEqual(res.summary, "Resilient synthesis summary.")
             self.assertGreater(res.score, 0)
 
+
+class PFEntryTests(TestCase):
+    """Tests for PF (Provident Fund / PPF) per-family-member accounts across UI, Services, and MCP."""
+
+    def setUp(self):
+        self.group = AccountGroup.objects.create(name="PF Household")
+        self.group.set_portfolio_password("pass123")
+        self.group.save()
+
+        self.user = User.objects.create_user(
+            username="atul",
+            first_name="Atul",
+            password="securepassword",
+            user_type="PRIMARY",
+            group=self.group,
+        )
+        self.client = Client()
+        self.client.login(username="atul", password="securepassword")
+        session = self.client.session
+        session['portfolio_unlocked_at'] = time.time()
+        session.save()
+
+    def test_pf_ui_and_summary_per_member(self):
+        from portfolio.models import PFEntry
+
+        # Add PF entry for Atul via UI
+        resp = self.client.post(reverse('add_pf_entry'), {
+            'account_name': 'Atul',
+            'date': '2026-04-05',
+            'entry_type': 'CONTRIBUTION',
+            'amount': '150000.00',
+            'remarks': 'FY27 PPF Deposit',
+        })
+        self.assertEqual(resp.status_code, 302)
+
+        # Add PF interest for Atul and contribution for Kanika
+        PFEntry.objects.create(
+            group=self.group,
+            account_name='Atul',
+            date=datetime.date(2026, 3, 31),
+            entry_type='INTEREST',
+            amount=Decimal('25000.00'),
+            remarks='Annual Interest',
+        )
+        PFEntry.objects.create(
+            group=self.group,
+            account_name='Kanika',
+            date=datetime.date(2026, 4, 10),
+            entry_type='CONTRIBUTION',
+            amount=Decimal('150000.00'),
+            remarks='Kanika PPF',
+        )
+
+        summary = get_portfolio_summary(self.group)
+        self.assertEqual(summary['pf_total_contrib'], Decimal('300000.00'))
+        self.assertEqual(summary['pf_total_interest'], Decimal('25000.00'))
+        self.assertEqual(summary['pf_balance'], Decimal('325000.00'))
+        self.assertEqual(len(summary['pf_accounts']), 2)
+        self.assertEqual(summary['pf_accounts'][0]['account_name'], 'Atul')
+        self.assertEqual(summary['pf_accounts'][0]['balance'], Decimal('175000.00'))
+        self.assertEqual(summary['pf_accounts'][1]['account_name'], 'Kanika')
+        self.assertEqual(summary['pf_accounts'][1]['balance'], Decimal('150000.00'))
+
+        # Verify pf_detail page & member filter
+        detail_resp = self.client.get(reverse('pf_detail'))
+        self.assertEqual(detail_resp.status_code, 200)
+        self.assertContains(detail_resp, 'Atul')
+        self.assertContains(detail_resp, 'Kanika')
+
+        kanika_resp = self.client.get(reverse('pf_detail') + '?member=Kanika')
+        self.assertEqual(kanika_resp.status_code, 200)
+        self.assertEqual(len(kanika_resp.context['entries']), 1)
+        self.assertEqual(kanika_resp.context['balance'], Decimal('150000.00'))
+
+        # Verify snapshot includes PF breakdown
+        snap, _ = take_monthly_snapshot(datetime.date(2026, 4, 1), group=self.group)
+        self.assertIn('pf', snap.data)
+        self.assertEqual(snap.data['pf']['current'], 325000.0)
+        self.assertEqual(len(snap.data['pf']['accounts']), 2)
+
+    def test_pf_mcp_tools(self):
+        # Create via MCP add_pf_entry
+        res_str = mcp_srv.add_pf_entry(
+            account_name="Kanika",
+            date="2026-05-01",
+            amount="100000",
+            entry_type="CONTRIBUTION",
+            remarks="MCP deposit",
+        )
+        res = json.loads(res_str)
+        self.assertEqual(res['status'], 'created')
+        self.assertEqual(res['account_name'], 'Kanika')
+        entry_id = res['id']
+
+        # Update via MCP update_pf_entry
+        upd_str = mcp_srv.update_pf_entry(
+            entry_id=entry_id,
+            amount="125000",
+            remarks="Updated MCP deposit",
+        )
+        upd = json.loads(upd_str)
+        self.assertEqual(upd['status'], 'updated')
+
+        # Read via MCP get_pf_details
+        details = json.loads(mcp_srv.get_pf_details(account_name="Kanika"))
+        self.assertEqual(details['balance'], '125000.00')
+        self.assertEqual(len(details['entries']), 1)
+
+        # Delete via MCP delete_record
+        del_res = json.loads(mcp_srv.delete_record('portfolio.PFEntry', entry_id))
+        self.assertEqual(del_res['status'], 'deleted')
+
+

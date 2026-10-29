@@ -163,7 +163,7 @@
 {# ——— MOBILE QUICK STATS ——— #}
 <div class="md:hidden quick-stats-scroll mb-3">
   {% for a in assets %}
-  <a href="#{% if a.name == 'Real Estate' or a.name == 'Gold' or a.name == 'Silver' or a.name == 'Crypto' %}alternates{% elif a.name == 'EPF' or a.name == 'Bonds' %}debt{% elif a.name == 'Cash' or a.name == 'FD' %}liquidity{% else %}equity{% endif %}" class="quick-stat-chip">
+  <a href="#{% if a.name == 'Real Estate' or a.name == 'Gold' or a.name == 'Silver' or a.name == 'Crypto' %}alternates{% elif a.name == 'EPF' or a.name == 'PF' or a.name == 'Bonds' %}debt{% elif a.name == 'Cash' or a.name == 'FD' %}liquidity{% else %}equity{% endif %}" class="quick-stat-chip">
     <span class="material-symbols-outlined qs-icon">{{ a.icon }}</span>
     <div>
       <div class="qs-label">{{ a.name }}</div>
@@ -331,7 +331,7 @@
       <span>Returns: <strong class="{% if us_stocks_returns >= 0 %}text-success{% else %}text-error{% endif %}">{% if us_stocks_returns >= 0 %}+{% endif %}{{ us_stocks_returns|inr }}</strong></span>
     </div>
     {% if us_stocks %}
-    <div class="hidden md:block overflow-x-auto"><table class="table table-sm">
+    <div class="hidden md:block overflow-x-auto max-h-72 overflow-y-auto pf-scroll-box"><table class="table table-sm">
       <thead><tr><th>Symbol</th><th>Qty</th><th>Vest Date</th><th class="text-right">Buy (USD)</th><th class="text-right">Now (USD)</th><th class="text-right">Invested (₹)</th><th class="text-right">Current (₹)</th><th class="text-right">P&amp;L</th><th class="w-10"></th></tr></thead>
       <tbody>
       {% for h in us_stocks %}
@@ -349,7 +349,7 @@
       {% endfor %}
       </tbody>
     </table></div>
-    <div class="md:hidden space-y-2">
+    <div class="md:hidden space-y-2 max-h-72 overflow-y-auto pf-scroll-box">
       {% for h in us_stocks %}
       <div class="table-card">
         <div class="flex items-center justify-between gap-2">
@@ -381,10 +381,10 @@
       <div class="flex flex-wrap items-center gap-1.5">{% if nps_latest %}<span class="badge badge-primary badge-sm">{{ nps_latest.total_balance|inr }}</span>{% endif %}<a href="{% url 'nps_detail' %}" class="btn btn-outline btn-primary btn-xs gap-1">View All<span class="material-symbols-outlined text-sm">arrow_forward</span></a><button class="btn btn-ghost btn-sm gap-1" onclick="openNpsAddModal()"><span class="material-symbols-outlined text-base">add</span>Add</button></div>
     </div>
     {% if nps_entries %}
-    <div class="hidden md:block overflow-x-auto max-h-60"><table class="table table-sm"><thead><tr><th>Date</th><th class="text-right">Total (Entry)</th><th class="text-right">Returns</th><th class="w-10"></th></tr></thead><tbody>
+    <div class="hidden md:block overflow-x-auto max-h-60 overflow-y-auto pf-scroll-box"><table class="table table-sm"><thead><tr><th>Date</th><th class="text-right">Total (Entry)</th><th class="text-right">Returns</th><th class="w-10"></th></tr></thead><tbody>
     {% for e in nps_entries %}<tr class="hover"><td class="opacity-60 text-sm">{{ e.date|date:"d M Y" }}</td><td class="text-right whitespace-nowrap font-semibold">₹{{ e.contribution|add:e.interest_earned|floatformat:0|indian_number }}</td><td class="text-right whitespace-nowrap"><span class="text-success">+{{ e.interest_earned|inr }}</span></td><td><button class="btn btn-ghost btn-xs btn-square" data-edit-nps data-id="{{ e.id }}" data-date="{{ e.date|date:'Y-m-d' }}" data-contrib="{{ e.contribution }}" data-interest="{{ e.interest_earned }}" data-balance="{{ e.total_balance }}" data-remarks="{{ e.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button></td></tr>
     {% endfor %}</tbody></table></div>
-    <div class="md:hidden space-y-2 max-h-60 overflow-y-auto">
+    <div class="md:hidden space-y-2 max-h-60 overflow-y-auto pf-scroll-box">
       {% for e in nps_entries %}
       <div class="table-card">
         <div class="flex items-center justify-between gap-2">
@@ -426,7 +426,7 @@
       <span>Returns: <strong class="{% if real_estate_returns >= 0 %}text-success{% else %}text-error{% endif %}">{% if real_estate_returns >= 0 %}+{% endif %}{{ real_estate_returns|inr }}</strong></span>
     </div>
     {% if real_estate_holdings %}
-    <div class="hidden md:block overflow-x-auto"><table class="table table-sm">
+    <div class="hidden md:block overflow-x-auto max-h-72 overflow-y-auto pf-scroll-box"><table class="table table-sm">
       <thead><tr><th>Property</th><th>Location</th><th class="text-right">Area</th><th class="text-right">Invested (₹)</th><th class="text-right">Current (₹)</th><th class="text-right">Rate/Gaj</th><th class="text-right">P&amp;L</th><th class="w-10"></th></tr></thead>
       <tbody>
       {% for h in real_estate_holdings %}
@@ -455,7 +455,7 @@
       {% endfor %}
       </tbody>
     </table></div>
-    <div class="md:hidden space-y-2">
+    <div class="md:hidden space-y-2 max-h-72 overflow-y-auto pf-scroll-box">
       {% for h in real_estate_holdings %}
       <div class="table-card">
         <div class="flex items-center justify-between gap-2">
@@ -498,7 +498,7 @@
           <div class="font-bold">{{ gold_value|inr }}</div>
         </div>
         {% if gold_holdings %}
-        <div class="space-y-1 max-h-44 overflow-y-auto text-sm">
+        <div class="space-y-1.5 max-h-44 overflow-y-auto pf-scroll-box text-sm">
           {% for h in gold_holdings %}
           <div class="flex justify-between items-center">
             <span>{{ h.description }}</span>
@@ -518,7 +518,7 @@
           <div class="font-bold">{{ silver_value|inr }}</div>
         </div>
         {% if silver_holdings %}
-        <div class="space-y-1 max-h-44 overflow-y-auto text-sm">
+        <div class="space-y-1.5 max-h-44 overflow-y-auto pf-scroll-box text-sm">
           {% for h in silver_holdings %}
           <div class="flex justify-between items-center">
             <span>{{ h.description }}</span>
@@ -542,10 +542,10 @@
       <div class="flex flex-wrap items-center gap-1.5"><span class="badge badge-primary badge-sm">{{ crypto_current|inr }}</span><a href="{% url 'crypto_detail' %}" class="btn btn-outline btn-primary btn-xs gap-1">View All<span class="material-symbols-outlined text-sm">arrow_forward</span></a><button class="btn btn-ghost btn-sm gap-1" onclick="openModal('addCryptoModal')"><span class="material-symbols-outlined text-base">add</span>Add</button></div>
     </div>
     {% if crypto_holdings %}
-    <div class="hidden md:block overflow-x-auto max-h-60"><table class="table table-sm"><thead><tr><th>Name</th><th class="text-right">Invested</th><th class="text-right">Current</th><th class="text-right">P&amp;L</th><th class="w-10"></th></tr></thead><tbody>
+    <div class="hidden md:block overflow-x-auto max-h-60 overflow-y-auto pf-scroll-box"><table class="table table-sm"><thead><tr><th>Name</th><th class="text-right">Invested</th><th class="text-right">Current</th><th class="text-right">P&amp;L</th><th class="w-10"></th></tr></thead><tbody>
     {% for c in crypto_holdings %}<tr class="hover"><td class="font-semibold">{{ c.name }}</td><td class="text-right">{{ c.amount_invested|inr }}</td><td class="text-right font-semibold">{{ c.current_value|inr }}</td><td class="text-right"><span class="{% if c.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if c.pnl >= 0 %}+{% endif %}{{ c.pnl|inr }}</span></td><td><button class="btn btn-ghost btn-xs btn-square" data-edit-crypto data-id="{{ c.id }}" data-name="{{ c.name }}" data-invested="{{ c.amount_invested }}" data-current="{{ c.current_value }}" data-remarks="{{ c.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button></td></tr>
     {% endfor %}</tbody></table></div>
-    <div class="md:hidden space-y-2 max-h-60 overflow-y-auto">
+    <div class="md:hidden space-y-2 max-h-60 overflow-y-auto pf-scroll-box">
       {% for c in crypto_holdings %}
       <div class="table-card">
         <div class="flex items-center justify-between gap-2">
@@ -573,15 +573,15 @@
 {# ——— EPF ——— #}
 <div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.35s">
   <div class="card-body p-4">
-    <div class="flex flex-wrap items-center justify-between gap-2 mb-1"><h2 class="card-title text-base flex items-center gap-1.5"><span class="material-symbols-outlined text-emerald-400 text-lg">savings</span>EPF</h2>
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-1"><h2 class="card-title text-base flex items-center gap-1.5"><span class="material-symbols-outlined text-emerald-400 text-lg">account_balance</span>EPF</h2>
       <div class="flex flex-wrap items-center gap-1.5"><span class="badge badge-primary badge-sm">{{ epf_balance|inr }}</span><a href="{% url 'epf_detail' %}" class="btn btn-outline btn-primary btn-xs gap-1">View All<span class="material-symbols-outlined text-sm">arrow_forward</span></a><button class="btn btn-ghost btn-sm gap-1" onclick="openModal('addEpfModal')"><span class="material-symbols-outlined text-base">add</span>Add</button></div>
     </div>
     <div class="flex flex-wrap gap-4 text-xs opacity-60 mb-3"><span>Contributions: <strong class="text-success">{{ epf_total_contrib|inr }}</strong></span><span>Interest: <strong class="text-success">{{ epf_total_interest|inr }}</strong></span></div>
     {% if epf_entries %}
-    <div class="hidden md:block overflow-x-auto max-h-72"><table class="table table-sm"><thead><tr><th>Date</th><th>Type</th><th class="text-right">Amount</th><th>Remarks</th><th class="w-10"></th></tr></thead><tbody>
+    <div class="hidden md:block overflow-x-auto max-h-72 overflow-y-auto pf-scroll-box"><table class="table table-sm"><thead><tr><th>Date</th><th>Type</th><th class="text-right">Amount</th><th>Remarks</th><th class="w-10"></th></tr></thead><tbody>
     {% for e in epf_entries %}<tr class="hover"><td class="opacity-60 text-sm whitespace-nowrap">{{ e.date|date:"d M Y" }}</td><td><span class="badge {% if e.entry_type == 'CONTRIBUTION' %}badge-primary{% else %}badge-ghost{% endif %} badge-sm">{{ e.get_entry_type_display }}</span></td><td class="text-right whitespace-nowrap"><span class="text-success">+{{ e.amount|inr }}</span></td><td class="opacity-50 text-sm">{{ e.remarks|default:"—" }}</td><td><button class="btn btn-ghost btn-xs btn-square" data-edit-epf data-id="{{ e.id }}" data-date="{{ e.date|date:'Y-m-d' }}" data-type="{{ e.entry_type }}" data-amount="{{ e.amount }}" data-remarks="{{ e.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button></td></tr>
     {% endfor %}</tbody></table></div>
-    <div class="md:hidden space-y-2 max-h-72 overflow-y-auto">
+    <div class="md:hidden space-y-2 max-h-72 overflow-y-auto pf-scroll-box">
       {% for e in epf_entries %}
       <div class="table-card">
         <div class="flex items-center justify-between gap-2">
@@ -602,6 +602,86 @@
   </div>
 </div>
 
+{# ——— PF (PROVIDENT FUND — PER FAMILY MEMBER) ——— #}
+<div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.38s">
+  <div class="card-body p-4">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
+      <h2 class="card-title text-base flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-emerald-400 text-lg">savings</span>PF (Provident Fund)
+      </h2>
+      <div class="flex flex-wrap items-center gap-1.5">
+        <span class="badge badge-primary badge-sm">{{ pf_balance|inr }}</span>
+        <a href="{% url 'pf_detail' %}" class="btn btn-outline btn-primary btn-xs gap-1">View All<span class="material-symbols-outlined text-sm">arrow_forward</span></a>
+        <button class="btn btn-ghost btn-sm gap-1" onclick="openAddPfModal()"><span class="material-symbols-outlined text-base">add</span>Add</button>
+      </div>
+    </div>
+    <div class="flex flex-wrap gap-4 text-xs opacity-60 mb-2.5">
+      <span>Contributions: <strong class="text-success">{{ pf_total_contrib|inr }}</strong></span>
+      <span>Interest: <strong class="text-success">{{ pf_total_interest|inr }}</strong></span>
+    </div>
+    {% if pf_accounts %}
+    <div class="flex flex-wrap items-center gap-2 mb-3">
+      {% for m in pf_accounts %}
+      <a href="{% url 'pf_detail' %}?member={{ m.account_name|urlencode }}" class="pf-member-chip" title="View {{ m.account_name }}'s PF entries (Contributed: {{ m.contrib|inr }}, Interest: {{ m.interest|inr }})">
+        <span class="w-4 h-4 rounded-full bg-primary/20 text-primary text-[10px] font-bold flex items-center justify-center">{{ m.account_name|slice:":1"|upper }}</span>
+        <span class="opacity-70">{{ m.account_name }}:</span>
+        <strong class="text-primary tabular-nums">{{ m.balance|inr }}</strong>
+        <span class="text-[10px] opacity-40">({{ m.pct|floatformat:0 }}%)</span>
+      </a>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% if pf_entries %}
+    <div class="hidden md:block overflow-x-auto max-h-72 overflow-y-auto pf-scroll-box">
+      <table class="table table-sm">
+        <thead>
+          <tr>
+            <th>Member</th>
+            <th>Date</th>
+            <th>Type</th>
+            <th class="text-right">Amount</th>
+            <th>Remarks</th>
+            <th class="w-10"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for e in pf_entries %}
+          <tr class="hover">
+            <td>
+              <a href="{% url 'pf_detail' %}?member={{ e.account_name|urlencode }}" class="badge badge-ghost badge-sm font-medium hover:badge-primary transition-colors">{{ e.account_name }}</a>
+            </td>
+            <td class="opacity-60 text-sm whitespace-nowrap">{{ e.date|date:"d M Y" }}</td>
+            <td><span class="badge {% if e.entry_type == 'CONTRIBUTION' %}badge-primary{% else %}badge-ghost{% endif %} badge-sm">{{ e.get_entry_type_display }}</span></td>
+            <td class="text-right whitespace-nowrap"><span class="text-success">+{{ e.amount|inr }}</span></td>
+            <td class="opacity-50 text-sm">{{ e.remarks|default:"—" }}</td>
+            <td><button class="btn btn-ghost btn-xs btn-square" data-edit-pf data-id="{{ e.id }}" data-account="{{ e.account_name }}" data-date="{{ e.date|date:'Y-m-d' }}" data-type="{{ e.entry_type }}" data-amount="{{ e.amount }}" data-remarks="{{ e.remarks }}" data-baby="{{ e.is_baby|yesno:'true,false' }}"><span class="material-symbols-outlined text-base">edit</span></button></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="md:hidden space-y-2 max-h-72 overflow-y-auto pf-scroll-box">
+      {% for e in pf_entries %}
+      <div class="table-card">
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex flex-wrap items-center gap-1.5 min-w-0">
+            <span class="badge badge-ghost badge-xs font-semibold">{{ e.account_name }}</span>
+            <span class="badge {% if e.entry_type == 'CONTRIBUTION' %}badge-primary{% else %}badge-ghost{% endif %} badge-xs">{{ e.get_entry_type_display }}</span>
+            <span class="text-xs opacity-50">{{ e.date|date:"d M Y" }}</span>
+          </div>
+          <button class="btn btn-ghost btn-xs btn-square shrink-0" data-edit-pf data-id="{{ e.id }}" data-account="{{ e.account_name }}" data-date="{{ e.date|date:'Y-m-d' }}" data-type="{{ e.entry_type }}" data-amount="{{ e.amount }}" data-remarks="{{ e.remarks }}" data-baby="{{ e.is_baby|yesno:'true,false' }}"><span class="material-symbols-outlined text-base">edit</span></button>
+        </div>
+        <div class="flex items-center justify-between mt-1.5">
+          <span class="text-sm font-semibold text-success tabular-nums">+{{ e.amount|inr }}</span>
+          <span class="text-xs opacity-40 truncate max-w-[50%]">{{ e.remarks|default:"" }}</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}<p class="text-sm opacity-40">No PF entries yet. Add PF / PPF accounts for family members (e.g. Atul, Kanika).</p>{% endif %}
+  </div>
+</div>
+
 {# ——— BONDS ——— #}
 <div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.45s">
   <div class="card-body p-4">
@@ -609,10 +689,10 @@
       <div class="flex flex-wrap items-center gap-1.5"><span class="badge badge-primary badge-sm">{{ bonds_total|inr }}</span><a href="{% url 'bonds_detail' %}" class="btn btn-outline btn-primary btn-xs gap-1">View All<span class="material-symbols-outlined text-sm">arrow_forward</span></a><button class="btn btn-ghost btn-sm gap-1" onclick="openModal('addBondModal')"><span class="material-symbols-outlined text-base">add</span>Add</button></div>
     </div>
     {% if bonds %}
-    <div class="hidden md:block overflow-x-auto max-h-60"><table class="table table-sm"><thead><tr><th>Account</th><th class="text-right">Amount</th><th class="w-10"></th></tr></thead><tbody>
+    <div class="hidden md:block overflow-x-auto max-h-60 overflow-y-auto pf-scroll-box"><table class="table table-sm"><thead><tr><th>Account</th><th class="text-right">Amount</th><th class="w-10"></th></tr></thead><tbody>
     {% for b in bonds %}<tr class="hover"><td class="font-semibold">{{ b.account_name }}</td><td class="text-right">{{ b.amount|inr }}</td><td><button class="btn btn-ghost btn-xs btn-square" data-edit-bond data-id="{{ b.id }}" data-account="{{ b.account_name }}" data-amount="{{ b.amount }}" data-remarks="{{ b.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button></td></tr>
     {% endfor %}</tbody></table></div>
-    <div class="md:hidden space-y-2 max-h-60 overflow-y-auto">
+    <div class="md:hidden space-y-2 max-h-60 overflow-y-auto pf-scroll-box">
       {% for b in bonds %}
       <div class="table-card flex items-center justify-between gap-3">
         <span class="font-semibold text-sm">{{ b.account_name }}</span>
@@ -640,10 +720,10 @@
       <div class="flex flex-wrap items-center gap-1.5"><span class="badge badge-primary badge-sm">{{ cash_total|inr }}</span><a href="{% url 'cash_detail' %}" class="btn btn-outline btn-primary btn-xs gap-1">View All<span class="material-symbols-outlined text-sm">arrow_forward</span></a><button class="btn btn-ghost btn-sm gap-1" onclick="openModal('addCashModal')"><span class="material-symbols-outlined text-base">add</span>Add</button></div>
     </div>
     {% if cash_positions %}
-    <div class="hidden md:block overflow-x-auto max-h-60"><table class="table table-sm"><thead><tr><th>Name</th><th class="text-right">Amount</th><th>Remarks</th><th class="w-10"></th></tr></thead><tbody>
+    <div class="hidden md:block overflow-x-auto max-h-60 overflow-y-auto pf-scroll-box"><table class="table table-sm"><thead><tr><th>Name</th><th class="text-right">Amount</th><th>Remarks</th><th class="w-10"></th></tr></thead><tbody>
     {% for c in cash_positions %}<tr class="hover"><td class="font-semibold">{{ c.name }}</td><td class="text-right font-semibold">{{ c.amount|inr }}</td><td class="opacity-50 text-sm">{{ c.remarks|default:"—" }}</td><td><button class="btn btn-ghost btn-xs btn-square" data-edit-cash data-id="{{ c.id }}" data-name="{{ c.name }}" data-amount="{{ c.amount }}" data-remarks="{{ c.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button></td></tr>
     {% endfor %}</tbody></table></div>
-    <div class="md:hidden space-y-2 max-h-60 overflow-y-auto">
+    <div class="md:hidden space-y-2 max-h-60 overflow-y-auto pf-scroll-box">
       {% for c in cash_positions %}
       <div class="table-card flex items-center justify-between gap-3">
         <div class="min-w-0">
@@ -668,10 +748,10 @@
       <div class="flex flex-wrap items-center gap-1.5"><span class="badge badge-primary badge-sm">{{ fd_current|inr }}</span><a href="{% url 'fd_detail' %}" class="btn btn-outline btn-primary btn-xs gap-1">View All<span class="material-symbols-outlined text-sm">arrow_forward</span></a><button class="btn btn-ghost btn-sm gap-1" onclick="openModal('addFdModal')"><span class="material-symbols-outlined text-base">add</span>Add FD</button></div>
     </div>
     {% if active_fds %}
-    <div class="hidden md:block overflow-x-auto max-h-72"><table class="table table-sm"><thead><tr><th>Name</th><th>Account</th><th class="text-right">Principal</th><th class="text-right">Rate</th><th>Compounding</th><th class="text-right">Current Value</th><th>Maturity</th><th class="w-10"></th></tr></thead><tbody>
+    <div class="hidden md:block overflow-x-auto max-h-72 overflow-y-auto pf-scroll-box"><table class="table table-sm"><thead><tr><th>Name</th><th>Account</th><th class="text-right">Principal</th><th class="text-right">Rate</th><th>Compounding</th><th class="text-right">Current Value</th><th>Maturity</th><th class="w-10"></th></tr></thead><tbody>
     {% for fd in active_fds %}<tr class="hover"><td class="font-semibold">{{ fd.name }}</td><td class="opacity-60 text-sm">{{ fd.account_name }}</td><td class="text-right">{{ fd.principal|inr }}</td><td class="text-right">{{ fd.interest_rate }}%</td><td><span class="badge badge-ghost badge-sm">{{ fd.get_compounding_display }}</span></td><td class="text-right font-semibold text-success">{{ fd.current_value|inr }}</td><td class="opacity-60 text-sm">{{ fd.maturity_date|date:"d M Y" }}{% if fd.days_remaining > 0 %} <span class="text-xs">({{ fd.days_remaining }}d)</span>{% endif %}</td><td><button class="btn btn-ghost btn-xs btn-square" data-edit-fd data-id="{{ fd.id }}" data-name="{{ fd.name }}" data-account="{{ fd.account_name }}" data-principal="{{ fd.principal }}" data-rate="{{ fd.interest_rate }}" data-compounding="{{ fd.compounding }}" data-start="{{ fd.start_date|date:'Y-m-d' }}" data-maturity="{{ fd.maturity_date|date:'Y-m-d' }}" data-active="{{ fd.is_active|yesno:'true,false' }}" data-remarks="{{ fd.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button></td></tr>
     {% endfor %}</tbody></table></div>
-    <div class="md:hidden space-y-2">
+    <div class="md:hidden space-y-2 max-h-72 overflow-y-auto pf-scroll-box">
       {% for fd in active_fds %}
       <div class="table-card">
         <div class="flex items-center justify-between gap-2">
@@ -732,9 +812,12 @@
 {# EPF Modal #}
 {% include 'portfolio/_epf_form_modal.html' with form_obj=epf_form %}
 
+{# PF Modal #}
+{% include 'portfolio/_pf_form_modal.html' with form_obj=pf_form %}
+
 {# Goal Modal #}
-<dialog class="modal" id="addGoalModal">
-  <div class="modal-box">
+<dialog class="modal modal-bottom sm:modal-middle" id="addGoalModal">
+  <div class="modal-box max-h-[90vh] overflow-y-auto overscroll-contain">
     <h3 class="font-bold text-lg flex items-center gap-2" id="goalModalTitle">
       <span class="material-symbols-outlined text-primary">add_circle</span>Plan Financial Year Goal
     </h3>
@@ -748,7 +831,7 @@
         <span class="text-[10px] opacity-40 mt-1">Select an Indian FY cycle (Apr 1 – Mar 31) to auto-fill target end date.</span>
       </div>
 
-      <div class="grid grid-cols-2 gap-4 mt-3">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-3">
         <div class="form-field">
           <label class="label text-xs font-semibold">Goal Label</label>
           {{ goal_form.label }}
@@ -805,7 +888,7 @@
 
 
 {# US Stock Modal #}
-<dialog class="modal" id="addUSStockModal"><div class="modal-box"><h3 class="font-bold text-lg flex items-center gap-2" id="usStockModalTitle"><span class="material-symbols-outlined text-primary">add_circle</span>Add RSU Holding</h3><form id="usStockForm" method="post" action="{% url 'add_us_stock' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><div class="grid grid-cols-2 gap-4 mt-4"><div class="form-field"><label class="label text-xs font-semibold">Symbol</label>{{ us_stock_form.symbol }}</div><div class="form-field"><label class="label text-xs font-semibold">Company</label>{{ us_stock_form.company_name }}</div></div><div class="grid grid-cols-2 gap-4 mt-3"><div class="form-field"><label class="label text-xs font-semibold">Quantity (shares)</label>{{ us_stock_form.quantity }}</div><div class="form-field"><label class="label text-xs font-semibold">Vest Date</label>{{ us_stock_form.vest_date }}</div></div><div class="grid grid-cols-2 gap-4 mt-3"><div class="form-field"><label class="label text-xs font-semibold">Buy Price (USD) <span class="opacity-40">auto if blank</span></label>{{ us_stock_form.purchase_price_usd }}</div><div class="form-field"><label class="label text-xs font-semibold">USD/INR Rate <span class="opacity-40">auto if blank</span></label>{{ us_stock_form.purchase_usd_inr }}</div></div><div class="form-field mt-3"><label class="label text-xs font-semibold">Remarks <span class="opacity-40">optional</span></label>{{ us_stock_form.remarks }}</div><div class="modal-action"><button type="button" id="usStockDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteUSStockForm')"><span class="material-symbols-outlined text-base">delete</span>Delete</button><button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addUSStockModal')">Cancel</button><button type="submit" class="btn btn-primary btn-sm">Save</button></div></form><form id="deleteUSStockForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form></div><form method="dialog" class="modal-backdrop"><button>close</button></form></dialog>
+<dialog class="modal modal-bottom sm:modal-middle" id="addUSStockModal"><div class="modal-box max-h-[90vh] overflow-y-auto overscroll-contain"><h3 class="font-bold text-lg flex items-center gap-2" id="usStockModalTitle"><span class="material-symbols-outlined text-primary">add_circle</span>Add RSU Holding</h3><form id="usStockForm" method="post" action="{% url 'add_us_stock' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4"><div class="form-field"><label class="label text-xs font-semibold">Symbol</label>{{ us_stock_form.symbol }}</div><div class="form-field"><label class="label text-xs font-semibold">Company</label>{{ us_stock_form.company_name }}</div></div><div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3"><div class="form-field"><label class="label text-xs font-semibold">Quantity (shares)</label>{{ us_stock_form.quantity }}</div><div class="form-field"><label class="label text-xs font-semibold">Vest Date</label>{{ us_stock_form.vest_date }}</div></div><div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3"><div class="form-field"><label class="label text-xs font-semibold">Buy Price (USD) <span class="opacity-40">auto if blank</span></label>{{ us_stock_form.purchase_price_usd }}</div><div class="form-field"><label class="label text-xs font-semibold">USD/INR Rate <span class="opacity-40">auto if blank</span></label>{{ us_stock_form.purchase_usd_inr }}</div></div><div class="form-field mt-3"><label class="label text-xs font-semibold">Remarks <span class="opacity-40">optional</span></label>{{ us_stock_form.remarks }}</div><div class="modal-action"><button type="button" id="usStockDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteUSStockForm')"><span class="material-symbols-outlined text-base">delete</span>Delete</button><button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addUSStockModal')">Cancel</button><button type="submit" class="btn btn-primary btn-sm">Save</button></div></form><form id="deleteUSStockForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form></div><form method="dialog" class="modal-backdrop"><button>close</button></form></dialog>
 
 {# Real Estate Modal #}
 {% include 'portfolio/_real_estate_form_modal.html' with form_obj=real_estate_form is_baby=False %}
@@ -914,6 +997,20 @@
 <script src="{% static 'js/nps_modal.js' %}"></script>
 
 <script>
+function openAddPfModal(defaultMember) {
+  var form = document.getElementById('pfForm');
+  form.action = "{% url 'add_pf_entry' %}";
+  form.reset();
+  if (defaultMember) {
+    var acctEl = form.querySelector('[name=account_name]');
+    if (acctEl) acctEl.value = defaultMember;
+  }
+  var delBtn = document.getElementById('pfDeleteBtn');
+  if (delBtn) delBtn.style.display = 'none';
+  document.getElementById('pfModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">savings</span> Add PF Entry';
+  openModal('addPfModal');
+}
+
 function openGoalModal(defaultFy) {
   var form = document.getElementById('goalForm');
   form.action = "{% url 'add_goal' %}";
@@ -1103,6 +1200,10 @@ document.addEventListener('click', function(e) {
     _editSetup('epfForm','deleteEpfForm','epfDeleteBtn','epfModalTitle',
       "{% url 'edit_epf_entry' pk=0 %}","{% url 'delete_epf_entry' pk=0 %}",'Edit EPF Entry','addEpfModal',btn.dataset,
       {date:btn.dataset.date,entry_type:btn.dataset.type,amount:btn.dataset.amount,remarks:btn.dataset.remarks});
+  } else if ((btn = e.target.closest('[data-edit-pf]'))) {
+    _editSetup('pfForm','deletePfForm','pfDeleteBtn','pfModalTitle',
+      "{% url 'edit_pf_entry' pk=0 %}","{% url 'delete_pf_entry' pk=0 %}",'Edit PF Entry','addPfModal',btn.dataset,
+      {account_name:btn.dataset.account,date:btn.dataset.date,entry_type:btn.dataset.type,amount:btn.dataset.amount,remarks:btn.dataset.remarks,is_baby:btn.dataset.baby});
   } else if ((btn = e.target.closest('[data-edit-fd]'))) {
     _editSetup('fdForm','deleteFdForm','fdDeleteBtn','fdModalTitle',
       "{% url 'edit_fd' pk=0 %}","{% url 'delete_fd' pk=0 %}",'Edit Fixed Deposit','addFdModal',btn.dataset,

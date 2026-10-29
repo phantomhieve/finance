@@ -56,7 +56,7 @@ from tracker.models import (  # noqa: E402
     MonthlySavingsComment,
 )
 from portfolio.models import (  # noqa: E402
-    ZerodhaAccount, EPFEntry, NPSEntry, FixedDeposit, CashPosition,
+    ZerodhaAccount, EPFEntry, PFEntry, NPSEntry, FixedDeposit, CashPosition,
     BondHolding, CryptoHolding, CommodityHolding,
     CommodityPrice, MonthlySnapshot,
     FinancialGoal as PortfolioGoal, USStockHolding,
@@ -65,6 +65,7 @@ from portfolio.models import (  # noqa: E402
 from jewellery.models import JewelleryItem  # noqa: E402
 from portfolio.services import (  # noqa: E402
     get_portfolio_summary as _fetch_portfolio_summary,
+    get_pf_summary as _fetch_pf_summary,
     refresh_commodity_prices as _refresh_commodity_prices,
     refresh_us_stock_prices as _refresh_us_stock_prices,
     get_growth_data as _fetch_growth_data,
@@ -204,6 +205,17 @@ def portfolio_summary() -> str:
         ],
         'goals': summary['goals'],
         'epf_balance': str(summary['epf_balance']),
+        'pf_balance': str(summary['pf_balance']),
+        'pf_accounts': [
+            {
+                'account_name': m['account_name'],
+                'contrib': str(m['contrib']),
+                'interest': str(m['interest']),
+                'balance': str(m['balance']),
+                'pct': str(m['pct']),
+            }
+            for m in summary['pf_accounts']
+        ],
         'nps_balance': str(summary.get('nps_latest').total_balance if summary.get('nps_latest') else 0),
         'fd_principal': str(summary['fd_principal']),
         'fd_current': str(summary['fd_current']),
@@ -278,6 +290,31 @@ def portfolio_epf() -> str:
         'total_contribution': str(total_contrib),
         'total_interest': str(total_interest),
         'balance': str(total_contrib + total_interest),
+        'entries': entries,
+    })
+
+
+@mcp.resource("vault://portfolio/pf")
+def portfolio_pf() -> str:
+    """PF (Provident Fund / PPF) entries and per-member running balances."""
+    group = _get_group()
+    pf = _fetch_pf_summary(group=group, is_baby=False)
+    qs = PFEntry.objects.filter(group=group) if group else PFEntry.objects.all()
+    entries = [_model_to_dict(e) for e in qs[:100]]
+    return _to_json({
+        'total_contribution': str(pf['pf_total_contrib']),
+        'total_interest': str(pf['pf_total_interest']),
+        'balance': str(pf['pf_balance']),
+        'accounts': [
+            {
+                'account_name': m['account_name'],
+                'contrib': str(m['contrib']),
+                'interest': str(m['interest']),
+                'balance': str(m['balance']),
+                'pct': str(m['pct']),
+            }
+            for m in pf['pf_accounts']
+        ],
         'entries': entries,
     })
 
@@ -618,6 +655,38 @@ def get_portfolio_mutual_funds(fund_name: str = "", account_name: str = "") -> s
 def get_epf_details() -> str:
     """Get EPF (Employee Provident Fund) running balance, total contribution, total interest, and recent entries."""
     return portfolio_epf()
+
+
+@mcp.tool()
+def get_pf_details(account_name: str = "") -> str:
+    """Get PF (Provident Fund / PPF) running balance, per-family-member breakdown (e.g. Atul, Kanika), and entries.
+
+    Args:
+        account_name: Optional family member name filter (e.g. 'Atul', 'Kanika')
+    """
+    group = _get_group()
+    pf = _fetch_pf_summary(group=group, is_baby=False)
+    qs = PFEntry.objects.filter(group=group) if group else PFEntry.objects.all()
+    if account_name:
+        qs = qs.filter(account_name__icontains=account_name.strip())
+    entries = [_model_to_dict(e) for e in qs[:100]]
+    return _to_json({
+        'total_contribution': str(pf['pf_total_contrib']),
+        'total_interest': str(pf['pf_total_interest']),
+        'balance': str(pf['pf_balance']),
+        'accounts': [
+            {
+                'account_name': m['account_name'],
+                'contrib': str(m['contrib']),
+                'interest': str(m['interest']),
+                'balance': str(m['balance']),
+                'pct': str(m['pct']),
+            }
+            for m in pf['pf_accounts']
+        ],
+        'filtered_account': account_name or None,
+        'entries': entries,
+    })
 
 
 @mcp.tool()
@@ -1397,6 +1466,104 @@ def update_epf_entry(
     entry.save()
     log_update(entry, old_data, 'update_epf_entry')
     return _to_json({'status': 'updated', 'id': entry.id, 'summary': str(entry)})
+
+
+@mcp.tool()
+def add_pf_entry(
+    account_name: str,
+    date: str,
+    amount: str,
+    entry_type: str = "CONTRIBUTION",
+    remarks: str = "",
+    is_baby: bool = False,
+) -> str:
+    """Add a PF (Provident Fund / PPF) contribution or interest entry for a family member.
+
+    Args:
+        account_name: Family member / PF account holder name (e.g. 'Atul', 'Kanika')
+        date: Entry date in YYYY-MM-DD format
+        amount: Amount in INR
+        entry_type: CONTRIBUTION or INTEREST (default: CONTRIBUTION)
+        remarks: Optional remarks
+        is_baby: Track in Child portfolio (default: False)
+    """
+    group = _get_group()
+    if entry_type.upper() not in ('CONTRIBUTION', 'INTEREST'):
+        return "Error: entry_type must be CONTRIBUTION or INTEREST"
+    clean_member = (account_name or "").strip()
+    if not clean_member:
+        return "Error: account_name is required (e.g. 'Atul', 'Kanika')"
+
+    entry = PFEntry(
+        group=group,
+        account_name=clean_member,
+        date=_parse_date(date),
+        amount=_parse_decimal(amount),
+        entry_type=entry_type.upper(),
+        remarks=remarks,
+        is_baby=bool(is_baby),
+    )
+    entry.save()
+    log_create(entry, 'add_pf_entry')
+    return _to_json({
+        'status': 'created',
+        'id': entry.id,
+        'account_name': entry.account_name,
+        'summary': str(entry),
+    })
+
+
+@mcp.tool()
+def update_pf_entry(
+    entry_id: int,
+    account_name: str = "",
+    amount: str = "",
+    date: str = "",
+    entry_type: str = "",
+    remarks: str = "",
+    is_baby: bool = None,
+) -> str:
+    """Update an existing PF (Provident Fund / PPF) entry.
+
+    Args:
+        entry_id: ID of the PF entry
+        account_name: Updated family member name (e.g. 'Atul', 'Kanika') (optional)
+        amount: New amount in INR (optional)
+        date: New date in YYYY-MM-DD format (optional)
+        entry_type: CONTRIBUTION or INTEREST (optional)
+        remarks: Updated remarks (optional)
+        is_baby: Move to/from Child portfolio (optional)
+    """
+    group = _get_group()
+    try:
+        entry = PFEntry.objects.get(pk=entry_id, group=group) if group else PFEntry.objects.get(pk=entry_id)
+    except PFEntry.DoesNotExist:
+        return f"Error: PF entry #{entry_id} not found."
+
+    old_data = serialize_instance(entry)
+    if account_name and account_name.strip():
+        entry.account_name = account_name.strip()
+    if amount:
+        entry.amount = _parse_decimal(amount)
+    if date:
+        entry.date = _parse_date(date)
+    if entry_type:
+        if entry_type.upper() not in ('CONTRIBUTION', 'INTEREST'):
+            return "Error: entry_type must be CONTRIBUTION or INTEREST"
+        entry.entry_type = entry_type.upper()
+    if remarks:
+        entry.remarks = remarks
+    if is_baby is not None:
+        entry.is_baby = bool(is_baby)
+
+    entry.save()
+    log_update(entry, old_data, 'update_pf_entry')
+    return _to_json({
+        'status': 'updated',
+        'id': entry.id,
+        'account_name': entry.account_name,
+        'summary': str(entry),
+    })
 
 
 @mcp.tool()
@@ -2371,7 +2538,7 @@ def delete_record(
     # Allowlist of models that can be deleted via MCP
     allowed = {
         'tracker.Transaction', 'tracker.Note', 'tracker.HRAExpense',
-        'portfolio.EPFEntry', 'portfolio.NPSEntry', 'portfolio.FixedDeposit',
+        'portfolio.EPFEntry', 'portfolio.PFEntry', 'portfolio.NPSEntry', 'portfolio.FixedDeposit',
         'portfolio.CashPosition', 'portfolio.BondHolding',
         'portfolio.CryptoHolding', 'portfolio.CommodityHolding',
         'portfolio.FinancialGoal', 'portfolio.USStockHolding',

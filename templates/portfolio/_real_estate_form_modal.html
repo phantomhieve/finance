@@ -1,4 +1,4 @@
-<dialog class="modal" id="{{ modal_id|default:'addRealEstateModal' }}">
+<dialog class="modal modal-bottom sm:modal-middle" id="{{ modal_id|default:'addRealEstateModal' }}">
   <div class="modal-box max-w-2xl bg-base-100 border border-base-content/10 shadow-2xl">
     <div class="flex items-start justify-between gap-2 mb-4 pb-3 border-b border-base-content/10">
       <h3 id="{{ title_id|default:'realEstateModalTitle' }}" class="font-bold text-lg flex items-center gap-2">
@@ -13,7 +13,7 @@
       <input type="hidden" name="next" value="{{ request.get_full_path }}">
       {% if is_baby %}<input type="hidden" name="is_baby" value="true">{% endif %}
 
-      <div class="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+      <div class="space-y-4 max-h-[70vh] overflow-y-auto pf-scroll-box pr-1">
         {# Property Identity #}
         <div>
           <h4 class="text-xs font-bold uppercase tracking-wider text-primary mb-2 flex items-center gap-1">
