@@ -267,7 +267,7 @@ def expenses_year(request):
     group = _group(request)
     current = fy_start_year(timezone.localdate())
     fy_start = parse_fy_param(request.GET.get('fy'), current)
-    summary = fy_summary(group, fy_start)
+    summary = fy_summary(group, fy_start, hide_investments=_hides_investments(request))
     return render(request, 'expenses/year.html', {
         'summary': summary,
         'fy_start': fy_start,
@@ -275,6 +275,8 @@ def expenses_year(request):
         'chart': {
             'labels': [m['label'] for m in summary['months']],
             'params': [m['param'] for m in summary['months']],
+            'totals': [float(m['total']) for m in summary['months']],
+            'partial': [m['partial'] for m in summary['months']],
             'stack': summary['stack'],
             'avg': float(summary['avg_month']),
         },
@@ -443,18 +445,42 @@ def expenses_ai_audit(request):
 def expenses_settings(request):
     group = _group(request)
     ensure_default_categories(group)
-    categories = ExpenseCategory.objects.filter(group=group).annotate(n=Count('expenses', filter=Q(expenses__is_deleted=False)))
-    rules = MerchantRule.objects.filter(group=group).select_related('category').order_by('source', 'merchant_label')
+    categories_qs = ExpenseCategory.objects.filter(group=group).annotate(
+        n=Count('expenses', filter=Q(expenses__is_deleted=False))
+    )
+    rules_qs = MerchantRule.objects.filter(group=group).select_related('category').order_by('source', 'merchant_label')
     if _hides_investments(request):
-        categories = categories.exclude(name=INVESTMENT_CATEGORY)
-        rules = rules.exclude(category__name=INVESTMENT_CATEGORY)
+        categories_qs = categories_qs.exclude(name=INVESTMENT_CATEGORY)
+        rules_qs = rules_qs.exclude(category__name=INVESTMENT_CATEGORY)
+
+    accounts_list = list(GmailAccount.objects.filter(group=group).select_related('user'))
+    sources_list = list(
+        PaymentSource.objects.filter(group=group)
+        .select_related('owner')
+        .annotate(n=Count('expenses', filter=Q(expenses__is_deleted=False)))
+    )
+    categories_list = list(categories_qs)
+    rules_list = list(rules_qs)
+
+    reconnect_count = sum(1 for a in accounts_list if a.needs_reconnect)
+    cards_count = sum(1 for s in sources_list if s.kind == 'CREDIT_CARD')
+    cards_with_pwd_count = sum(1 for s in sources_list if s.kind == 'CREDIT_CARD' and s.statement_password_enc)
+    user_rules_count = sum(1 for r in rules_list if r.source == 'USER')
+    ai_rules_count = len(rules_list) - user_rules_count
+
     return render(request, 'expenses/settings.html', {
-        'accounts': GmailAccount.objects.filter(group=group).select_related('user'),
+        'accounts': accounts_list,
+        'reconnect_count': reconnect_count,
+        'active_accounts_count': len(accounts_list) - reconnect_count,
         'gmail_configured': gmail.is_configured(),
-        'sources': PaymentSource.objects.filter(group=group).select_related('owner')
-                   .annotate(n=Count('expenses', filter=Q(expenses__is_deleted=False))),
-        'categories': categories,
-        'rules': rules,
+        'sources': sources_list,
+        'cards_count': cards_count,
+        'cards_with_pwd_count': cards_with_pwd_count,
+        'bank_accounts_count': len(sources_list) - cards_count,
+        'categories': categories_list,
+        'rules': rules_list,
+        'user_rules_count': user_rules_count,
+        'ai_rules_count': ai_rules_count,
         'members': group.members.filter(user_type__in=('PRIMARY', 'ACCOUNT_HOLDER')),
         'kind_choices': PaymentSource.KIND_CHOICES,
         'category_kinds': ExpenseCategory.KIND_CHOICES,

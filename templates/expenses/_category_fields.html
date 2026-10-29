@@ -1,18 +1,55 @@
-<label class="flex flex-col gap-1 col-span-2">
-  <span class="text-xs font-bold uppercase tracking-wider opacity-50">Name</span>
-  <input type="text" name="name" required maxlength="50" value="{{ c.name|default:'' }}" class="input input-bordered input-sm w-full">
+<div class="sm:col-span-2 p-2.5 rounded-xl bg-base-100/70 border border-base-content/10 flex items-center gap-3">
+  <span class="jw-type-avatar shrink-0 cat-live-avatar" style="--h:{% if c %}{{ c.hue }}{% else %}230{% endif %};width:2.5rem;height:2.5rem;border-radius:.75rem">
+    <span class="icon-filled material-symbols-outlined text-xl cat-live-icon">{{ c.icon|default:'category' }}</span>
+  </span>
+  <div class="min-w-0 flex-1">
+    <div class="text-[10px] font-bold uppercase tracking-wider opacity-45">Live Badge Preview</div>
+    <div class="text-sm font-bold truncate cat-live-name">{{ c.name|default:'New Category' }}</div>
+  </div>
+  <span class="badge badge-xs badge-ghost font-mono opacity-60 cat-live-hue-lbl">H:{{ c.hue|default:230 }}°</span>
+</div>
+
+<label class="flex flex-col gap-1 sm:col-span-2">
+  <span class="text-[11px] font-bold uppercase tracking-wider opacity-60">Category Name</span>
+  <input type="text" name="name" required maxlength="50" value="{{ c.name|default:'' }}" placeholder="e.g. Coffee &amp; Cafes"
+         class="input input-bordered input-sm w-full bg-base-100"
+         oninput="syncCatPreview(this)">
 </label>
+
 <label class="flex flex-col gap-1">
-  <span class="text-xs font-bold uppercase tracking-wider opacity-50">Counts as</span>
-  <select name="kind" class="select select-bordered select-sm w-full">
+  <span class="text-[11px] font-bold uppercase tracking-wider opacity-60">Counts As</span>
+  <select name="kind" class="select select-bordered select-sm w-full bg-base-100">
     {% for value, label in category_kinds %}<option value="{{ value }}" {% if c.kind == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
   </select>
 </label>
+
 <label class="flex flex-col gap-1">
-  <span class="text-xs font-bold uppercase tracking-wider opacity-50">Colour (hue)</span>
-  <input type="range" name="hue" min="0" max="360" value="{% if c %}{{ c.hue }}{% else %}230{% endif %}" class="range range-xs mt-2">
+  <span class="text-[11px] font-bold uppercase tracking-wider opacity-60">Colour Hue (0° – 360°)</span>
+  <input type="range" name="hue" min="0" max="360" value="{% if c %}{{ c.hue }}{% else %}230{% endif %}"
+         class="range range-xs range-primary mt-2"
+         oninput="syncCatPreview(this)">
 </label>
-<label class="flex flex-col gap-1 col-span-2">
-  <span class="text-xs font-bold uppercase tracking-wider opacity-50">Icon</span>
-  <input type="text" name="icon" maxlength="40" value="{{ c.icon|default:'category' }}" placeholder="Material symbol, e.g. local_cafe" class="input input-bordered input-sm w-full">
-</label>
+
+<div class="flex flex-col gap-1.5 sm:col-span-2">
+  <label class="flex flex-col gap-1">
+    <span class="text-[11px] font-bold uppercase tracking-wider opacity-60">Material Symbol Icon</span>
+    <input type="text" name="icon" maxlength="40" value="{{ c.icon|default:'category' }}" placeholder="Material symbol, e.g. local_cafe"
+           class="input input-bordered input-sm w-full bg-base-100 font-mono text-xs"
+           oninput="syncCatPreview(this)">
+  </label>
+  <div class="flex flex-wrap gap-1 pt-0.5">
+    {% for ic in "restaurant,local_grocery_store,shopping_bag,local_cafe,flight,directions_car,medical_services,subscriptions,home,bolt,savings,redeem,pets,school,fitness_center,payments"|make_list %}{% endfor %}
+    <button type="button" class="btn btn-ghost btn-xs btn-square rounded-lg border border-base-content/10" onclick="pickCatIcon(this, 'restaurant')" title="restaurant"><span class="material-symbols-outlined text-sm">restaurant</span></button>
+    <button type="button" class="btn btn-ghost btn-xs btn-square rounded-lg border border-base-content/10" onclick="pickCatIcon(this, 'local_grocery_store')" title="local_grocery_store"><span class="material-symbols-outlined text-sm">local_grocery_store</span></button>
+    <button type="button" class="btn btn-ghost btn-xs btn-square rounded-lg border border-base-content/10" onclick="pickCatIcon(this, 'shopping_bag')" title="shopping_bag"><span class="material-symbols-outlined text-sm">shopping_bag</span></button>
+    <button type="button" class="btn btn-ghost btn-xs btn-square rounded-lg border border-base-content/10" onclick="pickCatIcon(this, 'local_cafe')" title="local_cafe"><span class="material-symbols-outlined text-sm">local_cafe</span></button>
+    <button type="button" class="btn btn-ghost btn-xs btn-square rounded-lg border border-base-content/10" onclick="pickCatIcon(this, 'flight')" title="flight"><span class="material-symbols-outlined text-sm">flight</span></button>
+    <button type="button" class="btn btn-ghost btn-xs btn-square rounded-lg border border-base-content/10" onclick="pickCatIcon(this, 'directions_car')" title="directions_car"><span class="material-symbols-outlined text-sm">directions_car</span></button>
+    <button type="button" class="btn btn-ghost btn-xs btn-square rounded-lg border border-base-content/10" onclick="pickCatIcon(this, 'medical_services')" title="medical_services"><span class="material-symbols-outlined text-sm">medical_services</span></button>
+    <button type="button" class="btn btn-ghost btn-xs btn-square rounded-lg border border-base-content/10" onclick="pickCatIcon(this, 'subscriptions')" title="subscriptions"><span class="material-symbols-outlined text-sm">subscriptions</span></button>
+    <button type="button" class="btn btn-ghost btn-xs btn-square rounded-lg border border-base-content/10" onclick="pickCatIcon(this, 'home')" title="home"><span class="material-symbols-outlined text-sm">home</span></button>
+    <button type="button" class="btn btn-ghost btn-xs btn-square rounded-lg border border-base-content/10" onclick="pickCatIcon(this, 'bolt')" title="bolt"><span class="material-symbols-outlined text-sm">bolt</span></button>
+    <button type="button" class="btn btn-ghost btn-xs btn-square rounded-lg border border-base-content/10" onclick="pickCatIcon(this, 'redeem')" title="redeem"><span class="material-symbols-outlined text-sm">redeem</span></button>
+    <button type="button" class="btn btn-ghost btn-xs btn-square rounded-lg border border-base-content/10" onclick="pickCatIcon(this, 'payments')" title="payments"><span class="material-symbols-outlined text-sm">payments</span></button>
+  </div>
+</div>

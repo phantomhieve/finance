@@ -300,34 +300,115 @@ var Expenses = (function () {
 
   // Vault's chart palette: category hues sit too close together (food vs fuel) to tell apart when stacked.
   var STACK_COLORS = ['#648cfa', '#a78bfa', '#34d399', '#fbbf24', '#f87171'];
+  var _yearChartInstance = null;
+  var _yearChartData = null;
+  var _yearChartCanvas = null;
+  var _yearChartMode = 'stacked';
 
-  function yearChart(canvas, d) {
-    var c = palette();
-    var datasets = d.stack.map(function (s, i) {
-      var color = s.hue == null ? 'rgba(148,163,184,0.55)' : STACK_COLORS[i % STACK_COLORS.length];
-      return {
-        type: 'bar', label: s.label, data: s.values, stack: 'spend',
-        backgroundColor: color, hoverBackgroundColor: color,
-        borderRadius: i === d.stack.length - 1 ? { topLeft: 5, topRight: 5 } : 0, borderSkipped: false,
-        maxBarThickness: 30,
-      };
-    });
+  var yearTopValues = {
+    id: 'expYearTopValues',
+    afterDatasetsDraw: function (chart) {
+      var d = _yearChartData;
+      if (!d || !d.totals) return;
+      var ctx = chart.ctx;
+      var barDatasetIndices = [];
+      chart.data.datasets.forEach(function (ds, idx) {
+        if (ds.type === 'bar' && chart.isDatasetVisible(idx)) barDatasetIndices.push(idx);
+      });
+      if (!barDatasetIndices.length) return;
+      ctx.save();
+      ctx.font = '600 9.5px Inter, ui-sans-serif, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = palette().label;
+      d.labels.forEach(function (_, i) {
+        var topY = Infinity;
+        var barX = null;
+        var sum = 0;
+        barDatasetIndices.forEach(function (dsIdx) {
+          var val = chart.data.datasets[dsIdx].data[i] || 0;
+          if (val > 0) {
+            sum += val;
+            var meta = chart.getDatasetMeta(dsIdx);
+            var el = meta && meta.data && meta.data[i];
+            if (el) {
+              barX = el.x;
+              if (el.y < topY) topY = el.y;
+            }
+          }
+        });
+        if (sum > 0 && barX != null && topY < Infinity) {
+          ctx.fillText(inrShort(sum), barX, Math.max(10, topY - 5));
+        }
+      });
+      ctx.restore();
+    },
+  };
+
+  function buildYearDatasets(d, mode, c) {
+    var datasets = [];
+    if (mode === 'total' && d.totals) {
+      var peak = Math.max.apply(null, d.totals);
+      datasets.push({
+        type: 'bar',
+        label: 'Monthly spend',
+        data: d.totals,
+        stack: 'spend',
+        backgroundColor: d.totals.map(function (v, i) {
+          if (d.partial && d.partial[i]) return 'rgba(251, 146, 60, 0.65)';
+          if (peak > 0 && v === peak) return '#f87171';
+          return ORANGE;
+        }),
+        hoverBackgroundColor: ORANGE,
+        borderRadius: { topLeft: 6, topRight: 6 },
+        borderSkipped: false,
+        maxBarThickness: 32,
+      });
+    } else {
+      datasets = d.stack.map(function (s, i) {
+        var color = s.hue == null ? 'rgba(148,163,184,0.55)' : STACK_COLORS[i % STACK_COLORS.length];
+        return {
+          type: 'bar', label: s.label, data: s.values, stack: 'spend',
+          backgroundColor: color, hoverBackgroundColor: color,
+          borderRadius: i === d.stack.length - 1 ? { topLeft: 5, topRight: 5 } : 0, borderSkipped: false,
+          maxBarThickness: 30,
+        };
+      });
+    }
     if (d.avg) {
       datasets.push({
         type: 'line', label: 'Monthly average', data: d.labels.map(function () { return d.avg; }),
         borderColor: c.muted, borderWidth: 1.5, borderDash: [4, 4], pointRadius: 0, pointHoverRadius: 0, stack: 'avg',
       });
     }
-    new Chart(canvas, {
+    return datasets;
+  }
+
+  function yearChart(canvas, d) {
+    _yearChartCanvas = canvas;
+    _yearChartData = d;
+    var c = palette();
+    if (_yearChartInstance) {
+      _yearChartInstance.destroy();
+    }
+    var datasets = buildYearDatasets(d, _yearChartMode, c);
+    _yearChartInstance = new Chart(canvas, {
       data: { labels: d.labels, datasets: datasets },
+      plugins: [yearTopValues],
       options: {
-        responsive: true, maintainAspectRatio: false, animation: { duration: 700 },
+        responsive: true, maintainAspectRatio: false, animation: { duration: 650 },
+        layout: { padding: { top: 18 } },
         interaction: { mode: 'index', intersect: false },
         onClick: function (_, els) {
           if (els.length) window.location.href = canvas.dataset.monthUrl + '?m=' + d.params[els[0].index];
         },
+        onHover: function (evt, els) {
+          if (evt && evt.native && evt.native.target) {
+            evt.native.target.style.cursor = els.length ? 'pointer' : 'default';
+          }
+        },
         plugins: {
           legend: {
+            display: _yearChartMode === 'stacked',
             position: 'bottom',
             labels: { color: c.tick, usePointStyle: true, pointStyle: 'circle', boxWidth: 7, boxHeight: 7, padding: 12, font: { size: 11 },
                       filter: function (item) { return item.text !== 'Monthly average'; } },
@@ -336,8 +417,14 @@ var Expenses = (function () {
             displayColors: true, usePointStyle: true, itemSort: function (a, b) { return b.raw - a.raw; },
             filter: function (item) { return item.raw > 0 && item.dataset.type === 'bar'; },
             callbacks: {
-              label: function (item) { return ' ' + item.dataset.label + '  ' + inr(item.raw); },
+              label: function (item) {
+                var suffix = (_yearChartMode === 'total' && d.partial && d.partial[item.dataIndex]) ? ' (in progress)' : '';
+                return ' ' + item.dataset.label + '  ' + inr(item.raw) + suffix;
+              },
               footer: function (items) {
+                if (_yearChartMode === 'total') {
+                  return d.avg ? 'Monthly avg  ' + inr(d.avg) : '';
+                }
                 var t = items.reduce(function (s, i) { return s + (i.dataset.type === 'bar' ? i.raw : 0); }, 0);
                 return 'Total  ' + inr(t);
               },
@@ -346,7 +433,7 @@ var Expenses = (function () {
         },
         scales: {
           x: { stacked: true, grid: { display: false }, border: { display: false },
-               ticks: { color: c.tick, font: { size: 10 }, maxRotation: 0, autoSkip: false } },
+               ticks: { color: c.tick, font: { size: 10, weight: '600' }, maxRotation: 0, autoSkip: false } },
           y: {
             stacked: true, beginAtZero: true, grid: { color: c.grid }, border: { display: false },
             ticks: { color: c.tick, font: { size: 10 }, maxTicksLimit: 5, callback: inrShort },
@@ -354,6 +441,23 @@ var Expenses = (function () {
         },
       },
     });
+  }
+
+  function setYearChartMode(mode) {
+    if (!_yearChartCanvas || !_yearChartData) return;
+    _yearChartMode = mode === 'total' ? 'total' : 'stacked';
+    yearChart(_yearChartCanvas, _yearChartData);
+    var btnStacked = $('yearChartBtnStacked');
+    var btnTotal = $('yearChartBtnTotal');
+    if (btnStacked && btnTotal) {
+      var isStacked = _yearChartMode === 'stacked';
+      btnStacked.classList.toggle('bg-primary', isStacked);
+      btnStacked.classList.toggle('text-primary-content', isStacked);
+      btnStacked.classList.toggle('opacity-60', !isStacked);
+      btnTotal.classList.toggle('bg-primary', !isStacked);
+      btnTotal.classList.toggle('text-primary-content', !isStacked);
+      btnTotal.classList.toggle('opacity-60', isStacked);
+    }
   }
 
   function toggleEmi(enable) {
@@ -411,12 +515,25 @@ var Expenses = (function () {
       var trend = readJson('expense-trend-chart');
       if (trend && $('trendChart')) trendChart($('trendChart'), trend);
       var year = readJson('expense-year-chart');
-      if (year && $('yearChart')) yearChart($('yearChart'), year);
+      if (year && $('yearChart')) {
+        yearChart($('yearChart'), year);
+        if (typeof MutationObserver !== 'undefined') {
+          new MutationObserver(function () {
+            if (_yearChartCanvas && _yearChartData) yearChart(_yearChartCanvas, _yearChartData);
+          }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+        }
+      }
     }
 
     var params = new URLSearchParams(window.location.search);
     if (params.get('add') === '1') open();
   });
 
-  return { open: open, remove: remove, toggleEmi: toggleEmi, syncEmiPending: syncEmiPending };
+  return {
+    open: open,
+    remove: remove,
+    toggleEmi: toggleEmi,
+    syncEmiPending: syncEmiPending,
+    setYearChartMode: setYearChartMode,
+  };
 })();
