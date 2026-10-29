@@ -1,6 +1,6 @@
 # AGENTS.md — Antigravity Agent Guidelines
 
-See [GEMINI.md](file:///Users/phantomhive/Desktop/Atul/finance/GEMINI.md) for full system specifications.
+See [GEMINI.md](GEMINI.md) and [.agents/skills/vault-architecture/SKILL.md](.agents/skills/vault-architecture/SKILL.md) for full system specifications.
 
 ## Quick Reference for Antigravity Agents
 
