@@ -984,7 +984,7 @@ class PFEntryTests(TestCase):
 
         # Read via MCP get_pf_details
         details = json.loads(mcp_srv.get_pf_details(account_name="Kanika"))
-        self.assertEqual(details['balance'], '125000.00')
+        self.assertEqual(Decimal(details['balance']), Decimal('125000.00'))
         self.assertEqual(len(details['entries']), 1)
 
         # Delete via MCP delete_record
