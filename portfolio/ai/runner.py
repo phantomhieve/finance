@@ -142,6 +142,7 @@ def call_gemini_direct(prompt_data: dict, group=None) -> AIResult:
     )
 
     adapter = GeminiAdapter()
+    is_debug = getattr(settings, 'DEBUG', True)
     parsed = adapter.generate_structured(
         node=node,
         schema=PortfolioInsightsResponse,
@@ -149,7 +150,8 @@ def call_gemini_direct(prompt_data: dict, group=None) -> AIResult:
         system=system_instruction,
         model=model,
         api_key=api_key,
-        temperature=0.3,
+        task=TaskType.REASONING,
+        temperature=0.2 if is_debug else 0.15,
     )
 
     return AIResult(
@@ -201,12 +203,13 @@ def call_ai_insights(prompt_data: dict, group=None) -> AIResult:
     )
 
     try:
+        is_debug = getattr(settings, 'DEBUG', True)
         parsed = gateway.generate_structured(
             schema=PortfolioInsightsResponse,
             prompt=user_message,
             system=get_system_instruction(group),
             task=TaskType.REASONING,
-            temperature=0.2,
+            temperature=0.2 if is_debug else 0.15,
         )
         return AIResult(
             model=f"{provider}:insights",

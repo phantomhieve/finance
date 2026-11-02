@@ -422,7 +422,7 @@ DAG Compilation Brief:
         schema=PortfolioInsightsResponse,
         prompt=prompt,
         task=TaskType.REASONING,
-        temperature=0.2,
+        temperature=0.2 if getattr(settings, 'DEBUG', True) else 0.15,
     )
 
     # Hard-enforce grounded score in case model adjusted it

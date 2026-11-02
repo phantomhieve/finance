@@ -83,6 +83,7 @@ class AIGateway:
                     temperature=temperature,
                     max_tokens=max_tokens,
                     api_key=active_key,
+                    task=task,
                     **kwargs,
                 )
                 self.circuit_breaker.record_success(node)
@@ -151,6 +152,7 @@ class AIGateway:
                     temperature=temperature,
                     max_tokens=max_tokens,
                     api_key=active_key,
+                    task=task,
                     **kwargs,
                 )
                 self.circuit_breaker.record_success(node)
