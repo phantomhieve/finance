@@ -1606,3 +1606,98 @@ class RefundAndEmiTrackingTests(TestCase):
 
 
 
+class EmiProjectionTests(ExpenseTestCase):
+    def _emi(self, num, date, principal='3475.00', interest='395.00', total=None):
+        for comp, amt in (('PRINCIPAL', principal), ('INTEREST', interest)):
+            Expense.objects.create(
+                group=self.group, amount=Decimal(amt), direction='DEBIT', txn_date=date,
+                merchant=f'Loan ••9861 ({comp} #{num})', is_emi=True, emi_component=comp,
+                emi_installment_num=num, emi_reference='9861', emi_total_installments=total,
+            )
+
+    def test_no_projection_without_tenure(self):
+        from .emi import emi_projection
+        self._emi(3, datetime.date(2026, 10, 23))
+        plan = emi_projection(self.group, datetime.date(2026, 11, 1), datetime.date(2026, 11, 30),
+                              today=datetime.date(2026, 11, 2))
+        self.assertEqual(plan['items'], [])
+
+    def test_setting_tenure_projects_following_months(self):
+        from .emi import emi_projection
+        self._emi(3, datetime.date(2026, 10, 23))
+        self.client.force_login(self.user)
+        self.client.post(reverse('expense_set_emi_tenure'),
+                         {'ref': '9861', 'total_installments': '6', 'installment_num': '3'})
+        today = datetime.date(2026, 11, 2)
+        nov = emi_projection(self.group, datetime.date(2026, 11, 1), datetime.date(2026, 11, 30), today=today)
+        self.assertEqual([(i['num'], i['date']) for i in nov['items']], [(4, datetime.date(2026, 11, 23))])
+        self.assertEqual(nov['items'][0]['amount'], Decimal('3870.00'))
+        self.assertEqual(nov['loans'][0]['paid'], 3)
+        self.assertEqual(nov['loans'][0]['remaining'], 3)
+        self.assertEqual(nov['loans'][0]['ends_on'], datetime.date(2027, 1, 23))
+        self.assertEqual(nov['remaining_total'], Decimal('11610.00'))
+        jan = emi_projection(self.group, datetime.date(2027, 1, 1), datetime.date(2027, 1, 31), today=today)
+        self.assertEqual([i['num'] for i in jan['items']], [6])
+        feb = emi_projection(self.group, datetime.date(2027, 2, 1), datetime.date(2027, 2, 28), today=today)
+        self.assertEqual(feb['items'], [])  # tenure finished
+
+    def test_real_debit_replaces_projection(self):
+        from .emi import emi_projection
+        self._emi(3, datetime.date(2026, 10, 23), total=6)
+        self._emi(4, datetime.date(2026, 11, 23), total=6)
+        today = datetime.date(2026, 11, 25)
+        nov = emi_projection(self.group, datetime.date(2026, 11, 1), datetime.date(2026, 11, 30), today=today)
+        self.assertEqual(nov['items'], [])
+        dec = emi_projection(self.group, datetime.date(2026, 12, 1), datetime.date(2026, 12, 31), today=today)
+        self.assertEqual([i['num'] for i in dec['items']], [5])
+
+    def test_month_end_clamping(self):
+        from .emi import _add_months
+        self.assertEqual(_add_months(datetime.date(2026, 1, 31), 1), datetime.date(2026, 2, 28))
+
+    def test_home_shows_upcoming_emi(self):
+        self._emi(3, datetime.date(2026, 10, 23), total=6)
+        self.client.force_login(self.user)
+        resp = self.client.get(reverse('expenses_home') + '?m=2026-11')
+        self.assertContains(resp, 'Upcoming this month')
+        self.assertContains(resp, 'Loan tracker')
+
+
+class ExpensesSecondFactorTests(ExpenseTestCase):
+    def test_not_gated_without_vault_password(self):
+        self.client.force_login(self.user)
+        self.assertEqual(self.client.get(reverse('expenses_home')).status_code, 200)
+
+    def test_gated_when_vault_password_set(self):
+        self.group.set_portfolio_password('vault-pass')
+        self.group.save()
+        self.client.force_login(self.user)
+        resp = self.client.get(reverse('expenses_home'))
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn(reverse('portfolio_unlock'), resp['Location'])
+
+    def test_unlock_then_access_then_expiry(self):
+        self.group.set_portfolio_password('vault-pass')
+        self.group.save()
+        self.client.force_login(self.user)
+        self.client.post(reverse('portfolio_unlock'), {'password': 'vault-pass', 'next': '/expenses/'})
+        self.assertEqual(self.client.get(reverse('expenses_home')).status_code, 200)
+        session = self.client.session
+        session['portfolio_unlocked_at'] = session['portfolio_unlocked_at'] - 10 * 3600
+        session.save()
+        self.assertEqual(self.client.get(reverse('expenses_home')).status_code, 302)
+
+    def test_xhr_gets_json_403_when_locked(self):
+        self.group.set_portfolio_password('vault-pass')
+        self.group.save()
+        self.client.force_login(self.user)
+        resp = self.client.post(reverse('expense_set_emi_tenure'), {}, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+        self.assertEqual(resp.status_code, 403)
+        self.assertTrue(resp.json()['locked'])
+
+
+class SessionLifetimeTests(SimpleTestCase):
+    def test_sessions_are_persistent_30_days(self):
+        from django.conf import settings
+        self.assertEqual(settings.SESSION_COOKIE_AGE, 30 * 24 * 3600)
+        self.assertFalse(settings.SESSION_EXPIRE_AT_BROWSER_CLOSE)

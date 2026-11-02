@@ -662,15 +662,6 @@ def _build_hra_monthly(expenses, fy_start, today):
 # Utility
 # ---------------------------------------------------------------------------
 
-def _gf_kwargs(gf):
-    """Convert a Q object group filter into kwargs usable with get_object_or_404.
-    Extracts the underlying lookup from the Q for simple single-condition filters."""
-    for child in gf.children:
-        if isinstance(child, tuple):
-            return {child[0]: child[1]}
-    return {}
-
-
 
 # ---------------------------------------------------------------------------
 # Notes (all authenticated users, own notes only)

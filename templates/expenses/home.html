@@ -326,7 +326,7 @@
     {% endif %}
 
     {# Credit Card EMI Tracker Section #}
-    {% if summary.emi_summary.count %}
+    {% if summary.emi_summary.count or emi_plan.items or emi_plan.loans %}
     <div class="card bg-base-200/70 shadow-sm border border-purple-500/20 animate-up card-hover">
       <div class="card-body p-4">
         <div class="flex items-center justify-between">
@@ -391,6 +391,60 @@
                 <span class="material-symbols-outlined text-[11px]">edit_calendar</span> Set tenure
               </button>
               {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if emi_plan.items %}
+        <div class="flex items-center justify-between mb-1">
+          <div class="text-[10px] font-bold uppercase tracking-wider opacity-60">Upcoming this month</div>
+          <span class="text-[10px] font-bold tabular-nums text-purple-300">{{ emi_plan.total|inr }} expected</span>
+        </div>
+        <div class="flex flex-col gap-1.5 mb-2.5">
+          {% for it in emi_plan.items %}
+          <div class="p-2.5 rounded-xl bg-base-300/40 border border-dashed border-purple-500/30 flex items-center justify-between gap-2.5">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center flex-wrap gap-1.5">
+                <span class="text-xs font-bold">Loan ••{{ it.ref }}</span>
+                <span class="text-[11px] font-semibold text-purple-300">Installment #{{ it.num }} of {{ it.total_installments }}</span>
+                <span class="badge badge-xs {% if it.is_past %}bg-amber-500/20 text-amber-300 border border-amber-500/30{% else %}bg-purple-500/15 text-purple-300 border border-purple-500/30{% endif %} font-semibold">{% if it.is_past %}Not seen yet{% else %}Due {{ it.date|date:"d M" }}{% endif %}</span>
+              </div>
+              <div class="text-[10px] opacity-60 truncate mt-0.5">
+                Projected from last installment{% if it.payment_source %} · {{ it.payment_source.short_name }}{% endif %}
+              </div>
+            </div>
+            <span class="text-xs font-bold tabular-nums text-purple-300 shrink-0">{{ it.amount|inr }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if emi_plan.loans %}
+        <div class="flex items-center justify-between mb-1">
+          <div class="text-[10px] font-bold uppercase tracking-wider opacity-60">Loan tracker</div>
+          <span class="text-[10px] opacity-60 tabular-nums">{{ emi_plan.remaining_total|inr }} left to pay</span>
+        </div>
+        <div class="flex flex-col gap-1.5 mb-2.5">
+          {% for loan in emi_plan.loans %}
+          <div class="p-2.5 rounded-xl bg-base-300/40 border border-base-content/5">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-1.5 min-w-0">
+                <span class="text-xs font-bold">Loan ••{{ loan.ref }}</span>
+                <span class="text-[11px] text-purple-300 font-semibold">{{ loan.paid }}/{{ loan.total_installments }} paid</span>
+                <button type="button" class="text-purple-300/50 hover:text-purple-200 cursor-pointer inline-flex items-center"
+                        onclick="openEmiTenureModal('{{ loan.ref }}', '{{ loan.item_id }}', '{{ loan.last_num }}', '{{ loan.total_installments }}')"
+                        title="Edit tenure for Loan ••{{ loan.ref }}">
+                  <span class="material-symbols-outlined text-[13px]">edit</span>
+                </button>
+              </div>
+              <span class="text-[11px] font-bold tabular-nums">{{ loan.amount|inr }}/mo</span>
+            </div>
+            <progress class="progress progress-secondary w-full h-1.5 mt-1.5" value="{{ loan.progress_pct }}" max="100"></progress>
+            <div class="flex items-center justify-between text-[10px] opacity-60 mt-1">
+              <span>{{ loan.remaining }} left · next {{ loan.next.date|date:"d M Y" }}</span>
+              <span>Ends {{ loan.ends_on|date:"M Y" }}</span>
             </div>
           </div>
           {% endfor %}

@@ -4,7 +4,10 @@ from functools import wraps
 from itertools import groupby
 import logging
 import secrets
+import time
+from urllib.parse import quote
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Count, Q
@@ -20,6 +23,7 @@ from tracker.services import parse_fy_param
 
 from . import crypto, gmail
 from .anomaly import ai_audit_expenses, apply_flags, audit_cooldown_status
+from .emi import emi_projection
 from .forms import CategoryForm, ExpenseForm, PaymentSourceForm, StatementUploadForm
 from .models import CardStatement, Expense, ExpenseCategory, GmailAccount, MerchantRule, PaymentSource, StatementLine
 from .services import (
@@ -33,6 +37,7 @@ logger = logging.getLogger(__name__)
 
 INLINE_SYNC_SECONDS = 20
 _OAUTH_STATE_KEY = 'expenses_gmail_oauth_state'
+_VAULT_UNLOCK_KEY = 'portfolio_unlocked_at'  # shared with portfolio/jewellery (portfolio_unlock view)
 
 
 def _require_expenses(view_func):
@@ -43,8 +48,28 @@ def _require_expenses(view_func):
             return HttpResponseForbidden('You do not have permission to view this page.')
         if request.user.group is None or not feature_enabled(request.user, 'expenses'):
             raise Http404
+        locked = _expenses_locked(request)
+        if locked:
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest' or 'application/json' in request.headers.get('accept', ''):
+                return JsonResponse({'ok': False, 'locked': True, 'error': 'Expenses are locked. Unlock to continue.'}, status=403)
+            nxt = request.get_full_path() if request.method == 'GET' else reverse('expenses_home')
+            return redirect(reverse('portfolio_unlock') + '?next=' + quote(nxt))
         return view_func(request, *args, **kwargs)
     return _wrapped
+
+
+def _expenses_locked(request):
+    """Second factor: when the household has set a vault password, expenses need the same
+    password / passkey unlock as the portfolio (the unlock session is shared). The unlock stays
+    valid for EXPENSES_UNLOCK_TTL seconds. Households without a vault password are not gated."""
+    group = request.user.group
+    if not group or not group.portfolio_password:
+        return False
+    unlocked_at = request.session.get(_VAULT_UNLOCK_KEY)
+    if unlocked_at and (time.time() - unlocked_at) <= settings.EXPENSES_UNLOCK_TTL:
+        return False
+    request.session.pop(_VAULT_UNLOCK_KEY, None)
+    return True
 
 
 def _group(request):
@@ -219,8 +244,10 @@ def expenses_home(request):
     edit_tmpl = reverse('expense_edit', args=[0])
     delete_tmpl = reverse('expense_delete', args=[0])
     review_tmpl = reverse('expense_review', args=[0])
+    emi_plan = emi_projection(group, summary['start'], summary['end'], today=today)
     context = {
         'summary': summary,
+        'emi_plan': emi_plan,
         'days': days,
         'row_count': len(rows),
         'payload': {str(e.pk): _expense_payload(e, edit_tmpl, delete_tmpl, review_tmpl) for e in rows},
