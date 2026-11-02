@@ -92,9 +92,12 @@ _LOCKOUT_SECONDS = 300
 @login_required
 def portfolio_unlock(request):
     from django.core.cache import cache
-    next_url = request.GET.get('next', request.POST.get('next', '/portfolio/'))
-    allowed = url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()})
-    if not allowed:
+    raw_next = request.POST.get('next') or request.GET.get('next', '/portfolio/')
+    if raw_next and raw_next.startswith('/') and not raw_next.startswith('//') and url_has_allowed_host_and_scheme(
+        raw_next, allowed_hosts=None, require_https=request.is_secure()
+    ):
+        next_url = raw_next
+    else:
         next_url = '/portfolio/'
 
     group = request.user.group

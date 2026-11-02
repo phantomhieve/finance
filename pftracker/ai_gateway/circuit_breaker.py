@@ -123,8 +123,8 @@ class CircuitBreakerManager:
             k_state.cooldown_until = time.time() + cooldown_seconds
             k_state.failure_count += 1
             logger.warning(
-                "API key [%s] on node '%s' placed on cooldown for %.1fs (HTTP 429 rate limit)",
-                node.get_masked_key(node.api_keys.index(key) if key in node.api_keys else 0),
+                "API key #%d on node '%s' placed on cooldown for %.1fs (HTTP 429 rate limit)",
+                node.api_keys.index(key) if key in node.api_keys else 0,
                 node.id,
                 cooldown_seconds,
             )

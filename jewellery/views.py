@@ -12,7 +12,7 @@ from pftracker.utils import safe_redirect
 from portfolio.views import _require_jewellery, _user_group
 from .models import JewelleryItem
 from .forms import JewelleryItemForm
-from .utils import get_or_create_thumbnail
+from .utils import get_or_create_thumbnail, safe_media_path
 from portfolio.models import CommodityPrice
 
 
@@ -227,8 +227,8 @@ def serve_photo(request, pk):
     if fallback_content_type is None:
         raise Http404("Unsupported media type")
 
-    file_path = obj.photo.path
-    if not os.path.exists(file_path):
+    file_path = safe_media_path(obj.photo.path)
+    if not file_path or not os.path.exists(file_path):
         raise Http404("File does not exist")
 
     size_variant = request.GET.get('size', 'thumb')
@@ -243,6 +243,10 @@ def serve_photo(request, pk):
             size_variant=size_variant,
             fallback_content_type=fallback_content_type,
         )
+
+    serve_path = safe_media_path(serve_path)
+    if not serve_path:
+        raise Http404("File does not exist")
 
     try:
         stat = os.stat(serve_path)

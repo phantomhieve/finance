@@ -1,9 +1,25 @@
 """Utilities for Jewellery photo processing, responsive thumbnail caching, and cleanup."""
 import logging
 import os
+from django.conf import settings
 from PIL import Image, ImageOps
 
 logger = logging.getLogger(__name__)
+
+
+def safe_media_path(path):
+    """Return the resolved real path if it lies inside MEDIA_ROOT, else None.
+
+    Guards every filesystem access derived from stored file names against path traversal
+    (``..`` segments, absolute paths, symlinks leaving the media directory).
+    """
+    if not path:
+        return None
+    root = os.path.realpath(str(settings.MEDIA_ROOT))
+    real = os.path.realpath(str(path))
+    if real == root or not real.startswith(root + os.sep):
+        return None
+    return real
 
 THUMBNAIL_SIZES = {
     'thumb': (480, 480),
@@ -25,6 +41,7 @@ def get_or_create_thumbnail(original_path, size_variant='thumb', fallback_conten
     Caches the resized WebP file under media/jewellery_photos/cache/<uuid>_<variant>.webp.
     If generation fails or the original cannot be decoded, falls back to original_path.
     """
+    original_path = safe_media_path(original_path)
     if not original_path or not os.path.exists(original_path):
         return original_path, fallback_content_type
 
@@ -36,7 +53,13 @@ def get_or_create_thumbnail(original_path, size_variant='thumb', fallback_conten
         os.makedirs(cache_dir, exist_ok=True)
 
         base_name = os.path.splitext(os.path.basename(original_path))[0]
-        cached_path = os.path.join(cache_dir, f"{base_name}_{size_variant}.webp")
+        base_name = "".join(c for c in base_name if c.isalnum() or c in ('-', '_'))
+        if not base_name:
+            return original_path, fallback_content_type
+
+        cached_path = safe_media_path(os.path.join(cache_dir, f"{base_name}_{size_variant}.webp"))
+        if not cached_path:
+            return original_path, fallback_content_type
 
         orig_mtime = os.path.getmtime(original_path)
         if not force and os.path.exists(cached_path) and os.path.getmtime(cached_path) >= orig_mtime:
@@ -56,7 +79,9 @@ def get_or_create_thumbnail(original_path, size_variant='thumb', fallback_conten
             max_size = THUMBNAIL_SIZES[size_variant]
             img.thumbnail(max_size, Image.Resampling.LANCZOS)
 
-            temp_path = f"{cached_path}.tmp.{os.getpid()}"
+            temp_path = safe_media_path(f"{cached_path}.tmp.{os.getpid()}")
+            if not temp_path:
+                return original_path, fallback_content_type
             quality = 80 if size_variant == 'thumb' else 85
             img.save(temp_path, format='WEBP', quality=quality, method=4)
             os.replace(temp_path, cached_path)
@@ -69,12 +94,18 @@ def get_or_create_thumbnail(original_path, size_variant='thumb', fallback_conten
 
 def delete_cached_thumbnails(original_path):
     """Clean up cached thumbnails when a jewellery photo is deleted or replaced."""
+    original_path = safe_media_path(original_path)
     if not original_path:
         return
     cache_dir = os.path.join(os.path.dirname(original_path), 'cache')
     base_name = os.path.splitext(os.path.basename(original_path))[0]
+    base_name = "".join(c for c in base_name if c.isalnum() or c in ('-', '_'))
+    if not base_name:
+        return
     for variant in ('thumb', 'full'):
-        cached_path = os.path.join(cache_dir, f"{base_name}_{variant}.webp")
+        cached_path = safe_media_path(os.path.join(cache_dir, f"{base_name}_{variant}.webp"))
+        if not cached_path:
+            continue
         try:
             if os.path.exists(cached_path):
                 os.remove(cached_path)
