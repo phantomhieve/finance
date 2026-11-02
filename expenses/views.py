@@ -244,7 +244,7 @@ def expenses_home(request):
     edit_tmpl = reverse('expense_edit', args=[0])
     delete_tmpl = reverse('expense_delete', args=[0])
     review_tmpl = reverse('expense_review', args=[0])
-    emi_plan = emi_projection(group, summary['start'], summary['end'], today=today)
+    emi_plan = emi_projection(group, summary['start'], summary['end'], today=today, ongoing=summary['emi_summary']['ongoing'])
     context = {
         'summary': summary,
         'emi_plan': emi_plan,
