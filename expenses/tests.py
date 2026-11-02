@@ -1659,8 +1659,11 @@ class EmiProjectionTests(ExpenseTestCase):
         self._emi(3, datetime.date(2026, 10, 23), total=6)
         self.client.force_login(self.user)
         resp = self.client.get(reverse('expenses_home') + '?m=2026-11')
-        self.assertContains(resp, 'Upcoming this month')
-        self.assertContains(resp, 'Loan tracker')
+        self.assertContains(resp, 'Credit Card EMIs')
+        self.assertContains(resp, 'Loan ••9861')
+        self.assertContains(resp, 'Installment #4 of 6')
+        self.assertContains(resp, 'left to pay')
+        self.assertContains(resp, '3/6 paid')
 
 
 class ExpensesSecondFactorTests(ExpenseTestCase):
