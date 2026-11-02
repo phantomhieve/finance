@@ -255,6 +255,7 @@ AUTHENTICATION_BACKENDS = [
 # django-allauth
 ACCOUNT_ADAPTER = 'pftracker.adapters.NoSignupAccountAdapter'
 ACCOUNT_LOGIN_METHODS = {'username', 'email'}
+ACCOUNT_SESSION_REMEMBER = True  # always persist the session (SESSION_COOKIE_AGE); no per-login checkbox
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'username*', 'password1*', 'password2*']
 ACCOUNT_DEFAULT_HTTP_PROTOCOL = 'http' if DEBUG else 'https'
 SOCIALACCOUNT_ADAPTER = 'pftracker.adapters.PreExistingEmailAdapter'
@@ -326,11 +327,15 @@ SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'
 
-# Session expiry — 8 hours for a finance app; extend on each request;
-# expire when the browser window is closed.
-SESSION_COOKIE_AGE = 8 * 60 * 60
-SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+# Session expiry — 30 days, persistent across browser restarts, renewed on activity (sliding).
+# The portfolio / jewellery vaults and the expenses vault keep their own short unlock TTL on top of this,
+# so a long login session does not weaken the second factor on sensitive data.
+SESSION_COOKIE_AGE = int(os.environ.get('DJANGO_SESSION_DAYS', '30')) * 24 * 60 * 60
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 SESSION_SAVE_EVERY_REQUEST = True
+
+# How long a password/passkey unlock keeps Expenses open (portfolio & jewellery stay at 30 min).
+EXPENSES_UNLOCK_TTL = int(os.environ.get('EXPENSES_UNLOCK_TTL_SECONDS', str(4 * 60 * 60)))
 
 if not DEBUG:
     SESSION_COOKIE_SECURE = True
@@ -391,6 +396,14 @@ OAUTH2_PROVIDER = {
         'mcp_server.oauth.AuthorizationCodeOnlyDCRPermission',
     ),
     'CIMD_ENABLED': True,
+    # RFC 9700 (OAuth 2.0 Security BCP) hardening. Left off on purpose (would force every MCP client
+    # to re-authorise or break loopback redirects): COMPLIANT_BCP_RFC9700_TOKEN_STORAGE,
+    # ..._AUTHZ_RESPONSE_ISS and removing 'http' from ALLOWED_REDIRECT_URI_SCHEMES.
+    'COMPLIANT_BCP_RFC9700_IMPLICIT_GRANT': True,
+    'COMPLIANT_BCP_RFC9700_PASSWORD_GRANT': True,
+    'COMPLIANT_BCP_RFC9700_PKCE_METHOD': True,  # S256 only
+    'COMPLIANT_BCP_RFC9700_ACCESS_TOKEN_TRANSPORT': True,  # no tokens in the query string
+    'REFRESH_TOKEN_REUSE_PROTECTION': True,
 }
 
 # CORS Configuration for MCP & OAuth
