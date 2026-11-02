@@ -41,7 +41,12 @@ var Expenses = (function () {
     if ($('expRemember')) $('expRemember').checked = false;
 
     if (current) {
-      form.action = current.edit_url;
+      var expId = parseInt(current.id, 10);
+      if (!isNaN(expId) && expId > 0) {
+        form.action = '/expenses/' + expId + '/edit/';
+        if ($('expReviewForm')) $('expReviewForm').action = '/expenses/' + expId + '/review/';
+        if ($('expDeleteForm')) $('expDeleteForm').action = '/expenses/' + expId + '/delete/';
+      }
       setText('expModalTitle', 'Edit expense');
       $('expAmount').value = String(current.amount).replace(/\.00$/, '');
       $('expMerchant').value = current.merchant;
@@ -53,14 +58,13 @@ var Expenses = (function () {
       (current.direction === 'CREDIT' ? $('expDirCredit') : $('expDirDebit')).checked = true;
 
       var reasons = $('expFlagReasons');
-      reasons.innerHTML = '';
+      reasons.replaceChildren();
       (current.flag_reasons || []).forEach(function (r) {
         var li = document.createElement('li');
         li.textContent = r;
         reasons.appendChild(li);
       });
       toggle('expFlagBox', current.flagged, 'flex');
-      $('expReviewForm').action = current.review_url;
 
       if (current.is_refunded || current.direction === 'CREDIT') {
         if (current.is_refunded) {
@@ -103,9 +107,8 @@ var Expenses = (function () {
       toggle('expMetaSubject', !!current.subject);
       toggle('expMeta', true);
       toggle('expDeleteBtn', true, 'inline-flex');
-      $('expDeleteForm').action = current.delete_url;
     } else {
-      form.action = addUrl;
+      form.action = '/expenses/add/';
       setText('expModalTitle', 'Add expense');
       $('expDate').value = new Date().toLocaleDateString('en-CA');
       var self = document.querySelector('#expMember option[data-self]');
@@ -399,7 +402,12 @@ var Expenses = (function () {
         layout: { padding: { top: 18 } },
         interaction: { mode: 'index', intersect: false },
         onClick: function (_, els) {
-          if (els.length) window.location.href = canvas.dataset.monthUrl + '?m=' + d.params[els[0].index];
+          if (els.length && d && d.params) {
+            var rawParam = d.params[els[0].index];
+            if (rawParam && /^\d{4}-\d{2}$/.test(String(rawParam))) {
+              window.location.href = '/expenses/?m=' + encodeURIComponent(rawParam);
+            }
+          }
         },
         onHover: function (evt, els) {
           if (evt && evt.native && evt.native.target) {

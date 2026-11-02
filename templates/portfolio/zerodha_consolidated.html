@@ -556,32 +556,35 @@ function showBreakdown(name, type, idx) {
     var actionTd = document.createElement('td');
     actionTd.style.textAlign = 'right';
     var modelName = isStock ? 'stockholding' : 'mutualfundholding';
-    var toggleForm = document.createElement('form');
-    toggleForm.method = 'post';
-    toggleForm.action = "/portfolio/toggle-baby/" + modelName + "/" + e.id + "/";
-    toggleForm.className = "inline m-0";
-    var csrfInput = document.createElement('input');
-    csrfInput.type = 'hidden';
-    csrfInput.name = 'csrfmiddlewaretoken';
-    csrfInput.value = '{{ csrf_token }}';
-    toggleForm.appendChild(csrfInput);
-    var toggleBtn = document.createElement('button');
-    toggleBtn.type = 'submit';
-    toggleBtn.className = "btn btn-ghost btn-xs btn-square";
-    var iconSpan = document.createElement('span');
-    iconSpan.className = "material-symbols-outlined text-base";
-    if (e.is_baby === true || e.is_baby === 'true') {
-      toggleBtn.classList.add("text-warning");
-      toggleBtn.title = "Move to Master Portfolio";
-      iconSpan.textContent = "assignment_return";
-    } else {
-      toggleBtn.classList.add("opacity-60", "hover:opacity-100");
-      toggleBtn.title = "Move to Child Portfolio";
-      iconSpan.textContent = "child_care";
+    var entryId = parseInt(e.id, 10);
+    if (!isNaN(entryId) && entryId > 0) {
+      var toggleForm = document.createElement('form');
+      toggleForm.method = 'post';
+      toggleForm.action = "/portfolio/toggle-baby/" + modelName + "/" + entryId + "/";
+      toggleForm.className = "inline m-0";
+      var csrfInput = document.createElement('input');
+      csrfInput.type = 'hidden';
+      csrfInput.name = 'csrfmiddlewaretoken';
+      csrfInput.value = '{{ csrf_token }}';
+      toggleForm.appendChild(csrfInput);
+      var toggleBtn = document.createElement('button');
+      toggleBtn.type = 'submit';
+      toggleBtn.className = "btn btn-ghost btn-xs btn-square";
+      var iconSpan = document.createElement('span');
+      iconSpan.className = "material-symbols-outlined text-base";
+      if (e.is_baby === true || e.is_baby === 'true') {
+        toggleBtn.classList.add("text-warning");
+        toggleBtn.title = "Move to Master Portfolio";
+        iconSpan.textContent = "assignment_return";
+      } else {
+        toggleBtn.classList.add("opacity-60", "hover:opacity-100");
+        toggleBtn.title = "Move to Child Portfolio";
+        iconSpan.textContent = "child_care";
+      }
+      toggleBtn.appendChild(iconSpan);
+      toggleForm.appendChild(toggleBtn);
+      actionTd.appendChild(toggleForm);
     }
-    toggleBtn.appendChild(iconSpan);
-    toggleForm.appendChild(toggleBtn);
-    actionTd.appendChild(toggleForm);
     tr.appendChild(actionTd);
 
     body.appendChild(tr);

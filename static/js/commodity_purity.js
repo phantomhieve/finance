@@ -16,7 +16,7 @@
     if (!typeSelect || !puritySelect) return;
     var opts = typeSelect.value === 'SILVER' ? silverOpts : goldOpts;
     var prev = keepValue || puritySelect.value;
-    puritySelect.innerHTML = '';
+    puritySelect.replaceChildren();
     opts.forEach(function(o) {
       var opt = document.createElement('option');
       opt.value = o.v;

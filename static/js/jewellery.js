@@ -16,7 +16,7 @@
   ];
 
   function fill(select, list, prev, fallback) {
-    select.innerHTML = '';
+    select.replaceChildren();
     list.forEach(function (p) {
       var opt = document.createElement('option');
       opt.value = p.value;
@@ -37,7 +37,10 @@
     } else if (metal === 'SILVER') {
       fill(puritySelect, SILVER_PURITIES, prev, '999');
     } else {
-      puritySelect.innerHTML = '<option value="">N/A</option>';
+      var na = document.createElement('option');
+      na.value = '';
+      na.textContent = 'N/A';
+      puritySelect.replaceChildren(na);
       puritySelect.disabled = true;
     }
   }
@@ -135,21 +138,36 @@
         item.style.display = (i >= start && i < end) ? '' : 'none';
       });
 
-      var info = '<span class="text-[10px] uppercase tracking-wider opacity-40 font-bold">Showing ' +
-        (start + 1) + ' – ' + Math.min(end, items.length) + ' of ' + items.length + '</span>';
-      var btns = '<div class="join">';
-      btns += '<button class="join-item btn btn-xs btn-ghost' + (currentPage === 1 ? ' btn-disabled' : '') +
-        '" data-page="prev"><span class="material-symbols-outlined text-sm">chevron_left</span></button>';
+      var info = document.createElement('span');
+      info.className = 'text-[10px] uppercase tracking-wider opacity-40 font-bold';
+      info.textContent = 'Showing ' + (start + 1) + ' – ' + Math.min(end, items.length) + ' of ' + items.length;
+
+      var pageBtn = function (page, disabled, active, iconName) {
+        var b = document.createElement('button');
+        b.className = 'join-item btn btn-xs ' + (active ? 'btn-primary' : 'btn-ghost') + (disabled ? ' btn-disabled' : '');
+        b.setAttribute('data-page', String(page));
+        if (iconName) {
+          var ic = document.createElement('span');
+          ic.className = 'material-symbols-outlined text-sm';
+          ic.textContent = iconName;
+          b.appendChild(ic);
+        } else {
+          b.textContent = String(page);
+        }
+        return b;
+      };
+
+      var join = document.createElement('div');
+      join.className = 'join';
+      join.appendChild(pageBtn('prev', currentPage === 1, false, 'chevron_left'));
       var sp = Math.max(1, currentPage - 2);
       var ep = Math.min(totalPages, sp + 4);
       if (ep - sp < 4) sp = Math.max(1, ep - 4);
       for (var p = sp; p <= ep; p++) {
-        btns += '<button class="join-item btn btn-xs' + (p === currentPage ? ' btn-primary' : ' btn-ghost') +
-          '" data-page="' + p + '">' + p + '</button>';
+        join.appendChild(pageBtn(p, false, p === currentPage));
       }
-      btns += '<button class="join-item btn btn-xs btn-ghost' + (currentPage === totalPages ? ' btn-disabled' : '') +
-        '" data-page="next"><span class="material-symbols-outlined text-sm">chevron_right</span></button></div>';
-      nav.innerHTML = info + btns;
+      join.appendChild(pageBtn('next', currentPage === totalPages, false, 'chevron_right'));
+      nav.replaceChildren(info, join);
     }
 
     nav.addEventListener('click', function (e) {

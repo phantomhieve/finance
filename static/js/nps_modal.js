@@ -1,4 +1,11 @@
 (function() {
+  function setNpsTitle(el, iconName, label) {
+    var icon = document.createElement('span');
+    icon.className = 'material-symbols-outlined text-primary';
+    icon.textContent = iconName;
+    el.replaceChildren(icon, document.createTextNode(label));
+  }
+
   function updateNpsTotal() {
     var form = document.getElementById('npsForm');
     if (!form) return;
@@ -21,18 +28,19 @@
   window.openNpsAddModal = function() {
     var form = document.getElementById('npsForm');
     if (!form) return;
-    form.action = form.getAttribute('data-add-url');
+    form.action = '/portfolio/nps/add/';
     form.reset();
     var delBtn = document.getElementById('npsDeleteBtn');
     if (delBtn) delBtn.style.display = 'none';
     var titleEl = document.getElementById('npsModalTitle');
     if (titleEl) {
-      titleEl.innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span> Add NPS Entry';
+      setNpsTitle(titleEl, 'add_circle', ' Add NPS Entry');
     }
     var prevEl = document.getElementById('npsPrevBalance');
     if (prevEl) {
-      var base = prevEl.getAttribute('data-current-balance') || '0';
-      prevEl.value = base;
+      var rawBase = prevEl.getAttribute('data-current-balance') || '0';
+      var numBase = parseFloat(rawBase);
+      prevEl.value = isNaN(numBase) ? '0' : String(numBase);
     }
     updateNpsTotal();
     openModal('addNpsModal');
@@ -45,27 +53,26 @@
     var form = document.getElementById('npsForm');
     if (!form) return;
 
-    var editUrl = form.getAttribute('data-edit-url');
-    var deleteUrl = form.getAttribute('data-delete-url');
-    if (!editUrl || !deleteUrl) return;
+    var npsId = parseInt(btn.dataset.id, 10);
+    if (isNaN(npsId) || npsId <= 0) return;
 
-    form.action = editUrl.replace('/0/', '/' + btn.dataset.id + '/');
+    form.action = '/portfolio/nps/' + npsId + '/edit/';
     var delForm = document.getElementById('deleteNpsForm');
     if (delForm) {
-      delForm.action = deleteUrl.replace('/0/', '/' + btn.dataset.id + '/');
+      delForm.action = '/portfolio/nps/' + npsId + '/delete/';
     }
     var delBtn = document.getElementById('npsDeleteBtn');
     if (delBtn) delBtn.style.display = 'inline-flex';
     var titleEl = document.getElementById('npsModalTitle');
     if (titleEl) {
-      titleEl.innerHTML = '<span class="material-symbols-outlined text-primary">edit</span> Edit NPS Entry';
+      setNpsTitle(titleEl, 'edit', ' Edit NPS Entry');
     }
 
-    form.querySelector('[name=date]').value = btn.dataset.date;
-    form.querySelector('[name=contribution]').value = btn.dataset.contrib;
-    form.querySelector('[name=interest_earned]').value = btn.dataset.interest;
-    form.querySelector('[name=total_balance]').value = btn.dataset.balance;
-    form.querySelector('[name=remarks]').value = btn.dataset.remarks;
+    form.querySelector('[name=date]').value = btn.dataset.date || '';
+    form.querySelector('[name=contribution]').value = btn.dataset.contrib || '';
+    form.querySelector('[name=interest_earned]').value = btn.dataset.interest || '';
+    form.querySelector('[name=total_balance]').value = btn.dataset.balance || '';
+    form.querySelector('[name=remarks]').value = btn.dataset.remarks || '';
 
     // prev balance = existing total - contrib - interest
     var prev = parseFloat(btn.dataset.balance || '0') -
