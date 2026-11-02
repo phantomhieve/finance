@@ -200,3 +200,61 @@ class ModelAliasNormalizationTests(SimpleTestCase):
         self.assertEqual(_normalize_model_name("gemini-3.5-flash-lite"), "gemini-3.8-flash")
 
 
+class GeminiThinkingConfigOptimizationTests(SimpleTestCase):
+    def test_argon_prod_portfolio_reasoning(self):
+        from .adapters.gemini import _build_gemini_thinking_config
+        from .types import TaskType
+        from google.genai.types import ThinkingLevel
+
+        with self.settings(DEBUG=False):
+            tc = _build_gemini_thinking_config(model="gemini-4-argon", task=TaskType.REASONING)
+            self.assertIsNotNone(tc)
+            self.assertEqual(tc.thinking_level, ThinkingLevel.HIGH)
+            self.assertFalse(tc.include_thoughts)
+
+    def test_argon_dev_portfolio_reasoning(self):
+        from .adapters.gemini import _build_gemini_thinking_config
+        from .types import TaskType
+        from google.genai.types import ThinkingLevel
+
+        with self.settings(DEBUG=True):
+            tc = _build_gemini_thinking_config(model="gemini-4-argon", task=TaskType.REASONING)
+            self.assertIsNotNone(tc)
+            self.assertEqual(tc.thinking_level, ThinkingLevel.LOW)
+            self.assertFalse(tc.include_thoughts)
+
+    def test_argon_expenses_fast_and_extraction(self):
+        from .adapters.gemini import _build_gemini_thinking_config
+        from .types import TaskType
+
+        for is_debug in (True, False):
+            with self.settings(DEBUG=is_debug):
+                tc_fast = _build_gemini_thinking_config(model="gemini-4-argon", task=TaskType.FAST)
+                self.assertIsNotNone(tc_fast)
+                self.assertEqual(tc_fast.thinking_budget, 0)
+                self.assertFalse(tc_fast.include_thoughts)
+
+                tc_ext = _build_gemini_thinking_config(model="gemini-4-argon", task=TaskType.EXTRACTION)
+                self.assertIsNotNone(tc_ext)
+                self.assertEqual(tc_ext.thinking_budget, 0)
+                self.assertFalse(tc_ext.include_thoughts)
+
+    def test_flash_expenses_task(self):
+        from .adapters.gemini import _build_gemini_thinking_config
+        from .types import TaskType
+
+        tc = _build_gemini_thinking_config(model="gemini-3.8-flash", task=TaskType.FAST)
+        self.assertIsNotNone(tc)
+        self.assertEqual(tc.thinking_budget, 0)
+        self.assertFalse(tc.include_thoughts)
+
+    def test_explicit_thinking_override(self):
+        from .adapters.gemini import _build_gemini_thinking_config
+        from .types import TaskType
+        from google.genai.types import ThinkingLevel
+
+        with self.settings(GEMINI_THINKING_LEVEL="MEDIUM"):
+            tc = _build_gemini_thinking_config(model="gemini-4-argon", task=TaskType.REASONING)
+            self.assertEqual(tc.thinking_level, ThinkingLevel.MEDIUM)
+
+

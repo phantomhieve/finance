@@ -53,6 +53,105 @@ def _clean_schema_for_gemini(data: Any) -> Any:
     return data
 
 
+def _build_gemini_thinking_config(
+    model: str,
+    task: Any = None,
+    explicit_thinking_config: Any = None,
+    thinking_level: Any = None,
+    thinking_budget: Any = None,
+) -> Any:
+    """Resolve optimized ThinkingConfig for Gemini models based on dev vs prod and task tier.
+
+    Optimization Matrix:
+    - Portfolio (TaskType.REASONING):
+      - PROD with Argon: ThinkingLevel.HIGH for exhaustive multi-pillar analysis.
+      - DEV with Argon/Flash: ThinkingLevel.LOW for fast, iterative developer feedback.
+    - Expenses (TaskType.FAST / EXTRACTION):
+      - Both DEV and PROD: thinking_budget=0 (thinking disabled) for instantaneous
+        extraction, matching, and categorisation without wasting latency or tokens.
+    """
+    import os
+    from django.conf import settings
+    from google import genai
+
+    # 1. Direct explicit ThinkingConfig takes highest precedence
+    if explicit_thinking_config is not None:
+        return explicit_thinking_config
+
+    # 2. Check explicit keyword args or settings/env overrides
+    cfg_level = thinking_level or getattr(settings, "GEMINI_THINKING_LEVEL", None) or os.environ.get("GEMINI_THINKING_LEVEL", "")
+    cfg_budget = thinking_budget if thinking_budget is not None else getattr(settings, "GEMINI_THINKING_BUDGET", None)
+    if cfg_budget is None and os.environ.get("GEMINI_THINKING_BUDGET"):
+        try:
+            cfg_budget = int(os.environ["GEMINI_THINKING_BUDGET"])
+        except ValueError:
+            cfg_budget = None
+
+    level_enum = None
+    if cfg_level:
+        lvl_str = str(cfg_level).upper().strip()
+        level_map = {
+            "MINIMAL": genai.types.ThinkingLevel.MINIMAL,
+            "LOW": genai.types.ThinkingLevel.LOW,
+            "MEDIUM": genai.types.ThinkingLevel.MEDIUM,
+            "HIGH": genai.types.ThinkingLevel.HIGH,
+            "UNSPECIFIED": genai.types.ThinkingLevel.THINKING_LEVEL_UNSPECIFIED,
+        }
+        level_enum = level_map.get(lvl_str)
+
+    if level_enum is not None or cfg_budget is not None:
+        tc_kwargs: dict[str, Any] = {"include_thoughts": False}
+        if level_enum is not None:
+            tc_kwargs["thinking_level"] = level_enum
+        if cfg_budget is not None:
+            tc_kwargs["thinking_budget"] = cfg_budget
+        return genai.types.ThinkingConfig(**tc_kwargs)
+
+    # 3. Environment-aware automatic optimization
+    target = _normalize_model_name(model).lower()
+    is_reasoning_model = "argon" in target or "thinking" in target or "r1" in target
+    is_debug = getattr(settings, "DEBUG", True)
+    task_str = str(task.value if hasattr(task, "value") else (task or "")).lower()
+
+    if is_reasoning_model:
+        # Portfolio Analysis / Scoring / Fiduciary Review
+        if task_str in ("reasoning", "research", ""):
+            if is_debug:
+                # DEV: Fast reasoning to keep development turnaround quick
+                return genai.types.ThinkingConfig(
+                    thinking_level=genai.types.ThinkingLevel.LOW,
+                    include_thoughts=False,
+                )
+            else:
+                # PROD: Exhaustive frontier reasoning across portfolio pillars
+                return genai.types.ThinkingConfig(
+                    thinking_level=genai.types.ThinkingLevel.HIGH,
+                    include_thoughts=False,
+                )
+        # Expenses Tasks (Categorisation, Extraction, Receipt/Statement Parsing)
+        elif task_str in ("fast", "extraction"):
+            return genai.types.ThinkingConfig(
+                thinking_budget=0,
+                include_thoughts=False,
+            )
+    else:
+        # Non-reasoning / Flash models:
+        # In DEV, if running reasoning task on Flash:
+        if task_str == "reasoning" and is_debug:
+            return genai.types.ThinkingConfig(
+                thinking_level=genai.types.ThinkingLevel.LOW,
+                include_thoughts=False,
+            )
+        # Fast / extraction tasks on Flash:
+        if task_str in ("fast", "extraction"):
+            return genai.types.ThinkingConfig(
+                thinking_budget=0,
+                include_thoughts=False,
+            )
+
+    return None
+
+
 class GeminiAdapter(BaseAIAdapter):
     """Adapter for Google Gemini using the google-genai SDK."""
 
@@ -72,6 +171,7 @@ class GeminiAdapter(BaseAIAdapter):
         temperature: float = 0.2,
         max_tokens: int | None = None,
         api_key: str | None = None,
+        task: Any = None,
         **kwargs: Any,
     ) -> str:
         from google import genai
@@ -85,11 +185,34 @@ class GeminiAdapter(BaseAIAdapter):
         if max_tokens:
             config_kwargs["max_output_tokens"] = max_tokens
 
-        resp = client.models.generate_content(
+        thinking_cfg = _build_gemini_thinking_config(
             model=target_model,
-            contents=prompt,
-            config=genai.types.GenerateContentConfig(**config_kwargs),
+            task=task or kwargs.get("task"),
+            explicit_thinking_config=kwargs.get("thinking_config"),
+            thinking_level=kwargs.get("thinking_level"),
+            thinking_budget=kwargs.get("thinking_budget"),
         )
+        if thinking_cfg is not None:
+            config_kwargs["thinking_config"] = thinking_cfg
+
+        try:
+            resp = client.models.generate_content(
+                model=target_model,
+                contents=prompt,
+                config=genai.types.GenerateContentConfig(**config_kwargs),
+            )
+        except Exception as exc:
+            exc_str = str(exc).lower()
+            if "thinking" in exc_str and ("not supported" in exc_str or "invalid" in exc_str):
+                logger.warning("Gemini thinking_config not supported for model %s; retrying without it...", target_model)
+                config_kwargs.pop("thinking_config", None)
+                resp = client.models.generate_content(
+                    model=target_model,
+                    contents=prompt,
+                    config=genai.types.GenerateContentConfig(**config_kwargs),
+                )
+            else:
+                raise
         return resp.text or ""
 
     def generate_structured(
@@ -102,6 +225,7 @@ class GeminiAdapter(BaseAIAdapter):
         temperature: float = 0.1,
         max_tokens: int | None = None,
         api_key: str | None = None,
+        task: Any = None,
         **kwargs: Any,
     ) -> T:
         import json
@@ -119,6 +243,16 @@ class GeminiAdapter(BaseAIAdapter):
         if max_tokens:
             config_kwargs["max_output_tokens"] = max_tokens
 
+        thinking_cfg = _build_gemini_thinking_config(
+            model=target_model,
+            task=task or kwargs.get("task"),
+            explicit_thinking_config=kwargs.get("thinking_config"),
+            thinking_level=kwargs.get("thinking_level"),
+            thinking_budget=kwargs.get("thinking_budget"),
+        )
+        if thinking_cfg is not None:
+            config_kwargs["thinking_config"] = thinking_cfg
+
         if hasattr(schema, "model_json_schema"):
             try:
                 config_kwargs["response_schema"] = _clean_schema_for_gemini(schema.model_json_schema())
@@ -134,7 +268,16 @@ class GeminiAdapter(BaseAIAdapter):
                 config=genai.types.GenerateContentConfig(**config_kwargs),
             )
         except Exception as exc:
-            if "additionalProperties" in str(exc) or "schema" in str(exc).lower():
+            exc_str = str(exc).lower()
+            if "thinking" in exc_str and ("not supported" in exc_str or "invalid" in exc_str):
+                logger.warning("Gemini thinking_config not supported for model %s; retrying without it...", target_model)
+                config_kwargs.pop("thinking_config", None)
+                resp = client.models.generate_content(
+                    model=target_model,
+                    contents=prompt,
+                    config=genai.types.GenerateContentConfig(**config_kwargs),
+                )
+            elif "additionalproperties" in exc_str or "schema" in exc_str:
                 logger.warning("Gemini response_schema failed (%s); retrying with JSON mode fallback...", exc)
                 config_kwargs.pop("response_schema", None)
                 schema_json = json.dumps(schema.model_json_schema()) if hasattr(schema, "model_json_schema") else ""
