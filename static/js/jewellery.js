@@ -80,41 +80,69 @@
   // Shows a brief "processing" spinner, then reveals the selected image —
   // mimicking the feel of the server receiving the upload.
   function handlePhotoSelect(input, previewContainerId, previewImgId, uploadBoxId) {
-    var file = input.files[0];
+    var file = input && input.files ? input.files[0] : null;
     var container = document.getElementById(previewContainerId);
     var box = document.getElementById(uploadBoxId);
     var img = document.getElementById(previewImgId);
-    var loader = container.querySelector('[data-photo-loader]');
+    var loader = container ? container.querySelector('[data-photo-loader]') : null;
 
     if (!file) {
-      container.classList.add('hidden');
-      box.classList.remove('hidden');
+      if (container) container.classList.add('hidden');
+      if (box) box.classList.remove('hidden');
+      if (img) img.removeAttribute('src');
       return;
     }
 
-    box.classList.add('hidden');
-    container.classList.remove('hidden');
-    img.classList.add('opacity-0');
+    var allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!file.type || allowedTypes.indexOf(file.type.toLowerCase()) === -1) {
+      if (input) input.value = '';
+      if (container) container.classList.add('hidden');
+      if (box) box.classList.remove('hidden');
+      if (img) img.removeAttribute('src');
+      return;
+    }
+
+    if (box) box.classList.add('hidden');
+    if (container) container.classList.remove('hidden');
+    if (img) img.classList.add('opacity-0');
     if (loader) loader.classList.remove('hidden');
 
-    var objectUrl = URL.createObjectURL(file);
     var started = Date.now();
+    var reader = new FileReader();
 
-    img.onload = function () {
-      // Keep the spinner visible for at least ~550ms so it reads as work.
-      var wait = Math.max(0, 550 - (Date.now() - started));
-      setTimeout(function () {
+    reader.onload = function (e) {
+      var result = e.target && e.target.result;
+      var isSafeDataUrl = typeof result === 'string' && (
+        result.indexOf('data:image/jpeg;base64,') === 0 ||
+        result.indexOf('data:image/png;base64,') === 0 ||
+        result.indexOf('data:image/webp;base64,') === 0
+      ) && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=\s]+$/.test(result);
+
+      if (isSafeDataUrl) {
+        var wait = Math.max(0, 550 - (Date.now() - started));
+        setTimeout(function () {
+          if (loader) loader.classList.add('hidden');
+          if (img) {
+            img.src = result;
+            img.classList.remove('opacity-0');
+          }
+        }, wait);
+      } else {
         if (loader) loader.classList.add('hidden');
-        img.classList.remove('opacity-0');
-        URL.revokeObjectURL(objectUrl);
-      }, wait);
+        if (box) box.classList.remove('hidden');
+        if (container) container.classList.add('hidden');
+        if (img) img.removeAttribute('src');
+      }
     };
-    img.onerror = function () {
+
+    reader.onerror = function () {
       if (loader) loader.classList.add('hidden');
-      img.classList.remove('opacity-0');
-      URL.revokeObjectURL(objectUrl);
+      if (box) box.classList.remove('hidden');
+      if (container) container.classList.add('hidden');
+      if (img) img.removeAttribute('src');
     };
-    img.src = objectUrl;
+
+    reader.readAsDataURL(file);
   }
 
   // ── Grid pagination ──────────────────────────────────────────────
