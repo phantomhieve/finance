@@ -18,9 +18,17 @@ ROUND2 = Decimal('0.01')
 def safe_redirect(request, fallback='dashboard'):
     """Redirect to the `next` POST/GET param only if it's a safe, same-host URL."""
     target = request.POST.get('next') or request.GET.get('next', '')
-    if target and url_has_allowed_host_and_scheme(target, allowed_hosts={request.get_host()}):
+    allowed_hosts = {request.get_host()}
+    if target and url_has_allowed_host_and_scheme(target, allowed_hosts=allowed_hosts):
         return redirect(target)
-    return redirect(fallback)
+    if fallback and isinstance(fallback, str) and url_has_allowed_host_and_scheme(fallback, allowed_hosts=allowed_hosts):
+        return redirect(fallback)
+    if fallback and isinstance(fallback, str) and not fallback.startswith(('/', 'http://', 'https://', '//', '\\')):
+        try:
+            return redirect(fallback)
+        except Exception:
+            pass
+    return redirect('dashboard')
 
 
 

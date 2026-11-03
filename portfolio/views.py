@@ -10,7 +10,6 @@ from urllib.parse import quote
 
 from django.conf import settings
 from django.db import transaction
-from django.urls import reverse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -743,24 +742,22 @@ def save_pf_fy_entry(request):
     """Create or update PF contribution & interest entries for a Financial Year."""
     group = _user_group(request)
     if not group:
-        return redirect('pf_detail')
+        return _safe_redirect(request, fallback='pf_detail')
 
     account_name = (request.POST.get('account_name') or 'Atul').strip()
     if not account_name:
         messages.error(request, "Account holder name is required.")
-        return redirect('pf_detail')
+        return _safe_redirect(request, fallback='pf_detail')
 
-    orig_member = (request.POST.get('orig_member') or account_name).strip()
+    action_type = (request.POST.get('action_type') or '').strip().lower()
+    orig_member = (request.POST.get('orig_member') or '').strip()
+    orig_fy_year_raw = (request.POST.get('orig_fy_year') or '').strip()
+    is_edit = (action_type == 'edit') or bool(orig_member and orig_fy_year_raw)
 
     try:
         fy_year = int(request.POST.get('fy_year'))
     except (TypeError, ValueError):
         fy_year = fy_start_year()
-
-    try:
-        orig_fy_year = int(request.POST.get('orig_fy_year'))
-    except (TypeError, ValueError):
-        orig_fy_year = fy_year
 
     contrib_val = _parse_inr(request.POST.get('contribution'))
     interest_val = _parse_inr(request.POST.get('interest'))
@@ -768,43 +765,96 @@ def save_pf_fy_entry(request):
     is_baby = request.POST.get('is_baby') in ('true', 'True', '1', 'on')
 
     with transaction.atomic():
-        existing = PFEntry.objects.filter(
-            group=group,
-            account_name__iexact=orig_member,
-            fy_year=orig_fy_year,
-            is_baby=is_baby,
-        ).first()
+        if is_edit:
+            try:
+                orig_fy_year = int(orig_fy_year_raw)
+            except (TypeError, ValueError):
+                orig_fy_year = fy_year
 
-        if existing:
-            existing.account_name = account_name
-            existing.fy_year = fy_year
-            existing.financial_year = fy_label(fy_year)
-            existing.date = datetime.date(fy_year, 4, 1)
-            existing.contribution = contrib_val
-            existing.interest = interest_val
-            existing.remarks = remarks
-            existing.is_baby = is_baby
-            existing.save()
-        else:
-            PFEntry.objects.update_or_create(
+            existing = PFEntry.objects.filter(
                 group=group,
-                account_name=account_name,
+                account_name__iexact=orig_member or account_name,
+                fy_year=orig_fy_year,
+                is_baby=is_baby,
+            ).first()
+
+            if existing:
+                # If changing member or year, guard against collision with an existing record
+                if (account_name.lower() != (orig_member or account_name).lower()) or (fy_year != orig_fy_year):
+                    collision = PFEntry.objects.filter(
+                        group=group,
+                        account_name__iexact=account_name,
+                        fy_year=fy_year,
+                        is_baby=is_baby,
+                    ).exclude(pk=existing.pk).first()
+                    if collision:
+                        messages.error(
+                            request,
+                            f"An entry for {account_name} ({fy_label(fy_year)}) already exists."
+                        )
+                        return _safe_redirect(request, fallback='pf_detail')
+
+                existing.account_name = account_name
+                existing.fy_year = fy_year
+                existing.financial_year = fy_label(fy_year)
+                existing.date = datetime.date(fy_year, 4, 1)
+                existing.contribution = contrib_val
+                existing.interest = interest_val
+                existing.remarks = remarks
+                existing.is_baby = is_baby
+                existing.save()
+                messages.success(request, f"PF for {account_name} ({fy_label(fy_year)}) updated successfully.")
+            else:
+                PFEntry.objects.update_or_create(
+                    group=group,
+                    account_name=account_name,
+                    fy_year=fy_year,
+                    is_baby=is_baby,
+                    defaults={
+                        'financial_year': fy_label(fy_year),
+                        'date': datetime.date(fy_year, 4, 1),
+                        'contribution': contrib_val,
+                        'interest': interest_val,
+                        'remarks': remarks,
+                    },
+                )
+                messages.success(request, f"PF for {account_name} ({fy_label(fy_year)}) saved successfully.")
+        else:
+            # ADD mode: if record already exists for this member/FY, ACCUMULATE without wiping old data
+            existing = PFEntry.objects.filter(
+                group=group,
+                account_name__iexact=account_name,
                 fy_year=fy_year,
                 is_baby=is_baby,
-                defaults={
-                    'financial_year': fy_label(fy_year),
-                    'date': datetime.date(fy_year, 4, 1),
-                    'contribution': contrib_val,
-                    'interest': interest_val,
-                    'remarks': remarks,
-                },
-            )
+            ).first()
 
-    messages.success(request, f"PF for {account_name} ({fy_label(fy_year)}) saved successfully.")
-    next_url = request.POST.get('next')
-    if next_url:
-        return safe_redirect(request, next_url)
-    return redirect(f"{reverse('pf_detail')}?member={quote(account_name)}")
+            if existing:
+                existing.contribution = (existing.contribution or Decimal('0')) + contrib_val
+                existing.interest = (existing.interest or Decimal('0')) + interest_val
+                if remarks:
+                    existing.remarks = f"{existing.remarks} · {remarks}" if existing.remarks else remarks
+                existing.save()
+                messages.success(
+                    request,
+                    f"Added to existing PF for {account_name} ({fy_label(fy_year)}) — "
+                    f"Contribution: +₹{contrib_val:,.0f} (Total: ₹{existing.contribution:,.0f}), "
+                    f"Interest: +₹{interest_val:,.0f} (Total: ₹{existing.interest:,.0f})."
+                )
+            else:
+                PFEntry.objects.create(
+                    group=group,
+                    account_name=account_name,
+                    fy_year=fy_year,
+                    financial_year=fy_label(fy_year),
+                    date=datetime.date(fy_year, 4, 1),
+                    contribution=contrib_val,
+                    interest=interest_val,
+                    remarks=remarks,
+                    is_baby=is_baby,
+                )
+                messages.success(request, f"PF entry for {account_name} ({fy_label(fy_year)}) created successfully.")
+
+    return _safe_redirect(request, fallback='pf_detail')
 
 
 @login_required
@@ -814,18 +864,18 @@ def delete_pf_fy_entry(request):
     """Delete PF entry for a member in a specific FY."""
     group = _user_group(request)
     if not group:
-        return redirect('pf_detail')
+        return _safe_redirect(request, fallback='pf_detail')
 
     account_name = (request.POST.get('account_name') or '').strip()
     if not account_name:
         messages.error(request, "Account holder name is required.")
-        return redirect('pf_detail')
+        return _safe_redirect(request, fallback='pf_detail')
 
     try:
         fy_year = int(request.POST.get('fy_year'))
     except (TypeError, ValueError):
         messages.error(request, "Invalid Financial Year.")
-        return redirect('pf_detail')
+        return _safe_redirect(request, fallback='pf_detail')
 
     PFEntry.objects.filter(
         group=group,
@@ -834,10 +884,7 @@ def delete_pf_fy_entry(request):
     ).delete()
 
     messages.success(request, f"Deleted PF entry for {account_name} ({fy_label(fy_year)}).")
-    next_url = request.POST.get('next')
-    if next_url:
-        return safe_redirect(request, next_url)
-    return redirect(f"{reverse('pf_detail')}?member={quote(account_name)}")
+    return _safe_redirect(request, fallback='pf_detail')
 
 
 @login_required
