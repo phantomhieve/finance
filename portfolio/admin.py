@@ -49,11 +49,11 @@ class EPFEntryAdmin(ModelAdmin):
 
 @admin.register(PFEntry)
 class PFEntryAdmin(ModelAdmin):
-    list_display = ('account_name', 'date', 'entry_type', 'amount', 'is_baby', 'group', 'remarks')
-    list_filter = ('account_name', 'entry_type', 'is_baby', 'group')
+    list_display = ('account_name', 'financial_year', 'contribution', 'interest', 'is_baby', 'group', 'remarks')
+    list_filter = ('account_name', 'financial_year', 'is_baby', 'group')
     list_select_related = ('group',)
-    search_fields = ('account_name', 'remarks')
-    ordering = ('-date',)
+    search_fields = ('account_name', 'financial_year', 'remarks')
+    ordering = ('-fy_year', '-date')
 
 
 @admin.register(NPSEntry)

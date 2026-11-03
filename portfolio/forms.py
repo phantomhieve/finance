@@ -27,19 +27,22 @@ class EPFEntryForm(forms.ModelForm):
 class PFEntryForm(forms.ModelForm):
     class Meta:
         model = PFEntry
-        fields = ['account_name', 'date', 'entry_type', 'amount', 'is_baby', 'remarks']
+        fields = ['account_name', 'fy_year', 'contribution', 'interest', 'remarks', 'is_baby']
         widgets = {
             'account_name': forms.TextInput(attrs={
                 'placeholder': 'e.g. Atul, Kanika',
                 'list': 'pfMemberList',
                 'autocomplete': 'off',
             }),
-            'date': forms.DateInput(attrs={'type': 'date'}),
-            'entry_type': forms.Select(),
-            'amount': forms.NumberInput(attrs={'step': '0.01', 'placeholder': '0.00'}),
-            'is_baby': forms.CheckboxInput(attrs={'class': 'checkbox checkbox-sm checkbox-primary'}),
+            'fy_year': forms.Select(),
+            'contribution': forms.NumberInput(attrs={'step': '0.01', 'placeholder': '0.00'}),
+            'interest': forms.NumberInput(attrs={'step': '0.01', 'placeholder': '0.00'}),
             'remarks': forms.TextInput(attrs={'placeholder': 'Optional'}),
+            'is_baby': forms.CheckboxInput(attrs={'class': 'checkbox checkbox-sm checkbox-primary'}),
         }
+
+
+PFFinancialYearForm = PFEntryForm
 
 
 class NPSEntryForm(forms.ModelForm):

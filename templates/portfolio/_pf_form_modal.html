@@ -1,60 +1,91 @@
 <dialog class="modal modal-bottom sm:modal-middle" id="addPfModal">
-  <div class="modal-box max-w-md w-full max-h-[90vh] overflow-y-auto overscroll-contain">
+  <div class="modal-box max-w-lg w-full max-h-[90vh] overflow-y-auto overscroll-contain">
     <div class="flex items-start justify-between gap-2 mb-4">
       <h3 id="pfModalTitle" class="font-bold text-lg flex items-center gap-2">
-        <span class="material-symbols-outlined text-primary">savings</span> Add PF Entry
+        <span class="material-symbols-outlined text-primary">add_circle</span> Add PF Entry
       </h3>
       <button type="button" class="btn btn-ghost btn-xs btn-square" onclick="closeModal('addPfModal')" aria-label="Close">
         <span class="material-symbols-outlined">close</span>
       </button>
     </div>
-    <form id="pfForm" method="post" action="{% url 'add_pf_entry' %}" data-add-url="{% url 'add_pf_entry' %}" data-edit-url="{% url 'edit_pf_entry' pk=0 %}" data-delete-url="{% url 'delete_pf_entry' pk=0 %}">{% csrf_token %}
+
+    <form id="pfForm" method="post" action="{% url 'save_pf_fy_entry' %}">{% csrf_token %}
       <input type="hidden" name="next" value="{{ request.get_full_path }}">
-      <div class="space-y-3">
+      <input type="hidden" name="orig_member" id="pfOrigMember" value="">
+      <input type="hidden" name="orig_fy_year" id="pfOrigYear" value="">
+
+      <div class="space-y-3.5">
+        {# Family Member #}
         <div class="form-field">
           <div class="flex items-center justify-between gap-2 mb-1">
             <label class="label text-xs font-semibold p-0">Family Member / Account</label>
-            <div class="flex flex-wrap gap-1" id="pfMemberQuickPills">
+            <div class="flex flex-wrap gap-1">
               {% for m_name in pf_member_names|default:'' %}
-              <button type="button" class="badge badge-sm badge-outline hover:badge-primary cursor-pointer transition-colors" onclick="var inp = document.querySelector('#pfForm [name=account_name]'); if (inp) { inp.value = '{{ m_name|escapejs }}'; inp.focus(); }">{{ m_name }}</button>
+              <button type="button" class="badge badge-sm badge-outline hover:badge-primary cursor-pointer transition-colors" onclick="setPfMember('{{ m_name|escapejs }}')">{{ m_name }}</button>
               {% empty %}
-              <button type="button" class="badge badge-sm badge-outline hover:badge-primary cursor-pointer transition-colors" onclick="var inp = document.querySelector('#pfForm [name=account_name]'); if (inp) { inp.value = 'Atul'; }">Atul</button>
-              <button type="button" class="badge badge-sm badge-outline hover:badge-primary cursor-pointer transition-colors" onclick="var inp = document.querySelector('#pfForm [name=account_name]'); if (inp) { inp.value = 'Kanika'; }">Kanika</button>
+              <button type="button" class="badge badge-sm badge-outline hover:badge-primary cursor-pointer transition-colors" onclick="setPfMember('Atul')">Atul</button>
+              <button type="button" class="badge badge-sm badge-outline hover:badge-primary cursor-pointer transition-colors" onclick="setPfMember('Kanika')">Kanika</button>
               {% endfor %}
             </div>
           </div>
-          {{ form_obj.account_name }}
+          <input type="text" name="account_name" id="pfAccountName" class="input input-sm input-bordered w-full" placeholder="e.g. Atul, Kanika" list="pfMemberList" autocomplete="off" required>
           <datalist id="pfMemberList">
             {% for m_name in pf_member_names %}
             <option value="{{ m_name }}"></option>
             {% endfor %}
           </datalist>
         </div>
+
+        {# Financial Year #}
+        <div class="form-field">
+          <label class="label text-xs font-semibold pb-1">Financial Year</label>
+          <select name="fy_year" id="pfYearSelect" class="select select-sm select-bordered w-full font-medium" required>
+            {% for opt in fy_options %}
+            <option value="{{ opt.year }}" {% if opt.is_current %}selected{% endif %}>
+              {{ opt.label }}{% if opt.is_current %} (Current FY){% endif %}
+            </option>
+            {% empty %}
+            <option value="2026">FY 2026-27 (Current FY)</option>
+            <option value="2025" selected>FY 2025-26</option>
+            <option value="2024">FY 2024-25</option>
+            <option value="2023">FY 2023-24</option>
+            <option value="2022">FY 2022-23</option>
+            <option value="2021">FY 2021-22</option>
+            <option value="2020">FY 2020-21</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        {# Contribution & Interest #}
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div class="form-field">
-            <label class="label text-xs font-semibold">Date</label>
-            {{ form_obj.date }}
+            <label class="label text-xs font-semibold pb-1">Contribution (₹)</label>
+            <input type="number" name="contribution" id="pfContribution" step="0.01" min="0" class="input input-sm input-bordered w-full font-semibold" placeholder="0.00">
           </div>
           <div class="form-field">
-            <label class="label text-xs font-semibold">Type</label>
-            {{ form_obj.entry_type }}
+            <label class="label text-xs font-semibold pb-1 text-success">Interest Earned (₹)</label>
+            <input type="number" name="interest" id="pfInterest" step="0.01" min="0" class="input input-sm input-bordered w-full font-semibold text-success" placeholder="0.00">
           </div>
         </div>
+
+        {# Remarks #}
         <div class="form-field">
-          <label class="label text-xs font-semibold">Amount (₹)</label>
-          {{ form_obj.amount }}
+          <label class="label text-xs font-semibold pb-1">Remarks <span class="opacity-40 font-normal">optional</span></label>
+          <input type="text" name="remarks" id="pfRemarks" class="input input-sm input-bordered w-full" placeholder="e.g. Annual credit">
         </div>
-        <div class="form-field">
-          <label class="label text-xs font-semibold">Remarks <span class="opacity-40 font-normal">optional</span></label>
-          {{ form_obj.remarks }}
-        </div>
+
+        {# Child Portfolio #}
         <div class="form-field flex flex-row items-center gap-2.5 pt-1">
-          {{ form_obj.is_baby }}
-          <label class="label text-xs font-semibold cursor-pointer p-0" for="{{ form_obj.is_baby.id_for_label }}">Track in Child Portfolio</label>
+          <input type="checkbox" name="is_baby" id="pfIsBaby" class="checkbox checkbox-sm checkbox-primary">
+          <label class="label text-xs font-semibold cursor-pointer p-0" for="pfIsBaby">
+            Track in Child Portfolio
+          </label>
         </div>
       </div>
-      <div class="modal-action flex-wrap gap-2 mt-6">
-        <button type="button" id="pfDeleteBtn" class="btn btn-error btn-sm gap-1 mr-auto hidden" onclick="confirmDelete('deletePfForm')">
+
+      {# Actions #}
+      <div class="modal-action flex-wrap items-center gap-2 mt-6">
+        <button type="button" id="pfDeleteBtn" class="btn btn-error btn-sm gap-1 mr-auto hidden" onclick="confirmDeletePf()">
           <span class="material-symbols-outlined text-base">delete</span>Delete
         </button>
         <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addPfModal')">Cancel</button>
@@ -63,8 +94,13 @@
         </button>
       </div>
     </form>
-    <form id="deletePfForm" method="post" action="" class="hidden">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form>
+
+    <form id="deletePfForm" method="post" action="{% url 'delete_pf_fy_entry' %}" class="hidden">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <input type="hidden" name="account_name" id="delPfAccount" value="">
+      <input type="hidden" name="fy_year" id="delPfYear" value="">
+    </form>
   </div>
   <form method="dialog" class="modal-backdrop"><button>close</button></form>
 </dialog>
-

@@ -36,6 +36,8 @@ urlpatterns = [
     path('pf/add/', views.add_pf_entry, name='add_pf_entry'),
     path('pf/<int:pk>/edit/', views.edit_pf_entry, name='edit_pf_entry'),
     path('pf/<int:pk>/delete/', views.delete_pf_entry, name='delete_pf_entry'),
+    path('pf/fy/save/', views.save_pf_fy_entry, name='save_pf_fy_entry'),
+    path('pf/fy/delete/', views.delete_pf_fy_entry, name='delete_pf_fy_entry'),
 
     # NPS
     path('nps/add/', views.add_nps_entry, name='add_nps_entry'),

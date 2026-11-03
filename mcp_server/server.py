@@ -1471,66 +1471,134 @@ def update_epf_entry(
 @mcp.tool()
 def add_pf_entry(
     account_name: str,
-    date: str,
-    amount: str,
+    financial_year: str = "",
+    contribution: str = "0",
+    interest: str = "0",
+    date: str = "",
+    amount: str = "",
     entry_type: str = "CONTRIBUTION",
     remarks: str = "",
     is_baby: bool = False,
 ) -> str:
-    """Add a PF (Provident Fund / PPF) contribution or interest entry for a family member.
+    """Add a PF (Provident Fund / PPF) annual entry for a family member.
 
     Args:
         account_name: Family member / PF account holder name (e.g. 'Atul', 'Kanika')
-        date: Entry date in YYYY-MM-DD format
-        amount: Amount in INR
-        entry_type: CONTRIBUTION or INTEREST (default: CONTRIBUTION)
+        financial_year: Financial year label (e.g. 'FY 2025-26') or leave empty to auto-derive from date
+        contribution: Annual contribution in INR (e.g. '150000')
+        interest: Annual interest earned in INR (e.g. '79385')
+        date: Entry date in YYYY-MM-DD format (optional; defaults to 1 April of FY)
+        amount: Legacy parameter for backwards compatibility (used if contribution/interest not provided)
+        entry_type: Legacy parameter: CONTRIBUTION or INTEREST (default: CONTRIBUTION)
         remarks: Optional remarks
         is_baby: Track in Child portfolio (default: False)
     """
     group = _get_group()
-    if entry_type.upper() not in ('CONTRIBUTION', 'INTEREST'):
-        return "Error: entry_type must be CONTRIBUTION or INTEREST"
     clean_member = (account_name or "").strip()
     if not clean_member:
         return "Error: account_name is required (e.g. 'Atul', 'Kanika')"
 
-    entry = PFEntry(
+    import datetime
+    import re
+    from pftracker.utils import fy_start_year, fy_label
+
+    entry_date = _parse_date(date) if date else None
+    fy_y = 0
+    fy_str = (financial_year or "").strip().upper()
+    if fy_str:
+        match = re.search(r'(\d{4})', fy_str)
+        if match:
+            fy_y = int(match.group(1))
+            fy_str = fy_label(fy_y)
+    elif entry_date:
+        fy_y = fy_start_year(entry_date)
+        fy_str = fy_label(fy_y)
+    else:
+        today = datetime.date.today()
+        fy_y = fy_start_year(today)
+        fy_str = fy_label(fy_y)
+
+    if not entry_date and fy_y:
+        entry_date = datetime.date(fy_y, 4, 1)
+
+    c_val = _parse_decimal(contribution) if contribution else Decimal('0')
+    i_val = _parse_decimal(interest) if interest else Decimal('0')
+
+    # Handle legacy amount & entry_type if contribution and interest are zero/empty
+    if amount and c_val == 0 and i_val == 0:
+        leg_amt = _parse_decimal(amount)
+        if entry_type.upper() == 'INTEREST':
+            i_val = leg_amt
+        else:
+            c_val = leg_amt
+
+    entry, created = PFEntry.objects.get_or_create(
         group=group,
         account_name=clean_member,
-        date=_parse_date(date),
-        amount=_parse_decimal(amount),
-        entry_type=entry_type.upper(),
-        remarks=remarks,
+        fy_year=fy_y,
         is_baby=bool(is_baby),
+        defaults={
+            'financial_year': fy_str,
+            'date': entry_date,
+            'contribution': c_val,
+            'interest': i_val,
+            'remarks': remarks,
+        }
     )
-    entry.save()
-    log_create(entry, 'add_pf_entry')
-    return _to_json({
-        'status': 'created',
-        'id': entry.id,
-        'account_name': entry.account_name,
-        'summary': str(entry),
-    })
+    if not created:
+        old_data = serialize_instance(entry)
+        if c_val:
+            entry.contribution = c_val
+        if i_val:
+            entry.interest = i_val
+        if remarks:
+            entry.remarks = remarks
+        if entry_date:
+            entry.date = entry_date
+        entry.save()
+        log_update(entry, old_data, 'add_pf_entry')
+        return _to_json({
+            'status': 'updated',
+            'id': entry.id,
+            'account_name': entry.account_name,
+            'financial_year': entry.financial_year,
+            'summary': str(entry),
+        })
+    else:
+        log_create(entry, 'add_pf_entry')
+        return _to_json({
+            'status': 'created',
+            'id': entry.id,
+            'account_name': entry.account_name,
+            'financial_year': entry.financial_year,
+            'summary': str(entry),
+        })
 
 
 @mcp.tool()
 def update_pf_entry(
     entry_id: int,
     account_name: str = "",
-    amount: str = "",
+    financial_year: str = "",
+    contribution: str = "",
+    interest: str = "",
     date: str = "",
+    amount: str = "",
     entry_type: str = "",
     remarks: str = "",
     is_baby: bool = None,
 ) -> str:
-    """Update an existing PF (Provident Fund / PPF) entry.
+    """Update an existing PF (Provident Fund / PPF) annual entry.
 
     Args:
         entry_id: ID of the PF entry
         account_name: Updated family member name (e.g. 'Atul', 'Kanika') (optional)
-        amount: New amount in INR (optional)
+        financial_year: Updated financial year label (e.g. 'FY 2025-26') (optional)
+        contribution: Updated annual contribution in INR (optional)
+        interest: Updated annual interest in INR (optional)
         date: New date in YYYY-MM-DD format (optional)
-        entry_type: CONTRIBUTION or INTEREST (optional)
+        amount: Legacy amount parameter (optional)
+        entry_type: Legacy entry_type parameter ('CONTRIBUTION' or 'INTEREST') (optional)
         remarks: Updated remarks (optional)
         is_baby: Move to/from Child portfolio (optional)
     """
@@ -1543,15 +1611,26 @@ def update_pf_entry(
     old_data = serialize_instance(entry)
     if account_name and account_name.strip():
         entry.account_name = account_name.strip()
+    if financial_year and financial_year.strip():
+        from pftracker.utils import fy_label
+        import re
+        match = re.search(r'(\d{4})', financial_year.strip())
+        if match:
+            entry.fy_year = int(match.group(1))
+            entry.financial_year = fy_label(entry.fy_year)
+    if contribution:
+        entry.contribution = _parse_decimal(contribution)
+    if interest:
+        entry.interest = _parse_decimal(interest)
     if amount:
-        entry.amount = _parse_decimal(amount)
+        amt = _parse_decimal(amount)
+        if entry_type and entry_type.upper() == 'INTEREST':
+            entry.interest = amt
+        else:
+            entry.contribution = amt
     if date:
         entry.date = _parse_date(date)
-    if entry_type:
-        if entry_type.upper() not in ('CONTRIBUTION', 'INTEREST'):
-            return "Error: entry_type must be CONTRIBUTION or INTEREST"
-        entry.entry_type = entry_type.upper()
-    if remarks:
+    if remarks is not None and remarks != "":
         entry.remarks = remarks
     if is_baby is not None:
         entry.is_baby = bool(is_baby)
@@ -1562,6 +1641,7 @@ def update_pf_entry(
         'status': 'updated',
         'id': entry.id,
         'account_name': entry.account_name,
+        'financial_year': entry.financial_year,
         'summary': str(entry),
     })
 

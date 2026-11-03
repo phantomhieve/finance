@@ -999,30 +999,24 @@ class PFEntryTests(TestCase):
         from portfolio.models import PFEntry
 
         # Add PF entry for Atul via UI
-        resp = self.client.post(reverse('add_pf_entry'), {
+        resp = self.client.post(reverse('save_pf_fy_entry'), {
             'account_name': 'Atul',
-            'date': '2026-04-05',
-            'entry_type': 'CONTRIBUTION',
-            'amount': '150000.00',
+            'fy_year': '2026',
+            'contribution': '150000.00',
+            'interest': '25000.00',
             'remarks': 'FY27 PPF Deposit',
         })
         self.assertEqual(resp.status_code, 302)
 
-        # Add PF interest for Atul and contribution for Kanika
-        PFEntry.objects.create(
-            group=self.group,
-            account_name='Atul',
-            date=datetime.date(2026, 3, 31),
-            entry_type='INTEREST',
-            amount=Decimal('25000.00'),
-            remarks='Annual Interest',
-        )
+        # Add PF for Kanika
         PFEntry.objects.create(
             group=self.group,
             account_name='Kanika',
+            fy_year=2026,
+            financial_year='FY 2026-27',
             date=datetime.date(2026, 4, 10),
-            entry_type='CONTRIBUTION',
-            amount=Decimal('150000.00'),
+            contribution=Decimal('150000.00'),
+            interest=Decimal('0.00'),
             remarks='Kanika PPF',
         )
 
@@ -1084,6 +1078,92 @@ class PFEntryTests(TestCase):
         # Delete via MCP delete_record
         del_res = json.loads(mcp_srv.delete_record('portfolio.PFEntry', entry_id))
         self.assertEqual(del_res['status'], 'deleted')
+
+    def test_pf_fy_breakdown_and_crud(self):
+        from portfolio.models import PFEntry
+        from portfolio.services import get_pf_fy_breakdown
+
+        # 1. Save FY 2024-25 for Atul via save_pf_fy_entry
+        resp = self.client.post(reverse('save_pf_fy_entry'), {
+            'account_name': 'Atul',
+            'fy_year': '2024',
+            'contribution': '150000.00',
+            'interest': '79385.00',
+            'remarks': 'FY25 Credit',
+        })
+        self.assertEqual(resp.status_code, 302)
+
+        # Verify 1 entry created per member/FY
+        entries_fy24 = list(PFEntry.objects.filter(group=self.group, account_name='Atul'))
+        self.assertEqual(len(entries_fy24), 1)
+        self.assertEqual(entries_fy24[0].contribution, Decimal('150000.00'))
+        self.assertEqual(entries_fy24[0].interest, Decimal('79385.00'))
+        self.assertEqual(entries_fy24[0].date, datetime.date(2024, 4, 1))
+
+        # 2. Save FY 2025-26 for Atul
+        resp = self.client.post(reverse('save_pf_fy_entry'), {
+            'account_name': 'Atul',
+            'fy_year': '2025',
+            'contribution': '100000.00',
+            'interest': '91825.00',
+            'remarks': 'FY26 Credit',
+        })
+        self.assertEqual(resp.status_code, 302)
+
+        # 3. Test get_pf_fy_breakdown calculation
+        breakdown = get_pf_fy_breakdown(self.group, selected_member='Atul')
+        self.assertEqual(len(breakdown), 2)
+
+        # Latest FY is first: FY 2025-26
+        fy25 = breakdown[0]
+        self.assertEqual(fy25['fy_year'], 2025)
+        self.assertEqual(fy25['opening_balance'], Decimal('229385.00'))
+        self.assertEqual(fy25['contribution'], Decimal('100000.00'))
+        self.assertEqual(fy25['interest'], Decimal('91825.00'))
+        self.assertEqual(fy25['annual_addition'], Decimal('191825.00'))
+        self.assertEqual(fy25['closing_balance'], Decimal('421210.00'))
+
+        # Older FY: FY 2024-25
+        fy24 = breakdown[1]
+        self.assertEqual(fy24['fy_year'], 2024)
+        self.assertEqual(fy24['opening_balance'], Decimal('0.00'))
+        self.assertEqual(fy24['contribution'], Decimal('150000.00'))
+        self.assertEqual(fy24['interest'], Decimal('79385.00'))
+        self.assertEqual(fy24['closing_balance'], Decimal('229385.00'))
+
+        # 4. Update FY 2025-26 (edit existing)
+        resp = self.client.post(reverse('save_pf_fy_entry'), {
+            'account_name': 'Atul',
+            'orig_member': 'Atul',
+            'fy_year': '2025',
+            'orig_fy_year': '2025',
+            'contribution': '110000.00',
+            'interest': '95000.00',
+            'remarks': 'Updated FY26',
+        })
+        self.assertEqual(resp.status_code, 302)
+
+        # Still 2 total entries in DB (1 for FY24, 1 for FY25)
+        self.assertEqual(PFEntry.objects.filter(group=self.group).count(), 2)
+        upd_entry = PFEntry.objects.get(group=self.group, fy_year=2025)
+        self.assertEqual(upd_entry.contribution, Decimal('110000.00'))
+        self.assertEqual(upd_entry.remarks, 'Updated FY26')
+
+        # 5. Check pf_detail view context
+        detail_resp = self.client.get(reverse('pf_detail') + '?member=Atul')
+        self.assertEqual(detail_resp.status_code, 200)
+        self.assertIn('fy_entries', detail_resp.context)
+        self.assertIn('fy_options', detail_resp.context)
+        self.assertEqual(len(detail_resp.context['fy_entries']), 2)
+
+        # 6. Delete FY 2024-25 via delete_pf_fy_entry
+        del_resp = self.client.post(reverse('delete_pf_fy_entry'), {
+            'account_name': 'Atul',
+            'fy_year': '2024',
+        })
+        self.assertEqual(del_resp.status_code, 302)
+        self.assertEqual(PFEntry.objects.filter(group=self.group, fy_year=2024).count(), 0)
+        self.assertEqual(PFEntry.objects.filter(group=self.group).count(), 1)
 
 
 class WeeklyBriefCommandTests(TestCase):
