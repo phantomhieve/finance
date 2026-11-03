@@ -57,9 +57,11 @@ def _generate(
     task: TaskType = TaskType.FAST,
     temperature: float = 0.1,
     max_tokens: int | None = None,
+    model: str | None = None,
+    **kwargs: Any,
 ) -> T:
     """Execute structured generation with task-level tier routing and model override."""
-    model_override = os.environ.get("EXPENSES_GEMINI_MODEL")
+    model_override = model or os.environ.get("EXPENSES_GEMINI_MODEL")
     start_t = time.monotonic()
     preferred_node = "gemini-cloud" if gateway.node_registry.get("gemini-cloud") else None
 
@@ -72,6 +74,7 @@ def _generate(
         model=model_override,
         temperature=temperature,
         max_tokens=max_tokens,
+        **kwargs,
     )
     elapsed_ms = (time.monotonic() - start_t) * 1000.0
     logger.debug(
@@ -210,7 +213,11 @@ def match_statement_lines(items: list[dict[str, Any]]) -> dict[int, LineMatch]:
     return out
 
 
-def monthly_commentary(summary_payload: dict[str, Any]) -> dict[str, Any] | None:
+def monthly_commentary(
+    summary_payload: dict[str, Any],
+    model: str | None = "gemini-3.8-flash",
+    thinking_level: str | None = "HIGH",
+) -> dict[str, Any] | None:
     """Generate concise, grounded commentary for the monthly household digest email."""
     if not ai_available(TaskType.FAST):
         return None
@@ -223,6 +230,8 @@ def monthly_commentary(summary_payload: dict[str, Any]) -> dict[str, Any] | None
             system=MONTHLY_NOTE_SYSTEM,
             task=TaskType.FAST,
             temperature=0.2,
+            model=model,
+            thinking_level=thinking_level,
         )
     except Exception as exc:
         logger.warning("AI monthly commentary generation failed: %s", exc)

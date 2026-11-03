@@ -1,0 +1,122 @@
+{% extends "emails/_base.html" %}
+{% load indian_format %}
+
+{% block title %}Vault · {{ fy }} Land Appreciation{% endblock %}
+
+{% block preheader %}Real estate revaluation completed for {{ fy }}: {% if primary %}{{ primary.holding.name }} marked up by +{{ primary.pct|floatformat:2 }}% ({{ primary.old|inr_short }} → {{ primary.new|inr_short }}).{% else %}No pending land revaluations.{% endif %}{% endblock %}
+
+{% block eyebrow %}Real Estate · {{ fy }}{% endblock %}
+
+{% block content %}
+
+{# ── Verdict Banner ────────────────────────────────────────────── #}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+  <td style="border-radius:12px; padding:18px 20px; background-color:#ecfdf5;">
+    <p style="margin:0; font-size:11px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; color:#047857;">
+      {% if primary.is_ai %}AI Grounded Fiduciary Appraisal{% else %}Annual Land Markup{% endif %}
+    </p>
+    <p style="margin:6px 0 0 0; font-size:20px; line-height:27px; font-weight:800; color:#0f172a;">
+      {% if primary %}
+        {{ primary.holding.name }} marked up by +{{ primary.pct|floatformat:2 }}% for {{ fy }}.
+      {% else %}
+        Land holdings reviewed for {{ fy }}.
+      {% endif %}
+    </p>
+  </td>
+</tr></table>
+
+{# ── Hero Valuation Strip ─────────────────────────────────────── #}
+{% if primary %}
+<p class="em-muted" style="margin:24px 0 6px 0; font-size:13px; color:#64748b;">Appraised Carrying Value (as of {{ as_of }})</p>
+<p class="em-hero em-text num" style="margin:0; font-size:38px; line-height:44px; font-weight:800; color:#0f172a; letter-spacing:-0.5px;">{{ primary.new|inr }}</p>
+<p style="margin:10px 0 0 0; font-size:14px; line-height:20px;">
+  <span class="num" style="display:inline-block; padding:3px 10px; border-radius:999px; font-weight:700; background-color:#ecfdf5; color:#047857;">
+    &#9650; +{{ primary.gain|inr_short }} (+{{ primary.pct|floatformat:2 }}%)
+  </span>
+  <span class="em-muted" style="color:#64748b;">&nbsp;from {{ primary.old|inr_short }} carrying value</span>
+</p>
+
+{# ── Asset Details ────────────────────────────────────────────── #}
+{% include "emails/_section.html" with title="Asset Profile" %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr>
+    <td class="em-muted em-line" style="padding:9px 0; font-size:14px; color:#64748b; border-bottom:1px solid #e2e8f0;">Asset</td>
+    <td class="em-text em-line" align="right" style="padding:9px 0; font-size:14px; font-weight:600; color:#0f172a; border-bottom:1px solid #e2e8f0;">{{ primary.holding.name }}</td>
+  </tr>
+  <tr>
+    <td class="em-muted em-line" style="padding:9px 0; font-size:14px; color:#64748b; border-bottom:1px solid #e2e8f0;">Micro-Market Corridor</td>
+    <td class="em-text em-line" align="right" style="padding:9px 0; font-size:14px; color:#0f172a; border-bottom:1px solid #e2e8f0;">{{ primary.holding.locality }}, {{ primary.holding.city }}</td>
+  </tr>
+  <tr>
+    <td class="em-muted em-line" style="padding:9px 0; font-size:14px; color:#64748b; border-bottom:1px solid #e2e8f0;">Plot Area</td>
+    <td class="em-text em-line num" align="right" style="padding:9px 0; font-size:14px; font-weight:600; color:#0f172a; border-bottom:1px solid #e2e8f0;">{{ primary.holding.area_value|floatformat:0 }} {{ primary.holding.area_unit }}</td>
+  </tr>
+  {% if primary.appraisal and primary.appraisal.implied_rate_per_sq_yd_inr > 0 %}
+  <tr>
+    <td class="em-muted em-line" style="padding:9px 0; font-size:14px; color:#64748b; border-bottom:1px solid #e2e8f0;">Implied Realizable Rate</td>
+    <td class="em-text em-line num" align="right" style="padding:9px 0; font-size:14px; font-weight:700; color:#0f172a; border-bottom:1px solid #e2e8f0;">{{ primary.appraisal.implied_rate_per_sq_yd_inr|inr }}/{{ primary.holding.area_unit }}</td>
+  </tr>
+  {% endif %}
+</table>
+
+{# ── Fiduciary Consensus & Methodology ─────────────────────────── #}
+{% if primary.appraisal %}
+{% include "emails/_section.html" with title="Fiduciary Valuation Architecture" %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr>
+    <td class="em-muted em-line" style="padding:9px 0; font-size:13px; color:#64748b; border-bottom:1px solid #e2e8f0;">Valuation Consensus</td>
+    <td class="em-text em-line" align="right" style="padding:9px 0; font-size:13px; font-weight:600; color:#4338ca; border-bottom:1px solid #e2e8f0;">{{ primary.appraisal.model_chain_used }}</td>
+  </tr>
+  <tr>
+    <td class="em-muted em-line" style="padding:9px 0; font-size:13px; color:#64748b; border-bottom:1px solid #e2e8f0;">Raw Market Asking Trend</td>
+    <td class="em-line num" align="right" style="padding:9px 0; font-size:13px; font-weight:600; color:#b45309; border-bottom:1px solid #e2e8f0;">+{{ primary.appraisal.raw_implied_growth_pct|floatformat:1 }}%</td>
+  </tr>
+  <tr>
+    <td class="em-muted em-line" style="padding:9px 0; font-size:13px; color:#64748b; border-bottom:1px solid #e2e8f0;">Speculative Ask Haircut (SAH)</td>
+    <td class="em-line num" align="right" style="padding:9px 0; font-size:13px; font-weight:600; color:#b91c1c; border-bottom:1px solid #e2e8f0;">-30.0% (Broker strip)</td>
+  </tr>
+  <tr>
+    <td class="em-muted em-line" style="padding:9px 0; font-size:13px; color:#64748b; border-bottom:1px solid #e2e8f0;">Illiquidity &amp; Friction Discount (IFD)</td>
+    <td class="em-line num" align="right" style="padding:9px 0; font-size:13px; font-weight:600; color:#b91c1c; border-bottom:1px solid #e2e8f0;">-15.0% (Liquidity floor)</td>
+  </tr>
+  <tr>
+    <td class="em-muted em-line" style="padding:9px 0; font-size:13px; color:#64748b; border-bottom:1px solid #e2e8f0;">Macro Growth Ceiling Guardrail</td>
+    <td class="em-text em-line num" align="right" style="padding:9px 0; font-size:13px; font-weight:600; color:#0f172a; border-bottom:1px solid #e2e8f0;">{{ primary.appraisal.max_allowable_yoy_growth_cap_pct|floatformat:1 }}% (Repo + CPI + 3%)</td>
+  </tr>
+  <tr>
+    <td class="em-text" style="padding:9px 0; font-size:14px; font-weight:700; color:#0f172a;">Recognized Ledger Growth</td>
+    <td class="em-text num" align="right" style="padding:9px 0; font-size:14px; font-weight:700; color:#047857;">+{{ primary.pct|floatformat:2 }}%</td>
+  </tr>
+</table>
+
+{# ── Growth Catalysts ─────────────────────────────────────────── #}
+{% if primary.appraisal.key_drivers %}
+{% include "emails/_section.html" with title="Regional Growth Catalysts" %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+  {% for driver in primary.appraisal.key_drivers %}
+  <tr>
+    <td style="padding:6px 0; font-size:13px; line-height:19px; color:#334155;">
+      <span style="color:#047857; font-weight:700;">&#10003;</span>&nbsp; {{ driver }}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+{# ── Audit Note Box ───────────────────────────────────────────── #}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:20px;">
+  <tr>
+    <td class="em-soft" style="background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:16px 18px;">
+      <p style="margin:0 0 6px 0; font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#64748b;">YEIDA Fiduciary Valuation Certificate</p>
+      <p style="margin:0; font-size:12px; line-height:18px; color:#475569;">{{ primary.appraisal.methodology_summary }}</p>
+    </td>
+  </tr>
+</table>
+{% endif %}
+
+{% endif %}
+
+{% endblock %}
+
+{% block cta_label %}View Real Estate Holdings{% endblock %}
+

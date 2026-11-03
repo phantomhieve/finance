@@ -1037,15 +1037,27 @@ LAND_PROPERTY_TYPES = ('PLOT_LAND', 'AGRICULTURAL')
 _MANUAL_REVALUATION_GRACE_DAYS = 30
 
 
-def apply_annual_land_appreciation(pct=Decimal('6'), today=None, group=None, dry_run=False):
-    """Mark land up by ``pct`` once for the FY that just closed (meant to run on 1 April).
+def apply_annual_land_appreciation(pct=None, today=None, group=None, dry_run=False, use_ai=None, is_debug=None):
+    """Mark land up for the FY that just closed (meant to run on 1 April).
+
+    When ``pct`` is None and ``use_ai`` is True (default for annual cron execution),
+    executes the Multi-Stage AI Land Appraisal DAG:
+      1. Stage 1 (Argon Grounding): Local comps, circle rates, and macro inflation via Search Grounding.
+      2. Stage 2 (DeepSeek / Shakti Auditor): Skeptical cross-examination deducting speculative listing & illiquidity haircuts.
+      3. Stage 3 (Argon Frontier Synthesis): Final conservative appreciation percentage synthesis.
+
+    If ``pct`` is explicitly provided (or ``use_ai=False``), applies that static percentage.
 
     Idempotent via ``last_appreciated_fy``. Plots revalued by hand in the last 30 days are
     treated as already reflecting the year-end price and are only marked as done.
     """
+    import sys
     today = today or datetime.date.today()
     closing_fy = fy_label(fy_start_year(today) - 1)
-    factor = 1 + Decimal(str(pct)) / 100
+
+    is_test_run = 'test' in sys.argv or getattr(settings, 'TESTING', False)
+    if use_ai is None:
+        use_ai = not is_test_run and pct is None
 
     qs = RealEstateHolding.objects.filter(property_type__in=LAND_PROPERTY_TYPES)
     if group is not None:
@@ -1058,16 +1070,56 @@ def apply_annual_land_appreciation(pct=Decimal('6'), today=None, group=None, dry
             h.last_valuation_date is not None
             and (today - h.last_valuation_date).days < _MANUAL_REVALUATION_GRACE_DAYS
         )
-        new = old if recent_manual else (old * factor).quantize(Decimal('1'))
-        results.append({'holding': h, 'old': old, 'new': new, 'skipped': recent_manual})
+
+        appraisal = None
+        if recent_manual:
+            new = old
+            applied_pct = Decimal('0')
+        elif pct is not None:
+            applied_pct = Decimal(str(pct))
+            factor = 1 + applied_pct / 100
+            new = (old * factor).quantize(Decimal('1'))
+        elif use_ai:
+            try:
+                from .land_appraisal import run_land_appraisal_dag
+                appraisal = run_land_appraisal_dag(h, closing_fy=closing_fy, today=today, is_debug=is_debug)
+                applied_pct = Decimal(str(appraisal.recommended_appreciation_pct))
+                factor = 1 + applied_pct / 100
+                new = (old * factor).quantize(Decimal('1'))
+            except Exception as e:
+                logger.warning("AI Land Appraisal failed for '%s' (%s); falling back to 6%% default", h.name, e)
+                applied_pct = Decimal('6')
+                factor = 1 + applied_pct / 100
+                new = (old * factor).quantize(Decimal('1'))
+        else:
+            applied_pct = Decimal('6')
+            factor = 1 + applied_pct / 100
+            new = (old * factor).quantize(Decimal('1'))
+
+        results.append({
+            'holding': h,
+            'old': old,
+            'new': new,
+            'pct': applied_pct,
+            'appraisal': appraisal,
+            'skipped': recent_manual,
+        })
         if dry_run:
             continue
+
         h.last_appreciated_fy = closing_fy
         fields = ['last_appreciated_fy', 'updated_at']
         if not recent_manual:
             h.current_valuation = new
             h.last_valuation_date = today
             fields += ['current_valuation', 'last_valuation_date']
+            if appraisal:
+                audit_note = (
+                    f"\n[AI FY-End Appraisal {closing_fy}]: +{applied_pct:.2f}% "
+                    f"(INR {old:,.0f} -> INR {new:,.0f}). {appraisal.methodology_summary}"
+                )
+                h.remarks = (h.remarks or "") + audit_note
+                fields.append('remarks')
         h.save(update_fields=fields)
     return closing_fy, results
 

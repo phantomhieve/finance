@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import socket
 from typing import Any, TypeVar
 
 from pydantic import BaseModel
@@ -10,6 +11,16 @@ from pydantic import BaseModel
 from ..sanitizer import clean_json_text
 from ..types import AINode
 from .base import BaseAIAdapter
+
+# Ensure IPv4 is preferred to prevent broken IPv6 network routes from causing 75s TCP SYN timeouts
+_orig_getaddrinfo = socket.getaddrinfo
+
+def _ipv4_preferred_getaddrinfo(*args: Any, **kwargs: Any) -> list[Any]:
+    res = _orig_getaddrinfo(*args, **kwargs)
+    ipv4 = [r for r in res if r[0] == socket.AF_INET]
+    return ipv4 if ipv4 else res
+
+socket.getaddrinfo = _ipv4_preferred_getaddrinfo
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)
@@ -23,6 +34,14 @@ def _normalize_model_name(model: str | None) -> str:
     m_lower = m.lower()
     if m_lower in ("argon", "gemini-argon", "gemini_argon"):
         return "gemini-4-argon"
+    if m_lower in (
+        "flash-lite",
+        "flash_lite",
+        "2.5-flash-lite",
+        "gemini-2.5-flash-lite",
+        "gemini_2_5_flash_lite",
+    ):
+        return "gemini-2.5-flash-lite"
     if m_lower in (
         "flash",
         "gemini-flash",
@@ -73,6 +92,10 @@ def _build_gemini_thinking_config(
     import os
     from django.conf import settings
     from google import genai
+
+    target = _normalize_model_name(model).lower()
+    if "flash-lite" in target or "flash_lite" in target:
+        return None
 
     # 1. Direct explicit ThinkingConfig takes highest precedence
     if explicit_thinking_config is not None:
