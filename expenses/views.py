@@ -158,15 +158,19 @@ def _collapse_transfer_legs(rows: list[Expense], group, start, end) -> list[Expe
     )
     all_debits = row_debits + boundary_debits
 
+    from collections import defaultdict
+    debits_by_amount_currency = defaultdict(list)
+    for d in all_debits:
+        debits_by_amount_currency[(d.amount, d.currency)].append(d)
+
     used_debits: set[int] = set()
     hidden_credits: set[int] = set()
 
     for c in credit_legs:
+        bucket = debits_by_amount_currency.get((c.amount, c.currency), [])
         candidates = [
-            d for d in all_debits
+            d for d in bucket
             if d.pk not in used_debits
-            and d.amount == c.amount
-            and d.currency == c.currency
             and abs((d.txn_date - c.txn_date).days) <= 4
             and (d.payment_source_id != c.payment_source_id or d.payment_source_id is None)
         ]

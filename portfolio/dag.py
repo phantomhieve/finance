@@ -22,7 +22,7 @@ and eliminating cross-domain hallucinations. Intermediate nodes can execute on c
 """
 from __future__ import annotations
 
-import concurrent.futures
+import asyncio
 import datetime
 import json
 import logging
@@ -33,6 +33,7 @@ from django.conf import settings
 from pydantic import BaseModel, Field
 
 from pftracker.ai_gateway import TaskProfile, gateway
+from pftracker.concurrency import DjangoSafeThreadPoolExecutor, safe_async_to_thread
 from .ai import (
     AIResult,
     Insight,
@@ -493,7 +494,7 @@ class PortfolioInsightsDAG:
 
         if self.use_concurrent:
             logger.info("[DAG] Dispatching Stage 1 lenses concurrently (3 worker threads)...")
-            with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            with DjangoSafeThreadPoolExecutor(max_workers=3) as executor:
                 future_alloc = executor.submit(run_stage_1a_allocation, prompt_data, investor_profile)
                 future_qual = executor.submit(run_stage_1b_quality, prompt_data, investor_profile)
                 future_macro = executor.submit(run_stage_1c_macro, prompt_data, investor_profile)
@@ -594,6 +595,107 @@ class PortfolioInsightsDAG:
             macro_res.sub_score,
         )
         return terminal_response, metadata
+
+    async def execute_async(self, prompt_data: dict, group=None) -> tuple[PortfolioInsightsResponse, DAGExecutionMetadata]:
+        """Asynchronously execute Stage 1 lenses concurrently via asyncio.gather and synthesize Stage 2/3."""
+        t0 = time.time()
+        start_time_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        nodes_executed: list[str] = []
+        investor_profile = await safe_async_to_thread(_load_investor_profile, group)
+
+        # STAGE 1: Async concurrent fan-out
+        async def _run_alloc():
+            try:
+                res = await safe_async_to_thread(run_stage_1a_allocation, prompt_data, investor_profile)
+                return "Stage1A:Allocation", res
+            except Exception as e:
+                logger.warning("[DAG] Async Stage 1A failed (%s); using resilient fallback", e)
+                return None, _fallback_allocation()
+
+        async def _run_qual():
+            try:
+                res = await safe_async_to_thread(run_stage_1b_quality, prompt_data, investor_profile)
+                return "Stage1B:Quality", res
+            except Exception as e:
+                logger.warning("[DAG] Async Stage 1B failed (%s); using resilient fallback", e)
+                return None, _fallback_quality()
+
+        async def _run_macro():
+            try:
+                res = await safe_async_to_thread(run_stage_1c_macro, prompt_data, investor_profile)
+                return "Stage1C:Macro", res
+            except Exception as e:
+                logger.warning("[DAG] Async Stage 1C failed (%s); using resilient fallback", e)
+                return None, _fallback_macro()
+
+        results = await asyncio.gather(_run_alloc(), _run_qual(), _run_macro())
+        (k_a, alloc_res), (k_q, qual_res), (k_m, macro_res) = results
+        if k_a:
+            nodes_executed.append(k_a)
+        if k_q:
+            nodes_executed.append(k_q)
+        if k_m:
+            nodes_executed.append(k_m)
+
+        # STAGE 2: Strategy (Fan-in)
+        strat_res: StrategyLensResult | None = None
+        try:
+            strat_res = await safe_async_to_thread(
+                run_stage_2_strategy, prompt_data, investor_profile, alloc_res, qual_res, macro_res
+            )
+            nodes_executed.append("Stage2:Strategy")
+        except Exception as e:
+            logger.warning("[DAG] Async Stage 2 failed (%s); using resilient fallback", e)
+            strat_res = _fallback_strategy()
+
+        # STAGE 3: Terminal Grounding & Synthesis
+        terminal_response = await safe_async_to_thread(
+            run_stage_3_terminal_synthesis,
+            prompt_data,
+            investor_profile,
+            alloc_res,
+            qual_res,
+            macro_res,
+            strat_res,
+        )
+        nodes_executed.append("Stage3:TerminalSynthesis")
+
+        elapsed_ms = (time.time() - t0) * 1000.0
+        end_time_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+
+        metadata = DAGExecutionMetadata(
+            started_at=start_time_iso,
+            completed_at=end_time_iso,
+            elapsed_ms=elapsed_ms,
+            nodes_executed=nodes_executed,
+            sub_scores={
+                "allocation": alloc_res.sub_score,
+                "quality": qual_res.sub_score,
+                "strategy": strat_res.sub_score,
+                "macro": macro_res.sub_score,
+            },
+            grounded_score=terminal_response.score,
+            fallback_used=len(nodes_executed) < 5,
+        )
+
+        return terminal_response, metadata
+
+
+async def arun_portfolio_insights_dag(
+    prompt_data: dict,
+    group=None,
+) -> AIResult:
+    """Async entry point for executing the portfolio insights multi-stage DAG without blocking."""
+    dag = PortfolioInsightsDAG(use_concurrent=True)
+    response, metadata = await dag.execute_async(prompt_data, group=group)
+
+    insights_dict = response.model_dump(mode="json")
+    insights_dict["_dag_metadata"] = metadata.model_dump(mode="json")
+
+    return AIResult(
+        model="vault-dag:multi-stage-async",
+        insights_dict=insights_dict,
+    )
 
 
 def run_portfolio_insights_dag(

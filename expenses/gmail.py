@@ -8,6 +8,7 @@ refresh tokens after 7 days.
 import base64
 import logging
 import os
+import threading
 import time
 from urllib.parse import urlencode
 
@@ -95,23 +96,27 @@ class GmailClient:
         self.refresh_token = refresh_token
         self._access_token = None
         self._expires_at = 0
+        self._token_lock = threading.Lock()
 
     def _token(self):
         if self._access_token and time.time() < self._expires_at - 60:
             return self._access_token
-        client_id, secret = _client_credentials()
-        resp = requests.post(TOKEN_URL, data={
-            'client_id': client_id, 'client_secret': secret,
-            'refresh_token': self.refresh_token, 'grant_type': 'refresh_token',
-        }, timeout=TIMEOUT)
-        if resp.status_code in (400, 401):
-            raise GmailAuthError('Gmail access was revoked or expired — reconnect this mailbox.')
-        if resp.status_code != 200:
-            raise GmailError(f'Token refresh failed ({resp.status_code}).')
-        data = resp.json()
-        self._access_token = data['access_token']
-        self._expires_at = time.time() + int(data.get('expires_in', 3600))
-        return self._access_token
+        with self._token_lock:
+            if self._access_token and time.time() < self._expires_at - 60:
+                return self._access_token
+            client_id, secret = _client_credentials()
+            resp = requests.post(TOKEN_URL, data={
+                'client_id': client_id, 'client_secret': secret,
+                'refresh_token': self.refresh_token, 'grant_type': 'refresh_token',
+            }, timeout=TIMEOUT)
+            if resp.status_code in (400, 401):
+                raise GmailAuthError('Gmail access was revoked or expired — reconnect this mailbox.')
+            if resp.status_code != 200:
+                raise GmailError(f'Token refresh failed ({resp.status_code}).')
+            data = resp.json()
+            self._access_token = data['access_token']
+            self._expires_at = time.time() + int(data.get('expires_in', 3600))
+            return self._access_token
 
     def _get(self, path, params=None):
         for attempt in range(3):

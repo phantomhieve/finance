@@ -296,6 +296,64 @@ class AIGateway:
                 return macro
         return None
 
+    async def agenerate_text(
+        self,
+        prompt: str,
+        system: str | None = None,
+        task: TaskProfile | TaskType | str = TaskType.GENERAL,
+        preferred_node_id: str | None = None,
+        model: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        sanitize_input: bool | None = None,
+        **kwargs: Any,
+    ) -> GatewayResult:
+        """Asynchronously generate text without blocking the event loop."""
+        from pftracker.concurrency import safe_async_to_thread
+
+        return await safe_async_to_thread(
+            self.generate_text,
+            prompt=prompt,
+            system=system,
+            task=task,
+            preferred_node_id=preferred_node_id,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            sanitize_input=sanitize_input,
+            **kwargs,
+        )
+
+    async def agenerate_structured(
+        self,
+        schema: type[T],
+        prompt: str,
+        system: str | None = None,
+        task: TaskProfile | TaskType | str = TaskType.GENERAL,
+        preferred_node_id: str | None = None,
+        model: str | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        sanitize_input: bool | None = None,
+        **kwargs: Any,
+    ) -> T:
+        """Asynchronously generate structured output validated against Pydantic schema."""
+        from pftracker.concurrency import safe_async_to_thread
+
+        return await safe_async_to_thread(
+            self.generate_structured,
+            schema=schema,
+            prompt=prompt,
+            system=system,
+            task=task,
+            preferred_node_id=preferred_node_id,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            sanitize_input=sanitize_input,
+            **kwargs,
+        )
+
 
 # Global singleton instance
 gateway = AIGateway()

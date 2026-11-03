@@ -36,6 +36,7 @@ A production-grade personal finance, multi-asset wealth management, and househol
   3. *Stage 3 (Frontier Synthesis)*: Executed on Argon with High Thinking (`gemini-4-argon` in production; `gemini-2.5-flash-lite` in dev). Separates approved balance sheet carrying value from unrealized speculative buffer and dispatches a rich HTML email certificate (`templates/emails/land_appraisal.html`).
 - **Unified AI Gateway (`pftracker/ai_gateway/`)** — Centralized multi-provider routing engine supporting Shakti Cloud (`deepseek-r1`, `llama3_3`) and Google Gemini (`gemini-4-argon`, `gemini-3.8-flash`, `gemini-2.5-flash-lite`). Features declarative task profiles (`TaskProfile`), automatic Dev (`DEBUG=True`) vs. Prod (`DEBUG=False`) model & thinking tiering, multi-key pool rotation on HTTP 429 rate limits, circuit breakers, PII scrubbing (cards, PAN, Aadhaar, accounts, OTPs), prompt injection boundary isolation, and secret redaction.
 - **Model Context Protocol (MCP) Server (`/mcp/sse`)** — Native FastMCP SSE endpoint exposing 30+ read/write financial tools to external AI agents (Claude, ChatGPT, Cursor) secured by OAuth 2.0 PKCE, role/scope enforcement (`MCPTokenAuthMiddleware`), and reversible `MCPAuditLog` before/after snapshots.
+- **High-Performance Database Engine & Safe Concurrency Architecture** — Production connection pooling (`CONN_MAX_AGE=600`, `CONN_HEALTH_CHECKS=True`), SQLite WAL mode with 15s busy timeouts and 64MB memory caches (`pftracker/db_optimizations.py`), leak-free worker pools (`DjangoSafeThreadPoolExecutor`), Starlette ASGI database lifecycle middleware (`DatabaseConnectionLifecycleMiddleware`), non-blocking async AI Gateway (`AIGateway.agenerate_text` / `agenerate_structured`), async multi-stage DAGs, parallel Gmail mailbox synchronization, $O(C)$ transfer leg collapsing, and composite database indexing.
 
 ---
 
@@ -146,6 +147,46 @@ Instead of hardcoding models, temperatures, or thinking settings across disparat
   - Bank account numbers (`[ACCOUNT_REDACTED]`), OTP/PIN codes (`[OTP_REDACTED]`), and email addresses (`[EMAIL_REDACTED]`).
 - **Prompt Injection Defense (`wrap_user_payload`, `escape_xml_boundaries`, `detect_prompt_injection`)**: User data is isolated within XML boundary tags with angle bracket escaping to prevent tag breakout or instruction hijacking.
 - **Credential Protection (`mask_secrets`)**: Strips Google API keys (`AIza...`), Bearer tokens, and OpenAI/Shakti keys from logs and exception traces to guarantee zero credential leakage.
+
+---
+
+## High-Performance Concurrency, Async I/O & Database Optimization
+
+Vault is architected for concurrent throughput, zero database connection leaks, and query efficiency:
+
+1. **Database Connection Pooling & Health Checks (`pftracker/settings.py`)**:
+   - `CONN_MAX_AGE=600` (10 minutes) in production avoids TCP and TLS handshake overhead.
+   - `CONN_HEALTH_CHECKS=True` automatically tests existing pooled connections before query dispatch, recovering from drops transparently.
+   - Defaults to `0` in development to ensure test and migration isolation.
+
+2. **SQLite WAL & Concurrency PRAGMAs (`pftracker/db_optimizations.py`)**:
+   - Automatically executed upon connection creation via the `connection_created` signal:
+     - `PRAGMA journal_mode = WAL;` (Write-Ahead Logging permits readers and writers to operate concurrently without lock starvation).
+     - `PRAGMA synchronous = NORMAL;` (Reduces disk fsync bottlenecks while preserving durability).
+     - `PRAGMA busy_timeout = 15000;` (15-second lock timeout prevents `OperationalError: database is locked` exceptions).
+     - `PRAGMA cache_size = -64000;` (Allocates a 64MB memory page cache for fast lookups).
+
+3. **Leak-Free Concurrency Primitives (`pftracker/concurrency.py`)**:
+   - `DjangoSafeThreadPoolExecutor`: Automatically cleans up Django database connections before and after every thread execution (`close_old_connections()` + `connections.close_all()`), resolving connection exhaustion outside web requests.
+   - `safe_db_worker`, `parallel_map`, and `safe_async_to_thread` provide drop-in safe concurrency primitives across sync and async contexts.
+
+4. **Starlette ASGI Database Middleware (`pftracker/asgi.py`)**:
+   - `DatabaseConnectionLifecycleMiddleware` wraps `/mcp` FastMCP routes to close stale connections and clean up thread-bound sockets across async requests.
+
+5. **Async AI Gateway & Non-Blocking Multi-Stage DAG (`pftracker/ai_gateway/`, `portfolio/dag.py`)**:
+   - `AIGateway.agenerate_text` and `agenerate_structured` provide non-blocking asynchronous generation offloaded cleanly to thread-safe worker pools.
+   - `PortfolioInsightsDAG.execute_async` and `arun_portfolio_insights_dag` execute Stage 1 diagnostic lenses concurrently via `asyncio.gather` and await Stage 2 & Stage 3 without blocking the event loop.
+
+6. **Concurrent Mailbox Sync & Thread-Safe OAuth (`expenses/sync.py`, `expenses/gmail.py`)**:
+   - `sync_group` synchronizes multiple active Gmail accounts in parallel using `DjangoSafeThreadPoolExecutor`.
+   - `GmailClient` employs a thread-safe double-checked lock (`threading.Lock()`) around OAuth token refresh.
+
+7. **Database Query Reduction & Composite Indexing**:
+   - `_zerodha_account_sums`: Optimized from 6 queries to 2 queries using `values('account_id').annotate(...)` and conditional `Case(When(...))`.
+   - `get_commodity_summary`: Optimized from 3 queries to 1 combined aggregate query.
+   - `get_portfolio_summary`: Combined multiple stock, mutual fund, and crypto queries into unified aggregates.
+   - `_collapse_transfer_legs`: Linear $O(C)$ bucketed matching on `(amount, currency)`.
+   - Composite indexes added to `StockHolding` (`account`, `is_baby`), `MutualFundHolding` (`account`, `fund_type`, `is_baby`), `CashPosition` (`group`, `is_baby`), `BondHolding` (`group`, `is_baby`), `CryptoHolding` (`group`, `is_baby`), `CommodityHolding` (`group`, `commodity_type`, `is_baby`), and `USStockHolding` (`group`, `is_baby`).
 
 ---
 

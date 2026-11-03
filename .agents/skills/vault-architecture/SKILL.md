@@ -153,7 +153,35 @@ Replaces monolithic prompts with a 3-stage fan-out / fan-in workflow:
 
 ---
 
-## 7. Pre-Push Verification Checklist
+## 7. High-Performance Concurrency, Async I/O & Database Optimization
+
+- **Database Connection Pooling & Health Checks (`pftracker/settings.py`)**:
+  - `CONN_MAX_AGE=600` in production (prevents socket thrashing) paired with `CONN_HEALTH_CHECKS=True` so dead pooled sockets are reconnected before query dispatch.
+  - Defaults to `0` in local dev/tests to ensure test isolation.
+- **SQLite Concurrency & WAL Mode (`pftracker/db_optimizations.py`)**:
+  - `PRAGMA journal_mode = WAL;`, `PRAGMA synchronous = NORMAL;`, `PRAGMA busy_timeout = 15000;`, `PRAGMA cache_size = -64000;` (64MB memory page cache) automatically applied via `connection_created` signal listener on `tracker.apps.TrackerConfig.ready()`.
+- **Django Safe Concurrency (`pftracker/concurrency.py`)**:
+  - `DjangoSafeThreadPoolExecutor`: Automatic worker-thread database connection cleanup before and after task execution (`close_old_connections()` + `connections.close_all()`), eliminating thread-local connection leaks.
+  - `safe_db_worker`, `parallel_map`, and `safe_async_to_thread` provide safe background thread offloading.
+- **Starlette ASGI Database Middleware (`pftracker/asgi.py`)**:
+  - `DatabaseConnectionLifecycleMiddleware` wraps `/mcp` FastMCP routes, ensuring database connections opened in async worker threads are properly closed and recycled across requests.
+- **Async AI Gateway (`pftracker/ai_gateway/gateway.py`)**:
+  - `AIGateway.agenerate_text` and `AIGateway.agenerate_structured` provide non-blocking asynchronous generation offloaded cleanly to thread-safe worker pools.
+- **Async Multi-Stage DAG Engine (`portfolio/dag.py`)**:
+  - `PortfolioInsightsDAG.execute_async` and `arun_portfolio_insights_dag` execute Stage 1 diagnostic lenses concurrently via `asyncio.gather` and await Stage 2 & Stage 3 without blocking the event loop.
+- **Concurrent Gmail Mailbox Sync (`expenses/sync.py`, `expenses/gmail.py`)**:
+  - `sync_group` synchronizes multiple active Gmail accounts in parallel via `DjangoSafeThreadPoolExecutor`.
+  - `GmailClient` employs a thread-safe double-checked lock (`threading.Lock()`) around OAuth token refresh.
+- **Database Query Reduction & Indexing**:
+  - `_zerodha_account_sums`: Reduced from 6 queries to 2 queries using `values('account_id').annotate(...)` and conditional `Case(When(...))`.
+  - `get_commodity_summary`: Reduced from 3 queries to 1 combined aggregate query.
+  - `get_portfolio_summary`: Combined multiple stock, mutual fund, and crypto queries into unified aggregates.
+  - `_collapse_transfer_legs`: Linear $O(C)$ bucketed matching on `(amount, currency)`.
+  - Composite indexes added to `StockHolding` (`account`, `is_baby`), `MutualFundHolding` (`account`, `fund_type`, `is_baby`), `CashPosition` (`group`, `is_baby`), `BondHolding` (`group`, `is_baby`), `CryptoHolding` (`group`, `is_baby`), `CommodityHolding` (`group`, `commodity_type`, `is_baby`), and `USStockHolding` (`group`, `is_baby`).
+
+---
+
+## 8. Pre-Push Verification Checklist
 
 Before committing or pushing any change:
 1. **Build CSS** (if templates or `static/css/src/input.css` changed):
@@ -166,5 +194,5 @@ Before committing or pushing any change:
    ```
 3. **Run Full Test Suite**:
    ```bash
-   ./venv/bin/python manage.py test expenses portfolio tracker jewellery mcp_server --keepdb
+   ./venv/bin/python manage.py test expenses portfolio tracker jewellery mcp_server pftracker.ai_gateway --keepdb
    ```
