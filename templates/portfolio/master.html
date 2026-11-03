@@ -636,10 +636,11 @@
       <table class="table table-sm">
         <thead>
           <tr>
+            <th>Financial Year</th>
             <th>Member</th>
-            <th>Date</th>
-            <th>Type</th>
-            <th class="text-right">Amount</th>
+            <th class="text-right">Contribution</th>
+            <th class="text-right">Interest</th>
+            <th class="text-right">Balance</th>
             <th>Remarks</th>
             <th class="w-10"></th>
           </tr>
@@ -647,14 +648,28 @@
         <tbody>
           {% for e in pf_entries %}
           <tr class="hover">
+            <td class="font-semibold whitespace-nowrap">{{ e.financial_year }}</td>
             <td>
               <a href="{% url 'pf_detail' %}?member={{ e.account_name|urlencode }}" class="badge badge-ghost badge-sm font-medium hover:badge-primary transition-colors">{{ e.account_name }}</a>
             </td>
-            <td class="opacity-60 text-sm whitespace-nowrap">{{ e.date|date:"d M Y" }}</td>
-            <td><span class="badge {% if e.entry_type == 'CONTRIBUTION' %}badge-primary{% else %}badge-ghost{% endif %} badge-sm">{{ e.get_entry_type_display }}</span></td>
-            <td class="text-right whitespace-nowrap"><span class="text-success">+{{ e.amount|inr }}</span></td>
-            <td class="opacity-50 text-sm">{{ e.remarks|default:"—" }}</td>
-            <td><button class="btn btn-ghost btn-xs btn-square" data-edit-pf data-id="{{ e.id }}" data-account="{{ e.account_name }}" data-date="{{ e.date|date:'Y-m-d' }}" data-type="{{ e.entry_type }}" data-amount="{{ e.amount }}" data-remarks="{{ e.remarks }}" data-baby="{{ e.is_baby|yesno:'true,false' }}"><span class="material-symbols-outlined text-base">edit</span></button></td>
+            <td class="text-right whitespace-nowrap"><span class="text-primary font-medium">{% if e.contribution > 0 %}+{{ e.contribution|inr }}{% else %}&mdash;{% endif %}</span></td>
+            <td class="text-right whitespace-nowrap"><span class="text-success font-medium">{% if e.interest > 0 %}+{{ e.interest|inr }}{% else %}&mdash;{% endif %}</span></td>
+            <td class="text-right whitespace-nowrap font-bold">{{ e.closing_balance|inr }}</td>
+            <td class="opacity-50 text-sm truncate max-w-[150px]">{{ e.remarks|default:"—" }}</td>
+            <td>
+              <button class="btn btn-ghost btn-xs btn-square" data-edit-pf
+                      data-id="{{ e.id }}"
+                      data-account="{{ e.account_name }}"
+                      data-member="{{ e.account_name }}"
+                      data-fy="{{ e.fy_year }}"
+                      data-fylabel="{{ e.financial_year }}"
+                      data-contrib="{{ e.contribution }}"
+                      data-interest="{{ e.interest }}"
+                      data-remarks="{{ e.remarks }}"
+                      data-baby="{{ e.is_baby|yesno:'true,false' }}">
+                <span class="material-symbols-outlined text-base">edit</span>
+              </button>
+            </td>
           </tr>
           {% endfor %}
         </tbody>
@@ -665,15 +680,29 @@
       <div class="table-card">
         <div class="flex items-center justify-between gap-2">
           <div class="flex flex-wrap items-center gap-1.5 min-w-0">
+            <span class="font-bold text-sm">{{ e.financial_year }}</span>
             <span class="badge badge-ghost badge-xs font-semibold">{{ e.account_name }}</span>
-            <span class="badge {% if e.entry_type == 'CONTRIBUTION' %}badge-primary{% else %}badge-ghost{% endif %} badge-xs">{{ e.get_entry_type_display }}</span>
-            <span class="text-xs opacity-50">{{ e.date|date:"d M Y" }}</span>
+            <span class="font-semibold text-sm">{{ e.closing_balance|inr }}</span>
           </div>
-          <button class="btn btn-ghost btn-xs btn-square shrink-0" data-edit-pf data-id="{{ e.id }}" data-account="{{ e.account_name }}" data-date="{{ e.date|date:'Y-m-d' }}" data-type="{{ e.entry_type }}" data-amount="{{ e.amount }}" data-remarks="{{ e.remarks }}" data-baby="{{ e.is_baby|yesno:'true,false' }}"><span class="material-symbols-outlined text-base">edit</span></button>
+          <button class="btn btn-ghost btn-xs btn-square shrink-0" data-edit-pf
+                  data-id="{{ e.id }}"
+                  data-account="{{ e.account_name }}"
+                  data-member="{{ e.account_name }}"
+                  data-fy="{{ e.fy_year }}"
+                  data-fylabel="{{ e.financial_year }}"
+                  data-contrib="{{ e.contribution }}"
+                  data-interest="{{ e.interest }}"
+                  data-remarks="{{ e.remarks }}"
+                  data-baby="{{ e.is_baby|yesno:'true,false' }}">
+            <span class="material-symbols-outlined text-base">edit</span>
+          </button>
         </div>
-        <div class="flex items-center justify-between mt-1.5">
-          <span class="text-sm font-semibold text-success tabular-nums">+{{ e.amount|inr }}</span>
-          <span class="text-xs opacity-40 truncate max-w-[50%]">{{ e.remarks|default:"" }}</span>
+        <div class="flex items-center justify-between mt-1 text-xs opacity-60">
+          <div>
+            {% if e.contribution > 0 %}<span class="text-primary font-medium">+{{ e.contribution|inr }}</span>{% endif %}
+            {% if e.interest > 0 %}<span class="text-success font-medium ml-1.5">+{{ e.interest|inr }}</span>{% endif %}
+          </div>
+          <span class="truncate max-w-[50%]">{{ e.remarks|default:"" }}</span>
         </div>
       </div>
       {% endfor %}
@@ -997,18 +1026,53 @@
 <script src="{% static 'js/nps_modal.js' %}"></script>
 
 <script>
+function setPfMember(name) {
+  var inp = document.getElementById('pfAccountName');
+  if (inp) {
+    inp.value = name;
+    inp.focus();
+  }
+}
+
 function openAddPfModal(defaultMember) {
   var form = document.getElementById('pfForm');
-  form.action = "{% url 'add_pf_entry' %}";
+  form.action = "{% url 'save_pf_fy_entry' %}";
   form.reset();
-  if (defaultMember) {
-    var acctEl = form.querySelector('[name=account_name]');
-    if (acctEl) acctEl.value = defaultMember;
+  var origMem = document.getElementById('pfOrigMember');
+  if (origMem) origMem.value = '';
+  var origYr = document.getElementById('pfOrigYear');
+  if (origYr) origYr.value = '';
+  var delAcct = document.getElementById('delPfAccount');
+  if (delAcct) delAcct.value = '';
+  var delYr = document.getElementById('delPfYear');
+  if (delYr) delYr.value = '';
+
+  var titleEl = document.getElementById('pfModalTitle');
+  if (titleEl) {
+    titleEl.innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span> Add PF Entry';
   }
+
+  var memberInp = document.getElementById('pfAccountName');
+  if (memberInp) {
+    memberInp.value = defaultMember || 'Atul';
+  }
+
   var delBtn = document.getElementById('pfDeleteBtn');
-  if (delBtn) delBtn.style.display = 'none';
-  document.getElementById('pfModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">savings</span> Add PF Entry';
+  if (delBtn) delBtn.classList.add('hidden');
+
+  var yearSelect = document.getElementById('pfYearSelect');
+  if (yearSelect && yearSelect.options.length > 0) {
+    yearSelect.selectedIndex = 0;
+  }
+
   openModal('addPfModal');
+}
+
+function confirmDeletePf() {
+  var member = document.getElementById('delPfAccount').value;
+  var fy = document.getElementById('delPfYear').value;
+  var msg = 'Delete PF entry for ' + member + ' (FY ' + fy + '-' + (parseInt(fy, 10) + 1).toString().slice(-2) + ')?';
+  confirmDelete('deletePfForm', msg);
 }
 
 function openGoalModal(defaultFy) {
@@ -1201,9 +1265,32 @@ document.addEventListener('click', function(e) {
       "{% url 'edit_epf_entry' pk=0 %}","{% url 'delete_epf_entry' pk=0 %}",'Edit EPF Entry','addEpfModal',btn.dataset,
       {date:btn.dataset.date,entry_type:btn.dataset.type,amount:btn.dataset.amount,remarks:btn.dataset.remarks});
   } else if ((btn = e.target.closest('[data-edit-pf]'))) {
-    _editSetup('pfForm','deletePfForm','pfDeleteBtn','pfModalTitle',
-      "{% url 'edit_pf_entry' pk=0 %}","{% url 'delete_pf_entry' pk=0 %}",'Edit PF Entry','addPfModal',btn.dataset,
-      {account_name:btn.dataset.account,date:btn.dataset.date,entry_type:btn.dataset.type,amount:btn.dataset.amount,remarks:btn.dataset.remarks,is_baby:btn.dataset.baby});
+    var form = document.getElementById('pfForm');
+    form.action = "{% url 'save_pf_fy_entry' %}";
+    form.reset();
+    var member = btn.dataset.member || btn.dataset.account || 'Atul';
+    var fy = btn.dataset.fy || '';
+    var fyLabel = btn.dataset.fylabel || ('FY ' + fy);
+    document.getElementById('pfModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">edit</span> Edit PF Entry · ' + fyLabel;
+    document.getElementById('pfAccountName').value = member;
+    var origMem = document.getElementById('pfOrigMember');
+    if (origMem) origMem.value = member;
+    var origYr = document.getElementById('pfOrigYear');
+    if (origYr) origYr.value = fy;
+    var yearSelect = document.getElementById('pfYearSelect');
+    if (yearSelect && fy) yearSelect.value = fy;
+    document.getElementById('pfContribution').value = (btn.dataset.contrib > 0 ? btn.dataset.contrib : '');
+    document.getElementById('pfInterest').value = (btn.dataset.interest > 0 ? btn.dataset.interest : '');
+    document.getElementById('pfRemarks').value = btn.dataset.remarks || '';
+    var babyInp = document.getElementById('pfIsBaby');
+    if (babyInp) babyInp.checked = (btn.dataset.baby === 'true');
+    var delAcct = document.getElementById('delPfAccount');
+    if (delAcct) delAcct.value = btn.dataset.account || 'Atul';
+    var delYr = document.getElementById('delPfYear');
+    if (delYr) delYr.value = btn.dataset.fy || '';
+    var delBtn = document.getElementById('pfDeleteBtn');
+    if (delBtn) delBtn.classList.remove('hidden');
+    openModal('addPfModal');
   } else if ((btn = e.target.closest('[data-edit-fd]'))) {
     _editSetup('fdForm','deleteFdForm','fdDeleteBtn','fdModalTitle',
       "{% url 'edit_fd' pk=0 %}","{% url 'delete_fd' pk=0 %}",'Edit Fixed Deposit','addFdModal',btn.dataset,

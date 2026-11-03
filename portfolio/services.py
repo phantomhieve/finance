@@ -59,22 +59,24 @@ def _gf(model_qs, group):
 def get_pf_summary(group=None, is_baby=False):
     """Aggregate PF (Provident Fund) entries into overall and per-member balances."""
     qs = _gf(PFEntry.objects.filter(is_baby=is_baby), group)
-    rows = qs.values('account_name', 'entry_type').annotate(total=Sum('amount'))
+    rows = qs.values('account_name').annotate(
+        contrib=Sum('contribution'),
+        interest=Sum('interest'),
+    )
     member_map = {}
     for row in rows:
         raw_name = (row['account_name'] or 'Primary').strip()
         key = raw_name.lower()
+        contrib = row['contrib'] or _ZERO
+        interest = row['interest'] or _ZERO
         rec = member_map.setdefault(key, {
             'account_name': raw_name,
             'contrib': _ZERO,
             'interest': _ZERO,
             'balance': _ZERO,
         })
-        amt = row['total'] or _ZERO
-        if row['entry_type'] == 'CONTRIBUTION':
-            rec['contrib'] += amt
-        elif row['entry_type'] == 'INTEREST':
-            rec['interest'] += amt
+        rec['contrib'] += contrib
+        rec['interest'] += interest
         rec['balance'] = rec['contrib'] + rec['interest']
 
     pf_accounts = sorted(member_map.values(), key=lambda x: x['balance'], reverse=True)
@@ -89,6 +91,61 @@ def get_pf_summary(group=None, is_baby=False):
         'pf_balance': pf_balance,
         'pf_accounts': pf_accounts,
     }
+
+
+def get_pf_fy_breakdown(group=None, selected_member=None, is_baby=False):
+    """
+    Aggregate PF (Provident Fund) entries into Financial Year milestones per account/member.
+    Computes opening balance, contributions, interest earned, annual addition, closing balance,
+    and effective annual yield percentage.
+    """
+    qs = _gf(PFEntry.objects.filter(is_baby=is_baby), group)
+    if selected_member:
+        qs = qs.filter(account_name__iexact=selected_member.strip())
+
+    entries = list(qs)
+    if not entries:
+        return []
+
+    members = {}
+    for e in entries:
+        raw_name = (e.account_name or 'Primary').strip()
+        members.setdefault(raw_name.lower(), []).append(e)
+
+    fy_rows = []
+    for _m_key, member_entries in members.items():
+        member_entries.sort(key=lambda x: x.fy_year)
+        running_balance = _ZERO
+        for e in member_entries:
+            opening = running_balance
+            contrib = e.contribution or _ZERO
+            interest = e.interest or _ZERO
+            annual_addition = contrib + interest
+            closing = opening + annual_addition
+            running_balance = closing
+
+            base = opening + contrib
+            yield_pct = (interest / base * 100).quantize(_ROUND2) if base > _ZERO and interest else _ZERO
+
+            fy_rows.append({
+                'id': e.id,
+                'account_name': e.account_name,
+                'fy_year': e.fy_year,
+                'financial_year': e.financial_year,
+                'fy_label': e.financial_year,
+                'opening_balance': opening,
+                'contribution': contrib,
+                'interest': interest,
+                'annual_addition': annual_addition,
+                'closing_balance': closing,
+                'yield_pct': yield_pct,
+                'date': e.date,
+                'remarks': e.remarks or '',
+                'is_baby': e.is_baby,
+            })
+
+    fy_rows.sort(key=lambda r: (-r['fy_year'], r['account_name'].lower()))
+    return fy_rows
 
 
 def get_commodity_summary(group=None, is_baby=False):
@@ -597,7 +654,7 @@ def get_portfolio_summary(group=None, is_baby=False):
             'gold_price_obj', 'silver_price_obj',
         )},
         'epf_entries': [] if is_baby else _gf(EPFEntry.objects, group).all()[:10],
-        'pf_entries': _gf(PFEntry.objects.filter(is_baby=is_baby), group).all()[:10],
+        'pf_entries': get_pf_fy_breakdown(group=group, is_baby=is_baby)[:10],
         'nps_entries': [] if is_baby else _gf(NPSEntry.objects, group).all()[:10],
         'us_stocks': us_stocks,
         'us_stocks_invested': us_stocks_invested,

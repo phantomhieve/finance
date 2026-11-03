@@ -185,11 +185,7 @@ class EPFEntry(models.Model):
 
 
 class PFEntry(models.Model):
-    """Provident Fund / Public Provident Fund (PF / PPF) entry per family member."""
-    ENTRY_TYPES = (
-        ('CONTRIBUTION', 'Contribution'),
-        ('INTEREST', 'Interest'),
-    )
+    """Provident Fund / Public Provident Fund (PF / PPF) annual entry per family member."""
     group = models.ForeignKey(
         'tracker.AccountGroup', on_delete=models.CASCADE,
         related_name='pf_entries', null=True, blank=True,
@@ -199,9 +195,27 @@ class PFEntry(models.Model):
         default='Atul',
         help_text="Family member / PF account holder (e.g. Atul, Kanika)",
     )
-    date = models.DateField()
-    entry_type = models.CharField(max_length=15, choices=ENTRY_TYPES, default='CONTRIBUTION')
-    amount = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    financial_year = models.CharField(
+        max_length=20,
+        default='',
+        help_text="e.g. FY 2025-26",
+    )
+    fy_year = models.IntegerField(
+        default=0,
+        help_text="FY start year (e.g. 2025 for FY 2025-26)",
+    )
+    date = models.DateField(
+        null=True, blank=True,
+        help_text="Entry date (defaults to 1 April of FY)",
+    )
+    contribution = models.DecimalField(
+        max_digits=14, decimal_places=2, default=0,
+        help_text="Annual contribution amount in ₹",
+    )
+    interest = models.DecimalField(
+        max_digits=14, decimal_places=2, default=0,
+        help_text="Annual interest earned in ₹",
+    )
     remarks = models.CharField(max_length=255, blank=True)
     is_baby = models.BooleanField(
         default=False,
@@ -210,21 +224,39 @@ class PFEntry(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ['-date', '-created_at']
+        ordering = ['-fy_year', '-date', '-created_at']
         verbose_name = 'PF Entry'
         verbose_name_plural = 'PF Entries'
         indexes = [
-            Index(fields=['group', '-date']),
+            Index(fields=['group', '-fy_year']),
             Index(fields=['group', 'account_name']),
         ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['group', 'account_name', 'fy_year', 'is_baby'],
+                name='unique_pf_entry_per_member_fy',
+            ),
+        ]
+
+    @property
+    def total_addition(self):
+        return (self.contribution or Decimal('0')) + (self.interest or Decimal('0'))
 
     def save(self, *args, **kwargs):
+        from pftracker.utils import fy_label, fy_start_year
         if self.account_name:
             self.account_name = self.account_name.strip()
+        if not self.fy_year and self.date:
+            self.fy_year = fy_start_year(self.date)
+        if self.fy_year and not self.financial_year:
+            self.financial_year = fy_label(self.fy_year)
+        if not self.date and self.fy_year:
+            import datetime
+            self.date = datetime.date(self.fy_year, 4, 1)
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"PF ({self.account_name}) {self.get_entry_type_display()} {self.date} — ₹{self.amount:,.0f}"
+        return f"PF ({self.account_name}) {self.financial_year} — Contrib: ₹{self.contribution:,.0f}, Interest: ₹{self.interest:,.0f}"
 
 
 

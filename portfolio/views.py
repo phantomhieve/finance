@@ -9,6 +9,8 @@ from functools import wraps
 from urllib.parse import quote
 
 from django.conf import settings
+from django.db import transaction
+from django.urls import reverse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -18,7 +20,10 @@ from django.views.decorators.http import require_POST
 
 from tracker.models import WebAuthnCredential
 
-from pftracker.utils import ZERO as _ZERO, feature_enabled, safe_redirect, pnl_pct as _pnl_pct
+from pftracker.utils import (
+    ZERO as _ZERO, feature_enabled, safe_redirect, pnl_pct as _pnl_pct,
+    fy_start_year, fy_label,
+)
 
 from .models import (
     ZerodhaAccount, StockHolding, MutualFundHolding,
@@ -30,7 +35,7 @@ from .models import (
     InsightGenerationSettings, RealEstateHolding,
 )
 from .forms import (
-    EPFEntryForm, PFEntryForm, NPSEntryForm, FixedDepositForm,
+    EPFEntryForm, PFEntryForm, PFFinancialYearForm, NPSEntryForm, FixedDepositForm,
     CashPositionForm, BondHoldingForm, CryptoHoldingForm,
     CommodityHoldingForm, FinancialGoalForm, USStockHoldingForm,
     RealEstateHoldingForm, RealEstateValuationForm,
@@ -39,6 +44,8 @@ from tracker.services import parse_fy_param
 from .services import (
     get_portfolio_summary,
     get_pf_summary,
+    get_pf_fy_breakdown,
+    _parse_inr,
     without_real_estate,
     get_commodity_summary,
     sync_zerodha_from_sheets,
@@ -673,16 +680,43 @@ def pf_detail(request):
         qs = qs.filter(account_name__iexact=selected_member)
     entries = list(qs)
     if selected_member:
-        contrib = sum((e.amount for e in entries if e.entry_type == 'CONTRIBUTION'), _ZERO)
-        interest = sum((e.amount for e in entries if e.entry_type == 'INTEREST'), _ZERO)
+        contrib = sum((e.contribution for e in entries), _ZERO)
+        interest = sum((e.interest for e in entries), _ZERO)
         balance = contrib + interest
     else:
         contrib = pf['pf_total_contrib']
         interest = pf['pf_total_interest']
         balance = pf['pf_balance']
 
+    # Financial Year breakdown
+    fy_entries = get_pf_fy_breakdown(group, selected_member=selected_member, is_baby=False)
+
+    current_fy = fy_start_year()
+    min_year = 2015
+    earliest_entry = PFEntry.objects.filter(group=group).order_by('date').first()
+    if earliest_entry:
+        min_year = min(min_year, fy_start_year(earliest_entry.date))
+
+    fy_options = [
+        {
+            'year': y,
+            'label': fy_label(y),
+            'is_current': (y == current_fy),
+        }
+        for y in range(current_fy + 1, min_year - 1, -1)
+    ]
+
+    growth_multiplier = (balance / contrib).quantize(Decimal('0.01')) if contrib > _ZERO else Decimal('1.00')
+    interest_share_pct = (interest / balance * 100).quantize(Decimal('0.1')) if balance > _ZERO else Decimal('0.0')
+    years_tracked = len({r['fy_year'] for r in fy_entries})
+
+    member_names = _pf_member_names(group)
+    default_member = selected_member or (member_names[0] if member_names else 'Atul')
+
     return render(request, 'portfolio/pf_detail.html', {
         'entries': entries,
+        'fy_entries': fy_entries,
+        'fy_options': fy_options,
         'total_contrib': contrib,
         'total_interest': interest,
         'balance': balance,
@@ -691,9 +725,119 @@ def pf_detail(request):
         'overall_interest': pf['pf_total_interest'],
         'pf_accounts': pf['pf_accounts'],
         'selected_member': selected_member,
-        'pf_member_names': _pf_member_names(group),
-        'form': PFEntryForm(initial={'account_name': selected_member or 'Atul'}),
+        'pf_member_names': member_names,
+        'growth_multiplier': growth_multiplier,
+        'interest_share_pct': interest_share_pct,
+        'years_tracked': years_tracked,
+        'current_fy': current_fy,
+        'default_member': default_member,
+        'form': PFEntryForm(initial={'account_name': default_member}),
+        'fy_form': PFFinancialYearForm(initial={'account_name': default_member, 'fy_year': current_fy}),
     })
+
+
+@login_required
+@_require_portfolio
+@require_POST
+def save_pf_fy_entry(request):
+    """Create or update PF contribution & interest entries for a Financial Year."""
+    group = _user_group(request)
+    if not group:
+        return redirect('pf_detail')
+
+    account_name = (request.POST.get('account_name') or 'Atul').strip()
+    if not account_name:
+        messages.error(request, "Account holder name is required.")
+        return redirect('pf_detail')
+
+    orig_member = (request.POST.get('orig_member') or account_name).strip()
+
+    try:
+        fy_year = int(request.POST.get('fy_year'))
+    except (TypeError, ValueError):
+        fy_year = fy_start_year()
+
+    try:
+        orig_fy_year = int(request.POST.get('orig_fy_year'))
+    except (TypeError, ValueError):
+        orig_fy_year = fy_year
+
+    contrib_val = _parse_inr(request.POST.get('contribution'))
+    interest_val = _parse_inr(request.POST.get('interest'))
+    remarks = (request.POST.get('remarks') or '').strip()
+    is_baby = request.POST.get('is_baby') in ('true', 'True', '1', 'on')
+
+    with transaction.atomic():
+        existing = PFEntry.objects.filter(
+            group=group,
+            account_name__iexact=orig_member,
+            fy_year=orig_fy_year,
+            is_baby=is_baby,
+        ).first()
+
+        if existing:
+            existing.account_name = account_name
+            existing.fy_year = fy_year
+            existing.financial_year = fy_label(fy_year)
+            existing.date = datetime.date(fy_year, 4, 1)
+            existing.contribution = contrib_val
+            existing.interest = interest_val
+            existing.remarks = remarks
+            existing.is_baby = is_baby
+            existing.save()
+        else:
+            PFEntry.objects.update_or_create(
+                group=group,
+                account_name=account_name,
+                fy_year=fy_year,
+                is_baby=is_baby,
+                defaults={
+                    'financial_year': fy_label(fy_year),
+                    'date': datetime.date(fy_year, 4, 1),
+                    'contribution': contrib_val,
+                    'interest': interest_val,
+                    'remarks': remarks,
+                },
+            )
+
+    messages.success(request, f"PF for {account_name} ({fy_label(fy_year)}) saved successfully.")
+    next_url = request.POST.get('next')
+    if next_url:
+        return safe_redirect(request, next_url)
+    return redirect(f"{reverse('pf_detail')}?member={quote(account_name)}")
+
+
+@login_required
+@_require_portfolio
+@require_POST
+def delete_pf_fy_entry(request):
+    """Delete PF entry for a member in a specific FY."""
+    group = _user_group(request)
+    if not group:
+        return redirect('pf_detail')
+
+    account_name = (request.POST.get('account_name') or '').strip()
+    if not account_name:
+        messages.error(request, "Account holder name is required.")
+        return redirect('pf_detail')
+
+    try:
+        fy_year = int(request.POST.get('fy_year'))
+    except (TypeError, ValueError):
+        messages.error(request, "Invalid Financial Year.")
+        return redirect('pf_detail')
+
+    PFEntry.objects.filter(
+        group=group,
+        account_name__iexact=account_name,
+        fy_year=fy_year,
+    ).delete()
+
+    messages.success(request, f"Deleted PF entry for {account_name} ({fy_label(fy_year)}).")
+    next_url = request.POST.get('next')
+    if next_url:
+        return safe_redirect(request, next_url)
+    return redirect(f"{reverse('pf_detail')}?member={quote(account_name)}")
 
 
 @login_required
