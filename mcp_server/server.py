@@ -1548,11 +1548,11 @@ def add_pf_entry(
     if not created:
         old_data = serialize_instance(entry)
         if c_val:
-            entry.contribution = c_val
+            entry.contribution = (entry.contribution or Decimal('0')) + c_val
         if i_val:
-            entry.interest = i_val
+            entry.interest = (entry.interest or Decimal('0')) + i_val
         if remarks:
-            entry.remarks = remarks
+            entry.remarks = f"{entry.remarks} · {remarks}" if entry.remarks else remarks
         if entry_date:
             entry.date = entry_date
         entry.save()

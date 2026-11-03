@@ -1038,6 +1038,8 @@ function openAddPfModal(defaultMember) {
   var form = document.getElementById('pfForm');
   form.action = "{% url 'save_pf_fy_entry' %}";
   form.reset();
+  var actType = document.getElementById('pfActionType');
+  if (actType) actType.value = 'add';
   var origMem = document.getElementById('pfOrigMember');
   if (origMem) origMem.value = '';
   var origYr = document.getElementById('pfOrigYear');
@@ -1065,8 +1067,54 @@ function openAddPfModal(defaultMember) {
     yearSelect.selectedIndex = 0;
   }
 
+  checkMasterPfExistingEntry();
   openModal('addPfModal');
 }
+
+var masterExistingPfMap = {
+  {% for e in pf_entries %}
+  '{{ e.account_name|lower|escapejs }}_{{ e.fy_year }}': {
+    contrib: '{{ e.contribution }}',
+    interest: '{{ e.interest }}',
+    label: '{{ e.financial_year }}'
+  },
+  {% endfor %}
+};
+
+function checkMasterPfExistingEntry() {
+  var actionType = document.getElementById('pfActionType') ? document.getElementById('pfActionType').value : 'add';
+  var alertEl = document.getElementById('pfExistingAlert');
+  var alertText = document.getElementById('pfExistingAlertText');
+  if (!alertEl || !alertText) return;
+
+  if (actionType !== 'add') {
+    alertEl.classList.add('hidden');
+    return;
+  }
+
+  var member = (document.getElementById('pfAccountName').value || '').trim().toLowerCase();
+  var year = document.getElementById('pfYearSelect') ? document.getElementById('pfYearSelect').value : '';
+  var key = member + '_' + year;
+
+  if (masterExistingPfMap && masterExistingPfMap[key]) {
+    var rec = masterExistingPfMap[key];
+    alertText.innerHTML = '<strong>' + rec.label + '</strong> already exists for this member. Saving will <strong>add</strong> the new amounts to the existing total (currently Contrib: ₹' + Number(rec.contrib).toLocaleString('en-IN') + ', Interest: ₹' + Number(rec.interest).toLocaleString('en-IN') + ').';
+    alertEl.classList.remove('hidden');
+  } else {
+    alertEl.classList.add('hidden');
+  }
+}
+
+document.addEventListener('input', function(e) {
+  if (e.target && (e.target.id === 'pfAccountName' || e.target.id === 'pfYearSelect')) {
+    checkMasterPfExistingEntry();
+  }
+});
+document.addEventListener('change', function(e) {
+  if (e.target && (e.target.id === 'pfAccountName' || e.target.id === 'pfYearSelect')) {
+    checkMasterPfExistingEntry();
+  }
+});
 
 function confirmDeletePf() {
   var member = document.getElementById('delPfAccount').value;
@@ -1268,6 +1316,10 @@ document.addEventListener('click', function(e) {
     var form = document.getElementById('pfForm');
     form.action = "{% url 'save_pf_fy_entry' %}";
     form.reset();
+    var actType = document.getElementById('pfActionType');
+    if (actType) actType.value = 'edit';
+    var alertEl = document.getElementById('pfExistingAlert');
+    if (alertEl) alertEl.classList.add('hidden');
     var member = btn.dataset.member || btn.dataset.account || 'Atul';
     var fy = btn.dataset.fy || '';
     var fyLabel = btn.dataset.fylabel || ('FY ' + fy);

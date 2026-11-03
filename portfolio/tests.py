@@ -1133,6 +1133,7 @@ class PFEntryTests(TestCase):
 
         # 4. Update FY 2025-26 (edit existing)
         resp = self.client.post(reverse('save_pf_fy_entry'), {
+            'action_type': 'edit',
             'account_name': 'Atul',
             'orig_member': 'Atul',
             'fy_year': '2025',
@@ -1148,6 +1149,31 @@ class PFEntryTests(TestCase):
         upd_entry = PFEntry.objects.get(group=self.group, fy_year=2025)
         self.assertEqual(upd_entry.contribution, Decimal('110000.00'))
         self.assertEqual(upd_entry.remarks, 'Updated FY26')
+
+        # 4a. Add a new entry to existing FY 2025-26 (action_type='add') -> must ACCUMULATE, not rewrite
+        resp = self.client.post(reverse('save_pf_fy_entry'), {
+            'action_type': 'add',
+            'account_name': 'Atul',
+            'fy_year': '2025',
+            'contribution': '40000.00',
+            'interest': '5000.00',
+            'remarks': 'Additional deposit',
+        })
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(PFEntry.objects.filter(group=self.group).count(), 2)
+        acc_entry = PFEntry.objects.get(group=self.group, fy_year=2025)
+        self.assertEqual(acc_entry.contribution, Decimal('150000.00'))
+        self.assertEqual(acc_entry.interest, Decimal('100000.00'))
+        self.assertIn('Updated FY26', acc_entry.remarks)
+        self.assertIn('Additional deposit', acc_entry.remarks)
+
+        # 4b. Verify safe_redirect blocks external malicious redirect
+        from django.test import RequestFactory
+        from pftracker.utils import safe_redirect
+        factory = RequestFactory()
+        bad_req = factory.post(reverse('save_pf_fy_entry'), {'next': 'https://evil.com/phish'})
+        red = safe_redirect(bad_req, fallback='pf_detail')
+        self.assertEqual(red.url, reverse('pf_detail'))
 
         # 5. Check pf_detail view context
         detail_resp = self.client.get(reverse('pf_detail') + '?member=Atul')

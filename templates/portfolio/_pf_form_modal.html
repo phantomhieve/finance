@@ -11,10 +11,15 @@
 
     <form id="pfForm" method="post" action="{% url 'save_pf_fy_entry' %}">{% csrf_token %}
       <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <input type="hidden" name="action_type" id="pfActionType" value="add">
       <input type="hidden" name="orig_member" id="pfOrigMember" value="">
       <input type="hidden" name="orig_fy_year" id="pfOrigYear" value="">
 
       <div class="space-y-3.5">
+        <div id="pfExistingAlert" class="alert alert-info py-2 px-3 text-xs flex items-center gap-2 hidden">
+          <span class="material-symbols-outlined text-sm shrink-0">info</span>
+          <span id="pfExistingAlertText"></span>
+        </div>
         {# Family Member #}
         <div class="form-field">
           <div class="flex items-center justify-between gap-2 mb-1">
