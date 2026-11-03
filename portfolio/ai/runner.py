@@ -7,7 +7,7 @@ import os
 
 from django.conf import settings
 
-from pftracker.ai_gateway import TaskType, gateway
+from pftracker.ai_gateway import TaskProfile, TaskType, gateway
 from .builder import _DecimalEncoder
 from .prompts import _MACRO_PROMPT, get_system_instruction
 from .schemas import PortfolioInsightsResponse
@@ -203,13 +203,11 @@ def call_ai_insights(prompt_data: dict, group=None) -> AIResult:
     )
 
     try:
-        is_debug = getattr(settings, 'DEBUG', True)
         parsed = gateway.generate_structured(
             schema=PortfolioInsightsResponse,
             prompt=user_message,
             system=get_system_instruction(group),
-            task=TaskType.REASONING,
-            temperature=0.2 if is_debug else 0.15,
+            task=TaskProfile.PORTFOLIO_INSIGHTS,
         )
         return AIResult(
             model=f"{provider}:insights",

@@ -25,7 +25,7 @@ from typing import Any
 from django.conf import settings
 from pydantic import BaseModel, Field
 
-from pftracker.ai_gateway import TaskType, gateway
+from pftracker.ai_gateway import TaskProfile, ai_config, gateway
 
 logger = logging.getLogger(__name__)
 
@@ -157,8 +157,7 @@ def discover_land_market_comps(holding: Any, is_debug: bool = False) -> Grounded
     """Stage 1: Fetch live local registry trends, circle rates, and macro data via Search Grounding."""
     logger.info("[LandAppraisal DAG] Stage 1: Discovering market comps for '%s'...", holding.name)
 
-    model = "gemini-2.5-flash-lite" if is_debug else "gemini-4-argon"
-    thinking_level = "LOW" if is_debug else "HIGH"
+    cfg = ai_config.resolve(TaskProfile.LAND_APPRAISAL_COMPS, is_debug=is_debug)
 
     corridor = holding.micro_market_tag or holding.locality
     prompt = f"""\
@@ -192,15 +191,16 @@ For major regional corridor catalysts (e.g. Airport, Film City, Expressway, Metr
 - Estimate the total delay in months from original baseline deadlines.
 """
 
+    cfg = ai_config.resolve(TaskProfile.LAND_APPRAISAL_COMPS, is_debug=is_debug)
     try:
         comps = gateway.generate_structured(
             schema=GroundedMarketComps,
             prompt=prompt,
-            task=TaskType.RESEARCH,
-            model=model,
-            preferred_node_id="gemini-cloud",
-            thinking_level=thinking_level,
-            temperature=0.1,
+            task=TaskProfile.LAND_APPRAISAL_COMPS,
+            model=cfg.model,
+            preferred_node_id=cfg.preferred_node_id,
+            thinking_level=cfg.thinking_level,
+            temperature=cfg.temperature,
         )
         if comps and (comps.observed_market_growth_pct or comps.median_portal_ask_per_sq_yd):
             logger.info(
@@ -284,18 +284,18 @@ MANDATORY AUDIT FORMULAS:
         "and prudent balance sheet valuation. Reject all speculative optimism. Return strictly structured JSON."
     )
 
-    model = "gemini-2.5-flash-lite" if is_debug else "gemini-4-argon"
-    thinking_level = "LOW" if is_debug else "HIGH"
+    cfg = ai_config.resolve(TaskProfile.LAND_APPRAISAL_AUDIT, is_debug=is_debug)
+    model = cfg.model
 
     try:
         review = gateway.generate_structured(
             schema=DeepSeekAuditorReview,
             prompt=f"{system}\n\n{prompt}",
-            task=TaskType.REASONING,
-            model=model,
-            preferred_node_id="gemini-cloud",
-            thinking_level=thinking_level,
-            temperature=0.1,
+            task=TaskProfile.LAND_APPRAISAL_AUDIT,
+            model=cfg.model,
+            preferred_node_id=cfg.preferred_node_id,
+            thinking_level=cfg.thinking_level,
+            temperature=cfg.temperature,
         )
         if review and review.conservative_appreciation_ceiling_pct:
             logger.info(
@@ -354,8 +354,8 @@ def synthesize_land_appreciation(
     """Stage 3: Argon reconciles Stage 1 comps and Stage 2 auditor review to set final growth rate."""
     logger.info("[LandAppraisal DAG] Stage 3: Synthesizing final appreciation with Argon...")
 
-    model = "gemini-2.5-flash-lite" if is_debug else "gemini-4-argon"
-    thinking_level = "LOW" if is_debug else "HIGH"
+    cfg = ai_config.resolve(TaskProfile.LAND_APPRAISAL_SYNTHESIS, is_debug=is_debug)
+    model = cfg.model
 
     current_val = float(holding.current_valuation)
     area = float(holding.area_value) if holding.area_value else 250.0
@@ -406,11 +406,11 @@ RECONCILIATION & GUARDRAILS:
         synthesis = gateway.generate_structured(
             schema=LandAppraisalSynthesis,
             prompt=f"{system}\n\n{prompt}",
-            task=TaskType.REASONING,
-            model=model,
-            preferred_node_id="gemini-cloud",
-            thinking_level=thinking_level,
-            temperature=0.1,
+            task=TaskProfile.LAND_APPRAISAL_SYNTHESIS,
+            model=cfg.model,
+            preferred_node_id=cfg.preferred_node_id,
+            thinking_level=cfg.thinking_level,
+            temperature=cfg.temperature,
         )
         if synthesis and synthesis.recommended_appreciation_pct is not None:
             # Enforce hard code-level guardrails

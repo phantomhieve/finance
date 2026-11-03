@@ -112,12 +112,17 @@ Vault is a multi-tenant, household-scoped personal finance, expense intelligence
 
 ### 5.1 Unified AI Gateway (`pftracker/ai_gateway/`)
 All LLM calls across `portfolio`, `expenses`, and `mcp_server` route through `pftracker.ai_gateway.gateway`:
-- **Task Tiers (`TaskType`)**:
-  - `FAST`: High-throughput categorization, statement line disambiguation (`llama3_3` / `gemini-2.5-flash`).
-  - `REASONING`: Deep multi-pillar portfolio strategy & forensic expense auditing (`deepseek-r1` / `gemini-2.5-pro`).
-  - `RESEARCH`: Live web-grounded market intelligence & weekly equity briefs (`gemini-2.5-flash` with Google Search grounding).
-  - `EXTRACTION`: Unstructured email and PDF statement table extraction.
-- **Resilience**: `NodeRouter` + `CircuitBreakerManager` handle priority failover, weighted round-robin across API key pools, 60s per-key cooldown on HTTP `429` rate limits, and JSON repair (`clean_json_text`, `safe_json_loads`) for reasoning models that emit `<think>` blocks.
+- **Central Configuration Manager (`TaskProfile`, `TaskSpec`, `ai_config` in `pftracker/ai_gateway/config.py`)**:
+  - Declarative single source of truth for all AI tasks (`PORTFOLIO_INSIGHTS`, `PORTFOLIO_DAG_ALLOCATION`, `PORTFOLIO_DAG_QUALITY`, `PORTFOLIO_DAG_MACRO`, `PORTFOLIO_DAG_STRATEGY`, `PORTFOLIO_DAG_SYNTHESIS`, `LAND_APPRAISAL_COMPS`, `LAND_APPRAISAL_AUDIT`, `LAND_APPRAISAL_SYNTHESIS`, `WEEKLY_BRIEF`, `EXPENSE_CATEGORIZATION`, `RECEIPT_PARSING`, `STATEMENT_PARSING`, `STATEMENT_MATCHING`, `EXPENSE_ANOMALY`, `MONTHLY_EXPENSE_NOTE`).
+  - Automatic Environment Tiering:
+    - **DEV (`DEBUG=True`)**: Cost-effective fast models (`gemini-2.5-flash-lite`, `gemini-3.8-flash`) with low thinking level (`LOW` or `thinking_budget=0`) for rapid development turnaround.
+    - **PROD (`DEBUG=False`)**: Frontier reasoning models (`gemini-4-argon`) with exhaustive thinking (`HIGH`) for fiduciary real estate appraisal and multi-pillar portfolio scoring; fast models (`gemini-3.8-flash`) with `thinking_budget=0` for instant expense classification and document parsing.
+  - Environment Overrides: Precedence hierarchy `direct kwargs > AI_TASK_MODEL_<NAME> > domain env (GEMINI_MODEL / EXPENSES_GEMINI_MODEL) > task spec`.
+- **Security Audit & Guardrails (`pftracker/ai_gateway/sanitizer.py`)**:
+  - **Financial PII Scrubbing (`mask_pii`)**: Automatically masks credit/debit cards (preserves last 4 digits for ledger matching), Indian PAN, Indian Aadhaar, Indian mobile phones, bank account numbers, OTP/PINs, and email addresses before outbound LLM transmission.
+  - **Prompt Injection Defense & Boundary Isolation (`wrap_user_payload`, `escape_xml_boundaries`, `detect_prompt_injection`)**: Delimits untrusted user inputs within escaped XML boundaries (`<user_payload>`) to prevent prompt breakouts, with heuristic detection of adversarial jailbreaks.
+  - **Secret Redaction in Logs & Traces (`mask_secrets`)**: Automatically strips Google API keys (`AIza...`), Bearer tokens, and OpenAI/Shakti keys from logs and exception traces.
+- **Resilience Engine**: `NodeRouter` + `CircuitBreakerManager` handle priority failover, weighted round-robin across API key pools, 60s per-key cooldown on HTTP `429` rate limits, IPv4 socket routing preference (preventing 75s IPv6 SYN drops), and JSON repair (`clean_json_text`, `safe_json_loads`) for reasoning traces.
 
 ### 5.2 Multi-Stage Portfolio DAG (`portfolio/dag.py`)
 Replaces monolithic prompts with a 3-stage fan-out / fan-in workflow:

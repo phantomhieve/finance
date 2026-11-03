@@ -32,7 +32,7 @@ from typing import Any
 from django.conf import settings
 from pydantic import BaseModel, Field
 
-from pftracker.ai_gateway import TaskType, gateway
+from pftracker.ai_gateway import TaskProfile, gateway
 from .ai import (
     AIResult,
     Insight,
@@ -219,8 +219,7 @@ Portfolio Slice:
     return gateway.generate_structured(
         schema=AllocationLensResult,
         prompt=prompt,
-        task=TaskType.FAST,
-        temperature=0.1,
+        task=TaskProfile.PORTFOLIO_DAG_ALLOCATION,
     )
 
 
@@ -254,8 +253,7 @@ Portfolio Slice:
     return gateway.generate_structured(
         schema=QualityLensResult,
         prompt=prompt,
-        task=TaskType.FAST,
-        temperature=0.1,
+        task=TaskProfile.PORTFOLIO_DAG_QUALITY,
     )
 
 
@@ -288,8 +286,7 @@ Portfolio Slice:
     return gateway.generate_structured(
         schema=MacroStressLensResult,
         prompt=prompt,
-        task=TaskType.FAST,
-        temperature=0.1,
+        task=TaskProfile.PORTFOLIO_DAG_MACRO,
     )
 
 
@@ -337,8 +334,7 @@ Synthesis Context:
     return gateway.generate_structured(
         schema=StrategyLensResult,
         prompt=prompt,
-        task=TaskType.REASONING,
-        temperature=0.2,
+        task=TaskProfile.PORTFOLIO_DAG_STRATEGY,
     )
 
 
@@ -421,8 +417,7 @@ DAG Compilation Brief:
     final_response = gateway.generate_structured(
         schema=PortfolioInsightsResponse,
         prompt=prompt,
-        task=TaskType.REASONING,
-        temperature=0.2 if getattr(settings, 'DEBUG', True) else 0.15,
+        task=TaskProfile.PORTFOLIO_DAG_SYNTHESIS,
     )
 
     # Hard-enforce grounded score in case model adjusted it

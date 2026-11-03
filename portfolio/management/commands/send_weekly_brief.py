@@ -6,7 +6,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from django.template.loader import render_to_string
 
-from pftracker.ai_gateway import TaskType, gateway
+from pftracker.ai_gateway import TaskProfile, TaskType, ai_config, gateway
 from tracker.models import AccountGroup
 from portfolio.ai import _load_investor_profile
 from portfolio.emails import apply_floor, build_weekly_context, send_html_email
@@ -91,13 +91,14 @@ class Command(BaseCommand):
                 "based on their net performance. Two sentences max per stock.\n"
                 f"Stocks: {stocks_json}\n"
             )
+            cfg = ai_config.resolve(TaskProfile.WEEKLY_BRIEF)
             parsed = gateway.generate_structured(
                 schema=WeeklyAnalysisResponse,
                 prompt=prompt,
-                task=TaskType.REASONING,
-                model="gemini-3.8-flash",
-                thinking_level="HIGH",
-                temperature=0.2,
+                task=TaskProfile.WEEKLY_BRIEF,
+                model=cfg.model,
+                thinking_level=cfg.thinking_level,
+                temperature=cfg.temperature,
             )
             if not parsed:
                 return DEFAULT_FLOOR, {}

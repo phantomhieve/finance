@@ -34,7 +34,7 @@ A production-grade personal finance, multi-asset wealth management, and househol
      - **Execution Slippage Penalty (ESP)**: $2.5\%$ haircut per 6 months of corridor infrastructure delays.
      - **Macro Growth Ceiling**: $\text{Repo Rate} + \text{CPI Inflation} + 3.0\%$ illiquidity risk premium (capping ledger markup).
   3. *Stage 3 (Frontier Synthesis)*: Executed on Argon with High Thinking (`gemini-4-argon` in production; `gemini-2.5-flash-lite` in dev). Separates approved balance sheet carrying value from unrealized speculative buffer and dispatches a rich HTML email certificate (`templates/emails/land_appraisal.html`).
-- **Unified AI Gateway (`pftracker/ai_gateway/`)** — Centralized multi-provider routing engine supporting Shakti Cloud (`deepseek-r1`, `llama3_3`) and Google Gemini, featuring task-tier routing (`FAST`, `REASONING`, `RESEARCH`, `EXTRACTION`), multi-key pool rotation on HTTP 429 rate limits, circuit breakers, and automatic `DEBUG` vs. Production model tiering.
+- **Unified AI Gateway (`pftracker/ai_gateway/`)** — Centralized multi-provider routing engine supporting Shakti Cloud (`deepseek-r1`, `llama3_3`) and Google Gemini (`gemini-4-argon`, `gemini-3.8-flash`, `gemini-2.5-flash-lite`). Features declarative task profiles (`TaskProfile`), automatic Dev (`DEBUG=True`) vs. Prod (`DEBUG=False`) model & thinking tiering, multi-key pool rotation on HTTP 429 rate limits, circuit breakers, PII scrubbing (cards, PAN, Aadhaar, accounts, OTPs), prompt injection boundary isolation, and secret redaction.
 - **Model Context Protocol (MCP) Server (`/mcp/sse`)** — Native FastMCP SSE endpoint exposing 30+ read/write financial tools to external AI agents (Claude, ChatGPT, Cursor) secured by OAuth 2.0 PKCE, role/scope enforcement (`MCPTokenAuthMiddleware`), and reversible `MCPAuditLog` before/after snapshots.
 
 ---
@@ -124,6 +124,28 @@ Vault's portfolio intelligence (`portfolio/dag.py`) replaces monolithic prompts 
                                     │ • Executive Summary & Outlook│
                                     └─────────────────────────────┘
 ```
+
+---
+
+## AI Gateway Central Configuration & Security Architecture
+
+All AI operations in Vault route through a single, declarative gateway in `pftracker/ai_gateway/`:
+
+### 1. Central Configuration (`TaskProfile` & `ai_config`)
+Instead of hardcoding models, temperatures, or thinking settings across disparate files, tasks declare a semantic profile:
+- **Profiles**: `PORTFOLIO_INSIGHTS`, `PORTFOLIO_DAG_ALLOCATION`, `PORTFOLIO_DAG_QUALITY`, `PORTFOLIO_DAG_MACRO`, `PORTFOLIO_DAG_STRATEGY`, `PORTFOLIO_DAG_SYNTHESIS`, `LAND_APPRAISAL_COMPS`, `LAND_APPRAISAL_AUDIT`, `LAND_APPRAISAL_SYNTHESIS`, `WEEKLY_BRIEF`, `EXPENSE_CATEGORIZATION`, `RECEIPT_PARSING`, `STATEMENT_PARSING`, `STATEMENT_MATCHING`, `EXPENSE_ANOMALY`, `MONTHLY_EXPENSE_NOTE`.
+- **Environment-Aware Optimization**:
+  - **Dev (`DEBUG=True`)**: Fast, cost-effective models (`gemini-2.5-flash-lite`, `gemini-3.8-flash`) and minimal/low thinking (`ThinkingLevel.LOW` or `thinking_budget=0`) for rapid developer iterations.
+  - **Prod (`DEBUG=False`)**: Frontier reasoning models (`gemini-4-argon`) with `ThinkingLevel.HIGH` for fiduciary portfolio scoring and annual real estate revaluation; fast models (`gemini-3.8-flash`) with `thinking_budget=0` for instantaneous categorization and OCR extraction.
+- **Dynamic Overrides**: `AI_TASK_MODEL_<NAME>` (per-task), `GEMINI_MODEL`, and `EXPENSES_GEMINI_MODEL` environment variables allow operational overrides without touching code.
+
+### 2. Privacy & Security Defenses
+- **PII Scrubbing (`mask_pii`)**: Automatically redacts sensitive Indian personal and financial data before outbound transmission to cloud LLMs:
+  - Credit/Debit cards (`[CARD_...4444]`, preserving last 4 digits for ledger reconciliation).
+  - Indian PAN (`[PAN_REDACTED]`), Aadhaar (`[AADHAAR_REDACTED]`), and mobile phones (`[PHONE_REDACTED]`).
+  - Bank account numbers (`[ACCOUNT_REDACTED]`), OTP/PIN codes (`[OTP_REDACTED]`), and email addresses (`[EMAIL_REDACTED]`).
+- **Prompt Injection Defense (`wrap_user_payload`, `escape_xml_boundaries`, `detect_prompt_injection`)**: User data is isolated within XML boundary tags with angle bracket escaping to prevent tag breakout or instruction hijacking.
+- **Credential Protection (`mask_secrets`)**: Strips Google API keys (`AIza...`), Bearer tokens, and OpenAI/Shakti keys from logs and exception traces to guarantee zero credential leakage.
 
 ---
 
