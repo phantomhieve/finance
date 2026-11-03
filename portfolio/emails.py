@@ -4,6 +4,7 @@ import os
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from django.db.models import Sum
+from django.template.loader import render_to_string
 from django.utils import timezone as _tz
 
 import datetime
@@ -226,3 +227,80 @@ def apply_floor(ctx, floor):
     ctx['coverage_pct'] = round(liquid / floor * 100) if floor else 100
     ctx['coverage_bar'] = min(100, ctx['coverage_pct'])
     return ctx
+
+
+def build_land_appraisal_context(results, fy, group=None):
+    """Build context for the Annual FY-End Land Appraisal Email."""
+    active_results = [r for r in results if not r.get('skipped')]
+    total_old = sum((r['old'] for r in active_results), Decimal('0'))
+    total_new = sum((r['new'] for r in active_results), Decimal('0'))
+    total_gain = total_new - total_old
+    overall_pct = ((total_gain / total_old) * 100).quantize(Decimal('0.01')) if total_old > 0 else Decimal('0')
+
+    items = []
+    for r in active_results:
+        h = r['holding']
+        appraisal = r.get('appraisal')
+        items.append({
+            'holding': h,
+            'old': r['old'],
+            'new': r['new'],
+            'gain': r['new'] - r['old'],
+            'pct': r['pct'],
+            'appraisal': appraisal,
+            'is_ai': appraisal is not None,
+        })
+
+    primary_holding = items[0] if items else None
+
+    return {
+        'fy': fy,
+        'results': items,
+        'has_revaluations': bool(items),
+        'primary': primary_holding,
+        'total_old': total_old,
+        'total_new': total_new,
+        'total_gain': total_gain,
+        'overall_pct': overall_pct,
+        'as_of': _tz.localtime().strftime('%d %b %Y'),
+        'app_url': app_url('/portfolio/'),
+    }
+
+
+def send_land_appraisal_email(results, fy, group=None, target_email=None):
+    """Render and dispatch the Land Appraisal Email to the household."""
+    active_results = [r for r in results if not r.get('skipped')]
+    if not active_results:
+        return False, "No active land revaluations to report."
+
+    if not target_email:
+        target_email = (
+            os.environ.get('VAULT_REPORT_EMAIL')
+            or getattr(settings, 'VAULT_REPORT_EMAIL', '')
+            or getattr(settings, 'EMAIL_HOST_USER', '')
+        )
+    if not target_email and group:
+        primary = group.members.filter(user_type='PRIMARY').first()
+        target_email = primary.email if primary and primary.email else ''
+
+    if not target_email:
+        return False, "No recipient email configured. Set VAULT_REPORT_EMAIL in .env."
+
+    ctx = build_land_appraisal_context(results, fy, group=group)
+    primary = ctx['primary']
+    subject = f"Vault Real Estate Revaluation · {primary['holding'].name} (+{primary['pct']:.2f}% for {fy})"
+
+    lines = [
+        f"Vault Real Estate Revaluation — {fy}",
+        f"Asset: {primary['holding'].name}",
+        f"Valuation: INR {primary['old']:,.0f} -> INR {primary['new']:,.0f} (+{primary['pct']:.2f}%)",
+    ]
+    if primary.get('appraisal'):
+        appraisal = primary['appraisal']
+        lines.append(f"Consensus: {appraisal.model_chain_used}")
+        lines.append(f"Methodology: {appraisal.methodology_summary}")
+
+    html = render_to_string('emails/land_appraisal.html', ctx)
+    send_html_email(subject, '\n'.join(lines), html, [target_email])
+    return True, f"Sent land appraisal email to {target_email}"
+

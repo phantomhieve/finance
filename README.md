@@ -21,11 +21,19 @@ A production-grade personal finance, multi-asset wealth management, and househol
   - **Fixed Income & Retirement**: EPF ledger (Employee + Employer + Interest), NPS state tracking, and Fixed Deposits (`SIMPLE`, `MONTHLY`, `QUARTERLY`, `ANNUAL` compounding math).
   - **Liquid Cash, Bonds & Crypto**: Cash positions, sovereign/corporate bonds, and crypto holdings.
   - **US Stocks & RSUs**: Dollar-denominated RSU vests (e.g., Uber) with live USD/INR currency conversion.
-  - **Real Estate Holdings**: Supports North Indian land units (`Gaj`, `Sq. Yards`, `Sq. Ft`, `Bigha`, `Acres`, `Sq. Meters`), stamp duty cost basis, rental yields, holding CAGR, annual FY land appreciation, and 1-click micro-market LLM research prompts.
+  - **Real Estate Holdings**: Supports North Indian land units (`Gaj`, `Sq. Yards`, `Sq. Ft`, `Bigha`, `Acres`, `Sq. Meters`), stamp duty cost basis, rental yields, holding CAGR, annual FY-end AI land revaluation (`portfolio/land_appraisal.py`) via an adversarial consensus DAG (Argon + DeepSeek rules), audit trail remarks, and automated HTML email notifications.
   - **Child Portfolio Segregation (`is_baby`)**: Isolate assets ear-marked for a child's future (`/portfolio/baby/`) from the Master Portfolio with instant CSRF-protected toggle controls.
 - **Jewellery Vault (`/jewellery/`)** — Physical precious metals & ornament catalog (Gold, Silver, Platinum, Diamond) with purity fineness multipliers (`24K`, `22K`, `18K`, `14K`, `999`, `925`), storage location tracking (`Bank Locker` vs. `Home Safe`), live spot-rate valuations, UUID-isolated photo storage, iPhone HEIC/HEIF conversion, and cached WebP thumbnails.
 - **AI Portfolio Insights & Multi-Stage DAG Engine** — Directed Acyclic Graph workflow (`portfolio/dag.py`) running parallel diagnostic lenses (Allocation & Liquidity, Asset Quality & Legacy MF Audit, Macro Regime & `-35%` Crash Stress), Indian FY tax harvesting synthesis (Section 112A LTCG & Section 54/54EC), and deterministic composite health scoring:
   $$\text{Health Score} = \text{round}(0.30 \times S_{\text{allocation}} + 0.25 \times S_{\text{quality}} + 0.25 \times S_{\text{strategy}} + 0.20 \times S_{\text{macro}})$$
+- **AI Land Revaluation Multi-Stage DAG Engine (`portfolio/land_appraisal.py`)** — Replaces hardcoded annual markups with a 3-stage fiduciary valuation DAG:
+  1. *Stage 1 (Empirical Grounding)*: Google Search Grounding extracts government circle rates, local registry baselines, median portal asks, CPI inflation, and infrastructure milestone timelines (Jewar Airport, Film City).
+  2. *Stage 2 (Fiduciary Auditor Review)*: Applies mathematical sanitization formulated via adversarial consensus:
+     - **Speculative Ask Haircut (SAH)**: Mandatory 30% discount on raw broker asks to reflect true registry deeds.
+     - **Dynamic Illiquidity & Friction Discount (IFD)**: $9.0\% + (\text{Repo Rate} \times 0.75)$ (with a strict $15.0\%$ floor) accounting for 6–12 month exit friction.
+     - **Execution Slippage Penalty (ESP)**: $2.5\%$ haircut per 6 months of corridor infrastructure delays.
+     - **Macro Growth Ceiling**: $\text{Repo Rate} + \text{CPI Inflation} + 3.0\%$ illiquidity risk premium (capping ledger markup).
+  3. *Stage 3 (Frontier Synthesis)*: Executed on Argon with High Thinking (`gemini-4-argon` in production; `gemini-2.5-flash-lite` in dev). Separates approved balance sheet carrying value from unrealized speculative buffer and dispatches a rich HTML email certificate (`templates/emails/land_appraisal.html`).
 - **Unified AI Gateway (`pftracker/ai_gateway/`)** — Centralized multi-provider routing engine supporting Shakti Cloud (`deepseek-r1`, `llama3_3`) and Google Gemini, featuring task-tier routing (`FAST`, `REASONING`, `RESEARCH`, `EXTRACTION`), multi-key pool rotation on HTTP 429 rate limits, circuit breakers, and automatic `DEBUG` vs. Production model tiering.
 - **Model Context Protocol (MCP) Server (`/mcp/sse`)** — Native FastMCP SSE endpoint exposing 30+ read/write financial tools to external AI agents (Claude, ChatGPT, Cursor) secured by OAuth 2.0 PKCE, role/scope enforcement (`MCPTokenAuthMiddleware`), and reversible `MCPAuditLog` before/after snapshots.
 
@@ -199,7 +207,7 @@ codegraph sync
 | `sync_sheets` | `portfolio` | Syncs Zerodha equity and mutual fund holdings from Google Sheets |
 | `refresh_prices` | `portfolio` | Scrapes latest 24K Gold and Silver spot rates (`goodreturns.in`) and updates `CommodityPrice` |
 | `take_snapshot` | `portfolio` | Captures month-end `MonthlySnapshot` of net worth, capital added, and returns |
-| `appreciate_land` | `portfolio` | Applies annual FY-end capital appreciation (+6%) to qualifying `RealEstateHolding` plots |
+| `appreciate_land` | `portfolio` | Executes annual FY-end AI land revaluation DAG (Argon + DeepSeek rules), saves audit remarks, and emails certificate |
 | `send_weekly_brief` | `portfolio` | Generates and emails the Sunday AI Equity Intelligence Brief |
 | `send_monthly_summary` | `portfolio` | Dispatches the monthly AI portfolio health & performance email |
 | `send_fy_review` | `portfolio` | Generates the annual April 1 Financial Year close wealth review |
@@ -220,7 +228,7 @@ Recommended production schedule (`CRON_TZ=Asia/Kolkata`):
 | **Daily `09:00 IST`** | `expense_reminders` | Credit card statement due-date reminders |
 | **Daily `23:30 IST`** | `backup_db` | Automated PostgreSQL encrypted backup to GCS |
 | **Sunday `06:30 IST`** | `send_weekly_brief` | Weekly AI Equity Intelligence Brief email |
-| **1st of Month `05:45 IST`** | `appreciate_land` | Annual April 1 land valuation step-up |
+| **1st of April `05:45 IST`** | `appreciate_land` | Annual April 1 AI land revaluation step-up & email certificate |
 | **1st of Month `06:00 IST`** | `take_snapshot` | Monthly portfolio net-worth snapshot |
 | **1st of Month `06:30 IST`** | `send_monthly_summary` | Monthly AI portfolio review email |
 | **1st of Month `08:00 IST`** | `sync_expenses && send_expense_summary` | Monthly household expense report |

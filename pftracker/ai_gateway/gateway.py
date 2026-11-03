@@ -52,6 +52,13 @@ class AIGateway:
     ) -> GatewayResult:
         """Execute text generation with multi-node load balancing and automatic failover."""
         self.initialize()
+        if preferred_node_id is None and model:
+            m_low = model.lower()
+            if any(m_low.startswith(p) for p in ("gemini", "argon", "flash")):
+                preferred_node_id = "gemini-cloud"
+            elif any(m_low.startswith(p) for p in ("deepseek", "llama", "shakti")):
+                preferred_node_id = "shakti-primary"
+
         start_time = time.time()
         attempted_errors: list[str] = []
         fallback_used = False
@@ -128,6 +135,13 @@ class AIGateway:
     ) -> T:
         """Execute structured JSON generation with Pydantic validation and automatic failover."""
         self.initialize()
+        if preferred_node_id is None and model:
+            m_low = model.lower()
+            if any(m_low.startswith(p) for p in ("gemini", "argon", "flash")):
+                preferred_node_id = "gemini-cloud"
+            elif any(m_low.startswith(p) for p in ("deepseek", "llama", "shakti")):
+                preferred_node_id = "shakti-primary"
+
         attempted_errors: list[str] = []
 
         for node, active_key in self.router.plan_execution_nodes(task=task, preferred_node_id=preferred_node_id):

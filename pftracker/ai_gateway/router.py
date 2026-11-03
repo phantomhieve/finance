@@ -40,6 +40,11 @@ class NodeRouter:
         # 1. Handle explicit preferred node
         if preferred_node_id:
             target = self._registry.get(preferred_node_id)
+            if not target:
+                for n in all_nodes:
+                    if n.provider == preferred_node_id or (preferred_node_id.startswith("gemini") and n.provider == "gemini"):
+                        target = n
+                        break
             if target and target.is_active:
                 key, _ = self._circuit_breaker.get_active_key(target)
                 yield target, key

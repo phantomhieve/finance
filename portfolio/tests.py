@@ -2,6 +2,7 @@ import datetime
 import json
 import time
 from decimal import Decimal
+from unittest import mock
 
 from django.test import TestCase, Client
 from django.urls import reverse
@@ -990,5 +991,327 @@ class PFEntryTests(TestCase):
         # Delete via MCP delete_record
         del_res = json.loads(mcp_srv.delete_record('portfolio.PFEntry', entry_id))
         self.assertEqual(del_res['status'], 'deleted')
+
+
+class WeeklyBriefCommandTests(TestCase):
+    def setUp(self):
+        self.group = AccountGroup.objects.create(name="WeeklyHome")
+        self.user = User.objects.create_user(username="weekly_user", password="pw", user_type="PRIMARY", group=self.group, email="test@example.com")
+
+    @mock.patch('portfolio.management.commands.send_weekly_brief.gateway.generate_structured')
+    @mock.patch('portfolio.management.commands.send_weekly_brief.gateway.is_available', return_value=True)
+    def test_weekly_brief_ai_model_and_thinking(self, mock_avail, mock_gen):
+        from portfolio.management.commands.send_weekly_brief import Command, WeeklyAnalysisResponse, AIContextItem
+
+        mock_gen.return_value = WeeklyAnalysisResponse(safety_floor_inr=500000.0, items=[AIContextItem(symbol="INFY", context="Solid moat")])
+        cmd = Command()
+        floor, notes = cmd._ai_context(self.group, [{'symbol': 'INFY', 'pnl_pct': 10.0}])
+        self.assertEqual(floor, 500000.0)
+        self.assertEqual(notes, {'INFY': 'Solid moat'})
+        mock_gen.assert_called_once()
+        _, kwargs = mock_gen.call_args
+        self.assertEqual(kwargs.get('model'), 'gemini-3.8-flash')
+        self.assertEqual(kwargs.get('thinking_level'), 'HIGH')
+
+
+class LandAppraisalTests(TestCase):
+    def setUp(self):
+        self.group = AccountGroup.objects.create(name="LandGroup")
+        self.plot = RealEstateHolding.objects.create(
+            group=self.group,
+            name="Yamuna Expressway Sector 22D Plot",
+            property_type="PLOT_LAND",
+            area_value=Decimal("250"),
+            area_unit="GAJ",
+            locality="Sector 22D, Yamuna Expressway",
+            city="Greater Noida",
+            state="Uttar Pradesh",
+            micro_market_tag="yamuna_expressway_sec22d",
+            purchase_date=datetime.date(2021, 5, 10),
+            purchase_price=Decimal("8000000"),
+            current_valuation=Decimal("12000000"),
+        )
+        self.apr1 = datetime.date(2026, 4, 1)
+
+    @mock.patch('portfolio.land_appraisal.synthesize_land_appreciation')
+    @mock.patch('portfolio.land_appraisal.run_deepseek_auditor_review')
+    @mock.patch('portfolio.land_appraisal.discover_land_market_comps')
+    def test_run_land_appraisal_dag_end_to_end(self, mock_stage1, mock_stage2, mock_stage3):
+        from portfolio.land_appraisal import (
+            GroundedMarketComps,
+            DeepSeekAuditorReview,
+            LandAppraisalSynthesis,
+            run_land_appraisal_dag,
+        )
+
+        mock_stage1.return_value = GroundedMarketComps(
+            locality="Sector 22D",
+            city="Greater Noida",
+            median_portal_ask_per_sq_yd=65000.0,
+            circle_rate_floor_per_sq_yd=35000.0,
+            circle_rate_growth_pct=7.0,
+            observed_market_growth_pct=8.5,
+            rbi_repo_rate_pct=6.5,
+            cpi_inflation_pct=5.4,
+            infrastructure_delay_months=6,
+            infrastructure_catalysts=["Noida International Airport", "Film City"],
+            summary="Strong corridor momentum",
+        )
+        mock_stage2.return_value = DeepSeekAuditorReview(
+            gross_market_growth_pct=8.5,
+            speculative_ask_haircut_pct=30.0,
+            illiquidity_friction_discount_pct=15.0,
+            execution_slippage_penalty_pct=2.5,
+            max_allowable_yoy_growth_cap_pct=14.9,
+            conservative_appreciation_ceiling_pct=5.5,
+            auditor_verdict="Deduct speculative asking premiums.",
+            key_skeptical_concerns=["Possession delays"],
+        )
+        mock_stage3.return_value = LandAppraisalSynthesis(
+            holding_id=self.plot.id,
+            holding_name=self.plot.name,
+            closing_fy="FY 2025-26",
+            current_valuation_inr=12000000.0,
+            recommended_appreciation_pct=5.5,
+            new_valuation_inr=12660000.0,
+            net_value_increase_inr=660000.0,
+            implied_rate_per_sq_yd_inr=50640.0,
+            conservative_margin_of_safety_pct=3.0,
+            methodology_summary="Grounded at 5.5% net after fiduciary haircuts.",
+            key_drivers=["Airport progress"],
+            risk_haircuts_applied=["Speculative broker markup discount"],
+            confidence_score=0.9,
+            model_chain_used="gemini-grounding -> deepseek-auditor -> gemini-4-argon",
+        )
+
+        appraisal = run_land_appraisal_dag(self.plot, closing_fy="FY 2025-26", today=self.apr1, is_debug=False)
+        self.assertEqual(appraisal.recommended_appreciation_pct, 5.5)
+        self.assertEqual(appraisal.new_valuation_inr, 12660000.0)
+        self.assertIn("gemini-4-argon", appraisal.model_chain_used)
+
+    @mock.patch('portfolio.land_appraisal.run_land_appraisal_dag')
+    def test_apply_annual_land_appreciation_with_ai(self, mock_dag):
+        from portfolio.services import apply_annual_land_appreciation
+        from portfolio.land_appraisal import LandAppraisalSynthesis
+
+        mock_dag.return_value = LandAppraisalSynthesis(
+            holding_id=self.plot.id,
+            holding_name=self.plot.name,
+            closing_fy="FY 2025-26",
+            current_valuation_inr=12000000.0,
+            recommended_appreciation_pct=6.5,
+            new_valuation_inr=12780000.0,
+            net_value_increase_inr=780000.0,
+            implied_rate_per_sq_yd_inr=51120.0,
+            conservative_margin_of_safety_pct=2.0,
+            methodology_summary="Balanced FY appraisal via synthesized DAG",
+            key_drivers=["Corridor expansion"],
+            risk_haircuts_applied=["Illiquidity discount"],
+            confidence_score=0.88,
+            model_chain_used="gemini-grounding -> deepseek-auditor -> gemini-4-argon",
+        )
+
+        fy, results = apply_annual_land_appreciation(today=self.apr1, use_ai=True)
+        self.assertEqual(fy, "FY 2025-26")
+        self.assertEqual(len(results), 1)
+        r = results[0]
+        self.assertEqual(r['pct'], Decimal('6.5'))
+        self.assertEqual(r['new'], Decimal('12780000'))
+        self.plot.refresh_from_db()
+        self.assertEqual(self.plot.current_valuation, Decimal('12780000'))
+        self.assertEqual(self.plot.last_appreciated_fy, "FY 2025-26")
+        self.assertIn("[AI FY-End Appraisal FY 2025-26]", self.plot.remarks)
+
+    def test_land_appraisal_dag_fallbacks(self):
+        from portfolio.land_appraisal import (
+            _fallback_market_comps,
+            _fallback_auditor_review,
+            _fallback_synthesis,
+        )
+        comps = _fallback_market_comps(self.plot)
+        self.assertEqual(comps.observed_market_growth_pct, 7.5)
+        auditor = _fallback_auditor_review(comps)
+        self.assertEqual(auditor.conservative_appreciation_ceiling_pct, 6.0)
+        synth = _fallback_synthesis(self.plot, "FY 2025-26", comps, auditor)
+        self.assertEqual(synth.recommended_appreciation_pct, 6.0)
+        self.assertEqual(synth.new_valuation_inr, 12720000.0)
+
+    @mock.patch('portfolio.management.commands.appreciate_land.apply_annual_land_appreciation')
+    def test_appreciate_land_command_options(self, mock_apply):
+        from django.core.management import call_command
+        from io import StringIO
+        mock_apply.return_value = ("FY 2025-26", [{
+            'holding': self.plot,
+            'old': Decimal('12000000'),
+            'new': Decimal('12720000'),
+            'pct': Decimal('6.00'),
+            'appraisal': None,
+            'skipped': False,
+        }])
+
+        # 1. Test default AI mode
+        out = StringIO()
+        call_command('appreciate_land', stdout=out)
+        mock_apply.assert_called_with(pct=None, dry_run=False, use_ai=True)
+
+        # 2. Test --no-ai
+        out = StringIO()
+        call_command('appreciate_land', '--no-ai', stdout=out)
+        mock_apply.assert_called_with(pct=None, dry_run=False, use_ai=False)
+
+        # 3. Test manual --pct
+        out = StringIO()
+        call_command('appreciate_land', '--pct', '7.5', stdout=out)
+        mock_apply.assert_called_with(pct=Decimal('7.5'), dry_run=False, use_ai=False)
+
+        # 4. Test --dry-run
+        out = StringIO()
+        call_command('appreciate_land', '--dry-run', stdout=out)
+        mock_apply.assert_called_with(pct=None, dry_run=True, use_ai=True)
+
+    @mock.patch('portfolio.emails.send_html_email')
+    def test_land_appraisal_email_rendering_and_dispatch(self, mock_email):
+        from portfolio.emails import build_land_appraisal_context, send_land_appraisal_email
+        from portfolio.land_appraisal import LandAppraisalSynthesis
+        from django.template.loader import render_to_string
+
+        appraisal = LandAppraisalSynthesis(
+            holding_id=self.plot.id,
+            holding_name=self.plot.name,
+            closing_fy="FY 2025-26",
+            current_valuation_inr=12000000.0,
+            recommended_appreciation_pct=5.5,
+            new_valuation_inr=12660000.0,
+            net_value_increase_inr=660000.0,
+            implied_rate_per_sq_yd_inr=50640.0,
+            conservative_margin_of_safety_pct=3.0,
+            methodology_summary="Grounded at 5.5% net after fiduciary haircuts.",
+            key_drivers=["Jewar Airport Phase 1 progress"],
+            risk_haircuts_applied=["Speculative broker markup discount"],
+            confidence_score=0.9,
+            model_chain_used="gemini-grounding -> argon-auditor -> gemini-4-argon",
+        )
+        results = [{
+            'holding': self.plot,
+            'old': Decimal('12000000'),
+            'new': Decimal('12660000'),
+            'pct': Decimal('5.50'),
+            'appraisal': appraisal,
+            'skipped': False,
+        }]
+
+        # Context builder
+        ctx = build_land_appraisal_context(results, "FY 2025-26", group=self.group)
+        self.assertTrue(ctx['has_revaluations'])
+        self.assertEqual(ctx['primary']['holding'].name, self.plot.name)
+        self.assertEqual(ctx['total_gain'], Decimal('660000'))
+
+        # Template render
+        html = render_to_string('emails/land_appraisal.html', ctx)
+        self.assertIn("Yamuna Expressway Sector 22D Plot", html)
+        self.assertIn("1,26,60,000", html)
+        self.assertIn("YEIDA Fiduciary Valuation Certificate", html)
+
+        # Dispatch
+        ok, msg = send_land_appraisal_email(results, "FY 2025-26", group=self.group, target_email="family@example.com")
+        self.assertTrue(ok)
+        mock_email.assert_called_once()
+        subject, body, html_out, recipients = mock_email.call_args[0]
+        self.assertIn("Vault Real Estate Revaluation", subject)
+        self.assertEqual(recipients, ["family@example.com"])
+
+    @mock.patch('portfolio.management.commands.appreciate_land.apply_annual_land_appreciation')
+    @mock.patch('portfolio.emails.send_land_appraisal_email')
+    def test_command_triggers_email(self, mock_email, mock_apply):
+        from django.core.management import call_command
+        from io import StringIO
+
+        mock_apply.return_value = ("FY 2025-26", [{
+            'holding': self.plot,
+            'old': Decimal('12000000'),
+            'new': Decimal('12660000'),
+            'pct': Decimal('5.50'),
+            'appraisal': None,
+            'skipped': False,
+        }])
+        mock_email.return_value = (True, "Email dispatched")
+
+        # 1. Live run sends email
+        out = StringIO()
+        call_command('appreciate_land', stdout=out)
+        mock_email.assert_called_once()
+
+        # 2. --no-email suppresses email
+        mock_email.reset_mock()
+        out = StringIO()
+        call_command('appreciate_land', '--no-email', stdout=out)
+        mock_email.assert_not_called()
+
+        # 3. --dry-run suppresses email by default
+        mock_email.reset_mock()
+        out = StringIO()
+        call_command('appreciate_land', '--dry-run', stdout=out)
+        mock_email.assert_not_called()
+
+        # 4. --dry-run with --send-email sends email
+        mock_email.reset_mock()
+        out = StringIO()
+        call_command('appreciate_land', '--dry-run', '--send-email', stdout=out)
+        mock_email.assert_called_once()
+
+    @mock.patch('portfolio.land_appraisal.gateway.generate_structured')
+    def test_dag_stages_use_argon_in_production(self, mock_gen):
+        from portfolio.land_appraisal import (
+            GroundedMarketComps,
+            DeepSeekAuditorReview,
+            LandAppraisalSynthesis,
+            discover_land_market_comps,
+            run_deepseek_auditor_review,
+            synthesize_land_appreciation,
+        )
+
+        # Stage 1 in prod
+        mock_gen.return_value = GroundedMarketComps(
+            locality="Sector 22D",
+            city="Greater Noida",
+            median_portal_ask_per_sq_yd=65000.0,
+            circle_rate_floor_per_sq_yd=35000.0,
+        )
+        comps = discover_land_market_comps(self.plot, is_debug=False)
+        _, kwargs1 = mock_gen.call_args
+        self.assertEqual(kwargs1.get('model'), 'gemini-4-argon')
+        self.assertEqual(kwargs1.get('thinking_level'), 'HIGH')
+
+        # Stage 2 in prod
+        mock_gen.reset_mock()
+        mock_gen.return_value = DeepSeekAuditorReview(
+            gross_market_growth_pct=8.5,
+            conservative_appreciation_ceiling_pct=5.5,
+            auditor_verdict="Audited",
+        )
+        auditor = run_deepseek_auditor_review(self.plot, comps, is_debug=False)
+        _, kwargs2 = mock_gen.call_args
+        self.assertEqual(kwargs2.get('model'), 'gemini-4-argon')
+        self.assertEqual(kwargs2.get('thinking_level'), 'HIGH')
+
+        # Stage 3 in prod
+        mock_gen.reset_mock()
+        mock_gen.return_value = LandAppraisalSynthesis(
+            holding_id=self.plot.id,
+            holding_name=self.plot.name,
+            closing_fy="FY 2025-26",
+            current_valuation_inr=12000000.0,
+            recommended_appreciation_pct=5.5,
+            new_valuation_inr=12660000.0,
+            net_value_increase_inr=660000.0,
+            methodology_summary="Prod Argon DAG synthesis",
+        )
+        synth = synthesize_land_appreciation(self.plot, comps, auditor, "FY 2025-26", is_debug=False)
+        _, kwargs3 = mock_gen.call_args
+        self.assertEqual(kwargs3.get('model'), 'gemini-4-argon')
+        self.assertEqual(kwargs3.get('thinking_level'), 'HIGH')
+        self.assertIn("gemini-4-argon", synth.model_chain_used)
+
+
 
 

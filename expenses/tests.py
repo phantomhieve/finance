@@ -1051,6 +1051,20 @@ class ExpensesAITests(SimpleTestCase):
         self.assertEqual(res.amount, 1249.0)
         self.assertEqual(res.merchant, 'Swiggy')
 
+    @mock.patch('expenses.ai.runner.gateway.generate_structured')
+    @mock.patch('expenses.ai.runner.ai_available', return_value=True)
+    def test_monthly_commentary_model_and_thinking(self, mock_avail, mock_gen):
+        from .ai import MonthlyNote, monthly_commentary
+
+        mock_gen.return_value = MonthlyNote(headline='Spend was high', observations=['Food was up'])
+        res = monthly_commentary({'total_spend': 50000})
+        self.assertIsNotNone(res)
+        self.assertEqual(res['headline'], 'Spend was high')
+        mock_gen.assert_called_once()
+        _, kwargs = mock_gen.call_args
+        self.assertEqual(kwargs.get('model'), 'gemini-3.8-flash')
+        self.assertEqual(kwargs.get('thinking_level'), 'HIGH')
+
 
 class BrandKnowledgeTests(TestCase):
     def setUp(self):

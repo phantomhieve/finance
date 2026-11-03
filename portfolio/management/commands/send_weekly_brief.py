@@ -95,6 +95,8 @@ class Command(BaseCommand):
                 schema=WeeklyAnalysisResponse,
                 prompt=prompt,
                 task=TaskType.REASONING,
+                model="gemini-3.8-flash",
+                thinking_level="HIGH",
                 temperature=0.2,
             )
             if not parsed:

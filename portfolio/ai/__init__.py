@@ -38,6 +38,12 @@ from .schemas import (
     InsightSeverity,
     PortfolioInsightsResponse,
 )
+from ..land_appraisal import (
+    DeepSeekAuditorReview,
+    GroundedMarketComps,
+    LandAppraisalSynthesis,
+    run_land_appraisal_dag,
+)
 
 __all__ = [
     # Schemas
@@ -45,6 +51,9 @@ __all__ = [
     "InsightSeverity",
     "Insight",
     "PortfolioInsightsResponse",
+    "GroundedMarketComps",
+    "DeepSeekAuditorReview",
+    "LandAppraisalSynthesis",
     # Prompts & Profile
     "SYSTEM_INSTRUCTION",
     "_MACRO_PROMPT",
@@ -64,6 +73,7 @@ __all__ = [
     "call_shakti",
     "call_gemini_direct",
     "_fetch_macro_context",
+    "run_land_appraisal_dag",
     # Utilities
     "_clean_json_text",
 ]
