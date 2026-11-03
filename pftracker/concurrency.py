@@ -69,3 +69,4 @@ def parallel_map(
     with DjangoSafeThreadPoolExecutor(max_workers=workers) as executor:
         futures = [executor.submit(fn, item) for item in items_list]
         return [f.result(timeout=timeout) for f in futures]
+

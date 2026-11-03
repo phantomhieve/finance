@@ -139,10 +139,10 @@ def detect_prompt_injection(text: str) -> bool:
 
 
 # ===========================================================================
-# 4. Secret & Credential Redaction in Logs and Traces
+# 4. Diagnostic Redaction for Logs and Traces
 # ===========================================================================
 
-def mask_secrets(text: str) -> str:
+def scrub_diagnostics(text: str) -> str:
     """Redact API keys, tokens, and authorization credentials from log messages and exception traces."""
     if not text:
         return ""
@@ -151,6 +151,10 @@ def mask_secrets(text: str) -> str:
     text = GENERIC_API_KEY_PATTERN.sub("[API_KEY_REDACTED]", text)
     text = SECRET_KV_PATTERN.sub(r"\1[REDACTED]\3", text)
     return text
+
+
+# Backwards compatibility alias
+mask_secrets = scrub_diagnostics
 
 
 # ===========================================================================

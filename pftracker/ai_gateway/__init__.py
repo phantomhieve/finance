@@ -16,6 +16,7 @@ from .sanitizer import (
     mask_pii,
     mask_secrets,
     safe_json_loads,
+    scrub_diagnostics,
     wrap_user_payload,
 )
 from .types import AINode, CircuitState, GatewayResult, TaskType
@@ -43,6 +44,7 @@ __all__ = [
     "safe_json_loads",
     "mask_pii",
     "mask_secrets",
+    "scrub_diagnostics",
     "detect_prompt_injection",
     "wrap_user_payload",
     "escape_xml_boundaries",

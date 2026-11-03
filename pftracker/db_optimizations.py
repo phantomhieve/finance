@@ -27,3 +27,4 @@ def configure_sqlite_connection(sender, connection, **kwargs):
             cursor.close()
         except Exception as exc:
             logger.debug("Failed to apply SQLite PRAGMAs: %s", exc)
+

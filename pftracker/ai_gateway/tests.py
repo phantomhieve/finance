@@ -19,6 +19,7 @@ from .sanitizer import (
     mask_pii,
     mask_secrets,
     safe_json_loads,
+    scrub_diagnostics,
     wrap_user_payload,
 )
 from .types import AINode, CircuitState, TaskType
@@ -342,6 +343,13 @@ class SecuritySanitizerTests(SimpleTestCase):
         redacted_bearer = mask_secrets(bearer_msg)
         self.assertIn("Bearer [TOKEN_REDACTED]", redacted_bearer)
         self.assertNotIn("sk-secrettoken123456789012", redacted_bearer)
+
+    def test_scrub_diagnostics(self):
+        dummy_gemini_key = "AIza" + "SyD-9876543210zyxwvutsrqponmlkjih"
+        error_msg = f"Google GenAI 500 error key={dummy_gemini_key}"
+        redacted = scrub_diagnostics(error_msg)
+        self.assertIn("[GEMINI_KEY_REDACTED]", redacted)
+        self.assertNotIn(dummy_gemini_key, redacted)
 
 
 class AIConfigRegistryTests(SimpleTestCase):

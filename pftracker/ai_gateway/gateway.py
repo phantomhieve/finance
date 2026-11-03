@@ -11,7 +11,7 @@ from .circuit_breaker import CircuitBreakerManager
 from .config import ResolvedTaskConfig, TaskProfile, ai_config
 from .registry import NodeRegistry, ProviderRegistry
 from .router import NodeRouter
-from .sanitizer import mask_pii, mask_secrets
+from .sanitizer import mask_pii, scrub_diagnostics
 from .types import GatewayResult, TaskType
 
 logger = logging.getLogger(__name__)
@@ -139,8 +139,8 @@ class AIGateway:
 
             try:
                 logger.debug(
-                    "Routing %s to node '%s' (%s, model '%s', key '%s')",
-                    task_type.value, node.id, node.provider, exec_model, node.get_masked_key()
+                    "Routing %s to node '%s' (%s, model '%s')",
+                    task_type.value, node.id, node.provider, exec_model
                 )
                 text = adapter.generate_text(
                     node=node,
@@ -167,17 +167,17 @@ class AIGateway:
                     fallback_used=fallback_used,
                 )
             except Exception as e:
-                err_str = mask_secrets(str(e))
-                logger.warning("Attempt on node '%s' failed: %s", node.id, err_str)
-                attempted_errors.append(f"[{node.id}] {err_str}")
+                err_msg = scrub_diagnostics(str(e))
+                logger.warning("Attempt on node '%s' failed (%s)", node.id, type(e).__name__)
+                attempted_errors.append(f"[{node.id}] {err_msg}")
 
-                if "429" in err_str or "rate limit" in err_str.lower() or "resource_exhausted" in err_str.lower():
+                if "429" in err_msg or "rate limit" in err_msg.lower() or "resource_exhausted" in err_msg.lower():
                     self.circuit_breaker.record_key_rate_limit(node, active_key, cooldown_seconds=60.0)
                 else:
                     self.circuit_breaker.record_failure(node, e)
 
         raise RuntimeError(
-            mask_secrets(
+            scrub_diagnostics(
                 f"All AI nodes failed for task '{task_type.value}'. Attempted {len(attempted_errors)} node(s):\n"
                 + "\n".join(attempted_errors)
             )
@@ -261,17 +261,17 @@ class AIGateway:
                 self.circuit_breaker.record_success(node)
                 return structured_obj
             except Exception as e:
-                err_str = mask_secrets(str(e))
-                logger.warning("Structured generation failed on node '%s': %s", node.id, err_str)
-                attempted_errors.append(f"[{node.id}] {err_str}")
+                err_msg = scrub_diagnostics(str(e))
+                logger.warning("Structured generation failed on node '%s' (%s)", node.id, type(e).__name__)
+                attempted_errors.append(f"[{node.id}] {err_msg}")
 
-                if "429" in err_str or "rate limit" in err_str.lower() or "resource_exhausted" in err_str.lower():
+                if "429" in err_msg or "rate limit" in err_msg.lower() or "resource_exhausted" in err_msg.lower():
                     self.circuit_breaker.record_key_rate_limit(node, active_key, cooldown_seconds=60.0)
                 else:
                     self.circuit_breaker.record_failure(node, e)
 
         raise RuntimeError(
-            mask_secrets(
+            scrub_diagnostics(
                 f"All AI nodes failed structured generation for task '{task_type.value}'. Attempted:\n"
                 + "\n".join(attempted_errors)
             )
