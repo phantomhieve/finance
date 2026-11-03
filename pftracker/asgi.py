@@ -104,6 +104,29 @@ class MCPRouterApp:
         await self.streamable_app(new_scope, receive, send)
 
 
+class DatabaseConnectionLifecycleMiddleware:
+    """Ensure database connections opened by MCP tool calls in worker threads
+    are properly closed and unusable/stale connections cleaned up.
+    """
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+
+        from django.db import close_old_connections, connections
+        close_old_connections()
+        try:
+            return await self.app(scope, receive, send)
+        finally:
+            close_old_connections()
+            try:
+                connections.close_all()
+            except Exception:
+                pass
+
+
 # CORS is scoped to /mcp only. Bearer tokens travel in headers, so cookies are never
 # needed cross-origin; Django routes get CORS from django-cors-headers (CORS_URLS_REGEX).
 mcp_app = Starlette(
@@ -111,6 +134,7 @@ mcp_app = Starlette(
         Mount("/", app=MCPRouterApp(sse_app, streamable_app))
     ],
     middleware=[
+        Middleware(DatabaseConnectionLifecycleMiddleware),
         Middleware(
             CORSMiddleware,
             allow_origins=["*"],

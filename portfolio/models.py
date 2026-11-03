@@ -64,6 +64,9 @@ class StockHolding(PnlMixin, models.Model):
 
     class Meta:
         ordering = ['symbol']
+        indexes = [
+            Index(fields=['account', 'is_baby'], name='pf_stk_acct_baby_idx'),
+        ]
         constraints = [
             models.UniqueConstraint(fields=['account', 'symbol'], name='unique_account_symbol'),
         ]
@@ -92,6 +95,7 @@ class MutualFundHolding(PnlMixin, models.Model):
         ordering = ['fund_name']
         indexes = [
             Index(fields=['account', 'fund_type']),
+            Index(fields=['account', 'fund_type', 'is_baby'], name='pf_mf_acct_type_baby_idx'),
         ]
 
     def __str__(self):
@@ -353,6 +357,9 @@ class CashPosition(models.Model):
 
     class Meta:
         ordering = ['name']
+        indexes = [
+            Index(fields=['group', 'is_baby'], name='pf_cash_grp_baby_idx'),
+        ]
 
     def __str__(self):
         return f"{self.name} — ₹{self.amount:,.0f}"
@@ -370,6 +377,9 @@ class BondHolding(models.Model):
 
     class Meta:
         ordering = ['account_name']
+        indexes = [
+            Index(fields=['group', 'is_baby'], name='pf_bond_grp_baby_idx'),
+        ]
 
     def __str__(self):
         return f"Bond: {self.account_name} — ₹{self.amount:,.0f}"
@@ -388,6 +398,9 @@ class CryptoHolding(models.Model):
 
     class Meta:
         ordering = ['name']
+        indexes = [
+            Index(fields=['group', 'is_baby'], name='pf_crypto_grp_baby_idx'),
+        ]
 
     def __str__(self):
         return f"{self.name} — ₹{self.current_value:,.0f}"
@@ -438,6 +451,9 @@ class CommodityHolding(PnlMixin, models.Model):
 
     class Meta:
         ordering = ['commodity_type', '-weight_grams']
+        indexes = [
+            Index(fields=['group', 'commodity_type', 'is_baby'], name='pf_comm_grp_type_baby_idx'),
+        ]
 
     def __str__(self):
         return f"{self.get_commodity_type_display()}: {self.description}"
@@ -493,6 +509,9 @@ class USStockHolding(models.Model):
 
     class Meta:
         ordering = ['-vest_date']
+        indexes = [
+            Index(fields=['group', 'is_baby'], name='pf_usstk_grp_baby_idx'),
+        ]
 
     def __str__(self):
         return f"{self.symbol} × {self.quantity} ({self.vest_date})"

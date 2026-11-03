@@ -203,13 +203,26 @@ WSGI_APPLICATION = 'pftracker.wsgi.wsgi_application'
 
 
 # Database — uses DATABASE_URL env var if set, otherwise SQLite for local dev
-# conn_max_age defaults to 0 to prevent connection exhaustion across ASGI worker threads
+# conn_max_age defaults to 0 in dev to avoid stale test DBs; 600s with conn_health_checks in prod
+_default_conn_max_age = '0' if DEBUG else '600'
 DATABASES = {
     'default': dj_database_url.config(
         default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
-        conn_max_age=int(os.environ.get('DJANGO_CONN_MAX_AGE', '0')),
+        conn_max_age=int(os.environ.get('DJANGO_CONN_MAX_AGE', _default_conn_max_age)),
+        conn_health_checks=True,
     )
 }
+# Engine-specific connection optimizations
+_db_engine = DATABASES['default'].get('ENGINE', '')
+if _db_engine.endswith('sqlite3'):
+    DATABASES['default'].setdefault('OPTIONS', {})
+    DATABASES['default']['OPTIONS']['timeout'] = 15  # 15s busy timeout at driver level
+elif 'postgres' in _db_engine:
+    DATABASES['default'].setdefault('OPTIONS', {})
+    DATABASES['default']['OPTIONS'].setdefault('keepalives', 1)
+    DATABASES['default']['OPTIONS'].setdefault('keepalives_idle', 30)
+    DATABASES['default']['OPTIONS'].setdefault('keepalives_interval', 10)
+    DATABASES['default']['OPTIONS'].setdefault('keepalives_count', 5)
 
 
 AUTH_PASSWORD_VALIDATORS = [

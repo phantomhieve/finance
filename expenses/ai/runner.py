@@ -8,7 +8,7 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
-from pftracker.ai_gateway import TaskType, gateway
+from pftracker.ai_gateway import TaskProfile, TaskType, ai_config, gateway
 
 from .prompts import (
     ANOMALY_SYSTEM,
@@ -42,7 +42,7 @@ MAX_BATCH = 40
 MATCH_BATCH = 20
 
 
-def ai_available(task: TaskType = TaskType.FAST) -> bool:
+def ai_available(task: TaskProfile | TaskType = TaskType.FAST) -> bool:
     """Check if AI is available for the given task tier via gateway or environment keys."""
     return (
         gateway.is_available(task)
@@ -54,8 +54,8 @@ def _generate(
     prompt: str,
     schema: type[T],
     system: str,
-    task: TaskType = TaskType.FAST,
-    temperature: float = 0.1,
+    task: TaskProfile | TaskType = TaskProfile.EXPENSE_CATEGORIZATION,
+    temperature: float | None = None,
     max_tokens: int | None = None,
     model: str | None = None,
     **kwargs: Any,
@@ -77,9 +77,10 @@ def _generate(
         **kwargs,
     )
     elapsed_ms = (time.monotonic() - start_t) * 1000.0
+    task_name = task.value if hasattr(task, "value") else str(task)
     logger.debug(
         "Expenses AI completed structured call for task '%s' in %.1fms",
-        task.value,
+        task_name,
         elapsed_ms,
     )
     return result
@@ -114,8 +115,7 @@ def categorise(
                 prompt=prompt,
                 schema=CategoryBatch,
                 system=CATEGORISE_SYSTEM,
-                task=TaskType.FAST,
-                temperature=0.1,
+                task=TaskProfile.EXPENSE_CATEGORIZATION,
             )
         except Exception as exc:
             logger.warning("AI batch categorisation failed for %d items: %s", len(chunk), exc)
@@ -131,7 +131,7 @@ def categorise(
 
 def extract_transaction(subject: str, body: str) -> ExtractedTxn | None:
     """Extract structured transaction details from a single bank/card alert email."""
-    if not ai_available(TaskType.EXTRACTION):
+    if not ai_available(TaskProfile.RECEIPT_PARSING):
         return None
 
     text = build_extract_prompt(subject, body)
@@ -140,8 +140,7 @@ def extract_transaction(subject: str, body: str) -> ExtractedTxn | None:
             prompt=text,
             schema=ExtractedTxn,
             system=EXTRACT_SYSTEM,
-            task=TaskType.EXTRACTION,
-            temperature=0.0,  # Zero temperature for deterministic extraction
+            task=TaskProfile.RECEIPT_PARSING,
         )
     except Exception as exc:
         logger.warning("AI transaction extraction failed: %s", exc)
@@ -155,7 +154,7 @@ def extract_statement_lines(text: str) -> list[Any]:
 
     Long statements are processed in line-aligned chunks so later pages are not dropped.
     """
-    if not ai_available(TaskType.EXTRACTION) or not text:
+    if not ai_available(TaskProfile.STATEMENT_PARSING) or not text:
         return []
 
     out: list[Any] = []
@@ -165,8 +164,7 @@ def extract_statement_lines(text: str) -> list[Any]:
                 prompt=build_statement_prompt(chunk),
                 schema=ExtractedLines,
                 system=STATEMENT_SYSTEM,
-                task=TaskType.EXTRACTION,
-                temperature=0.0,
+                task=TaskProfile.STATEMENT_PARSING,
             )
         except Exception as exc:
             logger.warning("AI statement extraction failed: %s", exc)
@@ -185,7 +183,7 @@ def match_statement_lines(items: list[dict[str, Any]]) -> dict[int, LineMatch]:
     Returns:
         {line_id: LineMatch}. Verdicts pointing at an expense outside that line's candidates are dropped.
     """
-    if not items or not ai_available(TaskType.EXTRACTION):
+    if not items or not ai_available(TaskProfile.STATEMENT_MATCHING):
         return {}
 
     allowed = {it["line_id"]: {c["expense_id"] for c in it["candidates"]} for it in items}
@@ -197,8 +195,7 @@ def match_statement_lines(items: list[dict[str, Any]]) -> dict[int, LineMatch]:
                 prompt=build_match_prompt(chunk),
                 schema=LineMatchBatch,
                 system=MATCH_SYSTEM,
-                task=TaskType.EXTRACTION,
-                temperature=0.0,
+                task=TaskProfile.STATEMENT_MATCHING,
             )
         except Exception as exc:
             logger.warning("AI statement matching failed for %d lines: %s", len(chunk), exc)
@@ -215,12 +212,16 @@ def match_statement_lines(items: list[dict[str, Any]]) -> dict[int, LineMatch]:
 
 def monthly_commentary(
     summary_payload: dict[str, Any],
-    model: str | None = "gemini-3.8-flash",
-    thinking_level: str | None = "HIGH",
+    model: str | None = None,
+    thinking_level: str | None = None,
 ) -> dict[str, Any] | None:
     """Generate concise, grounded commentary for the monthly household digest email."""
-    if not ai_available(TaskType.FAST):
+    if not ai_available(TaskProfile.MONTHLY_EXPENSE_NOTE):
         return None
+
+    cfg = ai_config.resolve(TaskProfile.MONTHLY_EXPENSE_NOTE)
+    target_model = model or cfg.model
+    target_thinking = thinking_level if thinking_level is not None else cfg.thinking_level
 
     prompt = build_monthly_note_prompt(summary_payload)
     try:
@@ -228,10 +229,10 @@ def monthly_commentary(
             prompt=prompt,
             schema=MonthlyNote,
             system=MONTHLY_NOTE_SYSTEM,
-            task=TaskType.FAST,
-            temperature=0.2,
-            model=model,
-            thinking_level=thinking_level,
+            task=TaskProfile.MONTHLY_EXPENSE_NOTE,
+            model=target_model,
+            thinking_level=target_thinking,
+            temperature=cfg.temperature,
         )
     except Exception as exc:
         logger.warning("AI monthly commentary generation failed: %s", exc)
@@ -253,7 +254,7 @@ def detect_anomalies(
     Returns:
         Mapping of {expense_id: [reason1, reason2]} for transactions flagged as suspicious.
     """
-    if not items or not ai_available(TaskType.FAST):
+    if not items or not ai_available(TaskProfile.EXPENSE_ANOMALY):
         return {}
 
     context = context or {}
@@ -267,8 +268,7 @@ def detect_anomalies(
                 prompt=prompt,
                 schema=AnomalyBatchResult,
                 system=ANOMALY_SYSTEM,
-                task=TaskType.FAST,
-                temperature=0.1,
+                task=TaskProfile.EXPENSE_ANOMALY,
             )
             for anomaly in parsed.anomalies:
                 if anomaly.is_suspicious and anomaly.reasons:

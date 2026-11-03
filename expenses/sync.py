@@ -293,7 +293,28 @@ def backfill_statements(account, since, time_budget=None, max_messages=BACKFILL_
 
 
 def sync_group(group, time_budget=None):
+    accounts = list(GmailAccount.objects.filter(group=group, is_active=True))
+    if not accounts:
+        return {}
+    if len(accounts) == 1:
+        return {accounts[0].email: sync_account(accounts[0], time_budget=time_budget)}
+
+    from pftracker.concurrency import DjangoSafeThreadPoolExecutor
+
     results = {}
-    for account in GmailAccount.objects.filter(group=group, is_active=True):
-        results[account.email] = sync_account(account, time_budget=time_budget)
+    with DjangoSafeThreadPoolExecutor(max_workers=min(4, len(accounts))) as executor:
+        future_map = {
+            executor.submit(sync_account, account, time_budget=time_budget): account
+            for account in accounts
+        }
+        for future in future_map:
+            account = future_map[future]
+            try:
+                results[account.email] = future.result()
+            except Exception as exc:
+                logger.exception("Failed to sync account %s in sync_group", account.email)
+                res = SyncResult()
+                res.error = str(exc)
+                res.complete = False
+                results[account.email] = res
     return results

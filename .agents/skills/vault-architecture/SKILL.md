@@ -112,12 +112,17 @@ Vault is a multi-tenant, household-scoped personal finance, expense intelligence
 
 ### 5.1 Unified AI Gateway (`pftracker/ai_gateway/`)
 All LLM calls across `portfolio`, `expenses`, and `mcp_server` route through `pftracker.ai_gateway.gateway`:
-- **Task Tiers (`TaskType`)**:
-  - `FAST`: High-throughput categorization, statement line disambiguation (`llama3_3` / `gemini-2.5-flash`).
-  - `REASONING`: Deep multi-pillar portfolio strategy & forensic expense auditing (`deepseek-r1` / `gemini-2.5-pro`).
-  - `RESEARCH`: Live web-grounded market intelligence & weekly equity briefs (`gemini-2.5-flash` with Google Search grounding).
-  - `EXTRACTION`: Unstructured email and PDF statement table extraction.
-- **Resilience**: `NodeRouter` + `CircuitBreakerManager` handle priority failover, weighted round-robin across API key pools, 60s per-key cooldown on HTTP `429` rate limits, and JSON repair (`clean_json_text`, `safe_json_loads`) for reasoning models that emit `<think>` blocks.
+- **Central Configuration Manager (`TaskProfile`, `TaskSpec`, `ai_config` in `pftracker/ai_gateway/config.py`)**:
+  - Declarative single source of truth for all AI tasks (`PORTFOLIO_INSIGHTS`, `PORTFOLIO_DAG_ALLOCATION`, `PORTFOLIO_DAG_QUALITY`, `PORTFOLIO_DAG_MACRO`, `PORTFOLIO_DAG_STRATEGY`, `PORTFOLIO_DAG_SYNTHESIS`, `LAND_APPRAISAL_COMPS`, `LAND_APPRAISAL_AUDIT`, `LAND_APPRAISAL_SYNTHESIS`, `WEEKLY_BRIEF`, `EXPENSE_CATEGORIZATION`, `RECEIPT_PARSING`, `STATEMENT_PARSING`, `STATEMENT_MATCHING`, `EXPENSE_ANOMALY`, `MONTHLY_EXPENSE_NOTE`).
+  - Automatic Environment Tiering:
+    - **DEV (`DEBUG=True`)**: Cost-effective fast models (`gemini-2.5-flash-lite`, `gemini-3.8-flash`) with low thinking level (`LOW` or `thinking_budget=0`) for rapid development turnaround.
+    - **PROD (`DEBUG=False`)**: Frontier reasoning models (`gemini-4-argon`) with exhaustive thinking (`HIGH`) for fiduciary real estate appraisal and multi-pillar portfolio scoring; fast models (`gemini-3.8-flash`) with `thinking_budget=0` for instant expense classification and document parsing.
+  - Environment Overrides: Precedence hierarchy `direct kwargs > AI_TASK_MODEL_<NAME> > domain env (GEMINI_MODEL / EXPENSES_GEMINI_MODEL) > task spec`.
+- **Security Audit & Guardrails (`pftracker/ai_gateway/sanitizer.py`)**:
+  - **Financial PII Scrubbing (`mask_pii`)**: Automatically masks credit/debit cards (preserves last 4 digits for ledger matching), Indian PAN, Indian Aadhaar, Indian mobile phones, bank account numbers, OTP/PINs, and email addresses before outbound LLM transmission.
+  - **Prompt Injection Defense & Boundary Isolation (`wrap_user_payload`, `escape_xml_boundaries`, `detect_prompt_injection`)**: Delimits untrusted user inputs within escaped XML boundaries (`<user_payload>`) to prevent prompt breakouts, with heuristic detection of adversarial jailbreaks.
+  - **Secret Redaction in Logs & Traces (`mask_secrets`)**: Automatically strips Google API keys (`AIza...`), Bearer tokens, and OpenAI/Shakti keys from logs and exception traces.
+- **Resilience Engine**: `NodeRouter` + `CircuitBreakerManager` handle priority failover, weighted round-robin across API key pools, 60s per-key cooldown on HTTP `429` rate limits, IPv4 socket routing preference (preventing 75s IPv6 SYN drops), and JSON repair (`clean_json_text`, `safe_json_loads`) for reasoning traces.
 
 ### 5.2 Multi-Stage Portfolio DAG (`portfolio/dag.py`)
 Replaces monolithic prompts with a 3-stage fan-out / fan-in workflow:
@@ -148,7 +153,35 @@ Replaces monolithic prompts with a 3-stage fan-out / fan-in workflow:
 
 ---
 
-## 7. Pre-Push Verification Checklist
+## 7. High-Performance Concurrency, Async I/O & Database Optimization
+
+- **Database Connection Pooling & Health Checks (`pftracker/settings.py`)**:
+  - `CONN_MAX_AGE=600` in production (prevents socket thrashing) paired with `CONN_HEALTH_CHECKS=True` so dead pooled sockets are reconnected before query dispatch.
+  - Defaults to `0` in local dev/tests to ensure test isolation.
+- **SQLite Concurrency & WAL Mode (`pftracker/db_optimizations.py`)**:
+  - `PRAGMA journal_mode = WAL;`, `PRAGMA synchronous = NORMAL;`, `PRAGMA busy_timeout = 15000;`, `PRAGMA cache_size = -64000;` (64MB memory page cache) automatically applied via `connection_created` signal listener on `tracker.apps.TrackerConfig.ready()`.
+- **Django Safe Concurrency (`pftracker/concurrency.py`)**:
+  - `DjangoSafeThreadPoolExecutor`: Automatic worker-thread database connection cleanup before and after task execution (`close_old_connections()` + `connections.close_all()`), eliminating thread-local connection leaks.
+  - `safe_db_worker`, `parallel_map`, and `safe_async_to_thread` provide safe background thread offloading.
+- **Starlette ASGI Database Middleware (`pftracker/asgi.py`)**:
+  - `DatabaseConnectionLifecycleMiddleware` wraps `/mcp` FastMCP routes, ensuring database connections opened in async worker threads are properly closed and recycled across requests.
+- **Async AI Gateway (`pftracker/ai_gateway/gateway.py`)**:
+  - `AIGateway.agenerate_text` and `AIGateway.agenerate_structured` provide non-blocking asynchronous generation offloaded cleanly to thread-safe worker pools.
+- **Async Multi-Stage DAG Engine (`portfolio/dag.py`)**:
+  - `PortfolioInsightsDAG.execute_async` and `arun_portfolio_insights_dag` execute Stage 1 diagnostic lenses concurrently via `asyncio.gather` and await Stage 2 & Stage 3 without blocking the event loop.
+- **Concurrent Gmail Mailbox Sync (`expenses/sync.py`, `expenses/gmail.py`)**:
+  - `sync_group` synchronizes multiple active Gmail accounts in parallel via `DjangoSafeThreadPoolExecutor`.
+  - `GmailClient` employs a thread-safe double-checked lock (`threading.Lock()`) around OAuth token refresh.
+- **Database Query Reduction & Indexing**:
+  - `_zerodha_account_sums`: Reduced from 6 queries to 2 queries using `values('account_id').annotate(...)` and conditional `Case(When(...))`.
+  - `get_commodity_summary`: Reduced from 3 queries to 1 combined aggregate query.
+  - `get_portfolio_summary`: Combined multiple stock, mutual fund, and crypto queries into unified aggregates.
+  - `_collapse_transfer_legs`: Linear $O(C)$ bucketed matching on `(amount, currency)`.
+  - Composite indexes added to `StockHolding` (`account`, `is_baby`), `MutualFundHolding` (`account`, `fund_type`, `is_baby`), `CashPosition` (`group`, `is_baby`), `BondHolding` (`group`, `is_baby`), `CryptoHolding` (`group`, `is_baby`), `CommodityHolding` (`group`, `commodity_type`, `is_baby`), and `USStockHolding` (`group`, `is_baby`).
+
+---
+
+## 8. Pre-Push Verification Checklist
 
 Before committing or pushing any change:
 1. **Build CSS** (if templates or `static/css/src/input.css` changed):
@@ -161,5 +194,5 @@ Before committing or pushing any change:
    ```
 3. **Run Full Test Suite**:
    ```bash
-   ./venv/bin/python manage.py test expenses portfolio tracker jewellery mcp_server --keepdb
+   ./venv/bin/python manage.py test expenses portfolio tracker jewellery mcp_server pftracker.ai_gateway --keepdb
    ```

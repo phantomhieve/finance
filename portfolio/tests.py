@@ -880,6 +880,99 @@ class PortfolioInsightsDAGTests(TestCase):
             self.assertEqual(res.summary, "Resilient synthesis summary.")
             self.assertGreater(res.score, 0)
 
+    def test_dag_execute_async(self):
+        import asyncio
+        from portfolio.dag import (
+            PortfolioInsightsDAG,
+            AllocationLensResult,
+            QualityLensResult,
+            MacroStressLensResult,
+            StrategyLensResult,
+            arun_portfolio_insights_dag,
+        )
+        from portfolio.ai import PortfolioInsightsResponse
+        from unittest.mock import patch
+
+        def mock_generate(schema, *args, **kwargs):
+            if schema == AllocationLensResult:
+                return AllocationLensResult(sub_score=80)
+            elif schema == QualityLensResult:
+                return QualityLensResult(sub_score=75)
+            elif schema == MacroStressLensResult:
+                return MacroStressLensResult(sub_score=70)
+            elif schema == StrategyLensResult:
+                return StrategyLensResult(sub_score=85)
+            elif schema == PortfolioInsightsResponse:
+                return PortfolioInsightsResponse(
+                    summary="Async DAG synthesis summary.",
+                    score=78,
+                    insights=[],
+                )
+            raise ValueError(f"Unknown schema: {schema}")
+
+        with patch("portfolio.dag.gateway.generate_structured", side_effect=mock_generate):
+            dag = PortfolioInsightsDAG()
+            res, meta = asyncio.run(dag.execute_async({"summary": {"total_value": 3000000}}))
+            self.assertEqual(res.summary, "Async DAG synthesis summary.")
+            self.assertEqual(meta.grounded_score, 78)
+
+            ai_res = asyncio.run(arun_portfolio_insights_dag({"summary": {"total_value": 3000000}}))
+            self.assertEqual(ai_res.model, "vault-dag:multi-stage-async")
+            self.assertIn("_dag_metadata", ai_res.insights_dict)
+
+
+class PortfolioQueryOptimizationsTests(TestCase):
+    def setUp(self):
+        from tracker.models import AccountGroup
+        from portfolio.models import ZerodhaAccount, StockHolding, MutualFundHolding, CommodityHolding, CommodityPrice
+        self.group = AccountGroup.objects.create(name="Opt Group")
+        self.account = ZerodhaAccount.objects.create(name="Z1", slug="z1", group=self.group)
+        StockHolding.objects.create(
+            account=self.account, symbol="INFY", quantity=10,
+            purchase_value=Decimal('15000.00'), current_value=Decimal('18000.00')
+        )
+        MutualFundHolding.objects.create(
+            account=self.account, fund_name="Nifty Index", fund_type="INDEX",
+            units=Decimal('100.000'), purchase_value=Decimal('20000.00'), current_value=Decimal('25000.00')
+        )
+        MutualFundHolding.objects.create(
+            account=self.account, fund_name="Flexi Cap", fund_type="OTHER",
+            units=Decimal('50.000'), purchase_value=Decimal('10000.00'), current_value=Decimal('12000.00')
+        )
+        CommodityPrice.objects.create(commodity_type="GOLD", rate_per_gram=Decimal('7000.00'))
+        CommodityHolding.objects.create(
+            group=self.group, commodity_type="GOLD", description="Gold Bar",
+            weight_grams=Decimal('10.00'), purchase_price_per_gram=Decimal('6000.00')
+        )
+
+    def test_zerodha_account_sums_aggregation(self):
+        from portfolio.services import _zerodha_account_sums
+        sums = _zerodha_account_sums([self.account])
+        self.assertIn(self.account.id, sums)
+        acct_sum = sums[self.account.id]
+        self.assertEqual(acct_sum['stocks_cur'], Decimal('18000.00'))
+        self.assertEqual(acct_sum['stocks_inv'], Decimal('15000.00'))
+        self.assertEqual(acct_sum['index_cur'], Decimal('25000.00'))
+        self.assertEqual(acct_sum['index_inv'], Decimal('20000.00'))
+        self.assertEqual(acct_sum['other_cur'], Decimal('12000.00'))
+        self.assertEqual(acct_sum['other_inv'], Decimal('10000.00'))
+
+    def test_commodity_summary_aggregation(self):
+        from portfolio.services import get_commodity_summary
+        comm = get_commodity_summary(self.group)
+        self.assertEqual(comm['gold_weight'], Decimal('10.00'))
+        self.assertEqual(comm['gold_value'], Decimal('70000.00'))
+        self.assertEqual(comm['commodity_invested'], Decimal('60000.00'))
+        self.assertEqual(comm['commodity_returns'], Decimal('10000.00'))
+
+    def test_portfolio_summary_aggregation(self):
+        from portfolio.services import get_portfolio_summary
+        summary = get_portfolio_summary(self.group)
+        self.assertEqual(summary['total_value'], Decimal('125000.00'))
+        self.assertEqual(summary['total_invested'], Decimal('105000.00'))
+        self.assertEqual(summary['equity_total'], Decimal('55000.00'))
+        self.assertEqual(summary['equity_invested'], Decimal('45000.00'))
+
 
 class PFEntryTests(TestCase):
     """Tests for PF (Provident Fund / PPF) per-family-member accounts across UI, Services, and MCP."""
