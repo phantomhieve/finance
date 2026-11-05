@@ -632,35 +632,45 @@ class ExcludeRealEstateToggleTests(TestCase):
         from portfolio.services import fy_start_year
         today = datetime.date.today()
         cur_fy = fy_start_year(today)
+        # Goal of 80L: With RE (70L) gap is 10L. Without RE (Liquid 10L, RE 60L), effective target is 20L and gap is 10L!
         goal = FinancialGoal.objects.create(
             group=self.group,
-            label="Reach 50L",
-            target_amount=Decimal("5000000"),
+            label="Reach 80L",
+            target_amount=Decimal("8000000"),
             financial_year=f"FY {cur_fy}-{str(cur_fy + 1)[-2:]}",
         )
 
-        # 1. By default, real estate is excluded (non-RE = 10L < 50L) -> Goal NOT achieved
+        # 1. By default, real estate is excluded:
+        # Effective target = 80L - 60L = 20L. Liquid portfolio = 10L.
         default_resp = self.client.get('/portfolio/')
         rm_default = default_resp.context['goal_roadmap']
         self.assertIsNotNone(rm_default)
         goal_item = next(g for g in rm_default['goals'] if g['id'] == goal.id)
         self.assertFalse(goal_item['achieved'])
-        self.assertEqual(goal_item['remaining'], 4000000.0)
+        self.assertEqual(goal_item['raw_target'], 8000000.0)
+        self.assertEqual(goal_item['target'], 2000000.0)
+        self.assertEqual(goal_item['re_deduction'], 6000000.0)
+        self.assertTrue(goal_item['is_re_deducted'])
+        self.assertEqual(goal_item['remaining'], 1000000.0)
         self.assertContains(default_resp, 'excl. Real Estate')
 
-        # 2. When real estate is included (total = 70L >= 50L) -> Goal achieved
+        # 2. When real estate is included (total = 70L, target = 80L) -> Gap is still 10L, target is 80L
         inc_resp = self.client.get('/portfolio/?ex_re=0')
         rm_inc = inc_resp.context['goal_roadmap']
         goal_item_inc = next(g for g in rm_inc['goals'] if g['id'] == goal.id)
-        self.assertTrue(goal_item_inc['achieved'])
-        self.assertEqual(goal_item_inc['surplus'], 2000000.0)
+        self.assertFalse(goal_item_inc['achieved'])
+        self.assertEqual(goal_item_inc['target'], 8000000.0)
+        self.assertEqual(goal_item_inc['re_deduction'], 0.0)
+        self.assertFalse(goal_item_inc['is_re_deducted'])
+        self.assertEqual(goal_item_inc['remaining'], 1000000.0)
 
         # 3. Switching back to excluded: DB record is not corrupted
         ex_resp = self.client.get('/portfolio/?ex_re=1')
         rm_ex = ex_resp.context['goal_roadmap']
         goal_item_ex = next(g for g in rm_ex['goals'] if g['id'] == goal.id)
         self.assertFalse(goal_item_ex['achieved'])
-        self.assertEqual(goal_item_ex['remaining'], 4000000.0)
+        self.assertEqual(goal_item_ex['target'], 2000000.0)
+        self.assertEqual(goal_item_ex['remaining'], 1000000.0)
 
     def test_fy_performance_excludes_real_estate_only_when_snapshot_has_breakdown(self):
         from portfolio.services import get_fy_performance

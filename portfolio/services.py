@@ -274,7 +274,7 @@ def _months_until(today, deadline):
     return max(1, round((deadline - today).days / 30.44)) if deadline and deadline > today else 1
 
 
-def build_goal_roadmap(group, total_value, today=None, exclude_real_estate=False):
+def build_goal_roadmap(group, total_value, today=None, exclude_real_estate=False, real_estate_value=None):
     """Group portfolio goals by Indian FY with a frozen achieved/missed verdict for closed years.
 
     - Closed FY:  judged on ``closing_value`` (March snapshot), else on ``achieved_at`` ≤ FY end.
@@ -287,6 +287,15 @@ def build_goal_roadmap(group, total_value, today=None, exclude_real_estate=False
     """
     today = today or datetime.date.today()
     total = float(total_value)
+
+    if real_estate_value is None:
+        if exclude_real_estate and group:
+            re_holdings = _gf(RealEstateHolding.objects.filter(is_baby=False), group).all()
+            real_estate_value = sum((h.current_value for h in re_holdings), Decimal('0'))
+        else:
+            real_estate_value = Decimal('0')
+    re_val_float = float(real_estate_value)
+
     cur_fy = fy_start_year(today)
     cur_start = datetime.date(cur_fy, 4, 1)
     cur_end = datetime.date(cur_fy + 1, 3, 31)
@@ -296,14 +305,23 @@ def build_goal_roadmap(group, total_value, today=None, exclude_real_estate=False
 
     goal_objs = list(_gf(FinancialGoal.objects, group))
     march_close = {}
+    march_close_re = {}
     if any(g.fy_start is not None and g.fy_start < cur_fy and g.closing_value is None for g in goal_objs):
         for s in _gf(MonthlySnapshot.objects, group).filter(month__month=3):
             val = s.total_current_value
+            re_at_close = Decimal('0')
             if exclude_real_estate:
                 re = (s.data or {}).get('real_estate')
                 if re and 'current' in re:
-                    val = val - Decimal(str(re.get('current', 0)))
-            march_close[s.month.year - 1] = val
+                    re_at_close = Decimal(str(re.get('current', 0)))
+                    val = val - re_at_close
+                else:
+                    re_at_close = Decimal(str(re_val_float))
+                    val = max(Decimal('0'), val - re_at_close)
+            fy_idx = s.month.year - 1
+            march_close[fy_idx] = val
+            march_close_re[fy_idx] = float(re_at_close)
+
     opening_snap = _fy_opening_snapshot(group, cur_fy)
     opening_value = float(opening_snap.total_current_value) if opening_snap else None
     if exclude_real_estate and opening_snap:
@@ -311,11 +329,11 @@ def build_goal_roadmap(group, total_value, today=None, exclude_real_estate=False
         if re and 'current' in re:
             opening_value = float(Decimal(str(opening_snap.total_current_value)) - Decimal(str(re.get('current', 0))))
         else:
-            opening_value = None
+            opening_value = max(0.0, opening_value - re_val_float) if opening_value is not None else None
 
     goals = []
     for g in goal_objs:
-        target = float(g.target_amount)
+        raw_target = float(g.target_amount)
         fy_s = g.fy_start
         if fy_s is None:
             state, fy_name = 'long_term', FinancialGoal.LONG_TERM
@@ -323,10 +341,25 @@ def build_goal_roadmap(group, total_value, today=None, exclude_real_estate=False
             fy_name = fy_label(fy_s)
             state = 'closed' if fy_s < cur_fy else 'current' if fy_s == cur_fy else 'future'
 
+        if exclude_real_estate:
+            if state == 'closed' and fy_s in march_close_re:
+                re_deduct = march_close_re[fy_s]
+            else:
+                re_deduct = re_val_float
+            target = max(0.0, raw_target - re_deduct)
+            is_re_deducted = re_deduct > 0
+        else:
+            re_deduct = 0.0
+            target = raw_target
+            is_re_deducted = False
+
         item = {
             'id': g.id,
             'label': g.label,
             'target': target,
+            'raw_target': raw_target,
+            're_deduction': re_deduct,
+            'is_re_deducted': is_re_deducted,
             'target_date': g.target_date,
             'fy': fy_name,
             'fy_start': fy_s,
@@ -338,6 +371,8 @@ def build_goal_roadmap(group, total_value, today=None, exclude_real_estate=False
         if state == 'closed':
             closing = g.closing_value if g.closing_value is not None else march_close.get(fy_s)
             if closing is not None:
+                if exclude_real_estate and g.closing_value is not None:
+                    closing = max(Decimal('0'), closing - Decimal(str(re_deduct)))
                 achieved = float(closing) >= target
                 item['closing_value'] = float(closing)
             else:
@@ -361,7 +396,7 @@ def build_goal_roadmap(group, total_value, today=None, exclude_real_estate=False
             item['status'] = 'achieved' if achieved else ('on_track' if state == 'current' else 'upcoming')
 
         item['achieved'] = achieved
-        item['pct'] = round(min(ref / target * 100, 100), 1) if target else 0
+        item['pct'] = round(min(ref / target * 100, 100), 1) if target else 100.0
         item['remaining'] = max(0.0, target - ref)
         item['surplus'] = max(0.0, ref - target)
 
@@ -452,7 +487,7 @@ def without_real_estate(summary, group):
                          for c in summary['consolidated'] if c['name'] != 'Real Estate'],
         'fy_performance': summary['fy_performance'] and get_fy_performance(
             group, total_value, total_invested, exclude_real_estate=True),
-        'goal_roadmap': build_goal_roadmap(group, total_value, exclude_real_estate=True) if summary.get('goal_roadmap') else None,
+        'goal_roadmap': build_goal_roadmap(group, total_value, exclude_real_estate=True, real_estate_value=summary['real_estate_current']) if summary.get('goal_roadmap') else None,
     }
 
 
@@ -598,7 +633,7 @@ def get_portfolio_summary(group=None, is_baby=False):
     return_pct = _pct(total_returns, total_invested)
 
     # Goals are household-level targets against the master portfolio only
-    roadmap = build_goal_roadmap(group, total_value) if not is_baby else None
+    roadmap = build_goal_roadmap(group, total_value, real_estate_value=real_estate_current) if not is_baby else None
 
     # Zerodha account summaries (prefetch totals to avoid N+1)
     z_accounts = _gf(ZerodhaAccount.objects, group).all()
