@@ -595,22 +595,72 @@ class ExcludeRealEstateToggleTests(TestCase):
         s.save()
 
     def test_toggle_rebases_totals_and_persists(self):
-        full = self.client.get('/portfolio/')
-        self.assertContains(full, 'Include real estate')
-        self.assertFalse(full.context['exclude_re'])
+        # Default is exclude_re = True (Include real estate toggle OFF by default)
+        default_resp = self.client.get('/portfolio/')
+        self.assertContains(default_resp, 'Include real estate')
+        self.assertTrue(default_resp.context['exclude_re'])
+        self.assertEqual(default_resp.context['total_value'], Decimal("1000000"))
+        self.assertNotIn('Real Estate', [a['name'] for a in default_resp.context['assets']])
+        self.assertContains(default_resp, 'excl. Real Estate')
 
+        # User turns ON real estate (ex_re=0)
+        inc = self.client.get('/portfolio/?ex_re=0')
+        ctx_inc = inc.context
+        self.assertFalse(ctx_inc['exclude_re'])
+        self.assertEqual(ctx_inc['total_value'], Decimal("7000000"))
+        self.assertEqual(ctx_inc['total_invested'], Decimal("5000000"))
+        self.assertIn('Real Estate', [a['name'] for a in ctx_inc['assets']])
+        self.assertIn('Real Estate', [c['name'] for c in ctx_inc['consolidated']])
+
+        # User turns OFF real estate (ex_re=1)
         ex = self.client.get('/portfolio/?ex_re=1')
         ctx = ex.context
         self.assertTrue(ctx['exclude_re'])
-        self.assertEqual(ctx['total_value'], full.context['total_value'] - Decimal("6000000"))
-        self.assertEqual(ctx['total_invested'], full.context['total_invested'] - ctx['real_estate_invested'])
+        self.assertEqual(ctx['total_value'], Decimal("1000000"))
+        self.assertEqual(ctx['total_invested'], Decimal("1000000"))
         self.assertNotIn('Real Estate', [a['name'] for a in ctx['assets']])
         self.assertNotIn('Real Estate', [c['name'] for c in ctx['consolidated']])
         self.assertNotIn('Real Estate', ctx['pf_chart_data']['labels'])
         self.assertContains(ex, 'excl. Real Estate')
 
+        # Session persistence
         self.assertTrue(self.client.get('/portfolio/').context['exclude_re'])
         self.assertFalse(self.client.get('/portfolio/?ex_re=0').context['exclude_re'])
+
+    def test_toggle_rebases_goals_roadmap(self):
+        from portfolio.models import FinancialGoal
+        from portfolio.services import fy_start_year
+        today = datetime.date.today()
+        cur_fy = fy_start_year(today)
+        goal = FinancialGoal.objects.create(
+            group=self.group,
+            label="Reach 50L",
+            target_amount=Decimal("5000000"),
+            financial_year=f"FY {cur_fy}-{str(cur_fy + 1)[-2:]}",
+        )
+
+        # 1. By default, real estate is excluded (non-RE = 10L < 50L) -> Goal NOT achieved
+        default_resp = self.client.get('/portfolio/')
+        rm_default = default_resp.context['goal_roadmap']
+        self.assertIsNotNone(rm_default)
+        goal_item = next(g for g in rm_default['goals'] if g['id'] == goal.id)
+        self.assertFalse(goal_item['achieved'])
+        self.assertEqual(goal_item['remaining'], 4000000.0)
+        self.assertContains(default_resp, 'excl. Real Estate')
+
+        # 2. When real estate is included (total = 70L >= 50L) -> Goal achieved
+        inc_resp = self.client.get('/portfolio/?ex_re=0')
+        rm_inc = inc_resp.context['goal_roadmap']
+        goal_item_inc = next(g for g in rm_inc['goals'] if g['id'] == goal.id)
+        self.assertTrue(goal_item_inc['achieved'])
+        self.assertEqual(goal_item_inc['surplus'], 2000000.0)
+
+        # 3. Switching back to excluded: DB record is not corrupted
+        ex_resp = self.client.get('/portfolio/?ex_re=1')
+        rm_ex = ex_resp.context['goal_roadmap']
+        goal_item_ex = next(g for g in rm_ex['goals'] if g['id'] == goal.id)
+        self.assertFalse(goal_item_ex['achieved'])
+        self.assertEqual(goal_item_ex['remaining'], 4000000.0)
 
     def test_fy_performance_excludes_real_estate_only_when_snapshot_has_breakdown(self):
         from portfolio.services import get_fy_performance

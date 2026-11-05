@@ -274,7 +274,7 @@ def _months_until(today, deadline):
     return max(1, round((deadline - today).days / 30.44)) if deadline and deadline > today else 1
 
 
-def build_goal_roadmap(group, total_value, today=None):
+def build_goal_roadmap(group, total_value, today=None, exclude_real_estate=False):
     """Group portfolio goals by Indian FY with a frozen achieved/missed verdict for closed years.
 
     - Closed FY:  judged on ``closing_value`` (March snapshot), else on ``achieved_at`` ≤ FY end.
@@ -282,7 +282,8 @@ def build_goal_roadmap(group, total_value, today=None):
     - Future FY / Long term: live value, required monthly growth to the deadline.
 
     Side effect: stamps ``achieved_at`` the first time an open goal is reached and clears it
-    if the portfolio falls back below target before the FY closes. Closed goals are never touched.
+    if the portfolio falls back below target before the FY closes (only when not excluding real estate).
+    Closed goals are never touched.
     """
     today = today or datetime.date.today()
     total = float(total_value)
@@ -296,12 +297,21 @@ def build_goal_roadmap(group, total_value, today=None):
     goal_objs = list(_gf(FinancialGoal.objects, group))
     march_close = {}
     if any(g.fy_start is not None and g.fy_start < cur_fy and g.closing_value is None for g in goal_objs):
-        march_close = {
-            s.month.year - 1: s.total_current_value
-            for s in _gf(MonthlySnapshot.objects, group).filter(month__month=3)
-        }
+        for s in _gf(MonthlySnapshot.objects, group).filter(month__month=3):
+            val = s.total_current_value
+            if exclude_real_estate:
+                re = (s.data or {}).get('real_estate')
+                if re and 'current' in re:
+                    val = val - Decimal(str(re.get('current', 0)))
+            march_close[s.month.year - 1] = val
     opening_snap = _fy_opening_snapshot(group, cur_fy)
     opening_value = float(opening_snap.total_current_value) if opening_snap else None
+    if exclude_real_estate and opening_snap:
+        re = (opening_snap.data or {}).get('real_estate')
+        if re and 'current' in re:
+            opening_value = float(Decimal(str(opening_snap.total_current_value)) - Decimal(str(re.get('current', 0))))
+        else:
+            opening_value = None
 
     goals = []
     for g in goal_objs:
@@ -338,13 +348,16 @@ def build_goal_roadmap(group, total_value, today=None):
         else:
             achieved = total >= target
             ref = total
-            if achieved and g.achieved_at is None:
-                g.achieved_at = today
-                FinancialGoal.objects.filter(pk=g.pk).update(achieved_at=today)
-            elif not achieved and g.achieved_at is not None:
-                g.achieved_at = None
-                FinancialGoal.objects.filter(pk=g.pk).update(achieved_at=None)
-            item['achieved_at'] = g.achieved_at
+            if not exclude_real_estate:
+                if achieved and g.achieved_at is None:
+                    g.achieved_at = today
+                    FinancialGoal.objects.filter(pk=g.pk).update(achieved_at=today)
+                elif not achieved and g.achieved_at is not None:
+                    g.achieved_at = None
+                    FinancialGoal.objects.filter(pk=g.pk).update(achieved_at=None)
+                item['achieved_at'] = g.achieved_at
+            else:
+                item['achieved_at'] = g.achieved_at if achieved else None
             item['status'] = 'achieved' if achieved else ('on_track' if state == 'current' else 'upcoming')
 
         item['achieved'] = achieved
@@ -423,10 +436,7 @@ def build_goal_roadmap(group, total_value, today=None):
 # ---------------------------------------------------------------------------
 
 def without_real_estate(summary, group):
-    """Re-base headline totals, allocation and FY performance on the portfolio minus real estate.
-
-    Goals are left on the full portfolio: their targets are net-worth targets.
-    """
+    """Re-base headline totals, allocation, FY performance and goals on the portfolio minus real estate."""
     total_value = summary['total_value'] - summary['real_estate_current']
     total_invested = summary['total_invested'] - summary['real_estate_invested']
     total_returns = total_value - total_invested
@@ -442,6 +452,7 @@ def without_real_estate(summary, group):
                          for c in summary['consolidated'] if c['name'] != 'Real Estate'],
         'fy_performance': summary['fy_performance'] and get_fy_performance(
             group, total_value, total_invested, exclude_real_estate=True),
+        'goal_roadmap': build_goal_roadmap(group, total_value, exclude_real_estate=True) if summary.get('goal_roadmap') else None,
     }
 
 
