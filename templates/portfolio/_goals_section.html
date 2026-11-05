@@ -31,7 +31,23 @@
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
             <p class="text-[10px] font-bold uppercase tracking-widest opacity-40">{{ s.label }}</p>
-            <p class="text-3xl font-extrabold mt-1 text-primary tabular-nums">{{ s.target|inr }}</p>
+            <div class="flex flex-wrap items-baseline gap-2 mt-1">
+              <span class="text-3xl font-extrabold text-primary tabular-nums">{{ s.target|inr }}</span>
+              {% if exclude_re and s.is_re_deducted %}
+              <span class="badge badge-warning badge-soft badge-sm font-medium gap-1">
+                <span class="material-symbols-outlined text-xs">visibility_off</span>excl. Real Estate
+              </span>
+              {% endif %}
+            </div>
+            {% if exclude_re and s.is_re_deducted %}
+            <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs opacity-60 mt-1 tabular-nums">
+              <span>Full target: <strong class="text-base-content/80">{{ s.raw_target|inr }}</strong></span>
+              <span>&minus;</span>
+              <span>Real Estate: <strong class="text-warning/90">{{ s.re_deduction|inr }}</strong></span>
+              <span>=</span>
+              <span>Target: <strong class="text-primary font-bold">{{ s.target|inr }}</strong></span>
+            </div>
+            {% endif %}
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
             {% if s.status == 'achieved' %}<span class="badge badge-success badge-soft badge-sm gap-1.5 font-semibold"><span class="material-symbols-outlined text-sm">emoji_events</span>Achieved</span>
@@ -109,7 +125,12 @@
           <div class="flex items-center gap-2 py-1.5 cursor-pointer" {% include 'portfolio/_goal_edit_attrs.html' %}>
             <span class="material-symbols-outlined text-base {% if g.achieved %}text-success{% else %}opacity-30{% endif %}">{% if g.achieved %}check_circle{% else %}radio_button_unchecked{% endif %}</span>
             <span class="flex-1 text-sm truncate">{{ g.label }}</span>
-            <span class="text-sm tabular-nums opacity-70">{{ g.target|inr }}</span>
+            <div class="text-right shrink-0">
+              <span class="text-sm tabular-nums opacity-80 font-medium">{{ g.target|inr }}</span>
+              {% if exclude_re and g.is_re_deducted %}
+              <div class="text-[9px] opacity-40 font-normal">Base: {{ g.raw_target|inr }}</div>
+              {% endif %}
+            </div>
           </div>
           {% endfor %}
         </div>
@@ -140,7 +161,12 @@
               <span class="badge badge-ghost badge-xs">{{ g.fy }}</span>
               <span class="font-semibold text-sm ml-1">{{ g.label }}</span>
             </div>
-            <span class="font-semibold text-sm tabular-nums shrink-0">{{ g.target|inr }}</span>
+            <div class="text-right shrink-0">
+              <span class="font-semibold text-sm tabular-nums">{{ g.target|inr }}</span>
+              {% if exclude_re and g.is_re_deducted %}
+              <div class="text-[10px] opacity-40 font-normal">Base: {{ g.raw_target|inr }} (&minus;{{ g.re_deduction|inr }} RE)</div>
+              {% endif %}
+            </div>
           </div>
           <div class="flex items-center gap-3 mt-2">
             <progress class="progress {% if g.achieved %}progress-success{% else %}progress-primary{% endif %} h-1.5 flex-1" value="{{ g.pct|floatformat:0 }}" max="100"></progress>
@@ -173,7 +199,12 @@
         {% for y in rm.closed %}{% for g in y.goals %}
         <tr class="hover cursor-pointer" {% include 'portfolio/_goal_edit_attrs.html' %}>
           <td class="font-semibold whitespace-nowrap">{{ g.fy }}<div class="text-xs opacity-40 font-normal">{{ g.label }}</div></td>
-          <td class="text-right tabular-nums">{{ g.target|inr }}</td>
+          <td class="text-right tabular-nums">
+            {{ g.target|inr }}
+            {% if exclude_re and g.is_re_deducted %}
+            <div class="text-[10px] opacity-40 font-normal">Base: {{ g.raw_target|inr }}</div>
+            {% endif %}
+          </td>
           <td class="text-right tabular-nums">{% if g.closing_value is not None %}{{ g.closing_value|inr }}{% else %}<span class="opacity-30">—</span>{% endif %}</td>
           <td class="text-right">{% if g.achieved %}<span class="badge badge-success badge-sm">Achieved</span>{% else %}<span class="badge badge-error badge-soft badge-sm">Missed{% if g.closing_value is not None %} · {{ g.pct }}%{% endif %}</span>{% endif %}</td>
         </tr>
@@ -185,7 +216,9 @@
         <div class="table-card flex items-center justify-between gap-3" {% include 'portfolio/_goal_edit_attrs.html' %}>
           <div class="min-w-0">
             <div class="font-semibold text-sm">{{ g.fy }} <span class="opacity-40 font-normal">· {{ g.label }}</span></div>
-            <span class="text-xs opacity-50 tabular-nums">{{ g.target|inr }}{% if g.closing_value is not None %} · closed {{ g.closing_value|inr }}{% endif %}</span>
+            <span class="text-xs opacity-50 tabular-nums">
+              {{ g.target|inr }}{% if exclude_re and g.is_re_deducted %} (Base: {{ g.raw_target|inr }}){% endif %}{% if g.closing_value is not None %} · closed {{ g.closing_value|inr }}{% endif %}
+            </span>
           </div>
           {% if g.achieved %}<span class="badge badge-success badge-sm shrink-0">Achieved</span>{% else %}<span class="badge badge-error badge-soft badge-sm shrink-0">Missed</span>{% endif %}
         </div>
