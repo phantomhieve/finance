@@ -442,7 +442,7 @@ def master_portfolio(request):
     if request.GET.get('ex_re') in ('0', '1'):
         request.session['pf_exclude_re'] = request.GET['ex_re'] == '1'
     has_real_estate = summary['real_estate_current'] > 0
-    exclude_re = has_real_estate and request.session.get('pf_exclude_re', False)
+    exclude_re = has_real_estate and request.session.get('pf_exclude_re', True)
     if exclude_re:
         summary = without_real_estate(summary, group)
     latest_insight, can_generate = _insight_can_generate(group)

@@ -123,8 +123,8 @@
           </div>
           {% endif %}
           {% with s=goal_roadmap.spotlight %}{% if s %}
-          <a href="#goals-section" class="stat-card stat-card-accent no-underline text-inherit"{% if exclude_re %} title="Goals always track the full portfolio, including real estate"{% endif %}>
-            <div class="text-[10px] uppercase tracking-wider opacity-50">FY target</div>
+          <a href="#goals-section" class="stat-card stat-card-accent no-underline text-inherit"{% if exclude_re %} title="FY Goal Progress (excl. Real Estate)"{% endif %}>
+            <div class="text-[10px] uppercase tracking-wider opacity-50">FY target{% if exclude_re %} <span class="text-[9px] opacity-70">(excl. RE)</span>{% endif %}</div>
             <div class="text-base font-bold mt-0.5 tabular-nums">{{ s.fy_progress_pct }}%
               <span class="text-[10px] font-semibold {% if s.status == 'behind' %}text-warning{% else %}text-success{% endif %}">{% if s.achieved %}hit{% elif s.status == 'ahead' %}ahead{% elif s.status == 'behind' %}behind{% else %}on track{% endif %}</span>
             </div>

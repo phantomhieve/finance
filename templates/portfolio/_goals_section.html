@@ -4,6 +4,11 @@
 <div class="section-group-header" id="goals-section">
   <span class="material-symbols-outlined section-icon text-violet-400">flag</span>
   <h2>Financial Year Goals</h2>
+  {% if exclude_re %}
+  <span class="badge badge-warning badge-soft badge-sm font-medium gap-1 ml-2">
+    <span class="material-symbols-outlined text-xs">visibility_off</span>excl. Real Estate
+  </span>
+  {% endif %}
 </div>
 
 {% if rm and rm.goals %}
@@ -50,7 +55,7 @@
 
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
           <div class="stat-card stat-card-primary">
-            <div class="text-[10px] uppercase tracking-wider opacity-50">Portfolio now</div>
+            <div class="text-[10px] uppercase tracking-wider opacity-50">Portfolio now{% if exclude_re %} (excl. RE){% endif %}</div>
             <div class="text-base font-bold mt-0.5 tabular-nums">{{ total_value|inr }}</div>
           </div>
           <div class="stat-card {% if s.achieved %}stat-card-success{% endif %}">
