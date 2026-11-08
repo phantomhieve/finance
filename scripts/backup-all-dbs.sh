@@ -1,6 +1,7 @@
 #!/bin/bash
 # Dump PostgreSQL databases, zip, upload to GCS. Configure via .env (see .env.example).
 set -euo pipefail
+umask 077
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
