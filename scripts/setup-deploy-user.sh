@@ -90,7 +90,13 @@ mkdir -p "\$(dirname "\$CRON_LOG")"
 touch "\$CRON_LOG"
 chown "\$APP_OWNER:\$APP_OWNER" "\$CRON_LOG" 2>/dev/null || true
 
-sed -e "s|__APP_DIR__|\$APP|g" -e "s|__APP_OWNER__|\$APP_OWNER|g" -e "s|__CRON_LOG__|\$CRON_LOG|g" -e "s|__CRON_NAME__|\$CRON_NAME|g" "\$APP/deploy/cron" > "/etc/cron.d/\${CRON_NAME}"
+sed -e "s|__APP_DIR__|\$APP|g" -e "s|__APP_OWNER__|\$APP_OWNER|g" -e "s|__CRON_LOG__|\$CRON_LOG|g" -e "s|__CRON_NAME__|\$CRON_NAME|g" "\$APP/deploy/cron" > "/etc/cron.d/\${CRON_NAME}.tmp"
+if ! awk -v owner="\$APP_OWNER" '!/^[[:space:]]*(#|\$|[A-Za-z_][A-Za-z0-9_]*=)/ && \$6 != owner { exit 1 }' "/etc/cron.d/\${CRON_NAME}.tmp"; then
+  rm -f "/etc/cron.d/\${CRON_NAME}.tmp"
+  echo "ERROR: cron file contains unauthorized user entry (must be \$APP_OWNER)" >&2
+  exit 1
+fi
+mv "/etc/cron.d/\${CRON_NAME}.tmp" "/etc/cron.d/\${CRON_NAME}"
 chmod 644 "/etc/cron.d/\${CRON_NAME}"
 chown root:root "/etc/cron.d/\${CRON_NAME}"
 
