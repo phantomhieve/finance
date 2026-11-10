@@ -2,14 +2,13 @@
 {% load indian_format %}
 {% load static %}
 
-{% block title %}Crypto — Portfolio — Vault{% endblock %}
+{% block title %}Crypto | Portfolio | Vault{% endblock %}
 
 {% block page_header %}
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
   <div>
-    <p class="text-xs font-bold tracking-widest uppercase text-primary">Portfolio</p>
-    <h1 class="text-xl lg:text-2xl font-extrabold">Crypto Holdings</h1>
-    <p class="text-xs opacity-50">All cryptocurrency holdings</p>
+    <h1 class="text-xl lg:text-3xl font-extrabold tracking-tight">Crypto Holdings</h1>
+    <p class="text-xs opacity-50 mt-0.5">All cryptocurrency holdings</p>
   </div>
   <div class="flex flex-wrap items-center gap-2">
     <button type="button" class="btn btn-primary btn-sm gap-1" onclick="openAddModal()"><span class="material-symbols-outlined text-base">add</span>Add</button>
@@ -69,7 +68,7 @@
             <td class="text-right" data-val="{{ c.amount_invested }}">{{ c.amount_invested|inr }}</td>
             <td class="text-right font-semibold" data-val="{{ c.current_value }}">{{ c.current_value|inr }}</td>
             <td class="text-right font-semibold" data-val="{{ c.pnl }}"><span class="{% if c.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if c.pnl >= 0 %}+{% endif %}{{ c.pnl|inr }}</span></td>
-            <td class="opacity-60 text-sm">{{ c.remarks|default:"—" }}</td>
+            <td class="opacity-60 text-sm">{{ c.remarks|default:"-" }}</td>
             <td class="text-right">
               <button type="button" class="btn btn-ghost btn-xs btn-square" data-edit-crypto data-id="{{ c.id }}" data-name="{{ c.name }}" data-invested="{{ c.amount_invested }}" data-current="{{ c.current_value }}" data-remarks="{{ c.remarks|default:'' }}"><span class="material-symbols-outlined text-base">edit</span></button>
             </td>

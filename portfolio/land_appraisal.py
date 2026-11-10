@@ -416,17 +416,20 @@ RECONCILIATION & GUARDRAILS:
             # Enforce hard code-level guardrails
             synth_pct = Decimal(str(synthesis.recommended_appreciation_pct))
             capped_pct = max(MIN_CONSERVATIVE_PCT, min(synth_pct, MAX_CONSERVATIVE_PCT))
+            current_val_dec = Decimal(str(holding.current_valuation or 0))
             if capped_pct != synth_pct:
                 logger.warning(
                     "[LandAppraisal DAG] Clamped appreciation from %.2f%% to %.2f%%",
                     float(synth_pct), float(capped_pct),
                 )
                 synthesis.recommended_appreciation_pct = float(capped_pct)
-                synthesis.new_valuation_inr = round(current_val * (1 + float(capped_pct) / 100), 2)
-                synthesis.net_value_increase_inr = round(synthesis.new_valuation_inr - current_val, 2)
+                new_val_dec = (current_val_dec * (Decimal('1') + capped_pct / Decimal('100'))).quantize(Decimal('0.01'))
+                synthesis.new_valuation_inr = float(new_val_dec)
+                synthesis.net_value_increase_inr = float((new_val_dec - current_val_dec).quantize(Decimal('0.01')))
 
             if not synthesis.implied_rate_per_sq_yd_inr and area > 0:
-                synthesis.implied_rate_per_sq_yd_inr = round(synthesis.new_valuation_inr / area, 2)
+                calc_val_dec = Decimal(str(synthesis.new_valuation_inr or current_val))
+                synthesis.implied_rate_per_sq_yd_inr = float((calc_val_dec / Decimal(str(area))).quantize(Decimal('0.01')))
 
             synthesis.holding_id = holding.id
             synthesis.holding_name = holding.name
@@ -447,15 +450,18 @@ def _fallback_synthesis(
     auditor: DeepSeekAuditorReview,
 ) -> LandAppraisalSynthesis:
     """Deterministic fallback synthesis guaranteeing robust execution without crash."""
-    current_val = float(holding.current_valuation)
-    appreciation_pct = float(min(
+    current_val_dec = Decimal(str(holding.current_valuation or 0))
+    current_val = float(current_val_dec)
+    appreciation_dec = min(
         Decimal(str(auditor.conservative_appreciation_ceiling_pct or DEFAULT_CONSERVATIVE_FALLBACK_PCT)),
         MAX_CONSERVATIVE_PCT,
-    ))
-    new_val = round(current_val * (1 + appreciation_pct / 100), 2)
-    net_increase = round(new_val - current_val, 2)
+    )
+    appreciation_pct = float(appreciation_dec)
+    new_val_dec = (current_val_dec * (Decimal('1') + appreciation_dec / Decimal('100'))).quantize(Decimal('0.01'))
+    new_val = float(new_val_dec)
+    net_increase = float((new_val_dec - current_val_dec).quantize(Decimal('0.01')))
     area = float(holding.area_value) if holding.area_value else 250.0
-    implied_rate = round(new_val / area, 2) if area > 0 else 0.0
+    implied_rate = float((new_val_dec / Decimal(str(area))).quantize(Decimal('0.01'))) if area > 0 else 0.0
 
     return LandAppraisalSynthesis(
         holding_id=holding.id,

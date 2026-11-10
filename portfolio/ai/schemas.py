@@ -148,7 +148,9 @@ class PortfolioInsightsResponse(BaseModel):
         if isinstance(raw_insights, list):
             cleaned_list = []
             for item in raw_insights:
-                if isinstance(item, dict):
+                if isinstance(item, BaseModel):
+                    cleaned_list.append(item)
+                elif isinstance(item, dict):
                     # Ensure title exists
                     if not item.get('title'):
                         item['title'] = str(item.get('headline') or item.get('name') or item.get('category') or 'Insight')[:100]

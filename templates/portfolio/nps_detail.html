@@ -2,13 +2,12 @@
 {% load indian_format %}
 {% load static %}
 
-{% block title %}NPS — Portfolio — Vault{% endblock %}
+{% block title %}NPS | Portfolio | Vault{% endblock %}
 
 {% block page_header %}
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
   <div>
-    <p class="text-xs font-bold tracking-widest uppercase text-primary">Portfolio</p>
-    <h1 class="text-2xl font-bold mt-1">National Pension System</h1>
+    <h1 class="text-2xl lg:text-3xl font-extrabold tracking-tight">National Pension System</h1>
     <p class="text-sm opacity-60 mt-0.5">All NPS entries</p>
   </div>
   <div class="flex flex-wrap items-center gap-2">
@@ -67,7 +66,7 @@
             <td class="text-right whitespace-nowrap font-semibold text-success" data-val="{{ e.contribution }}">+{{ e.contribution|inr }}</td>
             <td class="text-right whitespace-nowrap font-semibold text-success" data-val="{{ e.interest_earned }}">+{{ e.interest_earned|inr }}</td>
             <td class="text-right whitespace-nowrap font-semibold" data-val="{{ e.contribution|add:e.interest_earned }}">₹{{ e.contribution|add:e.interest_earned|floatformat:0|indian_number }}</td>
-            <td class="opacity-60 text-sm">{{ e.remarks|default:"—" }}</td>
+            <td class="opacity-60 text-sm">{{ e.remarks|default:"-" }}</td>
             <td class="text-right">
               <button type="button" class="btn btn-ghost btn-xs btn-square" data-edit-nps data-id="{{ e.id }}" data-date="{{ e.date|date:'Y-m-d' }}" data-contrib="{{ e.contribution }}" data-interest="{{ e.interest_earned }}" data-balance="{{ e.total_balance }}" data-remarks="{{ e.remarks }}">
                 <span class="material-symbols-outlined text-base">edit</span>

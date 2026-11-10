@@ -2,24 +2,26 @@ document.addEventListener('DOMContentLoaded', function() {
   var _isMobile = window.innerWidth <= 640;
 
   var tooltipDefault = {
-    backgroundColor: 'oklch(0.2 0 0 / 0.95)',
-    borderColor: 'rgba(128,128,128,0.15)',
+    backgroundColor: 'rgba(22, 27, 34, 0.92)',
+    borderColor: 'rgba(240, 246, 252, 0.12)',
     borderWidth: 1,
-    titleColor: '#ddd',
-    bodyColor: '#aaa',
+    titleColor: '#f0f6fc',
+    bodyColor: '#8b949e',
     padding: 12,
-    cornerRadius: 8,
+    cornerRadius: 10,
+    titleFont: { family: "'Inter', sans-serif", weight: '600' },
+    bodyFont: { family: "'Inter', sans-serif" },
     callbacks: { label: function (c) { return ' \u20b9' + Math.round(c.raw).toLocaleString('en-IN'); } }
   };
 
   var legendDefault = {
     position: _isMobile ? 'bottom' : 'right',
-    labels: { color: 'rgba(128,128,128,0.7)', usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, padding: 10, font: { size: 12 } }
+    labels: { color: 'rgba(240, 246, 252, 0.7)', usePointStyle: true, pointStyle: 'circle', boxWidth: 8, boxHeight: 8, padding: 12, font: { family: "'Inter', sans-serif", size: 12 } }
   };
 
   var scaleOpts = {
-    x: { grid: { display: false }, ticks: { color: 'rgba(128,128,128,0.45)', maxRotation: 0, autoSkipPadding: 6 }, border: { display: false } },
-    y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: 'rgba(128,128,128,0.45)', callback: function (v) { return v >= 1e7 ? '\u20b9' + (v / 1e7).toFixed(1) + 'Cr' : v >= 1e5 ? '\u20b9' + (v / 1e5).toFixed(1) + 'L' : v >= 1e3 ? '\u20b9' + Math.round(v / 1e3) + 'K' : '\u20b9' + v.toLocaleString('en-IN'); } }, border: { display: false } }
+    x: { grid: { display: false }, ticks: { color: 'rgba(240, 246, 252, 0.5)', maxRotation: 0, autoSkipPadding: 6, font: { family: "'Inter', sans-serif" } }, border: { display: false } },
+    y: { grid: { color: 'rgba(240, 246, 252, 0.05)' }, ticks: { color: 'rgba(240, 246, 252, 0.5)', font: { family: "'Inter', sans-serif" }, callback: function (v) { return v >= 1e7 ? '\u20b9' + (v / 1e7).toFixed(1) + 'Cr' : v >= 1e5 ? '\u20b9' + (v / 1e5).toFixed(1) + 'L' : v >= 1e3 ? '\u20b9' + Math.round(v / 1e3) + 'K' : '\u20b9' + v.toLocaleString('en-IN'); } }, border: { display: false } }
   };
 
   // 1. Master/Baby Portfolio Doughnut

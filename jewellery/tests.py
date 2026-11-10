@@ -321,3 +321,81 @@ class JewelleryAccessControlTests(TestCase):
         config.feature_jewellery = False
         config.save()
         self.assertEqual(self.client.get(reverse('jewellery_dashboard')).status_code, 404)
+
+
+class JewelleryEdgeCasesAndValuationTests(TestCase):
+    def setUp(self):
+        self.group = AccountGroup.objects.create(name="Household")
+        self.group.config.feature_jewellery = True
+        self.group.config.save()
+        self.primary = User.objects.create_user(
+            username="primary_j", password="pw", user_type="PRIMARY", group=self.group
+        )
+        self.client = Client()
+        self.client.force_login(self.primary)
+        session = self.client.session
+        session['portfolio_unlocked_at'] = time.time()
+        session.save()
+
+        # Seed commodity prices
+        CommodityPrice.objects.create(commodity_type='GOLD', rate_per_gram=Decimal('7200.00'))
+        CommodityPrice.objects.create(commodity_type='SILVER', rate_per_gram=Decimal('90.00'))
+
+    def test_zero_weight_and_unsupported_metals_return_zero_valuation(self):
+        zero_gold = JewelleryItem.objects.create(
+            group=self.group, category="COIN", metal_type="GOLD", purity="24k", weight_grams=Decimal("0.00")
+        )
+        self.assertEqual(zero_gold.estimated_value, Decimal('0.00'))
+
+        platinum = JewelleryItem.objects.create(
+            group=self.group, category="RING", metal_type="PLATINUM", weight_grams=Decimal("5.00")
+        )
+        self.assertEqual(platinum.estimated_value, Decimal('0.00'))
+
+    def test_silver_valuation_with_purity_factors(self):
+        silver_bar = JewelleryItem.objects.create(
+            group=self.group, category="OTHER", metal_type="SILVER", purity="925", weight_grams=Decimal("100.00")
+        )
+        # 100g * 90 Rs/g * 0.925 = 8325.00
+        self.assertEqual(silver_bar.estimated_value, Decimal('8325.00'))
+
+    def test_attach_rates_efficiency(self):
+        items = [
+            JewelleryItem.objects.create(
+                group=self.group, category="CHAIN", metal_type="GOLD", purity="22k", weight_grams=Decimal("10.00")
+            ),
+            JewelleryItem.objects.create(
+                group=self.group, category="RING", metal_type="GOLD", purity="18k", weight_grams=Decimal("5.00")
+            ),
+        ]
+        rates = JewelleryItem.attach_rates(items)
+        self.assertIn('GOLD', rates)
+        # Calling estimated_value should not execute queries because _rates is cached on items
+        with self.assertNumQueries(0):
+            val1 = items[0].estimated_value
+            val2 = items[1].estimated_value
+            self.assertGreater(val1, 0)
+            self.assertGreater(val2, 0)
+
+    def test_autocomplete_search_endpoints(self):
+        JewelleryItem.objects.create(
+            group=self.group,
+            category="NECKLACE",
+            metal_type="GOLD",
+            purity="22k",
+            weight_grams=Decimal("25.00"),
+            location="BANK_LOCKER",
+            notes="Heirloom necklace from grandmother",
+        )
+
+        # Empty search
+        resp = self.client.get(reverse('jewellery_autocomplete') + '?q=')
+        self.assertEqual(resp.json(), {'results': []})
+
+        # Match by notes keyword
+        resp = self.client.get(reverse('jewellery_autocomplete') + '?q=heirloom')
+        results = resp.json().get('results', [])
+        self.assertEqual(len(results), 1)
+        self.assertIn('Necklace', results[0]['label'])
+        self.assertEqual(results[0]['location'], 'Bank Locker')
+

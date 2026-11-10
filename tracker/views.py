@@ -169,7 +169,7 @@ def dashboard(request):
     )
     pace = _savings_pace(monthly_data, goal_achieved, total_goal, today, fc['fy_start_date'], fc['fy_end_date'])
 
-    fy_transactions = transactions.order_by('-date', '-id')
+    fy_transactions = transactions.select_related('user', 'category').order_by('-date', '-id')
 
     txn_form = TransactionForm(initial={'date': today})
     goal_form = GoalIncrementForm()
@@ -559,7 +559,7 @@ def hra_tracker(request):
         gf,
         date__gte=fc['fy_start_date'],
         date__lte=fc['fy_end_date'],
-    ).order_by('-date')
+    ).select_related('user').order_by('-date')
 
     total_expense = float(
         expenses.filter(hra_type='EXPENSE').aggregate(t=Sum('amount'))['t'] or 0
@@ -668,6 +668,7 @@ def _build_hra_monthly(expenses, fy_start, today):
 # ---------------------------------------------------------------------------
 
 @login_required
+@_require_role('PRIMARY', 'ACCOUNT_HOLDER')
 @_require_feature('notes')
 def notes_list(request):
     """Display all notes for the current user, with section and FY filter."""
@@ -678,7 +679,7 @@ def notes_list(request):
     section_filter = request.GET.get('section', '')
     fy_filter = request.GET.get('fy', '')
 
-    notes_qs = Note.objects.filter(user=request.user)
+    notes_qs = Note.objects.filter(user=request.user).select_related('user')
     if section_filter:
         notes_qs = notes_qs.filter(section=section_filter)
 
@@ -752,6 +753,8 @@ def notes_list(request):
 
 
 @login_required
+@_require_role('PRIMARY', 'ACCOUNT_HOLDER')
+@_require_feature('notes')
 @require_POST
 def add_note(request):
     form = NoteForm(request.POST)
@@ -766,6 +769,8 @@ def add_note(request):
 
 
 @login_required
+@_require_role('PRIMARY', 'ACCOUNT_HOLDER')
+@_require_feature('notes')
 @require_POST
 def edit_note(request, pk):
     note = get_object_or_404(Note, pk=pk, user=request.user)
@@ -779,6 +784,8 @@ def edit_note(request, pk):
 
 
 @login_required
+@_require_role('PRIMARY', 'ACCOUNT_HOLDER')
+@_require_feature('notes')
 @require_POST
 def delete_note(request, pk):
     note = get_object_or_404(Note, pk=pk, user=request.user)
@@ -789,6 +796,8 @@ def delete_note(request, pk):
 
 
 @login_required
+@_require_role('PRIMARY', 'ACCOUNT_HOLDER')
+@_require_feature('notes')
 @require_POST
 def toggle_todo(request, pk):
     """Toggle the is_done state of a Todo note."""

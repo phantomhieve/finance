@@ -2,14 +2,13 @@
 {% load indian_format %}
 {% load static %}
 
-{% block title %}Commodities — Portfolio — Vault{% endblock %}
+{% block title %}Commodities | Portfolio | Vault{% endblock %}
 
 {% block page_header %}
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
   <div>
-    <p class="text-xs font-bold tracking-widest uppercase text-primary">Portfolio</p>
-    <h1 class="text-xl lg:text-2xl font-extrabold">Commodities</h1>
-    <div class="flex flex-wrap items-center gap-3 mt-1 text-xs opacity-60">
+    <h1 class="text-xl lg:text-3xl font-extrabold tracking-tight">Commodities</h1>
+    <div class="flex flex-wrap items-center gap-3 mt-1.5 text-xs opacity-60">
       <span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm text-warning">diamond</span>Gold {{ gold_rate|inr }}/g</span>
       <span>&middot;</span>
       <span class="flex items-center gap-1"><span class="material-symbols-outlined text-sm opacity-60">toll</span>Silver {{ silver_rate|inr }}/g</span>
@@ -57,7 +56,7 @@
   </div>
 </div>
 
-{# ——— Gold ——— #}
+{# --- Gold --- #}
 <div class="card bg-base-200 shadow-sm card-hover animate-up mb-4" style="animation-delay:0.1s">
   <div class="card-body p-4">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
@@ -160,7 +159,7 @@
   </div>
 </div>
 
-{# ——— Silver ——— #}
+{# --- Silver --- #}
 <div class="card bg-base-200 shadow-sm card-hover animate-up mb-4" style="animation-delay:0.15s">
   <div class="card-body p-4">
     <div class="flex flex-wrap items-center justify-between gap-3 mb-3">

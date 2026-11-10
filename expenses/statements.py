@@ -827,6 +827,10 @@ def auto_track_statement_payments(group, since_days=60):
     if not statements:
         return
 
+    from .categories import categories_by_name
+    cats = categories_by_name(group)
+    cc_payment_cat = cats.get('Credit Card Payment')
+
     today_date = datetime.date.today()
     for st in statements:
         card = st.payment_source
@@ -850,7 +854,7 @@ def auto_track_statement_payments(group, since_days=60):
                 txn_date__gte=start_date,
                 txn_date__lte=end_date,
                 is_deleted=False,
-            ).exclude(refund_of__isnull=False)
+            ).exclude(refund_of__isnull=False).select_related('category')
         )
 
         for c in card_credits:
@@ -858,12 +862,9 @@ def auto_track_statement_payments(group, since_days=60):
             if not c.merchant or c.merchant in ('Unknown merchant', 'Unknown'):
                 c.merchant = 'Credit Card Bill Payment'
                 updates_c.append('merchant')
-            if c.category and c.category.name == 'Transfers':
-                from .categories import categories_by_name
-                cats = categories_by_name(group)
-                if 'Credit Card Payment' in cats:
-                    c.category = cats['Credit Card Payment']
-                    updates_c.append('category')
+            if c.category and c.category.name == 'Transfers' and cc_payment_cat:
+                c.category = cc_payment_cat
+                updates_c.append('category')
             if updates_c:
                 c.save(update_fields=updates_c)
 
@@ -878,14 +879,12 @@ def auto_track_statement_payments(group, since_days=60):
                     is_deleted=False,
                 )
                 .filter(Q(category__name='Transfers') | Q(category__isnull=True))
+                .select_related('category')
                 .first()
             )
-            if twin_debit:
-                from .categories import categories_by_name
-                cats = categories_by_name(group)
-                if 'Credit Card Payment' in cats:
-                    twin_debit.category = cats['Credit Card Payment']
-                    twin_debit.save(update_fields=['category'])
+            if twin_debit and cc_payment_cat:
+                twin_debit.category = cc_payment_cat
+                twin_debit.save(update_fields=['category'])
 
         total_paid = sum((c.amount for c in card_credits), Decimal('0.00'))
 

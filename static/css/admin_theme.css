@@ -392,17 +392,17 @@ input[type="submit"].default, .submit-row input.default {
 .messagelist li.success {
   background: rgba(105,240,174,0.08);
   color: #69f0ae;
-  border-left: 3px solid #69f0ae;
+  border: 1px solid rgba(105,240,174,0.25);
 }
 .messagelist li.warning {
   background: rgba(255,213,79,0.08);
   color: #ffd54f;
-  border-left: 3px solid #ffd54f;
+  border: 1px solid rgba(255,213,79,0.25);
 }
 .messagelist li.error {
   background: rgba(255,92,138,0.08);
   color: #ff5c8a;
-  border-left: 3px solid #ff5c8a;
+  border: 1px solid rgba(255,92,138,0.25);
 }
 
 /* ── Nav sidebar ─────────────────────────────────────────────────── */

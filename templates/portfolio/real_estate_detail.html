@@ -2,16 +2,15 @@
 {% load indian_format %}
 {% load static %}
 
-{% block title %}Real Estate Investments — Portfolio — Vault{% endblock %}
+{% block title %}Real Estate Investments | Portfolio | Vault{% endblock %}
 
 {% block page_header %}
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
   <div>
-    <p class="text-xs font-bold tracking-widest uppercase text-primary">Portfolio</p>
-    <h1 class="text-xl lg:text-2xl font-extrabold flex items-center gap-2">
+    <h1 class="text-xl lg:text-3xl font-extrabold tracking-tight flex items-center gap-2.5">
       <span class="material-symbols-outlined text-primary text-2xl">domain</span> Real Estate Investments
     </h1>
-    <p class="text-xs opacity-50">Land, Plots, Residential, Commercial assets with North Indian measurement units &amp; AI research</p>
+    <p class="text-xs opacity-50 mt-0.5">Land, Plots, Residential, Commercial assets with North Indian measurement units &amp; AI research</p>
   </div>
   <div class="flex flex-wrap items-center gap-2">
     <button type="button" class="btn btn-primary btn-sm gap-1" onclick="openAddRealEstateModal()">
@@ -144,7 +143,7 @@
               {% if p.cagr_pct > 0 %}
               <span class="text-success">{{ p.cagr_pct }}%</span>
               {% else %}
-              <span class="opacity-40">—</span>
+              <span class="opacity-40">-</span>
               {% endif %}
             </td>
             <td class="text-right">

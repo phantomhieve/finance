@@ -1,14 +1,13 @@
 {% extends 'base.html' %}
 {% load indian_format %}
 
-{% block title %}{{ statement.payment_source.display_name }} statement — Vault{% endblock %}
+{% block title %}{{ statement.payment_source.display_name }} statement | Vault{% endblock %}
 
 {% block page_header %}
 <div class="flex items-start justify-between gap-3">
   <div class="min-w-0">
-    <p class="text-xs font-bold tracking-widest uppercase text-orange-400">Card statement</p>
-    <h1 class="text-xl lg:text-2xl font-extrabold truncate">{{ statement.payment_source.display_name }}</h1>
-    {% if statement.statement_date %}<p class="text-xs opacity-50">{% if statement.period_start %}{{ statement.period_start|date:"j M" }} → {% endif %}{{ statement.statement_date|date:"j M Y" }}</p>{% endif %}
+    <h1 class="text-xl lg:text-3xl font-extrabold tracking-tight truncate">{{ statement.payment_source.display_name }}</h1>
+    {% if statement.statement_date %}<p class="text-xs opacity-50 mt-0.5">{% if statement.period_start %}{{ statement.period_start|date:"j M" }} → {% endif %}{{ statement.statement_date|date:"j M Y" }}</p>{% endif %}
   </div>
   <a href="{% url 'expenses_statements' %}" class="btn btn-ghost btn-sm gap-1 shrink-0"><span class="material-symbols-outlined text-base">arrow_back</span><span class="hidden sm:inline">Statements</span></a>
 </div>
@@ -22,7 +21,7 @@
       <div class="flex items-start justify-between gap-3">
         <div>
           <p class="text-[10px] font-bold uppercase tracking-widest opacity-40">Total due</p>
-          <p class="text-3xl font-extrabold tabular-nums mt-1">{% if statement.total_due is not None %}{{ statement.total_due|inr }}{% else %}—{% endif %}</p>
+          <p class="text-3xl font-extrabold tabular-nums mt-1">{% if statement.total_due is not None %}{{ statement.total_due|inr }}{% else %}-{% endif %}</p>
           <p class="text-xs mt-1 {% if not statement.is_paid and statement.due_date and statement.due_date < today %}text-error{% else %}opacity-55{% endif %}">
             {% if statement.is_paid %}Paid{% if statement.paid_at %} on {{ statement.paid_at|date:"j M" }}{% endif %}{% if statement.paid_amount %} · {{ statement.paid_amount|inr }}{% endif %}
             {% elif statement.due_date %}Due {{ statement.due_date|date:"D, j M Y" }}{% endif %}
@@ -112,7 +111,7 @@
     </div>
   </div>
   {% elif statement.status == 'BODY_ONLY' %}
-  <p class="text-sm opacity-55">Only the totals were in the email — there was no PDF to match line items against. You can upload the PDF from the statements page.</p>
+  <p class="text-sm opacity-55">Only the totals were in the email: there was no PDF to match line items against. You can upload the PDF from the statements page.</p>
   {% elif statement.status == 'FAILED' %}
   <p class="text-sm text-error/80">The PDF opened but no transaction lines could be read from it.</p>
   {% endif %}
@@ -137,7 +136,7 @@
       <div class="table-card flex flex-col gap-2 !py-2.5 {% if ln.needs_review %}border border-warning/40 bg-warning/5{% endif %}">
         <div class="flex items-center gap-3">
           <span class="material-symbols-outlined text-lg shrink-0 {% if ln.needs_review %}text-warning{% elif ln.match_method == 'SKIP' %}opacity-40{% elif ln.was_added %}text-info{% elif ln.matched_expense %}text-success{% else %}opacity-30{% endif %}"
-                title="{% if ln.needs_review %}Possible duplicate — needs review{% elif ln.match_method == 'SKIP' %}Bill payment / skipped{% elif ln.was_added %}No email alert — added from statement{% elif ln.matched_expense %}Matched an alert{% else %}Credit / not tracked{% endif %}">
+                title="{% if ln.needs_review %}Possible duplicate (needs review){% elif ln.match_method == 'SKIP' %}Bill payment / skipped{% elif ln.was_added %}No email alert: added from statement{% elif ln.matched_expense %}Matched an alert{% else %}Credit / not tracked{% endif %}">
             {% if ln.needs_review %}help{% elif ln.match_method == 'SKIP' %}payments{% elif ln.was_added %}add_circle{% elif ln.matched_expense %}check_circle{% else %}remove{% endif %}
           </span>
           <div class="flex-1 min-w-0">

@@ -1,4 +1,6 @@
 import asyncio
+import datetime
+from decimal import Decimal
 import json
 from unittest import mock
 
@@ -132,3 +134,127 @@ class OAuthTenancyTests(TestCase):
         self.owner.is_active = False
         self.owner.save()
         self.assertIsNone(self._scopes(self._token(self.owner)))
+
+
+class MCPServerToolsAndResourcesTests(TestCase):
+    def setUp(self):
+        from tracker.models import AccountGroup, User
+        from portfolio.models import ZerodhaAccount, StockHolding, MutualFundHolding
+        self.group = AccountGroup.objects.create(name="Primary Family")
+        self.primary = User.objects.create_user(
+            username="mcp_primary", password="x", user_type="PRIMARY", group=self.group
+        )
+        self.acct = ZerodhaAccount.objects.create(group=self.group, name="Main Kite", slug="main-kite")
+        self.stock = StockHolding.objects.create(
+            account=self.acct,
+            symbol="INFY",
+            quantity=50,
+            purchase_value=Decimal('70000.00'),
+            current_value=Decimal('85000.00'),
+            is_baby=False,
+        )
+        self.mf = MutualFundHolding.objects.create(
+            account=self.acct,
+            fund_name="UTI Nifty 50 Index Fund",
+            fund_type="INDEX",
+            units=Decimal('500.00'),
+            purchase_value=Decimal('60000.00'),
+            current_value=Decimal('75000.00'),
+            is_baby=False,
+        )
+
+    def test_portfolio_stocks_resource_returns_valid_json_and_values(self):
+        from mcp_server.server import portfolio_stocks
+        raw = portfolio_stocks()
+        data = json.loads(raw)
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]['symbol'], 'INFY')
+        self.assertEqual(data[0]['account'], 'Main Kite')
+        self.assertEqual(data[0]['current_value'], '85000.00')
+
+    def test_portfolio_mutual_funds_resource_returns_valid_json(self):
+        from mcp_server.server import portfolio_mutual_funds
+        raw = portfolio_mutual_funds()
+        data = json.loads(raw)
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]['fund_name'], 'UTI Nifty 50 Index Fund')
+        self.assertEqual(data[0]['fund_type'], 'INDEX')
+        self.assertEqual(data[0]['current_value'], '75000.00')
+
+    def test_get_portfolio_stocks_tool_filtering(self):
+        from mcp_server.server import get_portfolio_stocks
+        # Matching symbol
+        res = json.loads(get_portfolio_stocks(symbol='INF'))
+        self.assertEqual(len(res), 1)
+        self.assertEqual(res[0]['symbol'], 'INFY')
+
+        # Non-matching symbol
+        res_none = json.loads(get_portfolio_stocks(symbol='TCS'))
+        self.assertEqual(len(res_none), 0)
+
+    def test_get_portfolio_mutual_funds_tool_filtering(self):
+        from mcp_server.server import get_portfolio_mutual_funds
+        res = json.loads(get_portfolio_mutual_funds(fund_name='Nifty'))
+        self.assertEqual(len(res), 1)
+        self.assertEqual(res[0]['fund_name'], 'UTI Nifty 50 Index Fund')
+
+        res_none = json.loads(get_portfolio_mutual_funds(fund_name='Midcap'))
+        self.assertEqual(len(res_none), 0)
+
+    def test_parse_helpers_resilience(self):
+        import datetime
+        from decimal import Decimal
+        from mcp_server.server import _parse_date, _parse_decimal
+
+        # Valid dates
+        self.assertEqual(_parse_date("2026-06-15"), datetime.date(2026, 6, 15))
+
+        # Invalid dates fallback to default or today
+        fallback = datetime.date(2025, 1, 1)
+        self.assertEqual(_parse_date("not-a-date", default=fallback), fallback)
+        self.assertEqual(_parse_date("", default=fallback), fallback)
+        self.assertEqual(_parse_date(None, default=fallback), fallback)
+
+        # Decimal parsing
+        self.assertEqual(_parse_decimal("123.45"), Decimal('123.45'))
+        self.assertEqual(_parse_decimal("invalid"), Decimal('0'))
+        self.assertEqual(_parse_decimal(None), Decimal('0'))
+
+    def test_audit_logging_create_update_delete_snapshots(self):
+        from mcp_server.audit import log_create, log_update, log_delete
+        from mcp_server.models import MCPAuditLog
+        from tracker.models import Note
+
+        note = Note.objects.create(
+            user=self.primary,
+            title="Audit Test Note",
+            body="Initial Body",
+            date=datetime.date(2026, 6, 1),
+            financial_year=2026,
+        )
+
+        # 1. Log create
+        log_create(note, 'add_note')
+        c_log = MCPAuditLog.objects.filter(model_name='tracker.Note', action='CREATE').first()
+        self.assertIsNotNone(c_log)
+        self.assertEqual(c_log.data_after['title'], 'Audit Test Note')
+        self.assertIsNone(c_log.data_before)
+
+        # 2. Log update
+        from mcp_server.audit import serialize_instance
+        before_state = serialize_instance(note)
+        note.body = "Modified Body"
+        note.save(update_fields=['body'])
+        log_update(note, before_state, 'update_note')
+        u_log = MCPAuditLog.objects.filter(model_name='tracker.Note', action='UPDATE').first()
+        self.assertIsNotNone(u_log)
+        self.assertEqual(u_log.data_before['body'], 'Initial Body')
+        self.assertEqual(u_log.data_after['body'], 'Modified Body')
+
+        # 3. Log delete
+        log_delete(note, 'delete_note')
+        d_log = MCPAuditLog.objects.filter(model_name='tracker.Note', action='DELETE').first()
+        self.assertIsNotNone(d_log)
+        self.assertEqual(d_log.data_before['title'], 'Audit Test Note')
+        self.assertIsNone(d_log.data_after)
+

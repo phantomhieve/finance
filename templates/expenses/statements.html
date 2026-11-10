@@ -1,13 +1,12 @@
 {% extends 'base.html' %}
 {% load indian_format %}
 
-{% block title %}Card statements — Vault{% endblock %}
+{% block title %}Card statements | Vault{% endblock %}
 
 {% block page_header %}
 <div class="flex items-start justify-between gap-3">
   <div>
-    <p class="text-xs font-bold tracking-widest uppercase text-orange-400">Expenses</p>
-    <h1 class="text-xl lg:text-2xl font-extrabold">Card statements</h1>
+    <h1 class="text-xl lg:text-3xl font-extrabold tracking-tight">Card Statements</h1>
   </div>
   <div class="flex items-center gap-1.5">
     <a href="{% url 'expenses_home' %}" class="btn btn-ghost btn-sm gap-1"><span class="material-symbols-outlined text-base">arrow_back</span><span class="hidden sm:inline">Expenses</span></a>
@@ -39,7 +38,7 @@
       </p>
     </div>
     <div class="text-right shrink-0">
-      <p class="text-sm font-bold tabular-nums">{% if st.total_due is not None %}{{ st.total_due|inr }}{% else %}—{% endif %}</p>
+      <p class="text-sm font-bold tabular-nums">{% if st.total_due is not None %}{{ st.total_due|inr }}{% else %}-{% endif %}</p>
       {% if st.is_paid %}<p class="text-[10px] text-success">Paid</p>
       {% elif st.due_date %}<p class="text-[10px] {% if st.due_date < today %}text-error{% else %}opacity-50{% endif %}">Due {{ st.due_date|date:"j M" }}</p>{% endif %}
     </div>

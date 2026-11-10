@@ -1572,5 +1572,104 @@ class LandAppraisalTests(TestCase):
         self.assertIn("gemini-4-argon", synth.model_chain_used)
 
 
+class PortfolioDAGResilienceAndBabyTests(TestCase):
+    def setUp(self):
+        import time
+        self.group = AccountGroup.objects.create(name="DAG Test Household")
+        self.owner = User.objects.create_user(username="dag_owner", password="x", user_type="PRIMARY", group=self.group)
+        self.other_group = AccountGroup.objects.create(name="Other Household")
+        self.other_owner = User.objects.create_user(username="other_dag_owner", password="x", user_type="PRIMARY", group=self.other_group)
+        self.client.force_login(self.owner)
+        session = self.client.session
+        session['portfolio_unlocked_at'] = time.time()
+        session.save()
+
+    @mock.patch('portfolio.dag.run_stage_1a_allocation')
+    @mock.patch('portfolio.dag.run_stage_1b_quality')
+    @mock.patch('portfolio.dag.run_stage_1c_macro')
+    @mock.patch('portfolio.dag.run_stage_2_strategy')
+    @mock.patch('portfolio.dag.run_stage_3_terminal_synthesis')
+    def test_dag_stage_3_exception_triggers_fallback_synthesis(
+        self, mock_stage3, mock_stage2, mock_stage1c, mock_stage1b, mock_stage1a
+    ):
+        from portfolio.dag import (
+            PortfolioInsightsDAG,
+            AllocationLensResult,
+            QualityLensResult,
+            MacroStressLensResult,
+            StrategyLensResult,
+        )
+
+        mock_stage1a.return_value = AllocationLensResult(sub_score=80)
+        mock_stage1b.return_value = QualityLensResult(sub_score=75)
+        mock_stage1c.return_value = MacroStressLensResult(sub_score=70)
+        mock_stage2.return_value = StrategyLensResult(sub_score=85)
+        # Stage 3 fails (e.g. gateway timeout or malformed response)
+        mock_stage3.side_effect = RuntimeError("Stage 3 LLM gateway timeout")
+
+        dag = PortfolioInsightsDAG(use_concurrent=False)
+        response, metadata = dag.execute({"summary": {"total_current_value": 5000000}}, group=self.group)
+
+        self.assertIsNotNone(response)
+        # Expected grounded score: 0.30*80 + 0.25*75 + 0.25*85 + 0.20*70 = 24 + 18.75 + 21.25 + 14 = 78
+        self.assertEqual(response.score, 78)
+        self.assertIn("Portfolio diagnostic complete", response.summary)
+        self.assertTrue(len(response.insights) > 0)
+
+    def test_toggle_baby_holdings_and_tenant_isolation(self):
+        from portfolio.models import ZerodhaAccount, StockHolding, FixedDeposit
+
+        acct = ZerodhaAccount.objects.create(group=self.group, name="Main Kite", slug="main-kite")
+        stock = StockHolding.objects.create(
+            account=acct,
+            symbol="RELIANCE",
+            quantity=10,
+            purchase_value=Decimal('25000'),
+            current_value=Decimal('28000'),
+            is_baby=False,
+        )
+        fd = FixedDeposit.objects.create(
+            group=self.group,
+            name="HDFC 1-Year FD",
+            account_name="Main Acc",
+            principal=Decimal('100000'),
+            interest_rate=Decimal('7.1'),
+            start_date=datetime.date(2025, 1, 1),
+            maturity_date=datetime.date(2027, 1, 1),
+            is_baby=False,
+        )
+
+        # 1. Toggle stock to baby
+        resp = self.client.post(f'/portfolio/toggle-baby/stockholding/{stock.pk}/', follow=True)
+        self.assertEqual(resp.status_code, 200)
+        stock.refresh_from_db()
+        self.assertTrue(stock.is_baby)
+
+        # 2. Toggle FD to baby
+        resp = self.client.post(f'/portfolio/toggle-baby/fixeddeposit/{fd.pk}/', follow=True)
+        self.assertEqual(resp.status_code, 200)
+        fd.refresh_from_db()
+        self.assertTrue(fd.is_baby)
+
+        # 3. Cross-tenant isolation: other user cannot toggle stock
+        self.client.force_login(self.other_owner)
+        session = self.client.session
+        session['portfolio_unlocked_at'] = 9999999999
+        session.save()
+        resp = self.client.post(f'/portfolio/toggle-baby/stockholding/{stock.pk}/', follow=True)
+        self.assertEqual(resp.status_code, 404)
+        stock.refresh_from_db()
+        self.assertTrue(stock.is_baby)  # Remains unchanged
+
+        # 4. Invalid model name returns 400
+        self.client.force_login(self.owner)
+        session = self.client.session
+        session['portfolio_unlocked_at'] = time.time()
+        session.save()
+        resp = self.client.post(f'/portfolio/toggle-baby/invalidmodel/{stock.pk}/')
+        self.assertEqual(resp.status_code, 400)
+
+
+
 
 

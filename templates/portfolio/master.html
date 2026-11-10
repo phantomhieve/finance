@@ -2,14 +2,13 @@
 {% load indian_format %}
 {% load static %}
 
-{% block title %}Portfolio — Vault{% endblock %}
+{% block title %}Portfolio | Vault{% endblock %}
 
 {% block page_header %}
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
   <div>
-    <p class="text-xs font-bold tracking-widest uppercase text-primary">Portfolio Tracker</p>
-    <h1 class="text-xl lg:text-2xl font-extrabold">Master Portfolio</h1>
-    <p class="text-xs opacity-50">All asset classes &amp; investments</p>
+    <h1 class="text-xl lg:text-3xl font-extrabold tracking-tight">Master Portfolio</h1>
+    <p class="text-xs opacity-50 mt-0.5">All asset classes &amp; investments</p>
   </div>
   <div class="hidden sm:flex flex-wrap items-center gap-2">
     <form method="post" action="{% url 'sync_from_sheets' %}" class="inline">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
@@ -78,7 +77,7 @@
   </a>
 </div>
 
-{# ——— PORTFOLIO HERO ——— #}
+{# --- PORTFOLIO HERO --- #}
 <div class="card hero-gradient-portfolio shadow-sm animate-up mb-4 card-hover">
   <div class="card-body p-4 lg:p-6">
     <div class="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-8">
@@ -148,7 +147,7 @@
   </div>
 </div>
 
-{# ——— STICKY SECTION NAV ——— #}
+{# --- STICKY SECTION NAV --- #}
 <div class="section-nav mb-3 rounded-xl" id="sectionNav">
   <div class="flex overflow-x-auto gap-1 px-2 py-2 scrollbar-hide">
     <a href="#allocation" class="section-tab active" data-section="allocation"><span class="material-symbols-outlined text-sm">pie_chart</span>Overview</a>
@@ -160,7 +159,7 @@
   </div>
 </div>
 
-{# ——— MOBILE QUICK STATS ——— #}
+{# --- MOBILE QUICK STATS --- #}
 <div class="md:hidden quick-stats-scroll mb-3">
   {% for a in assets %}
   <a href="#{% if a.name == 'Real Estate' or a.name == 'Gold' or a.name == 'Silver' or a.name == 'Crypto' %}alternates{% elif a.name == 'EPF' or a.name == 'PF' or a.name == 'Bonds' %}debt{% elif a.name == 'Cash' or a.name == 'FD' %}liquidity{% else %}equity{% endif %}" class="quick-stat-chip">
@@ -172,7 +171,7 @@
   </a>
   {% endfor %}
 </div>
-{# ——— ASSET BREAKDOWN + ALLOCATION (collapsed by default) ——— #}
+{# --- ASSET BREAKDOWN + ALLOCATION (collapsed by default) --- #}
 <div id="allocation" class="card bg-base-200 shadow-sm animate-up mb-4 card-hover scroll-mt-24" style="animation-delay:0.1s">
   <div class="collapse collapse-arrow">
     <input type="checkbox" />
@@ -228,7 +227,7 @@
   </div>
 </div>
 
-{# ——— CONSOLIDATED PORTFOLIO ——— #}
+{# --- CONSOLIDATED PORTFOLIO --- #}
 <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 animate-up mb-4" style="animation-delay:0.15s">
   <div class="card bg-base-200 shadow-sm lg:col-span-3 card-hover">
     <div class="card-body p-4">
@@ -256,13 +255,13 @@
   </div>
 </div>
 
-{# ——— SECTION: MARKET-LINKED ASSETS ——— #}
+{# --- SECTION: MARKET-LINKED ASSETS --- #}
 <div class="section-group-header" id="equity">
   <span class="material-symbols-outlined section-icon text-blue-400">trending_up</span>
   <h2>Market-Linked Assets</h2>
 </div>
 
-{# ——— EQUITY ——— #}
+{# --- EQUITY --- #}
 <div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.2s">
   <div class="card-body p-4">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-1"><h2 class="card-title text-base flex items-center gap-1.5"><span class="material-symbols-outlined text-primary text-lg">candlestick_chart</span>Equity Breakdown</h2><span class="badge badge-primary badge-sm">{{ equity_total|inr }}</span></div>
@@ -289,7 +288,7 @@
   </div>
 </div>
 
-{# ——— ZERODHA ACCOUNTS ——— #}
+{# --- ZERODHA ACCOUNTS --- #}
 {% if accounts %}
 <div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.25s">
   <div class="card-body p-4">
@@ -319,7 +318,7 @@
 </div>
 {% endif %}
 
-{# ——— US STOCKS (RSU) ——— #}
+{# --- US STOCKS (RSU) --- #}
 <div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.27s">
   <div class="card-body p-4">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
@@ -374,7 +373,7 @@
   </div>
 </div>
 
-{# ——— NPS ——— #}
+{# --- NPS --- #}
 <div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.29s">
   <div class="card-body p-4">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-3"><h2 class="card-title text-base flex items-center gap-1.5"><span class="material-symbols-outlined text-blue-400 text-lg">shield</span>NPS</h2>
@@ -402,13 +401,13 @@
   </div>
 </div>
 
-{# ——— SECTION: ALTERNATES ——— #}
+{# --- SECTION: ALTERNATES --- #}
 <div class="section-group-header" id="alternates">
   <span class="material-symbols-outlined section-icon text-amber-400">domain</span>
   <h2>Alternate Assets</h2>
 </div>
 
-{# ——— REAL ESTATE INVESTMENTS ——— #}
+{# --- REAL ESTATE INVESTMENTS --- #}
 <div id="real-estate" class="card bg-base-200 shadow-sm animate-up mb-4 card-hover scroll-mt-20" style="animation-delay:0.29s">
   <div class="card-body p-4">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
@@ -479,7 +478,7 @@
   </div>
 </div>
 
-{# ——— COMMODITIES ——— #}
+{# --- COMMODITIES --- #}
 <div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.3s">
   <div class="card-body p-4">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
@@ -535,7 +534,7 @@
   </div>
 </div>
 
-{# ——— CRYPTO ——— #}
+{# --- CRYPTO --- #}
 <div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.34s">
   <div class="card-body p-4">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-3"><h2 class="card-title text-base flex items-center gap-1.5"><span class="material-symbols-outlined text-purple-400 text-lg">currency_bitcoin</span>Crypto</h2>
@@ -564,13 +563,13 @@
   </div>
 </div>
 
-{# ——— SECTION: DEBT INSTRUMENTS ——— #}
+{# --- SECTION: DEBT INSTRUMENTS --- #}
 <div class="section-group-header" id="debt">
   <span class="material-symbols-outlined section-icon text-emerald-400">account_balance</span>
   <h2>Debt Instruments</h2>
 </div>
 
-{# ——— EPF ——— #}
+{# --- EPF --- #}
 <div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.35s">
   <div class="card-body p-4">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-1"><h2 class="card-title text-base flex items-center gap-1.5"><span class="material-symbols-outlined text-emerald-400 text-lg">account_balance</span>EPF</h2>
@@ -579,7 +578,7 @@
     <div class="flex flex-wrap gap-4 text-xs opacity-60 mb-3"><span>Contributions: <strong class="text-success">{{ epf_total_contrib|inr }}</strong></span><span>Interest: <strong class="text-success">{{ epf_total_interest|inr }}</strong></span></div>
     {% if epf_entries %}
     <div class="hidden md:block overflow-x-auto max-h-72 overflow-y-auto pf-scroll-box"><table class="table table-sm"><thead><tr><th>Date</th><th>Type</th><th class="text-right">Amount</th><th>Remarks</th><th class="w-10"></th></tr></thead><tbody>
-    {% for e in epf_entries %}<tr class="hover"><td class="opacity-60 text-sm whitespace-nowrap">{{ e.date|date:"d M Y" }}</td><td><span class="badge {% if e.entry_type == 'CONTRIBUTION' %}badge-primary{% else %}badge-ghost{% endif %} badge-sm">{{ e.get_entry_type_display }}</span></td><td class="text-right whitespace-nowrap"><span class="text-success">+{{ e.amount|inr }}</span></td><td class="opacity-50 text-sm">{{ e.remarks|default:"—" }}</td><td><button class="btn btn-ghost btn-xs btn-square" data-edit-epf data-id="{{ e.id }}" data-date="{{ e.date|date:'Y-m-d' }}" data-type="{{ e.entry_type }}" data-amount="{{ e.amount }}" data-remarks="{{ e.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button></td></tr>
+    {% for e in epf_entries %}<tr class="hover"><td class="opacity-60 text-sm whitespace-nowrap">{{ e.date|date:"d M Y" }}</td><td><span class="badge {% if e.entry_type == 'CONTRIBUTION' %}badge-primary{% else %}badge-ghost{% endif %} badge-sm">{{ e.get_entry_type_display }}</span></td><td class="text-right whitespace-nowrap"><span class="text-success">+{{ e.amount|inr }}</span></td><td class="opacity-50 text-sm">{{ e.remarks|default:"-" }}</td><td><button class="btn btn-ghost btn-xs btn-square" data-edit-epf data-id="{{ e.id }}" data-date="{{ e.date|date:'Y-m-d' }}" data-type="{{ e.entry_type }}" data-amount="{{ e.amount }}" data-remarks="{{ e.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button></td></tr>
     {% endfor %}</tbody></table></div>
     <div class="md:hidden space-y-2 max-h-72 overflow-y-auto pf-scroll-box">
       {% for e in epf_entries %}
@@ -602,7 +601,7 @@
   </div>
 </div>
 
-{# ——— PF (PROVIDENT FUND — PER FAMILY MEMBER) ——— #}
+{# --- PF (PROVIDENT FUND — PER FAMILY MEMBER) --- #}
 <div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.38s">
   <div class="card-body p-4">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-1">
@@ -655,7 +654,7 @@
             <td class="text-right whitespace-nowrap"><span class="text-primary font-medium">{% if e.contribution > 0 %}+{{ e.contribution|inr }}{% else %}&mdash;{% endif %}</span></td>
             <td class="text-right whitespace-nowrap"><span class="text-success font-medium">{% if e.interest > 0 %}+{{ e.interest|inr }}{% else %}&mdash;{% endif %}</span></td>
             <td class="text-right whitespace-nowrap font-bold">{{ e.closing_balance|inr }}</td>
-            <td class="opacity-50 text-sm truncate max-w-[150px]">{{ e.remarks|default:"—" }}</td>
+            <td class="opacity-50 text-sm truncate max-w-[150px]">{{ e.remarks|default:"-" }}</td>
             <td>
               <button class="btn btn-ghost btn-xs btn-square" data-edit-pf
                       data-id="{{ e.id }}"
@@ -711,7 +710,7 @@
   </div>
 </div>
 
-{# ——— BONDS ——— #}
+{# --- BONDS --- #}
 <div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.45s">
   <div class="card-body p-4">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-3"><h2 class="card-title text-base flex items-center gap-1.5"><span class="material-symbols-outlined text-emerald-400 text-lg">toll</span>Bonds</h2>
@@ -736,13 +735,13 @@
   </div>
 </div>
 
-{# ——— SECTION: LIQUIDITY ——— #}
+{# --- SECTION: LIQUIDITY --- #}
 <div class="section-group-header" id="liquidity">
   <span class="material-symbols-outlined section-icon text-cyan-400">payments</span>
   <h2>Liquidity</h2>
 </div>
 
-{# ——— CASH POSITIONS ——— #}
+{# --- CASH POSITIONS --- #}
 <div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.5s">
   <div class="card-body p-4">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-3"><h2 class="card-title text-base flex items-center gap-1.5"><span class="material-symbols-outlined text-cyan-400 text-lg">account_balance</span>Cash Positions</h2>
@@ -750,7 +749,7 @@
     </div>
     {% if cash_positions %}
     <div class="hidden md:block overflow-x-auto max-h-60 overflow-y-auto pf-scroll-box"><table class="table table-sm"><thead><tr><th>Name</th><th class="text-right">Amount</th><th>Remarks</th><th class="w-10"></th></tr></thead><tbody>
-    {% for c in cash_positions %}<tr class="hover"><td class="font-semibold">{{ c.name }}</td><td class="text-right font-semibold">{{ c.amount|inr }}</td><td class="opacity-50 text-sm">{{ c.remarks|default:"—" }}</td><td><button class="btn btn-ghost btn-xs btn-square" data-edit-cash data-id="{{ c.id }}" data-name="{{ c.name }}" data-amount="{{ c.amount }}" data-remarks="{{ c.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button></td></tr>
+    {% for c in cash_positions %}<tr class="hover"><td class="font-semibold">{{ c.name }}</td><td class="text-right font-semibold">{{ c.amount|inr }}</td><td class="opacity-50 text-sm">{{ c.remarks|default:"-" }}</td><td><button class="btn btn-ghost btn-xs btn-square" data-edit-cash data-id="{{ c.id }}" data-name="{{ c.name }}" data-amount="{{ c.amount }}" data-remarks="{{ c.remarks }}"><span class="material-symbols-outlined text-base">edit</span></button></td></tr>
     {% endfor %}</tbody></table></div>
     <div class="md:hidden space-y-2 max-h-60 overflow-y-auto pf-scroll-box">
       {% for c in cash_positions %}
@@ -770,7 +769,7 @@
   </div>
 </div>
 
-{# ——— FIXED DEPOSITS ——— #}
+{# --- FIXED DEPOSITS --- #}
 <div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.4s">
   <div class="card-body p-4">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-3"><h2 class="card-title text-base flex items-center gap-1.5"><span class="material-symbols-outlined text-cyan-400 text-lg">account_balance_wallet</span>Fixed Deposits</h2>
@@ -807,7 +806,7 @@
 </div>
 {% include 'portfolio/_goals_section.html' %}
 
-{# ——— AI INSIGHTS (moved to bottom) ——— #}
+{# --- AI INSIGHTS (moved to bottom) --- #}
 {% if latest_insight %}
 {% with ins=latest_insight.insights %}
 <div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover scroll-mt-24" id="ai-insights">
@@ -837,7 +836,7 @@
 {% endwith %}
 {% endif %}
 
-{# ——— ALL MODALS ——— #}
+{# --- ALL MODALS --- #}
 {# EPF Modal #}
 {% include 'portfolio/_epf_form_modal.html' with form_obj=epf_form %}
 
@@ -922,7 +921,7 @@
 {# Real Estate Modal #}
 {% include 'portfolio/_real_estate_form_modal.html' with form_obj=real_estate_form is_baby=False %}
 
-{# ——— BIOMETRIC MODAL ——— #}
+{# --- BIOMETRIC MODAL --- #}
 <dialog class="modal" id="biometricModal">
   <div class="modal-box max-w-sm">
     <h3 class="font-bold text-lg flex items-center gap-2">

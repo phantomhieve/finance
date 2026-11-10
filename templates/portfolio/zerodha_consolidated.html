@@ -5,14 +5,13 @@
 {% block extra_head %}
 {% endblock %}
 
-{% block title %}All Zerodha — Portfolio — Vault{% endblock %}
+{% block title %}All Zerodha | Portfolio | Vault{% endblock %}
 
 {% block page_header %}
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
   <div>
-    <p class="text-xs font-bold tracking-widest uppercase text-primary">Zerodha</p>
-    <h1 class="text-2xl font-bold mt-1">Consolidated Holdings</h1>
-    <p class="text-sm opacity-60 mt-0.5">All accounts — {{ accounts|length }} portfolios combined</p>
+    <h1 class="text-2xl lg:text-3xl font-extrabold tracking-tight">Consolidated Holdings</h1>
+    <p class="text-sm opacity-60 mt-0.5">All accounts: {{ accounts|length }} portfolios combined</p>
   </div>
   <div>
     <a href="{% url 'portfolio_tracker' %}" class="btn btn-ghost btn-sm gap-1"><span class="material-symbols-outlined text-base">arrow_back</span>Portfolio</a>
@@ -22,7 +21,7 @@
 
 {% block content %}
 
-{# ——— SUMMARY ——— #}
+{# --- SUMMARY --- #}
 <div class="card hero-gradient-portfolio shadow-sm card-hover animate-up mb-6">
   <div class="card-body p-4">
     <div class="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6 items-center">
@@ -64,7 +63,7 @@
   </div>
 </div>
 
-{# ——— DASHBOARD ROW ——— #}
+{# --- DASHBOARD ROW --- #}
 <div class="grid grid-cols-1 lg:grid-cols-5 gap-6 animate-up mb-6" style="animation-delay:0.05s">
   <div class="card bg-base-200 shadow-sm card-hover lg:col-span-3">
     <div class="card-body p-4">
@@ -120,7 +119,7 @@
   </div>
 </div>
 
-{# ——— TOP GAINERS + LOSERS ——— #}
+{# --- TOP GAINERS + LOSERS --- #}
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-up mb-6" style="animation-delay:0.08s">
   <div class="card bg-base-200 shadow-sm card-hover">
     <div class="card-body p-4">
@@ -206,7 +205,7 @@
   </div>
 </div>
 
-{# ——— ACCOUNT DASHBOARDS ——— #}
+{# --- ACCOUNT DASHBOARDS --- #}
 <div class="card bg-base-200 shadow-sm card-hover animate-up mb-6" style="animation-delay:0.1s">
   <div class="card-body p-4">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
@@ -241,7 +240,7 @@
   </div>
 </div>
 
-{# ——— STOCK HOLDINGS (MERGED) ——— #}
+{# --- STOCK HOLDINGS (MERGED) --- #}
 <div class="card bg-base-200 shadow-sm card-hover animate-up mt-0" style="animation-delay:0.1s">
   <div class="card-body p-4">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
@@ -299,7 +298,7 @@
   </div>
 </div>
 
-{# ——— INDEX MUTUAL FUNDS (MERGED) ——— #}
+{# --- INDEX MUTUAL FUNDS (MERGED) --- #}
 <div class="card bg-base-200 shadow-sm card-hover animate-up mt-6" style="animation-delay:0.15s">
   <div class="card-body p-4">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
@@ -379,7 +378,7 @@
   </div>
 </div>
 
-{# ——— OTHER MUTUAL FUNDS (MERGED) ——— #}
+{# --- OTHER MUTUAL FUNDS (MERGED) --- #}
 <div class="card bg-base-200 shadow-sm card-hover animate-up mt-6" style="animation-delay:0.2s">
   <div class="card-body p-4">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
@@ -459,7 +458,7 @@
   </div>
 </div>
 
-{# ——— BREAKDOWN MODAL ——— #}
+{# --- BREAKDOWN MODAL --- #}
 <dialog id="breakdownModal" class="modal zerodha-breakdown-modal">
   <div class="modal-box max-w-[640px] w-full">
     <form method="dialog">

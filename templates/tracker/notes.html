@@ -1,14 +1,13 @@
 {% extends 'base.html' %}
 {% load humanize indian_format %}
 
-{% block title %}Notes — Vault{% endblock %}
+{% block title %}Notes | Vault{% endblock %}
 
 {% block page_header %}
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
   <div>
-    <p class="text-xs font-bold tracking-widest uppercase text-violet-400">Personal Notes</p>
-    <h1 class="text-xl lg:text-2xl font-extrabold">My Notes</h1>
-    <p class="text-xs opacity-50">Private — only visible to you</p>
+    <h1 class="text-xl lg:text-3xl font-extrabold tracking-tight">My Notes</h1>
+    <p class="text-xs opacity-50 mt-0.5">Private: only visible to you</p>
   </div>
   <div class="flex flex-wrap items-center gap-2 sm:gap-2 justify-center sm:justify-start w-full sm:w-auto">
     <div class="fy-tabs" id="fySwitcher">
@@ -27,7 +26,7 @@
 
 {% block content %}
 
-{# ——— SECTION FILTER PILLS ——— #}
+{# --- SECTION FILTER PILLS --- #}
 <div class="flex flex-wrap items-center gap-2 mb-5 animate-up">
   <a href="?fy={{ active_fy|default:'all' }}"
      class="badge {% if not active_section %}badge-primary{% else %}badge-ghost opacity-60{% endif %} badge-md cursor-pointer hover:opacity-100 transition-opacity px-3 py-2.5">
@@ -43,7 +42,7 @@
   {% endif %}
 </div>
 
-{# ——— TODO SECTION ——— #}
+{# --- TODO SECTION --- #}
 {% if todo_open or todo_done or not active_section or active_section == 'Todo' %}
 <div class="mb-6 animate-up" id="todoSection">
 
@@ -161,7 +160,7 @@
 </div>
 {% endif %}
 
-{# ——— NOTES HEADER (only when both todos and notes exist) ——— #}
+{# --- NOTES HEADER (only when both todos and notes exist) --- #}
 {% if notes %}
 <div class="flex items-center gap-3 mb-3 mt-1">
   <span class="text-[10px] font-bold uppercase tracking-widest opacity-35">Notes</span>
@@ -324,7 +323,7 @@
 {% endif %}
 
 {% if not notes and not todo_open and not todo_done %}
-{# ——— EMPTY STATE ——— #}
+{# --- EMPTY STATE --- #}
 <div class="flex flex-col items-center justify-center py-20 gap-4 animate-up" style="animation-delay:0.1s">
   <div class="w-16 h-16 rounded-2xl bg-violet-400/10 border border-violet-400/20 flex items-center justify-center">
     <span class="icon-filled material-symbols-outlined text-3xl text-violet-400">sticky_note_2</span>
@@ -343,7 +342,7 @@
 {% endif %}
 
 
-{# ——— ADD / EDIT MODAL ——— #}
+{# --- ADD / EDIT MODAL --- #}
 <dialog class="modal" id="noteModal">
   <div class="modal-box max-w-lg">
     <h3 class="font-bold text-lg flex items-center gap-2" id="noteModalTitle">

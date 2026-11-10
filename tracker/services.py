@@ -1,6 +1,10 @@
-import datetime
+from __future__ import annotations
 
-from django.db.models import Case, Sum, Q, When, Value, DecimalField
+import datetime
+from decimal import Decimal
+from typing import Any, Iterable
+
+from django.db.models import Case, Sum, Q, When, Value, DecimalField, QuerySet
 
 from pftracker.utils import (  # noqa: F401 — re-exported for tracker.views
     fy_start_year as current_fy_start_year,
@@ -11,51 +15,58 @@ from .models import (
     FinancialGoal,
     GoalIncrement,
     MonthlyGoalAdjustment,
+    Transaction,
 )
 
-MONTH_ORDER = [
+MONTH_ORDER: list[str] = [
     'April', 'May', 'June', 'July', 'August', 'September',
     'October', 'November', 'December', 'January', 'February', 'March',
 ]
 
-MONTH_TO_NUM = {
+MONTH_TO_NUM: dict[str, int] = {
     'April': 4, 'May': 5, 'June': 6, 'July': 7, 'August': 8,
     'September': 9, 'October': 10, 'November': 11, 'December': 12,
     'January': 1, 'February': 2, 'March': 3,
 }
 
-DEFAULT_MONTHLY_GOAL = 3_500_000.0 / 12.0  # ≈ 291,666.67
+DEFAULT_MONTHLY_GOAL: float = 3_500_000.0 / 12.0  # ≈ 291,666.67
 
-MIN_FY_YEAR = 2000
-MAX_FY_YEAR = 2099
+MIN_FY_YEAR: int = 2000
+MAX_FY_YEAR: int = 2099
 
 
-def group_user_filter(user):
+def group_user_filter(user: Any) -> Q:
     """Return a Q filter that matches all users in the same group, or just this user if ungrouped."""
-    if user.group_id:
+    if getattr(user, 'group_id', None):
         return Q(user__group=user.group)
     return Q(user=user)
 
 
-def fy_date_range(fy_start_year):
+def fy_date_range(fy_start_year: int) -> tuple[datetime.date, datetime.date]:
+    """Return the start and end dates (April 1 to March 31) for an Indian Financial Year."""
     start = datetime.date(fy_start_year, 4, 1)
     end = datetime.date(fy_start_year + 1, 3, 31)
     return start, end
 
 
-def get_month_date(month_name, fy_start_year):
+def get_month_date(month_name: str, fy_start_year: int) -> datetime.date:
+    """Return the first date of a month within a given financial year."""
     num = MONTH_TO_NUM[month_name]
     year = fy_start_year if num >= 4 else fy_start_year + 1
     return datetime.date(year, num, 1)
 
 
-def resolve_per_month_goals(base_monthly_goal, increments, fy_start_year):
+def resolve_per_month_goals(
+    base_monthly_goal: float | Decimal,
+    increments: Iterable[GoalIncrement],
+    fy_start_year: int,
+) -> dict[str, float]:
     """
     Given a base monthly goal and a list of GoalIncrement objects,
     return a dict {month_name: effective_goal} for the FY.
     Increments are applied from their effective_month onwards.
     """
-    goals = {}
+    goals: dict[str, float] = {}
     current = float(base_monthly_goal)
     inc_map = {inc.effective_month: float(inc.increment_amount) for inc in increments}
 
@@ -68,7 +79,11 @@ def resolve_per_month_goals(base_monthly_goal, increments, fy_start_year):
     return goals
 
 
-def apply_monthly_adjustments(per_month_goals, adjustments, fy_start_year):
+def apply_monthly_adjustments(
+    per_month_goals: dict[str, float],
+    adjustments: Iterable[MonthlyGoalAdjustment],
+    fy_start_year: int,
+) -> dict[str, float]:
     """
     Apply one-off MonthlyGoalAdjustment entries on top of the base+increment goals.
     Each adjustment only changes the goal for its specific month.
@@ -76,7 +91,7 @@ def apply_monthly_adjustments(per_month_goals, adjustments, fy_start_year):
     adjusted = dict(per_month_goals)
 
     # Pre-compute mapping from date -> month_name for this FY
-    date_to_name = {}
+    date_to_name: dict[datetime.date, str] = {}
     for month_name in MONTH_ORDER:
         m_date = get_month_date(month_name, fy_start_year)
         date_to_name[m_date] = month_name
@@ -91,7 +106,8 @@ def apply_monthly_adjustments(per_month_goals, adjustments, fy_start_year):
     return adjusted
 
 
-def parse_fy_param(raw_value, fallback):
+def parse_fy_param(raw_value: Any, fallback: int) -> int:
+    """Parse and validate financial year parameter from query string."""
     try:
         val = int(raw_value)
     except (ValueError, TypeError):
@@ -101,13 +117,14 @@ def parse_fy_param(raw_value, fallback):
     return val
 
 
-def get_base_monthly_goal(user):
+def get_base_monthly_goal(user: Any) -> float:
     """Monthly goal from the latest FY goal on record, else the default."""
     goal_obj = FinancialGoal.objects.filter(group_user_filter(user)).order_by('-month').first()
     return float(goal_obj.monthly_goal) if goal_obj else DEFAULT_MONTHLY_GOAL
 
 
-def get_fy_increments(user, fy_start_date, fy_end_date):
+def get_fy_increments(user: Any, fy_start_date: datetime.date, fy_end_date: datetime.date) -> QuerySet[GoalIncrement]:
+    """Return GoalIncrement query set active during the given FY for the user's household group."""
     gf = group_user_filter(user)
     return GoalIncrement.objects.filter(
         gf,
@@ -116,7 +133,7 @@ def get_fy_increments(user, fy_start_date, fy_end_date):
     )
 
 
-def get_fy_adjustments(user, fy_start_date, fy_end_date):
+def get_fy_adjustments(user: Any, fy_start_date: datetime.date, fy_end_date: datetime.date) -> QuerySet[MonthlyGoalAdjustment]:
     """Return MonthlyGoalAdjustment objects for the FY across the group."""
     gf = group_user_filter(user)
     return MonthlyGoalAdjustment.objects.filter(
@@ -126,7 +143,7 @@ def get_fy_adjustments(user, fy_start_date, fy_end_date):
     )
 
 
-def apply_carry_forward(user, fy_start_date, base_monthly):
+def apply_carry_forward(user: Any, fy_start_date: datetime.date, base_monthly: float) -> float:
     """Add increments from before this FY to the base monthly goal."""
     gf = group_user_filter(user)
     carry = GoalIncrement.objects.filter(
@@ -135,7 +152,7 @@ def apply_carry_forward(user, fy_start_date, base_monthly):
     return base_monthly + float(carry) if carry else base_monthly
 
 
-def hra_spent(user, fy_start_date, fy_end_date):
+def hra_spent(user: Any, fy_start_date: datetime.date, fy_end_date: datetime.date) -> float:
     """Total HRA expenses for the FY across the group."""
     spent = HRAExpense.objects.filter(
         group_user_filter(user),
@@ -146,7 +163,7 @@ def hra_spent(user, fy_start_date, fy_end_date):
     return float(spent or 0)
 
 
-def aggregate_transactions(queryset):
+def aggregate_transactions(queryset: QuerySet[Transaction]) -> tuple[float, float, float, float]:
     """Return (net_savings, transfers, income, expense) totals from a transaction queryset."""
     agg = queryset.aggregate(
         savings_pos=Sum(Case(When(type='SAVINGS', then='amount'), default=Value(0), output_field=DecimalField())),

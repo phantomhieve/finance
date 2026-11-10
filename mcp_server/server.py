@@ -56,7 +56,7 @@ from tracker.models import (  # noqa: E402
     MonthlySavingsComment,
 )
 from portfolio.models import (  # noqa: E402
-    ZerodhaAccount, EPFEntry, PFEntry, NPSEntry, FixedDeposit, CashPosition,
+    StockHolding, MutualFundHolding, EPFEntry, PFEntry, NPSEntry, FixedDeposit, CashPosition,
     BondHolding, CryptoHolding, CommodityHolding,
     CommodityPrice, MonthlySnapshot,
     FinancialGoal as PortfolioGoal, USStockHolding,
@@ -119,9 +119,14 @@ def _get_primary_user():
     return User.objects.filter(user_type='PRIMARY').first()
 
 
-def _parse_date(date_str: str) -> datetime.date:
-    """Parse a date string in YYYY-MM-DD format."""
-    return datetime.date.fromisoformat(date_str)
+def _parse_date(date_str: str, default: datetime.date | None = None) -> datetime.date:
+    """Parse a date string in YYYY-MM-DD format safely."""
+    if not date_str:
+        return default or datetime.date.today()
+    try:
+        return datetime.date.fromisoformat(str(date_str).strip())
+    except (ValueError, TypeError):
+        return default or datetime.date.today()
 
 
 def _parse_decimal(value) -> Decimal:
@@ -239,20 +244,19 @@ def portfolio_summary() -> str:
 def portfolio_stocks() -> str:
     """All stock holdings across all Zerodha accounts."""
     group = _get_group()
-    accounts = ZerodhaAccount.objects.filter(group=group) if group else ZerodhaAccount.objects.all()
-    result = []
-    for acct in accounts:
-        for h in acct.stock_holdings.all():
-            result.append({
-                'account': acct.name,
-                'symbol': h.symbol,
-                'quantity': h.quantity,
-                'purchase_value': str(h.purchase_value),
-                'current_value': str(h.current_value),
-                'pnl': str(h.pnl),
-                'pnl_pct': str(h.pnl_pct),
-                'is_baby': h.is_baby,
-            })
+    holdings = StockHolding.objects.select_related('account')
+    if group:
+        holdings = holdings.filter(account__group=group)
+    result = [{
+        'account': h.account.name,
+        'symbol': h.symbol,
+        'quantity': h.quantity,
+        'purchase_value': str(h.purchase_value),
+        'current_value': str(h.current_value),
+        'pnl': str(h.pnl),
+        'pnl_pct': str(h.pnl_pct),
+        'is_baby': h.is_baby,
+    } for h in holdings]
     return _to_json(result)
 
 
@@ -260,21 +264,20 @@ def portfolio_stocks() -> str:
 def portfolio_mutual_funds() -> str:
     """All mutual fund holdings (index + other) across all Zerodha accounts."""
     group = _get_group()
-    accounts = ZerodhaAccount.objects.filter(group=group) if group else ZerodhaAccount.objects.all()
-    result = []
-    for acct in accounts:
-        for h in acct.mf_holdings.all():
-            result.append({
-                'account': acct.name,
-                'fund_name': h.fund_name,
-                'fund_type': h.fund_type,
-                'units': str(h.units),
-                'purchase_value': str(h.purchase_value),
-                'current_value': str(h.current_value),
-                'pnl': str(h.pnl),
-                'pnl_pct': str(h.pnl_pct),
-                'is_baby': h.is_baby,
-            })
+    holdings = MutualFundHolding.objects.select_related('account')
+    if group:
+        holdings = holdings.filter(account__group=group)
+    result = [{
+        'account': h.account.name,
+        'fund_name': h.fund_name,
+        'fund_type': h.fund_type,
+        'units': str(h.units),
+        'purchase_value': str(h.purchase_value),
+        'current_value': str(h.current_value),
+        'pnl': str(h.pnl),
+        'pnl_pct': str(h.pnl_pct),
+        'is_baby': h.is_baby,
+    } for h in holdings]
     return _to_json(result)
 
 
@@ -597,25 +600,23 @@ def get_portfolio_stocks(symbol: str = "", account_name: str = "") -> str:
         account_name: Optional Zerodha account name filter
     """
     group = _get_group()
-    accounts = ZerodhaAccount.objects.filter(group=group) if group else ZerodhaAccount.objects.all()
+    qs = StockHolding.objects.select_related('account')
+    if group:
+        qs = qs.filter(account__group=group)
     if account_name:
-        accounts = accounts.filter(name__icontains=account_name)
-    result = []
-    for acct in accounts:
-        holdings = acct.stock_holdings.all()
-        if symbol:
-            holdings = holdings.filter(symbol__icontains=symbol)
-        for h in holdings:
-            result.append({
-                'account': acct.name,
-                'symbol': h.symbol,
-                'quantity': h.quantity,
-                'purchase_value': str(h.purchase_value),
-                'current_value': str(h.current_value),
-                'pnl': str(h.pnl),
-                'pnl_pct': str(h.pnl_pct),
-                'is_baby': h.is_baby,
-            })
+        qs = qs.filter(account__name__icontains=account_name)
+    if symbol:
+        qs = qs.filter(symbol__icontains=symbol)
+    result = [{
+        'account': h.account.name,
+        'symbol': h.symbol,
+        'quantity': h.quantity,
+        'purchase_value': str(h.purchase_value),
+        'current_value': str(h.current_value),
+        'pnl': str(h.pnl),
+        'pnl_pct': str(h.pnl_pct),
+        'is_baby': h.is_baby,
+    } for h in qs]
     return _to_json(result)
 
 
@@ -628,26 +629,24 @@ def get_portfolio_mutual_funds(fund_name: str = "", account_name: str = "") -> s
         account_name: Optional account name filter
     """
     group = _get_group()
-    accounts = ZerodhaAccount.objects.filter(group=group) if group else ZerodhaAccount.objects.all()
+    qs = MutualFundHolding.objects.select_related('account')
+    if group:
+        qs = qs.filter(account__group=group)
     if account_name:
-        accounts = accounts.filter(name__icontains=account_name)
-    result = []
-    for acct in accounts:
-        holdings = acct.mf_holdings.all()
-        if fund_name:
-            holdings = holdings.filter(fund_name__icontains=fund_name)
-        for h in holdings:
-            result.append({
-                'account': acct.name,
-                'fund_name': h.fund_name,
-                'fund_type': h.fund_type,
-                'units': str(h.units),
-                'purchase_value': str(h.purchase_value),
-                'current_value': str(h.current_value),
-                'pnl': str(h.pnl),
-                'pnl_pct': str(h.pnl_pct),
-                'is_baby': h.is_baby,
-            })
+        qs = qs.filter(account__name__icontains=account_name)
+    if fund_name:
+        qs = qs.filter(fund_name__icontains=fund_name)
+    result = [{
+        'account': h.account.name,
+        'fund_name': h.fund_name,
+        'fund_type': h.fund_type,
+        'units': str(h.units),
+        'purchase_value': str(h.purchase_value),
+        'current_value': str(h.current_value),
+        'pnl': str(h.pnl),
+        'pnl_pct': str(h.pnl_pct),
+        'is_baby': h.is_baby,
+    } for h in qs]
     return _to_json(result)
 
 

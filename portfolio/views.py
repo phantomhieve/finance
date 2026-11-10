@@ -1439,7 +1439,7 @@ def toggle_baby(request, model_name, pk):
         obj = get_object_or_404(model_class, pk=pk, group=group)
         
     obj.is_baby = not obj.is_baby
-    obj.save()
+    obj.save(update_fields=['is_baby'])
     
     status_msg = "moved to Child Portfolio" if obj.is_baby else "moved to Master Portfolio"
     messages.success(request, f"{getattr(obj, 'symbol', getattr(obj, 'fund_name', getattr(obj, 'name', 'Asset')))} {status_msg}.")

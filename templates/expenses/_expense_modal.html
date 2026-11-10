@@ -109,14 +109,14 @@
         <label class="flex flex-col gap-1">
           <span class="text-xs font-bold uppercase tracking-wider opacity-50">Paid with</span>
           <select name="payment_source" id="expSource" class="select select-bordered w-full cursor-pointer">
-            <option value="">—</option>
+            <option value="">-</option>
             {% for s in payment_sources %}<option value="{{ s.pk }}">{{ s.display_name }}</option>{% endfor %}
           </select>
         </label>
         <label class="flex flex-col gap-1">
           <span class="text-xs font-bold uppercase tracking-wider opacity-50">Spent by</span>
           <select name="member" id="expMember" class="select select-bordered w-full cursor-pointer">
-            <option value="">—</option>
+            <option value="">-</option>
             {% for m in members %}<option value="{{ m.pk }}" {% if m.pk == user.pk %}data-self="1"{% endif %}>{{ m.first_name|default:m.username }}</option>{% endfor %}
           </select>
         </label>

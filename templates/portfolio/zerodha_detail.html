@@ -1,13 +1,12 @@
 {% extends 'base.html' %}
 {% load indian_format %}
 
-{% block title %}{{ account.name }} — Portfolio — Vault{% endblock %}
+{% block title %}{{ account.name }} | Portfolio | Vault{% endblock %}
 
 {% block page_header %}
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
   <div>
-    <p class="text-xs font-bold tracking-widest uppercase text-primary">Zerodha Account</p>
-    <h1 class="text-2xl font-bold mt-1">{{ account.name }}</h1>
+    <h1 class="text-2xl lg:text-3xl font-extrabold tracking-tight">{{ account.name }}</h1>
     <p class="text-sm opacity-60 mt-0.5">
       {% if account.last_synced %}Last synced {{ account.last_synced|timesince }} ago{% else %}Not synced yet{% endif %}
     </p>
@@ -20,7 +19,7 @@
 
 {% block content %}
 
-{# ——— SUMMARY KPIs ——— #}
+{# --- SUMMARY KPIs --- #}
 <div class="card hero-gradient-portfolio shadow-sm card-hover animate-up">
   <div class="card-body p-4">
     <div class="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6 items-start">
@@ -59,7 +58,7 @@
   </div>
 </div>
 
-{# ——— STOCK HOLDINGS ——— #}
+{# --- STOCK HOLDINGS --- #}
 <div class="card bg-base-200 shadow-sm card-hover animate-up mt-4" style="animation-delay:0.1s">
   <div class="card-body p-4">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
@@ -118,7 +117,7 @@
   </div>
 </div>
 
-{# ——— INDEX MUTUAL FUNDS ——— #}
+{# --- INDEX MUTUAL FUNDS --- #}
 <div class="card bg-base-200 shadow-sm card-hover animate-up mt-4" style="animation-delay:0.15s">
   <div class="card-body p-4">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
@@ -177,7 +176,7 @@
   </div>
 </div>
 
-{# ——— OTHER MUTUAL FUNDS ——— #}
+{# --- OTHER MUTUAL FUNDS --- #}
 <div class="card bg-base-200 shadow-sm card-hover animate-up mt-4" style="animation-delay:0.2s">
   <div class="card-body p-4">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-3">

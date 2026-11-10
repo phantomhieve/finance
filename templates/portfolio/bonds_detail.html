@@ -2,14 +2,13 @@
 {% load indian_format %}
 {% load static %}
 
-{% block title %}Bonds — Portfolio — Vault{% endblock %}
+{% block title %}Bonds | Portfolio | Vault{% endblock %}
 
 {% block page_header %}
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
   <div>
-    <p class="text-xs font-bold tracking-widest uppercase text-primary">Portfolio</p>
-    <h1 class="text-xl lg:text-2xl font-extrabold">Bonds</h1>
-    <p class="text-xs opacity-50">All bond holdings</p>
+    <h1 class="text-xl lg:text-3xl font-extrabold tracking-tight">Bonds</h1>
+    <p class="text-xs opacity-50 mt-0.5">All bond holdings</p>
   </div>
   <div class="flex flex-wrap items-center gap-2">
     <button type="button" class="btn btn-primary btn-sm gap-1" onclick="openAddModal()"><span class="material-symbols-outlined text-base">add</span>Add</button>
@@ -54,7 +53,7 @@
           <tr class="hover">
             <td class="font-semibold">{{ b.account_name }}</td>
             <td class="text-right font-semibold" data-val="{{ b.amount }}">{{ b.amount|inr }}</td>
-            <td class="opacity-60 text-sm">{{ b.remarks|default:"—" }}</td>
+            <td class="opacity-60 text-sm">{{ b.remarks|default:"-" }}</td>
             <td class="text-right">
               <button type="button" class="btn btn-ghost btn-xs btn-square" data-edit-bond data-id="{{ b.id }}" data-account="{{ b.account_name }}" data-amount="{{ b.amount }}" data-remarks="{{ b.remarks|default:'' }}"><span class="material-symbols-outlined text-base">edit</span></button>
             </td>
@@ -74,7 +73,7 @@
       <div class="table-card flex items-center justify-between gap-3">
         <div class="flex-1 min-w-0">
           <div class="font-semibold text-sm">{{ b.account_name }}</div>
-          <div class="text-xs opacity-50 mt-0.5 truncate">{{ b.remarks|default:"—" }}</div>
+          <div class="text-xs opacity-50 mt-0.5 truncate">{{ b.remarks|default:"-" }}</div>
         </div>
         <div class="flex items-center gap-2 shrink-0">
           <span class="font-bold text-sm">{{ b.amount|inr }}</span>

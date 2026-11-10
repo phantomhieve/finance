@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load indian_format static %}
 
-{% block title %}Expenses · {{ summary.label }} — Vault{% endblock %}
+{% block title %}Expenses · {{ summary.label }} | Vault{% endblock %}
 
 {% block page_header %}
 <div class="flex flex-row items-start justify-between gap-3 mb-1">
@@ -27,7 +27,7 @@
 
 {% block content %}
 
-{# ——— Month switcher ——— #}
+{# Month switcher #}
 <div class="flex items-center justify-between gap-2 mb-4 animate-up">
   <div class="exp-month-switch">
     <a href="?m={{ prev_month }}" class="btn btn-ghost btn-sm btn-square cursor-pointer" aria-label="Previous month"><span class="material-symbols-outlined">chevron_left</span></a>
@@ -43,7 +43,7 @@
   {% endif %}
 </div>
 
-{# ——— EXPENSES HERO CARD ——— #}
+{# Expenses Hero Card #}
 {% with pace=summary.pace %}
 <div class="card hero-gradient-portfolio shadow-sm animate-up card-hover border border-base-content/10 mb-4">
   <div class="card-body p-3.5 sm:p-5 lg:p-6">
@@ -150,7 +150,7 @@
 </div>
 {% endwith %}
 
-{# ——— Mobile Segmented Switcher (Visible only on mobile) ——— #}
+{# Mobile Segmented Switcher (Visible only on mobile) #}
 <div class="flex lg:hidden tabs tabs-boxed bg-base-300/60 p-1 rounded-xl mb-4 text-xs font-semibold">
   <button type="button" class="tab tab-sm flex-1 rounded-lg transition-all tab-active font-bold text-primary cursor-pointer" id="expTabFeedBtn" onclick="switchExpMobileTab('feed')">
     <span class="material-symbols-outlined text-base mr-1.5">receipt_long</span>Activity
@@ -160,10 +160,10 @@
   </button>
 </div>
 
-{# ——— MAIN DASHBOARD GRID ——— #}
+{# Main Dashboard Grid #}
 <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 lg:gap-6 items-start">
 
-  {# ——— LEFT COLUMN: Analytics, Categories & Attention items ——— #}
+  {# Left Column: Analytics, Categories & Attention items #}
   <div id="expInsightsColumn" class="lg:col-span-2 hidden lg:flex flex-col gap-4 space-y-4 lg:space-y-0">
 
     {# Needs attention alerts #}
@@ -525,7 +525,7 @@
 
   </div>
 
-  {# ——— RIGHT COLUMN: Transactions Feed & Filtering ——— #}
+  {# Right Column: Transactions Feed & Filtering #}
   <div id="expFeedColumn" class="lg:col-span-3 flex flex-col animate-up min-w-0">
 
     <div id="expFeedCard" class="card bg-base-200/70 shadow-sm border border-base-content/10 flex flex-col overflow-hidden min-h-0">
@@ -730,7 +730,7 @@
       {# Live Pending Preview #}
       <div id="emiPendingPreviewBox" class="p-2.5 rounded-lg bg-base-200/70 border border-base-content/10 flex items-center justify-between text-xs">
         <span class="opacity-70">Pending installments:</span>
-        <span class="font-bold text-purple-300" id="emiPendingResultText">—</span>
+        <span class="font-bold text-purple-300 tabular-nums" id="emiPendingResultText">-</span>
       </div>
 
       <div class="flex items-center justify-end gap-2 pt-2">

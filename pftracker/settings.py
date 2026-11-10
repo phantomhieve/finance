@@ -224,6 +224,21 @@ elif 'postgres' in _db_engine:
     DATABASES['default']['OPTIONS'].setdefault('keepalives_interval', 10)
     DATABASES['default']['OPTIONS'].setdefault('keepalives_count', 5)
 
+# Caching — in-memory cache for development/test, configurable via DJANGO_CACHE_BACKEND
+CACHES = {
+    'default': {
+        'BACKEND': os.environ.get(
+            'DJANGO_CACHE_BACKEND',
+            'django.core.cache.backends.locmem.LocMemCache'
+        ),
+        'LOCATION': 'vault-cache',
+        'TIMEOUT': 300,
+        'OPTIONS': {
+            'MAX_ENTRIES': 2000,
+        },
+    }
+}
+
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},

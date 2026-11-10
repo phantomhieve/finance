@@ -2,13 +2,12 @@
 {% load indian_format %}
 {% load static %}
 
-{% block title %}PF — Portfolio — Vault{% endblock %}
+{% block title %}PF | Portfolio | Vault{% endblock %}
 
 {% block page_header %}
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
   <div>
-    <p class="text-xs font-bold tracking-widest uppercase text-primary">Portfolio</p>
-    <h1 class="text-2xl font-bold mt-1">Provident Fund</h1>
+    <h1 class="text-2xl lg:text-3xl font-extrabold tracking-tight">Provident Fund</h1>
     <p class="text-sm opacity-60 mt-0.5">All contributions &amp; interest by financial year</p>
   </div>
   <div class="flex flex-wrap items-center gap-2">
@@ -106,7 +105,7 @@
             <td class="text-right whitespace-nowrap font-bold" data-val="{{ r.closing_balance }}">
               {{ r.closing_balance|inr }}
             </td>
-            <td class="opacity-60 text-sm max-w-xs truncate">{{ r.remarks|default:"—" }}</td>
+            <td class="opacity-60 text-sm max-w-xs truncate">{{ r.remarks|default:"-" }}</td>
             <td class="text-right">
               <button type="button" class="btn btn-ghost btn-xs btn-square" title="Edit entry"
                       data-edit-pf

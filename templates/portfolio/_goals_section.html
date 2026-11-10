@@ -13,7 +13,7 @@
 
 {% if rm and rm.goals %}
 
-{# ——— CURRENT FY ——— #}
+{# --- CURRENT FY --- #}
 <div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.52s">
   <div class="card-body p-4 lg:p-6">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
@@ -80,7 +80,7 @@
           </div>
           <div class="stat-card">
             <div class="text-[10px] uppercase tracking-wider opacity-50">Needed / month</div>
-            <div class="text-base font-bold mt-0.5 tabular-nums">{% if s.monthly_needed %}{{ s.monthly_needed|inr }}{% else %}—{% endif %}</div>
+            <div class="text-base font-bold mt-0.5 tabular-nums">{% if s.monthly_needed %}{{ s.monthly_needed|inr }}{% else %}-{% endif %}</div>
           </div>
           <div class="stat-card">
             <div class="text-[10px] uppercase tracking-wider opacity-50">Days left</div>
@@ -147,7 +147,7 @@
   </div>
 </div>
 
-{# ——— UPCOMING + TRACK RECORD ——— #}
+{# --- UPCOMING + TRACK RECORD --- #}
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-up mb-4" style="animation-delay:0.55s">
   <div class="card bg-base-200 shadow-sm card-hover">
     <div class="card-body p-4">
@@ -205,7 +205,7 @@
             <div class="text-[10px] opacity-40 font-normal">Base: {{ g.raw_target|inr }}</div>
             {% endif %}
           </td>
-          <td class="text-right tabular-nums">{% if g.closing_value is not None %}{{ g.closing_value|inr }}{% else %}<span class="opacity-30">—</span>{% endif %}</td>
+          <td class="text-right tabular-nums">{% if g.closing_value is not None %}{{ g.closing_value|inr }}{% else %}<span class="opacity-30">-</span>{% endif %}</td>
           <td class="text-right">{% if g.achieved %}<span class="badge badge-success badge-sm">Achieved</span>{% else %}<span class="badge badge-error badge-soft badge-sm">Missed{% if g.closing_value is not None %} · {{ g.pct }}%{% endif %}</span>{% endif %}</td>
         </tr>
         {% endfor %}{% endfor %}

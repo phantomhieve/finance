@@ -2,14 +2,13 @@
 {% load indian_format %}
 {% load static %}
 
-{% block title %}Monthly Savings — Vault{% endblock %}
+{% block title %}Monthly Savings | Vault{% endblock %}
 
 {% block page_header %}
 <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
   <div>
-    <p class="text-xs font-bold tracking-widest uppercase text-primary">Monthly Savings</p>
-    <h1 class="text-xl lg:text-2xl font-extrabold">{{ fy_label }}</h1>
-    <p class="text-xs opacity-50">{{ fy_start_date|date:"d M Y" }} → {{ fy_end_date|date:"d M Y" }}</p>
+    <h1 class="text-xl lg:text-3xl font-extrabold tracking-tight">{{ fy_label }}</h1>
+    <p class="text-xs opacity-50 mt-0.5">{{ fy_start_date|date:"d M Y" }} → {{ fy_end_date|date:"d M Y" }}</p>
   </div>
   <div class="flex flex-wrap items-center gap-2 sm:gap-2 justify-center sm:justify-start w-full sm:w-auto">
     <div class="fy-tabs" id="fySwitcher">
@@ -31,7 +30,7 @@
 
 {% block content %}
 
-{# ——— GOAL HERO ——— #}
+{# --- GOAL HERO --- #}
 <div class="card hero-gradient shadow-sm animate-up mb-4 card-hover">
   <div class="card-body p-4 lg:p-6">
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -97,7 +96,7 @@
   </div>
 </div>
 
-{# ——— MONTH GRID ——— #}
+{# --- MONTH GRID --- #}
 <div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.1s">
   <div class="card-body p-4 lg:p-6">
     <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
@@ -137,7 +136,7 @@
   </div>
 </div>
 
-{# ——— MONTH COMMENT MODAL ——— #}
+{# --- MONTH COMMENT MODAL --- #}
 <dialog class="modal" id="monthCommentModal">
   <div class="modal-box max-w-sm">
     <h3 class="font-bold text-lg flex items-center gap-2" id="monthCommentTitle">
@@ -166,7 +165,7 @@
   <form method="dialog" class="modal-backdrop"><button>close</button></form>
 </dialog>
 
-{# ——— CHARTS ——— #}
+{# --- CHARTS --- #}
 <div class="grid grid-cols-1 lg:grid-cols-5 gap-4 animate-up mb-4" style="animation-delay:0.2s">
   <div class="card bg-base-200 shadow-sm lg:col-span-3 card-hover">
     <div class="card-body p-4"><h2 class="card-title text-base mb-2">Savings vs Monthly Goal</h2><div class="chart-wrap"><canvas id="barChart"></canvas></div></div>
@@ -176,7 +175,7 @@
   </div>
 </div>
 
-{# ——— TRANSACTIONS ——— #}
+{# --- TRANSACTIONS --- #}
 <div class="card bg-base-200 shadow-sm animate-up" style="animation-delay:0.3s">
   <div class="card-body p-4">
     <h2 class="card-title text-base mb-2">Transactions {% if transactions %}<span class="badge badge-ghost badge-sm font-normal">{{ transactions|length }} in {{ fy_label }}</span>{% endif %}</h2>
@@ -201,7 +200,7 @@
               {% elif t.type == 'EXPENSE' %}<span class="badge badge-error badge-sm">Expense</span>
               {% else %}<span class="badge badge-ghost badge-sm">Other</span>{% endif %}
             </td>
-            <td class="opacity-50 text-sm">{{ t.remarks|default:"—" }}</td>
+            <td class="opacity-50 text-sm">{{ t.remarks|default:"-" }}</td>
             <td>
               {% if user.can_edit_savings %}
               <button class="btn btn-ghost btn-xs btn-square" onclick="editTransaction({{ t.id }}, '{{ t.date|date:'Y-m-d' }}', '{{ t.type }}', '{{ t.amount }}', '{{ t.remarks|escapejs }}')">
@@ -249,7 +248,7 @@
   </div>
 </div>
 
-{# ——— ADD/EDIT TRANSACTION MODAL ——— #}
+{# --- ADD/EDIT TRANSACTION MODAL --- #}
 <dialog class="modal" id="addTxnModal">
   <div class="modal-box">
     <h3 class="font-bold text-lg flex items-center gap-2" id="txnModalTitle">
@@ -277,7 +276,7 @@
   <form method="dialog" class="modal-backdrop"><button>close</button></form>
 </dialog>
 
-{# ——— GOAL MODAL ——— #}
+{# --- GOAL MODAL --- #}
 <dialog class="modal" id="goalModal">
   <div class="modal-box max-w-lg">
     <h3 class="font-bold text-lg flex items-center gap-2">

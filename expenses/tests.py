@@ -1719,3 +1719,88 @@ class SessionLifetimeTests(SimpleTestCase):
         from django.conf import settings
         self.assertEqual(settings.SESSION_COOKIE_AGE, 30 * 24 * 3600)
         self.assertFalse(settings.SESSION_EXPIRE_AT_BROWSER_CLOSE)
+
+
+class StatementPaymentReconciliationAndOptimizationsTests(ExpenseTestCase):
+    def test_auto_track_statement_payments_and_twin_debit_healing(self):
+        from expenses.statements import auto_track_statement_payments, upcoming_dues
+        from expenses.models import CardStatement, PaymentSource, ExpenseCategory, Expense
+
+        card = PaymentSource.objects.create(
+            group=self.group, institution="ICICI", nickname="Amazon Pay ICICI", kind="CREDIT_CARD", last4="5678"
+        )
+        cc_cat = ExpenseCategory.objects.get(group=self.group, name="Credit Card Payment")
+        transfer_cat = ExpenseCategory.objects.get(group=self.group, name="Transfers")
+
+        due_date = datetime.date.today() + datetime.timedelta(days=10)
+        st = CardStatement.objects.create(
+            group=self.group,
+            payment_source=card,
+            statement_date=datetime.date.today() - datetime.timedelta(days=15),
+            due_date=due_date,
+            total_due=Decimal('12500.00'),
+            is_paid=False,
+        )
+
+        # 1. Card credit (payment receipt on credit card)
+        credit_txn = Expense.objects.create(
+            group=self.group,
+            payment_source=card,
+            direction='CREDIT',
+            amount=Decimal('12500.00'),
+            txn_date=datetime.date.today(),
+            category=transfer_cat,
+        )
+
+        # 2. Bank debit (twin payment from savings account)
+        bank_source = PaymentSource.objects.create(group=self.group, institution="HDFC", nickname="HDFC Savings", kind="BANK_ACCOUNT", last4="9988")
+        debit_txn = Expense.objects.create(
+            group=self.group,
+            payment_source=bank_source,
+            direction='DEBIT',
+            amount=Decimal('12500.00'),
+            txn_date=datetime.date.today(),
+            category=transfer_cat,
+        )
+
+        # Run reconciliation
+        auto_track_statement_payments(self.group)
+
+        st.refresh_from_db()
+        self.assertTrue(st.is_paid)
+        self.assertEqual(st.paid_amount, Decimal('12500.00'))
+
+        # Check that categories were healed to 'Credit Card Payment'
+        credit_txn.refresh_from_db()
+        debit_txn.refresh_from_db()
+        self.assertEqual(credit_txn.category, cc_cat)
+        self.assertEqual(debit_txn.category, cc_cat)
+
+        # Check upcoming_dues computation
+        dues = upcoming_dues(self.group, today=datetime.date.today())
+        # Since statement is fully paid, it should not be in unpaid dues
+        self.assertNotIn(st.pk, [d.pk for d in dues])
+
+    def test_upcoming_dues_partial_payment(self):
+        from expenses.statements import upcoming_dues
+        from expenses.models import CardStatement, PaymentSource
+
+        card = PaymentSource.objects.create(
+            group=self.group, institution="Axis", nickname="Axis Atlas", kind="CREDIT_CARD", last4="1122"
+        )
+        due_date = datetime.date.today() + datetime.timedelta(days=5)
+        st = CardStatement.objects.create(
+            group=self.group,
+            payment_source=card,
+            due_date=due_date,
+            total_due=Decimal('50000.00'),
+            paid_amount=Decimal('20000.00'),
+            is_paid=False,
+        )
+
+        dues = upcoming_dues(self.group, today=datetime.date.today())
+        due_item = next((d for d in dues if d.pk == st.pk), None)
+        self.assertIsNotNone(due_item)
+        self.assertEqual(due_item.remaining_due, Decimal('30000.00'))
+        self.assertTrue(due_item.is_partial)
+
