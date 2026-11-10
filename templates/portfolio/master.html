@@ -180,189 +180,229 @@
 </div>
 
 {# --- OVERVIEW WORKBENCH: ASSET MATRIX & AI FIDUCIARY BRIEF --- #}
-<div class="v-workbench mb-6 scroll-mt-24" id="overview">
-  {# Left 7 cols: Asset Class Matrix & Double Doughnuts #}
-  <div class="v-workbench-main space-y-4">
-    <div class="v-panel">
-      <div class="v-panel-header">
-        <h2 class="v-panel-title">
-          <span class="material-symbols-outlined text-base text-primary">pie_chart</span>
-          Asset Class Allocation &amp; Diversification Matrix
-        </h2>
-        <span class="text-xs text-base-content/50 font-mono">11 Asset Classes</span>
-      </div>
-
-      <div class="v-panel-body">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4 border-b border-base-content/6">
-          <div>
-            <div class="text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2">Detailed Asset Breakdown</div>
-            <div class="chart-wrap" style="height:220px"><canvas id="allocationChart"></canvas></div>
-          </div>
-          <div>
-            <div class="text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2">Consolidated Asset Split</div>
-            <div class="chart-wrap" style="height:220px"><canvas id="consolidatedChart"></canvas></div>
-          </div>
+<div class="mb-6 scroll-mt-24" id="overview">
+  {# Balanced Top Row: 7-col Double Doughnuts + 5-col AI Fiduciary Intelligence #}
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4 items-stretch">
+    {# Left 7 cols: Double Doughnut Charts #}
+    <div class="lg:col-span-7">
+      <div class="v-panel">
+        <div class="v-panel-header">
+          <h2 class="v-panel-title">
+            <span class="material-symbols-outlined text-base text-primary">pie_chart</span>
+            Asset Allocation &amp; Diversification
+          </h2>
+          <span class="text-xs text-base-content/50 font-mono">11 Asset Classes</span>
         </div>
 
-        {# High-Density Asset Class Table #}
-        <div class="v-table-wrap mt-4">
-          <table class="v-table">
-            <thead>
-              <tr>
-                <th>Asset Class</th>
-                <th class="v-num">Current Valuation</th>
-                <th class="v-num">Allocation</th>
-                <th class="text-center">Domain</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for a in assets %}
-              <tr>
-                <td class="font-medium">
-                  <div class="flex items-center gap-2">
-                    <span class="material-symbols-outlined text-base text-base-content/50">{{ a.icon }}</span>
-                    <span class="font-semibold text-base-content">{{ a.name }}</span>
-                  </div>
-                </td>
-                <td class="v-num font-bold">{{ a.value|inr }}</td>
-                <td class="v-num">
-                  <span class="v-delta v-delta-neutral text-xs font-semibold">{{ a.pct }}%</span>
-                </td>
-                <td class="text-center">
-                  <a href="#{% if a.name == 'Real Estate' or a.name == 'Gold' or a.name == 'Silver' or a.name == 'Crypto' %}alternates{% elif a.name == 'EPF' or a.name == 'PF' or a.name == 'Bonds' or a.name == 'NPS' %}debt{% elif a.name == 'Cash' or a.name == 'FD' %}liquidity{% else %}equity{% endif %}"
-                     class="v-btn v-btn-ghost v-btn-xs">
-                    Inspect <span class="material-symbols-outlined text-xs">arrow_downward</span>
-                  </a>
-                </td>
-              </tr>
-              {% endfor %}
-            </tbody>
-            <tfoot>
-              <tr>
-                <td>Total Portfolio Net Worth</td>
-                <td class="v-num text-primary font-bold">{{ total_value|inr }}</td>
-                <td class="v-num text-primary font-bold">100.0%</td>
-                <td></td>
-              </tr>
-            </tfoot>
-          </table>
+        <div class="v-panel-body">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <div class="text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2">Detailed Asset Breakdown</div>
+              <div class="chart-wrap" style="height:220px"><canvas id="allocationChart"></canvas></div>
+            </div>
+            <div>
+              <div class="text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2">Consolidated Asset Split</div>
+              <div class="chart-wrap" style="height:220px"><canvas id="consolidatedChart"></canvas></div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
-  </div>
 
-  {# Right 5 cols: AI Portfolio Audit & Risk Brief #}
-  <div class="v-workbench-rail space-y-4" id="ai-insights">
-    {% if latest_insight %}
-    {% with ins=latest_insight.insights %}
-    <div class="v-panel">
-      <div class="v-panel-header">
-        <h2 class="v-panel-title">
-          <span class="material-symbols-outlined text-base text-amber-400">auto_awesome</span>
-          AI Fiduciary Intelligence
-        </h2>
-        <div class="flex items-center gap-1.5">
-          <span class="v-delta v-delta-neutral text-[10px] py-0.5 px-1.5">{{ latest_insight.model_used }}</span>
-          <span class="text-[11px] text-base-content/40">{{ latest_insight.generated_at|timesince }} ago</span>
-        </div>
-      </div>
-
-      <div class="v-panel-body">
-        {# Score Dial and Executive Summary #}
-        <div class="flex items-center gap-4 p-4 rounded-xl bg-base-content/3 border border-base-content/6">
-          <div class="ai-score-ring flex-shrink-0 {% if ins.score >= 75 %}ai-score-high{% elif ins.score >= 50 %}ai-score-mid{% else %}ai-score-low{% endif %}">
-            <svg viewBox="0 0 64 64">
-              <circle class="ai-score-ring-bg" cx="32" cy="32" r="28"/>
-              <circle class="ai-score-ring-fg" cx="32" cy="32" r="28" stroke-dasharray="175.93" stroke-dashoffset="175.93" data-score="{{ ins.score }}"/>
-            </svg>
-            <span class="ai-score-ring-text">{{ ins.score }}</span>
-          </div>
-          <div class="min-w-0">
-            <div class="text-xs font-bold uppercase tracking-wider text-base-content/50">Fiduciary Health Score</div>
-            <p class="text-xs text-base-content/80 mt-1 line-clamp-3 leading-relaxed">{{ ins.summary }}</p>
+    {# Right 5 cols: AI Portfolio Audit & Risk Brief #}
+    <div class="lg:col-span-5" id="ai-insights">
+      {% if latest_insight %}
+      {% with ins=latest_insight.insights %}
+      <div class="v-panel">
+        <div class="v-panel-header">
+          <h2 class="v-panel-title">
+            <span class="material-symbols-outlined text-base text-amber-400">auto_awesome</span>
+            AI Fiduciary Intelligence
+          </h2>
+          <div class="flex items-center gap-1.5">
+            <span class="v-delta v-delta-neutral text-[10px] py-0.5 px-1.5">{{ latest_insight.model_used }}</span>
+            <span class="text-[11px] text-base-content/40">{{ latest_insight.generated_at|timesince }} ago</span>
           </div>
         </div>
 
-        {# Actionable Critical / High Priority Audit Findings #}
-        <div class="mt-4">
-          <div class="text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2 flex items-center justify-between">
-            <span>Critical Findings &amp; Opportunities</span>
-            <span class="text-base-content/40">({{ ins.insights|length }})</span>
+        <div class="v-panel-body">
+          {# Score Dial and Executive Summary #}
+          <div class="flex items-center gap-4 p-4 rounded-xl bg-base-content/3 border border-base-content/6">
+            <div class="ai-score-ring flex-shrink-0 {% if ins.score >= 75 %}ai-score-high{% elif ins.score >= 50 %}ai-score-mid{% else %}ai-score-low{% endif %}">
+              <svg viewBox="0 0 64 64">
+                <circle class="ai-score-ring-bg" cx="32" cy="32" r="28"/>
+                <circle class="ai-score-ring-fg" cx="32" cy="32" r="28" stroke-dasharray="175.93" stroke-dashoffset="175.93" data-score="{{ ins.score }}"/>
+              </svg>
+              <span class="ai-score-ring-text">{{ ins.score }}</span>
+            </div>
+            <div class="min-w-0">
+              <div class="text-xs font-bold uppercase tracking-wider text-base-content/50">Fiduciary Health Score</div>
+              <p class="text-xs text-base-content/80 mt-1 line-clamp-3 leading-relaxed">{{ ins.summary }}</p>
+            </div>
           </div>
-          <div class="space-y-2">
-            {% for item in ins.insights|slice:":3" %}
-            <div class="p-3 rounded-lg bg-base-content/3 border border-base-content/6 text-xs">
-              <div class="flex items-center justify-between gap-2 mb-1">
-                <span class="font-bold flex items-center gap-1.5 text-base-content">
-                  <span class="material-symbols-outlined text-sm text-indigo-400">
-                    {% if item.category == 'risk' %}shield{% elif item.category == 'opportunity' %}trending_up{% elif item.category == 'rebalancing' %}balance{% elif item.category == 'goal' %}flag{% elif item.category == 'tax' %}receipt_long{% elif item.category == 'macro' %}public{% elif item.category == 'consolidation' %}merge{% elif item.category == 'international' %}language{% else %}lightbulb{% endif %}
+
+          {# Actionable Critical / High Priority Audit Findings #}
+          <div class="mt-4">
+            <div class="text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2 flex items-center justify-between">
+              <span>Critical Findings &amp; Opportunities</span>
+              <span class="text-base-content/40">({{ ins.insights|length }})</span>
+            </div>
+            <div class="space-y-2">
+              {% for item in ins.insights|slice:":3" %}
+              <div class="p-3 rounded-lg bg-base-content/3 border border-base-content/6 text-xs">
+                <div class="flex items-center justify-between gap-2 mb-1">
+                  <span class="font-bold flex items-center gap-1.5 text-base-content">
+                    <span class="material-symbols-outlined text-sm text-indigo-400">
+                      {% if item.category == 'risk' %}shield{% elif item.category == 'opportunity' %}trending_up{% elif item.category == 'rebalancing' %}balance{% elif item.category == 'goal' %}flag{% elif item.category == 'tax' %}receipt_long{% elif item.category == 'macro' %}public{% elif item.category == 'consolidation' %}merge{% elif item.category == 'international' %}language{% else %}lightbulb{% endif %}
+                    </span>
+                    {{ item.title }}
                   </span>
-                  {{ item.title }}
-                </span>
-                {% if item.severity == 'critical' %}
-                <span class="v-delta v-delta-neg text-[10px] py-0.5 px-1.5">Critical</span>
-                {% elif item.severity == 'warning' %}
-                <span class="v-delta v-delta-caution text-[10px] py-0.5 px-1.5">Warning</span>
-                {% elif item.severity == 'positive' %}
-                <span class="v-delta v-delta-pos text-[10px] py-0.5 px-1.5">Positive</span>
-                {% else %}
-                <span class="v-delta v-delta-neutral text-[10px] py-0.5 px-1.5">Info</span>
+                  {% if item.severity == 'critical' %}
+                  <span class="v-delta v-delta-neg text-[10px] py-0.5 px-1.5">Critical</span>
+                  {% elif item.severity == 'warning' %}
+                  <span class="v-delta v-delta-caution text-[10px] py-0.5 px-1.5">Warning</span>
+                  {% elif item.severity == 'positive' %}
+                  <span class="v-delta v-delta-pos text-[10px] py-0.5 px-1.5">Positive</span>
+                  {% else %}
+                  <span class="v-delta v-delta-neutral text-[10px] py-0.5 px-1.5">Info</span>
+                  {% endif %}
+                </div>
+                <p class="text-base-content/60 leading-relaxed">{{ item.detail }}</p>
+                {% if item.action %}
+                <div class="mt-1.5 text-primary font-medium flex items-center gap-1">
+                  <span class="material-symbols-outlined text-xs">arrow_forward</span>{{ item.action }}
+                </div>
                 {% endif %}
               </div>
-              <p class="text-base-content/60 leading-relaxed">{{ item.detail }}</p>
-              {% if item.action %}
-              <div class="mt-1.5 text-primary font-medium flex items-center gap-1">
-                <span class="material-symbols-outlined text-xs">arrow_forward</span>{{ item.action }}
+              {% endfor %}
+            </div>
+          </div>
+
+          {# Progressive Disclosure for Full Context #}
+          <details class="v-disclosure mt-4">
+            <summary>
+              <span>Market Context &amp; Outlook Analysis</span>
+              <span class="material-symbols-outlined text-sm transition-transform group-open:rotate-180">expand_more</span>
+            </summary>
+            <div class="v-disclosure-content space-y-3 text-xs leading-relaxed">
+              {% if ins.market_context %}
+              <div>
+                <div class="font-bold text-base-content/70 uppercase tracking-wider mb-1">Macro Backdrop</div>
+                <p class="text-base-content/60">{{ ins.market_context }}</p>
+              </div>
+              {% endif %}
+              {% if ins.outlook %}
+              <div>
+                <div class="font-bold text-base-content/70 uppercase tracking-wider mb-1">Tactical Outlook</div>
+                <p class="text-base-content/60">{{ ins.outlook }}</p>
               </div>
               {% endif %}
             </div>
+          </details>
+        </div>
+      </div>
+      {% endwith %}
+      {% else %}
+      <div class="v-panel p-6 text-center">
+        <span class="material-symbols-outlined text-3xl text-amber-400 mb-2">auto_awesome</span>
+        <h3 class="font-bold text-sm text-base-content">AI Fiduciary Intelligence Pending</h3>
+        <p class="text-xs text-base-content/50 mt-1 mb-4">Run an on-demand audit to evaluate asset allocation drift, tax exposure, and family milestone solvency.</p>
+        <form method="post" action="{% url 'generate_insights' %}" class="m-0">
+          {% csrf_token %}
+          <button type="submit" class="v-btn v-btn-secondary v-btn-sm w-full justify-center">
+            <span class="material-symbols-outlined text-sm">auto_awesome</span>Generate Portfolio Audit
+          </button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# Bottom Row: Full-Width Asset Class Allocation & Diversification Matrix #}
+  <div class="v-panel">
+    <div class="v-panel-header">
+      <div class="flex items-center gap-2">
+        <span class="material-symbols-outlined text-base text-primary">table_chart</span>
+        <h3 class="v-panel-title">Asset Class Allocation Matrix</h3>
+      </div>
+      <span class="text-xs text-base-content/50 font-mono">Total Portfolio Net Worth: <strong class="text-primary tabular-nums">{{ total_value|inr }}</strong></span>
+    </div>
+
+    <div class="v-panel-body p-0">
+      {# High-Density Desktop Table #}
+      <div class="hidden sm:block v-table-wrap">
+        <table class="v-table">
+          <thead>
+            <tr>
+              <th>Asset Class</th>
+              <th class="v-num">Current Valuation</th>
+              <th class="v-num">Allocation</th>
+              <th class="text-center">Domain</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in assets %}
+            <tr>
+              <td class="font-medium">
+                <div class="flex items-center gap-2">
+                  <span class="material-symbols-outlined text-base text-base-content/50">{{ a.icon }}</span>
+                  <span class="font-semibold text-base-content">{{ a.name }}</span>
+                </div>
+              </td>
+              <td class="v-num font-bold">{{ a.value|inr }}</td>
+              <td class="v-num">
+                <span class="v-delta v-delta-neutral text-xs font-semibold">{{ a.pct }}%</span>
+              </td>
+              <td class="text-center">
+                <a href="#{% if a.name == 'Real Estate' or a.name == 'Gold' or a.name == 'Silver' or a.name == 'Crypto' %}alternates{% elif a.name == 'EPF' or a.name == 'PF' or a.name == 'Bonds' or a.name == 'NPS' %}debt{% elif a.name == 'Cash' or a.name == 'FD' %}liquidity{% else %}equity{% endif %}"
+                   class="v-btn v-btn-ghost v-btn-xs">
+                  Inspect <span class="material-symbols-outlined text-xs">arrow_downward</span>
+                </a>
+              </td>
+            </tr>
             {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td>Total Portfolio Net Worth</td>
+              <td class="v-num text-primary font-bold">{{ total_value|inr }}</td>
+              <td class="v-num text-primary font-bold">100.0%</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      {# Mobile Cardless Rows #}
+      <div class="sm:hidden divide-y divide-base-content/5">
+        {% for a in assets %}
+        <div class="v-mobile-row">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <span class="material-symbols-outlined text-base text-base-content/50">{{ a.icon }}</span>
+              <span class="font-semibold text-sm text-base-content">{{ a.name }}</span>
+            </div>
+            <span class="v-delta v-delta-neutral text-xs font-semibold">{{ a.pct }}%</span>
+          </div>
+          <div class="flex items-center justify-between mt-1 text-xs">
+            <span class="tabular-nums font-bold text-base-content">{{ a.value|inr }}</span>
+            <a href="#{% if a.name == 'Real Estate' or a.name == 'Gold' or a.name == 'Silver' or a.name == 'Crypto' %}alternates{% elif a.name == 'EPF' or a.name == 'PF' or a.name == 'Bonds' or a.name == 'NPS' %}debt{% elif a.name == 'Cash' or a.name == 'FD' %}liquidity{% else %}equity{% endif %}"
+               class="text-primary text-xs font-medium flex items-center gap-0.5">
+              Inspect <span class="material-symbols-outlined text-xs">arrow_downward</span>
+            </a>
           </div>
         </div>
-
-        {# Progressive Disclosure for Full Context #}
-        <details class="v-disclosure mt-4">
-          <summary>
-            <span>Market Context &amp; Outlook Analysis</span>
-            <span class="material-symbols-outlined text-sm transition-transform group-open:rotate-180">expand_more</span>
-          </summary>
-          <div class="v-disclosure-content space-y-3 text-xs leading-relaxed">
-            {% if ins.market_context %}
-            <div>
-              <div class="font-bold text-base-content/70 uppercase tracking-wider mb-1">Macro Backdrop</div>
-              <p class="text-base-content/60">{{ ins.market_context }}</p>
-            </div>
-            {% endif %}
-            {% if ins.outlook %}
-            <div>
-              <div class="font-bold text-base-content/70 uppercase tracking-wider mb-1">Tactical Outlook</div>
-              <p class="text-base-content/60">{{ ins.outlook }}</p>
-            </div>
-            {% endif %}
-          </div>
-        </details>
+        {% endfor %}
+        <div class="p-3 bg-base-content/2 flex items-center justify-between text-xs font-bold">
+          <span>Total Net Worth</span>
+          <span class="text-primary tabular-nums">{{ total_value|inr }} (100.0%)</span>
+        </div>
       </div>
     </div>
-    {% endwith %}
-    {% else %}
-    <div class="v-panel p-6 text-center">
-      <span class="material-symbols-outlined text-3xl text-amber-400 mb-2">auto_awesome</span>
-      <h3 class="font-bold text-sm text-base-content">AI Fiduciary Intelligence Pending</h3>
-      <p class="text-xs text-base-content/50 mt-1 mb-4">Run an on-demand audit to evaluate asset allocation drift, tax exposure, and family milestone solvency.</p>
-      <form method="post" action="{% url 'generate_insights' %}" class="m-0">
-        {% csrf_token %}
-        <button type="submit" class="v-btn v-btn-secondary v-btn-sm w-full justify-center">
-          <span class="material-symbols-outlined text-sm">auto_awesome</span>Generate Portfolio Audit
-        </button>
-      </form>
-    </div>
-    {% endif %}
   </div>
 </div>
 
-{# ====================================================================
-   DOMAIN 1: MARKET-LINKED ASSETS (EQUITY, ZERODHA & US STOCKS)
-   ==================================================================== #}
+{% comment %} DOMAIN 1: MARKET-LINKED ASSETS (EQUITY, ZERODHA & US STOCKS) {% endcomment %}
 <div class="mb-8 scroll-mt-24" id="equity">
   <div class="flex items-center justify-between mb-3">
     <div class="flex items-center gap-2">
@@ -380,7 +420,7 @@
   <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
     {# Equity Category Breakdown Panel (4 cols) #}
     <div class="lg:col-span-4">
-      <div class="v-panel h-full flex flex-col justify-between">
+      <div class="v-panel">
         <div class="v-panel-header">
           <h3 class="v-panel-title">Asset Class Distribution</h3>
           <span class="text-xs text-base-content/50">Market Securities</span>
@@ -415,7 +455,7 @@
 
     {# Zerodha Multi-Account Cards (8 cols) #}
     <div class="lg:col-span-8">
-      <div class="v-panel h-full">
+      <div class="v-panel">
         <div class="v-panel-header">
           <h3 class="v-panel-title">Zerodha Demat Accounts</h3>
           <a href="{% url 'zerodha_consolidated' %}" class="v-btn v-btn-ghost v-btn-xs">
@@ -521,9 +561,7 @@
   </div>
 </div>
 
-{# ====================================================================
-   DOMAIN 2: REAL ASSETS & BULLION (REAL ESTATE, COMMODITIES, CRYPTO)
-   ==================================================================== #}
+{% comment %} DOMAIN 2: REAL ASSETS & BULLION (REAL ESTATE, COMMODITIES, CRYPTO) {% endcomment %}
 <div class="mb-8 scroll-mt-24" id="alternates">
   <div class="flex items-center justify-between mb-3">
     <div class="flex items-center gap-2">
@@ -622,7 +660,7 @@
   <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
     {# Commodities (8 cols) #}
     <div class="lg:col-span-8">
-      <div class="v-panel h-full">
+      <div class="v-panel">
         <div class="v-panel-header">
           <div class="flex items-center gap-2">
             <h3 class="v-panel-title">Physical Bullion (Gold &amp; Silver)</h3>
@@ -707,7 +745,7 @@
 
     {# Crypto (4 cols) #}
     <div class="lg:col-span-4">
-      <div class="v-panel h-full flex flex-col justify-between">
+      <div class="v-panel">
         <div class="v-panel-header">
           <div class="flex items-center gap-2">
             <h3 class="v-panel-title">Crypto Assets</h3>
@@ -758,9 +796,7 @@
   </div>
 </div>
 
-{# ====================================================================
-   DOMAIN 3: RETIREMENT & SOVEREIGN DEBT (EPF, PF / PPF, NPS, BONDS)
-   ==================================================================== #}
+{% comment %} DOMAIN 3: RETIREMENT & SOVEREIGN DEBT (EPF, PF / PPF, NPS, BONDS) {% endcomment %}
 <div class="mb-8 scroll-mt-24" id="debt">
   <div class="flex items-center justify-between mb-3">
     <div class="flex items-center gap-2">
@@ -1017,9 +1053,7 @@
   </div>
 </div>
 
-{# ====================================================================
-   DOMAIN 4: LIQUIDITY & FIXED DEPOSITS (CASH & FDs)
-   ==================================================================== #}
+{% comment %} DOMAIN 4: LIQUIDITY & FIXED DEPOSITS (CASH & FDs) {% endcomment %}
 <div class="mb-8 scroll-mt-24" id="liquidity">
   <div class="flex items-center justify-between mb-3">
     <div class="flex items-center gap-2">
@@ -1153,9 +1187,7 @@
 {# --- FINANCIAL YEAR GOALS SECTION PARTIAL --- #}
 {% include 'portfolio/_goals_section.html' %}
 
-{# ====================================================================
-   ALL MODALS & DRAWERS
-   ==================================================================== #}
+{% comment %} ALL MODALS & DRAWERS {% endcomment %}
 
 {# EPF Modal #}
 {% include 'portfolio/_epf_form_modal.html' with form_obj=epf_form %}

@@ -217,7 +217,7 @@ The standard card/panel container. Eliminates nested borders and ensures consist
 
 ## 6. Asymmetric Workbench Grid (`.v-workbench`)
 
-Organizes complex screens into a 2-column layout on desktop (`7fr 5fr` or `8fr 4fr`), preventing endless vertical scrolling.
+Organizes complex screens into a 2-column layout on desktop (`7fr 5fr`, `.v-workbench-8-4` for `8fr 4fr`, or `.v-workbench-equal` for `1fr 1fr`). Columns align to `start` with natural content height, preventing giant empty voids when adjacent panels have uneven length.
 
 ```html
 <div class="v-workbench">
@@ -237,15 +237,17 @@ Organizes complex screens into a 2-column layout on desktop (`7fr 5fr` or `8fr 4
 
 ## 7. Institutional High-Density Data Table (`.v-table`)
 
+For responsive tables, add `.v-col-hide-sm` to hide non-essential secondary columns below 640px, or `.v-col-hide-md` below 768px. Touch scrolling is enabled by default on `.v-table-wrap`.
+
 ```html
 <div class="v-table-wrap">
   <table class="v-table">
     <thead>
       <tr>
         <th>Holding / Instrument</th>
-        <th>Category</th>
-        <th class="v-num">Qty</th>
-        <th class="v-num">Avg Price</th>
+        <th class="v-col-hide-sm">Category</th>
+        <th class="v-num v-col-hide-sm">Qty</th>
+        <th class="v-num v-col-hide-md">Avg Price</th>
         <th class="v-num">Current</th>
         <th class="v-num">P&amp;L</th>
         <th class="text-center">Action</th>
