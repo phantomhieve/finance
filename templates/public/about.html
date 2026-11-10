@@ -1,34 +1,132 @@
 {% extends 'public/base.html' %}
-{% block title %}Vault — Private Household Finance Dashboard{% endblock %}
+{% block title %}Vault — Private Household Wealth Intelligence{% endblock %}
 {% block content %}
-<section class="hero">
-  <h1>Your household's money,<br><span>in one private vault.</span></h1>
-  <p>Vault is a private personal finance dashboard for a single family. It tracks savings, investments,
-     rent and jewellery, and automatically records card and bank spending from transaction alert emails,
-     so the household always knows where its money goes.</p>
-  <div class="actions">
-    <a href="{% url 'login' %}" class="btn btn-primary" id="hero-signin">Sign in with Google</a>
-    <a href="{% url 'privacy' %}" class="btn btn-ghost" id="hero-privacy">How we handle your data</a>
+
+{# --- HERO SECTION --- #}
+<section class="text-center py-12 sm:py-16 animate-up">
+  <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 mb-6">
+    <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
+    Private Family Office &amp; Wealth Operating System
+  </div>
+
+  <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight text-white max-w-3xl mx-auto leading-tight">
+    Your household's money,<br>
+    <span class="text-indigo-400">in one private vault.</span>
+  </h1>
+
+  <p class="mt-5 text-base sm:text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed">
+    Vault is a private, self-hosted personal finance ledger engineered for a single family. It tracks multi-asset wealth, physical jewellery custody, rent and savings goals, and reconciles card spends directly from bank alerts.
+  </p>
+
+  <div class="flex flex-wrap items-center justify-center gap-3 mt-8">
+    <a href="{% url 'login' %}" id="hero-signin" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/25 transition-all">
+      <span class="material-symbols-outlined text-lg">login</span>Sign in with Google
+    </a>
+    <a href="{% url 'privacy' %}" id="hero-privacy" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 transition-all">
+      <span class="material-symbols-outlined text-lg">policy</span>How we handle your data
+    </a>
   </div>
 </section>
 
-<section>
-  <h2>What Vault does</h2>
-  <div class="grid">
-    <div class="card"><div class="icon">📈</div><h3>Portfolio tracking</h3><p>Mutual funds, stocks and fixed deposits with returns, allocation and AI-generated insights.</p></div>
-    <div class="card"><div class="icon">💳</div><h3>Expense tracker</h3><p>Reads bank and credit card alert emails (read-only) to log spends, categorise them and flag unusual charges.</p></div>
-    <div class="card"><div class="icon">🧾</div><h3>Card statements</h3><p>Matches statement PDFs against alerts, adds missed transactions and reminds you before bills are due.</p></div>
-    <div class="card"><div class="icon">🏠</div><h3>Savings &amp; HRA</h3><p>Financial-year savings, rent paid and tax-relevant records in one place.</p></div>
+{# --- WHAT VAULT DOES --- #}
+<section class="mt-12 sm:mt-16 animate-up">
+  <div class="text-center mb-8">
+    <h2 class="text-xl sm:text-2xl font-bold text-white">What Vault does</h2>
+    <p class="text-sm text-slate-400 mt-1">Four core pillars of household financial intelligence</p>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+    {# Card 1: Portfolio #}
+    <div class="v-panel p-5 bg-[#111722] border-white/10">
+      <div class="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center text-indigo-400 mb-4">
+        <span class="material-symbols-outlined text-2xl">trending_up</span>
+      </div>
+      <h3 class="text-base font-bold text-white">Multi-Asset Portfolio Tracking</h3>
+      <p class="text-sm text-slate-400 mt-2 leading-relaxed">
+        Consolidated ledger for Indian equities, Zerodha demat accounts, mutual funds, EPF/PPF, NPS, fixed deposits, physical bullion, and real estate with automated valuation and capital compounding metrics.
+      </p>
+    </div>
+
+    {# Card 2: Expense Ingestion #}
+    <div class="v-panel p-5 bg-[#111722] border-white/10">
+      <div class="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center text-emerald-400 mb-4">
+        <span class="material-symbols-outlined text-2xl">credit_card</span>
+      </div>
+      <h3 class="text-base font-bold text-white">Automated Expense Intelligence</h3>
+      <p class="text-sm text-slate-400 mt-2 leading-relaxed">
+        Seamlessly ingests transaction alerts from 30+ Indian banks via read-only email sync. Automatically extracts merchants, amounts, and dates to audit daily burn pace against prior month trends.
+      </p>
+    </div>
+
+    {# Card 3: Card Statements #}
+    <div class="v-panel p-5 bg-[#111722] border-white/10">
+      <div class="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center text-amber-400 mb-4">
+        <span class="material-symbols-outlined text-2xl">receipt_long</span>
+      </div>
+      <h3 class="text-base font-bold text-white">Card Statement Reconciliation</h3>
+      <p class="text-sm text-slate-400 mt-2 leading-relaxed">
+        Unlocks password-protected credit card statement PDFs to execute a 3-stage audit: matching email alerts against statement lines, importing missed transactions, and tracking active EMI amortizations.
+      </p>
+    </div>
+
+    {# Card 4: Savings & HRA #}
+    <div class="v-panel p-5 bg-[#111722] border-white/10">
+      <div class="w-10 h-10 rounded-xl bg-cyan-500/15 border border-cyan-500/25 flex items-center justify-center text-cyan-400 mb-4">
+        <span class="material-symbols-outlined text-2xl">cottage</span>
+      </div>
+      <h3 class="text-base font-bold text-white">Indian FY Savings &amp; HRA Ledger</h3>
+      <p class="text-sm text-slate-400 mt-2 leading-relaxed">
+        Paces monthly savings across the April–March Financial Year against annual targets. Dedicated HRA tracker verifies rent transfers and landlord settlements with complete fiscal receipts.
+      </p>
+    </div>
   </div>
 </section>
 
-<section>
-  <h2>How Vault uses Google data</h2>
-  <div class="grid">
-    <div class="card"><div class="icon">🔑</div><h3>Sign-in</h3><p>Google Sign-In is used only to verify your identity. Vault receives your name, email and profile picture.</p></div>
-    <div class="card"><div class="icon">✉️</div><h3>Gmail (read-only, optional)</h3><p>If you connect Gmail, Vault searches for transaction alerts and statements and stores only the parsed amount, merchant, card and date. Email bodies are never stored.</p></div>
-    <div class="card"><div class="icon">🛡️</div><h3>Never shared or sold</h3><p>Data stays on Vault's own server, access tokens are encrypted, and you can disconnect at any time.</p></div>
+{# --- HOW VAULT USES GOOGLE DATA --- #}
+<section class="mt-16 sm:mt-20 animate-up">
+  <div class="text-center mb-8">
+    <h2 class="text-xl sm:text-2xl font-bold text-white">How Vault uses Google data</h2>
+    <p class="text-sm text-slate-400 mt-1">Privacy-first principles engineered for Google OAuth Verification</p>
   </div>
-  <p class="note">Vault is invite-only: access is limited to members of one household. Full details are in the <a href="{% url 'privacy' %}">Privacy Policy</a>.</p>
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    {# Trust 1: Sign-in #}
+    <div class="v-panel p-5 bg-[#111722] border-white/10">
+      <div class="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center text-indigo-400 mb-4">
+        <span class="material-symbols-outlined text-2xl">vpn_key</span>
+      </div>
+      <h3 class="text-base font-bold text-white">Google Sign-In</h3>
+      <p class="text-sm text-slate-400 mt-2 leading-relaxed">
+        Google Sign-In is used exclusively to authenticate household identity. Vault receives your verified name, email address, and profile picture. No external passwords are ever stored.
+      </p>
+    </div>
+
+    {# Trust 2: Gmail (read-only) #}
+    <div class="v-panel p-5 bg-[#111722] border-white/10">
+      <div class="w-10 h-10 rounded-xl bg-sky-500/15 border border-sky-500/25 flex items-center justify-center text-sky-400 mb-4">
+        <span class="material-symbols-outlined text-2xl">mail</span>
+      </div>
+      <h3 class="text-base font-bold text-white">Gmail (Read-Only, Optional)</h3>
+      <p class="text-sm text-slate-400 mt-2 leading-relaxed">
+        When connected, Vault queries your inbox strictly for bank alerts and credit card statements. Only parsed transaction metadata is saved; full email bodies are never stored on disk.
+      </p>
+    </div>
+
+    {# Trust 3: Never Shared #}
+    <div class="v-panel p-5 bg-[#111722] border-white/10">
+      <div class="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center text-emerald-400 mb-4">
+        <span class="material-symbols-outlined text-2xl">shield</span>
+      </div>
+      <h3 class="text-base font-bold text-white">Never Shared or Sold</h3>
+      <p class="text-sm text-slate-400 mt-2 leading-relaxed">
+        All financial records stay on your private deployment. Access tokens are encrypted at rest with Fernet symmetric cryptography, and you can revoke integration access at any time.
+      </p>
+    </div>
+  </div>
+
+  <div class="mt-6 p-4 rounded-xl bg-white/5 border border-white/10 text-center text-xs text-slate-400">
+    Vault is invite-only: deployment and access are restricted exclusively to members of a single household. Complete regulatory terms and data rights are detailed in our <a href="{% url 'privacy' %}" class="text-indigo-400 hover:underline">Privacy Policy</a>.
+  </div>
 </section>
+
 {% endblock %}

@@ -1,75 +1,134 @@
 {% extends 'public/base.html' %}
 {% block title %}Privacy Policy — Vault{% endblock %}
 {% block description %}How Vault collects, uses, stores and protects your data, including Google user data.{% endblock %}
+
 {% block content %}
-<article class="doc">
-  <h1>Privacy Policy</h1>
-  <p class="updated">Last updated: {{ updated }}</p>
+<article class="max-w-3xl mx-auto animate-up">
+  {# Document Header #}
+  <div class="border-b border-white/10 pb-6 mb-8">
+    <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 mb-3">
+      <span class="w-2 h-2 rounded-full bg-indigo-400"></span>Legal &amp; Data Governance
+    </div>
+    <h1 class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">Privacy Policy</h1>
+    <p class="text-xs text-slate-400 mt-2">Last updated: <span class="text-slate-200 font-medium">{{ updated }}</span></p>
+  </div>
 
-  <p>Vault ("we", "the app"), available at <a href="{{ site_url }}">{{ site_url }}</a>, is a private personal
-     finance dashboard used by the members of one household. This policy explains what data Vault collects,
-     how it is used, and the choices you have.</p>
+  {# Executive Scope Summary #}
+  <div class="p-5 rounded-2xl bg-white/5 border border-white/10 text-sm text-slate-300 leading-relaxed mb-8">
+    Vault (&ldquo;we&rdquo;, &ldquo;the app&rdquo;), deployed at <a href="{{ site_url }}" class="text-indigo-400 underline font-medium">{{ site_url }}</a>, is an invite-only personal finance and wealth intelligence dashboard operated strictly for members of a single household. This policy explains what data Vault collects, how it is used, and the absolute controls you retain over your information.
+  </div>
 
-  <h2>1. Data we collect</h2>
-  <ul>
-    <li><strong>Google account profile</strong> (via Google Sign-In): your name, email address and profile picture, used to identify you and control access.</li>
-    <li><strong>Financial records you enter</strong>: savings, investments, rent, jewellery and similar entries you add yourself.</li>
-    <li><strong>Gmail data (optional, read-only)</strong>: only if you choose to connect your Gmail inbox. See section 2.</li>
-    <li><strong>Statement PDF passwords</strong> you enter so card statements can be opened. These are stored encrypted.</li>
-    <li><strong>Technical data</strong>: standard server logs (IP address, browser, timestamps) used for security and troubleshooting.</li>
-  </ul>
+  {# Quick Table of Contents #}
+  <div class="p-4 rounded-xl bg-[#111722] border border-white/10 mb-10">
+    <div class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Sections</div>
+    <div class="flex flex-wrap gap-2 text-xs">
+      <a href="#section-1" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 transition-colors">1. Data we collect</a>
+      <a href="#section-2" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 transition-colors">2. How Vault uses Gmail data</a>
+      <a href="#section-3" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 transition-colors">3. Use of AI services</a>
+      <a href="#section-4" class="px-2.5 py-1 rounded-lg bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/30 transition-colors">4. Google API Services Policy</a>
+      <a href="#section-5" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 transition-colors">5. Storage &amp; security</a>
+      <a href="#section-6" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 transition-colors">6. Sharing</a>
+      <a href="#section-7" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 transition-colors">7. Retention &amp; deletion</a>
+      <a href="#section-8" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 transition-colors">8. Children</a>
+      <a href="#section-9" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 transition-colors">9. Changes</a>
+      <a href="#section-10" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 transition-colors">10. Contact</a>
+    </div>
+  </div>
 
-  <h2>2. How Vault uses Gmail data</h2>
-  <p>When you connect Gmail, Vault requests the <code>https://www.googleapis.com/auth/gmail.readonly</code> scope and uses it only to:</p>
-  <ul>
-    <li>Search your inbox for bank and credit card transaction alerts, credit card statements and bill payment confirmations.</li>
-    <li>Extract the transaction amount, merchant, card (last digits), date and currency from those emails.</li>
-    <li>Download credit card statement PDF attachments to reconcile transactions and find due dates.</li>
-  </ul>
-  <p>Vault <strong>does not</strong> store full email bodies. It keeps only the parsed transaction fields and a masked subject line for reference.
-     Vault never sends, modifies or deletes your email.</p>
+  {# Policy Sections #}
+  <div class="space-y-8 text-sm sm:text-base text-slate-300 leading-relaxed">
 
-  <h2>3. Use of AI services</h2>
-  <p>When an alert email isn't in a format Vault recognises, or a merchant needs a category, the relevant text snippet
-     is sent to Google's Gemini API to extract the transaction or suggest a category. It is not used to build advertising profiles.</p>
+    <section id="section-1" class="border-b border-white/5 pb-8">
+      <h2 class="text-lg sm:text-xl font-bold text-white mb-3">1. Data we collect</h2>
+      <ul class="space-y-2.5 list-disc pl-5 text-slate-300">
+        <li><strong class="text-white">Google account profile</strong> (via Google Sign-In): your name, email address, and profile picture, used exclusively to identify you and control household access.</li>
+        <li><strong class="text-white">Financial records you enter</strong>: savings entries, investment balances, rent records, jewellery catalog items, and financial notes you manually enter or import.</li>
+        <li><strong class="text-white">Gmail data (optional, read-only)</strong>: only if you explicitly choose to connect your Gmail inbox. See section 2 below.</li>
+        <li><strong class="text-white">Statement PDF passwords</strong> you enter so credit card statements can be decrypted locally. These are stored encrypted at rest.</li>
+        <li><strong class="text-white">Technical data</strong>: standard server logs (IP address, browser user-agent, timestamps) used solely for operational security and troubleshooting.</li>
+      </ul>
+    </section>
 
-  <h2>4. Google API Services User Data Policy</h2>
-  <p>Vault's use and transfer of information received from Google APIs to any other app will adhere to the
-     <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener">Google API Services User Data Policy</a>,
-     including the Limited Use requirements. In particular:</p>
-  <ul>
-    <li>Google user data is used only to provide the features described above, which are visible in the app.</li>
-    <li>It is not transferred to third parties, except as needed to provide those features (such as the AI processing in section 3), to comply with law, or with your consent.</li>
-    <li>It is never used for advertising, never sold, and never used to determine creditworthiness or for lending.</li>
-    <li>No human reads your Gmail data unless you give explicit permission (for example, to debug a problem you report), it is needed for security or legal reasons, or it has been aggregated and anonymised.</li>
-  </ul>
+    <section id="section-2" class="border-b border-white/5 pb-8">
+      <h2 class="text-lg sm:text-xl font-bold text-white mb-3">2. How Vault uses Gmail data</h2>
+      <p class="mb-3">
+        When you connect Gmail, Vault requests the <code class="px-2 py-0.5 rounded bg-white/10 text-indigo-300 font-mono text-xs">https://www.googleapis.com/auth/gmail.readonly</code> scope and uses it exclusively to:
+      </p>
+      <ul class="space-y-2 list-disc pl-5 mb-4 text-slate-300">
+        <li>Search your inbox for automated bank and credit card transaction alerts, credit card statements, and bill payment confirmations.</li>
+        <li>Extract the transaction amount, merchant name, card last-4 digits, transaction date, and currency from those specific alert emails.</li>
+        <li>Download credit card statement PDF attachments to reconcile transactions and compute billing due dates.</li>
+      </ul>
+      <p class="p-3.5 rounded-xl bg-white/5 border border-white/10 text-xs sm:text-sm text-slate-300">
+        <strong class="text-white">Email Body Privacy Commitment:</strong> Vault <strong class="text-white">does not</strong> store full email bodies. It keeps only the structured, parsed transaction metadata and a masked subject line for user verification. Vault never sends, modifies, or deletes your email.
+      </p>
+    </section>
 
-  <h2>5. Storage and security</h2>
-  <ul>
-    <li>Data is stored in a database on Vault's own server and is served only over HTTPS.</li>
-    <li>Gmail refresh tokens and statement passwords are encrypted at rest with symmetric (Fernet) encryption.</li>
-    <li>Access is restricted to approved household members who sign in with Google. Optional biometric unlock is supported.</li>
-    <li>Encrypted database backups are kept in private Google Cloud Storage.</li>
-  </ul>
+    <section id="section-3" class="border-b border-white/5 pb-8">
+      <h2 class="text-lg sm:text-xl font-bold text-white mb-3">3. Use of AI services</h2>
+      <p>
+        When an incoming alert email is not in a structured format recognized by local parsers, or when a merchant name requires categorization, the relevant text snippet is sent to Google&rsquo;s Gemini API to extract transaction metadata or suggest an expense category. This data is never used to train public models or build advertising profiles.
+      </p>
+    </section>
 
-  <h2>6. Sharing</h2>
-  <p>We do not sell, rent or share your personal data. Household members you have been grouped with can see shared household
-     figures (for example, combined monthly spend), as configured in the app.</p>
+    <section id="section-4" class="p-5 sm:p-6 rounded-2xl bg-[#111722] border border-indigo-500/30 pb-8">
+      <h2 class="text-lg sm:text-xl font-bold text-indigo-400 mb-3 flex items-center gap-2">
+        <span class="material-symbols-outlined">verified</span>
+        4. Google API Services User Data Policy
+      </h2>
+      <p class="mb-4 text-sm text-slate-300 leading-relaxed">
+        Vault&rsquo;s use and transfer of information received from Google APIs to any other app will adhere to the
+        <a href="https://developers.google.com/terms/api-services-user-data-policy" target="_blank" rel="noopener" class="text-indigo-400 underline font-semibold">Google API Services User Data Policy</a>, including the Limited Use requirements. Specifically:
+      </p>
+      <ul class="space-y-2.5 list-disc pl-5 text-sm text-slate-300">
+        <li>Google user data is used only to provide user-facing features described above and visible directly within the application interface.</li>
+        <li>Data is not transferred to third parties, except as strictly necessary to provide those features (such as AI extraction in section 3), to comply with applicable law, or with your explicit consent.</li>
+        <li>It is <strong class="text-white">never used for advertising</strong>, never sold, and never used to determine creditworthiness or for consumer lending.</li>
+        <li><strong class="text-white">No humans read your Gmail data</strong> unless you provide explicit permission (e.g., to debug a specific parsing error), it is legally required for security or regulatory reasons, or it has been aggregated and anonymized.</li>
+      </ul>
+    </section>
 
-  <h2>7. Retention and deletion</h2>
-  <ul>
-    <li>You can disconnect Gmail at any time from <em>Expenses → Settings</em>. This deletes the stored token, and Vault stops reading your inbox immediately.</li>
-    <li>You can also revoke Vault's access from your <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener">Google Account permissions</a> page.</li>
-    <li>Parsed transactions are kept until you delete them or ask for your account to be deleted. To delete your account and all associated data, email us at the address below; we will do so within 30 days.</li>
-  </ul>
+    <section id="section-5" class="border-b border-white/5 pb-8">
+      <h2 class="text-lg sm:text-xl font-bold text-white mb-3">5. Storage and security</h2>
+      <ul class="space-y-2 list-disc pl-5 text-slate-300">
+        <li>All application data is stored in a private database on Vault&rsquo;s dedicated server, served exclusively over encrypted HTTPS with TLS 1.3.</li>
+        <li>Gmail OAuth refresh tokens and statement PDF passwords are encrypted at rest using symmetric (Fernet / AES-128-CBC) encryption keys.</li>
+        <li>Access is strictly restricted to approved household members authenticated via Google OAuth 2.0. Optional hardware biometric unlock (WebAuthn passkeys) is supported.</li>
+        <li>Database backups are encrypted before storage in private, customer-managed Google Cloud Storage buckets.</li>
+      </ul>
+    </section>
 
-  <h2>8. Children</h2>
-  <p>Vault is not intended for children under 13 and does not knowingly collect their data.</p>
+    <section id="section-6" class="border-b border-white/5 pb-8">
+      <h2 class="text-lg sm:text-xl font-bold text-white mb-3">6. Sharing</h2>
+      <p>
+        We do not sell, rent, monetize, or publicly share your personal data. Within the application, household members grouped into your AccountGroup can view shared household metrics (such as aggregate monthly spends and physical jewellery custody), subject to configured role permissions.
+      </p>
+    </section>
 
-  <h2>9. Changes</h2>
-  <p>If this policy changes, we will update the "Last updated" date above. Material changes will be communicated to users.</p>
+    <section id="section-7" class="border-b border-white/5 pb-8">
+      <h2 class="text-lg sm:text-xl font-bold text-white mb-3">7. Retention and deletion</h2>
+      <ul class="space-y-2 list-disc pl-5 text-slate-300">
+        <li>You can disconnect Gmail at any time from <em>Expenses &rarr; Settings</em>. This immediately deletes the stored refresh token, and Vault stops accessing your inbox.</li>
+        <li>You can also revoke Vault&rsquo;s access directly from your <a href="https://myaccount.google.com/permissions" target="_blank" rel="noopener" class="text-indigo-400 underline">Google Account Permissions</a> page.</li>
+        <li>Parsed transaction records are retained until you delete them or request complete household account erasure. To request full account deletion, email us at the address below; we will permanently erase all associated records within 30 days.</li>
+      </ul>
+    </section>
 
-  <h2>10. Contact</h2>
-  <p>Questions or requests: <a href="mailto:{{ contact_email }}">{{ contact_email }}</a></p>
+    <section id="section-8" class="border-b border-white/5 pb-8">
+      <h2 class="text-lg sm:text-xl font-bold text-white mb-3">8. Children</h2>
+      <p>Vault is engineered for adult household financial administration and does not knowingly collect or solicit data from children under 13.</p>
+    </section>
+
+    <section id="section-9" class="border-b border-white/5 pb-8">
+      <h2 class="text-lg sm:text-xl font-bold text-white mb-3">9. Changes</h2>
+      <p>If our data practices evolve, we will update the &ldquo;Last updated&rdquo; date at the top of this policy. Material policy changes will be highlighted directly to users upon signing in.</p>
+    </section>
+
+    <section id="section-10">
+      <h2 class="text-lg sm:text-xl font-bold text-white mb-3">10. Contact</h2>
+      <p>For questions, privacy inquiries, or data erasure requests, contact the administrator directly at: <a href="mailto:{{ contact_email }}" class="text-indigo-400 font-semibold underline">{{ contact_email }}</a></p>
+    </section>
+
+  </div>
 </article>
 {% endblock %}

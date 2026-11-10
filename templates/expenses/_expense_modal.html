@@ -1,40 +1,48 @@
 {# Add / edit bottom sheet. Populated by static/js/expenses.js from the #expense-data payload. #}
 <dialog id="expenseModal" class="modal modal-bottom sm:modal-middle">
-  <div class="modal-box max-w-lg p-0 max-h-[92vh] flex flex-col">
-    <div class="flex items-center justify-between px-5 pt-5 pb-3">
-      <h3 class="font-bold text-lg" id="expModalTitle">Add expense</h3>
-      <button type="button" class="btn btn-ghost btn-sm btn-circle" onclick="closeModal('expenseModal')" aria-label="Close">
-        <span class="material-symbols-outlined">close</span>
+  <div class="modal-box max-w-lg p-0 max-h-[92vh] flex flex-col bg-base-100 border border-base-content/10 shadow-2xl rounded-2xl overflow-hidden">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-base-content/8 bg-base-200/50">
+      <div class="flex items-center gap-2">
+        <span class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+          <span class="material-symbols-outlined text-lg">receipt_long</span>
+        </span>
+        <h3 class="font-bold text-base text-base-content" id="expModalTitle">Add Expense</h3>
+      </div>
+      <button type="button" class="btn btn-ghost btn-xs btn-circle text-base-content/60 hover:text-base-content" onclick="closeModal('expenseModal')" aria-label="Close">
+        <span class="material-symbols-outlined text-base">close</span>
       </button>
     </div>
 
-    <form method="post" id="expenseForm" action="{% url 'expense_add' %}" class="overflow-y-auto px-5 pb-5 flex flex-col gap-3">
+    <form method="post" id="expenseForm" action="{% url 'expense_add' %}" class="overflow-y-auto px-5 py-4 flex flex-col gap-3.5 scrollbar-thin">
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ request.get_full_path }}">
 
-      <div id="expFlagBox" class="alert alert-warning alert-soft text-xs py-2.5 hidden items-start">
-        <span class="material-symbols-outlined text-lg">flag</span>
-        <div class="flex-1">
-          <p class="font-semibold mb-0.5">Looks unusual</p>
-          <ul id="expFlagReasons" class="list-disc pl-4 opacity-80"></ul>
+      {# Unusual Flag Alert #}
+      <div id="expFlagBox" class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs hidden items-start gap-2.5 text-amber-200">
+        <span class="material-symbols-outlined text-base text-amber-400 shrink-0 mt-0.5">flag</span>
+        <div class="flex-1 min-w-0">
+          <p class="font-bold mb-0.5 text-amber-300">Audited: Unusual Transaction</p>
+          <ul id="expFlagReasons" class="list-disc pl-4 opacity-85 space-y-0.5 text-[11px]"></ul>
         </div>
-        <button type="submit" form="expReviewForm" class="btn btn-xs btn-warning" id="expReviewBtn">Looks fine</button>
+        <button type="submit" form="expReviewForm" class="btn btn-xs btn-warning shrink-0 font-semibold" id="expReviewBtn">Looks fine</button>
       </div>
 
-      <div id="expRefundBox" class="alert alert-success alert-soft text-xs py-2 hidden items-center gap-2">
-        <span class="material-symbols-outlined text-base text-success">replay</span>
-        <div class="flex-1">
-          <span class="font-semibold">Refunded / Returned</span>
-          <p id="expRefundDetail" class="text-[11px] opacity-80"></p>
+      {# Refund Notice #}
+      <div id="expRefundBox" class="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-xs hidden items-center gap-2.5 text-emerald-300">
+        <span class="material-symbols-outlined text-base text-emerald-400 shrink-0">replay</span>
+        <div class="flex-1 min-w-0">
+          <span class="font-bold">Refunded / Reversal</span>
+          <p id="expRefundDetail" class="text-[11px] opacity-80 mt-0.5"></p>
         </div>
       </div>
 
-      <div id="expEmiBox" class="alert alert-info alert-soft text-xs py-2 hidden items-center justify-between gap-2">
+      {# Active EMI Box #}
+      <div id="expEmiBox" class="p-2.5 rounded-xl bg-purple-500/10 border border-purple-500/25 text-xs hidden items-center justify-between gap-2 text-purple-200">
         <div class="flex items-center gap-2 min-w-0">
-          <span class="material-symbols-outlined text-base text-purple-400">event_repeat</span>
+          <span class="material-symbols-outlined text-base text-purple-400 shrink-0">event_repeat</span>
           <div class="min-w-0">
-            <span class="font-semibold text-purple-300">Credit Card EMI</span>
-            <p id="expEmiDetail" class="text-[11px] opacity-80 truncate"></p>
+            <span class="font-bold text-purple-300">Credit Card EMI</span>
+            <p id="expEmiDetail" class="text-[11px] opacity-80 truncate mt-0.5"></p>
           </div>
         </div>
         <button type="button" id="expRemoveEmiBtn" class="btn btn-ghost btn-xs text-error/80 hover:text-error gap-1 shrink-0 cursor-pointer" onclick="Expenses.toggleEmi(false)" title="Mark this transaction as not an EMI">
@@ -42,108 +50,131 @@
         </button>
       </div>
 
-      <div class="join w-full">
-        <input type="radio" name="direction" value="DEBIT" aria-label="Spent" class="join-item btn btn-sm flex-1 cursor-pointer" checked id="expDirDebit">
-        <input type="radio" name="direction" value="CREDIT" aria-label="Received / refund" class="join-item btn btn-sm flex-1 cursor-pointer" id="expDirCredit">
+      {# Direction Join / Toggle #}
+      <div class="grid grid-cols-2 p-1 bg-base-200/80 rounded-xl border border-base-content/8 text-xs font-semibold">
+        <label class="flex items-center justify-center gap-1.5 py-1.5 rounded-lg cursor-pointer has-[:checked]:bg-base-100 has-[:checked]:text-primary has-[:checked]:shadow-sm has-[:checked]:font-bold transition-all">
+          <input type="radio" name="direction" value="DEBIT" class="hidden" checked id="expDirDebit">
+          <span class="material-symbols-outlined text-sm">arrow_upward</span>
+          <span>Debit / Spend</span>
+        </label>
+        <label class="flex items-center justify-center gap-1.5 py-1.5 rounded-lg cursor-pointer has-[:checked]:bg-base-100 has-[:checked]:text-emerald-400 has-[:checked]:shadow-sm has-[:checked]:font-bold transition-all">
+          <input type="radio" name="direction" value="CREDIT" class="hidden" id="expDirCredit">
+          <span class="material-symbols-outlined text-sm">arrow_downward</span>
+          <span>Credit / Refund</span>
+        </label>
       </div>
 
-      <label class="flex flex-col gap-1">
-        <span class="text-xs font-bold uppercase tracking-wider opacity-50">Amount (₹)</span>
-        <input type="text" name="amount" id="expAmount" inputmode="decimal" required placeholder="0"
-               class="input input-bordered w-full exp-amount-input" autocomplete="off">
-      </label>
+      {# Amount Input (Display Style) #}
+      <div class="flex flex-col gap-1">
+        <span class="text-[11px] font-semibold text-base-content/70">Amount (₹)</span>
+        <div class="relative">
+          <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-base font-bold opacity-40">₹</span>
+          <input type="text" name="amount" id="expAmount" inputmode="decimal" required placeholder="0"
+                 class="input input-bordered w-full pl-8 text-xl font-extrabold tabular-nums exp-amount-input bg-base-100 rounded-xl tracking-tight" autocomplete="off">
+        </div>
+      </div>
 
-      <label class="flex flex-col gap-1">
-        <span class="text-xs font-bold uppercase tracking-wider opacity-50">Merchant / description</span>
-        <input type="text" name="merchant" id="expMerchant" required maxlength="120" placeholder="e.g. Swiggy, Rent, Petrol"
-               class="input input-bordered w-full" autocomplete="off" list="expMerchantList">
-      </label>
+      {# Merchant Input #}
+      <div class="flex flex-col gap-1">
+        <span class="text-[11px] font-semibold text-base-content/70">Merchant / Payee</span>
+        <input type="text" name="merchant" id="expMerchant" required maxlength="120" placeholder="e.g. Swiggy, Rent, Shell Petrol"
+               class="input input-bordered w-full bg-base-100 rounded-xl text-sm" autocomplete="off" list="expMerchantList">
+      </div>
 
-      <div class="grid grid-cols-2 gap-3">
+      {# Date & Category Grid #}
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label class="flex flex-col gap-1">
-          <span class="text-xs font-bold uppercase tracking-wider opacity-50">Date</span>
-          <input type="date" name="txn_date" id="expDate" required class="input input-bordered w-full cursor-pointer" value="{{ today|date:'Y-m-d' }}">
+          <span class="text-[11px] font-semibold text-base-content/70">Transaction Date</span>
+          <input type="date" name="txn_date" id="expDate" required class="input input-bordered input-sm w-full cursor-pointer bg-base-100 rounded-lg text-sm" value="{{ today|date:'Y-m-d' }}">
         </label>
         <label class="flex flex-col gap-1">
-          <span class="text-xs font-bold uppercase tracking-wider opacity-50">Category</span>
-          <select name="category" id="expCategory" class="select select-bordered w-full cursor-pointer">
+          <span class="text-[11px] font-semibold text-base-content/70">Category</span>
+          <select name="category" id="expCategory" class="select select-bordered select-sm w-full cursor-pointer bg-base-100 rounded-lg text-xs">
             <option value="">Uncategorised</option>
             {% for c in categories %}<option value="{{ c.pk }}">{{ c.name }}</option>{% endfor %}
           </select>
         </label>
       </div>
 
-      <div class="flex items-center justify-between p-2.5 rounded-xl bg-base-200/50 border border-base-content/10">
-        <label for="expIsEmi" class="flex items-center gap-2 cursor-pointer flex-1">
-          <span class="material-symbols-outlined text-purple-400 text-lg">event_repeat</span>
-          <div>
-            <span class="text-xs font-semibold">Credit Card EMI</span>
-            <p class="text-[10px] opacity-60">Track as an installment or converted merchant purchase</p>
-          </div>
-        </label>
-        <input type="checkbox" name="is_emi" id="expIsEmi" class="toggle toggle-sm toggle-primary cursor-pointer">
-      </div>
-
-      <div id="expEmiFields" class="hidden p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 flex-col gap-2">
-        <div class="grid grid-cols-2 gap-2.5">
-          <label class="flex flex-col gap-1">
-            <span class="text-[11px] font-bold uppercase tracking-wider opacity-60">Installment #</span>
-            <input type="number" name="emi_installment_num" id="expEmiInstallmentNum" min="1" max="120"
-                   class="input input-bordered input-sm w-full font-bold tabular-nums" placeholder="e.g. 5" oninput="Expenses.syncEmiPending()">
+      {# EMI Accordion / Switcher #}
+      <div class="p-3 rounded-xl bg-base-200/50 border border-base-content/8 flex flex-col gap-2.5">
+        <div class="flex items-center justify-between">
+          <label for="expIsEmi" class="flex items-center gap-2 cursor-pointer flex-1">
+            <span class="material-symbols-outlined text-purple-400 text-lg">event_repeat</span>
+            <div>
+              <span class="text-xs font-bold text-base-content">Credit Card EMI</span>
+              <p class="text-[10px] text-base-content/50">Track as a monthly loan installment</p>
+            </div>
           </label>
-          <label class="flex flex-col gap-1">
-            <span class="text-[11px] font-bold uppercase tracking-wider opacity-60">Total Tenure (Months)</span>
-            <input type="number" name="emi_total_installments" id="expEmiTotalInstallments" min="1" max="120"
-                   class="input input-bordered input-sm w-full font-bold tabular-nums" placeholder="e.g. 12" oninput="Expenses.syncEmiPending()">
-          </label>
+          <input type="checkbox" name="is_emi" id="expIsEmi" class="toggle toggle-sm toggle-primary cursor-pointer">
         </div>
-        <div class="text-[11px] font-medium" id="expEmiPendingNote"></div>
+
+        <div id="expEmiFields" class="hidden p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 flex-col gap-2">
+          <div class="grid grid-cols-2 gap-2.5">
+            <label class="flex flex-col gap-1">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-purple-300/80">Installment #</span>
+              <input type="number" name="emi_installment_num" id="expEmiInstallmentNum" min="1" max="120"
+                     class="input input-bordered input-sm w-full font-bold tabular-nums bg-base-100 rounded-lg" placeholder="e.g. 5" oninput="Expenses.syncEmiPending()">
+            </label>
+            <label class="flex flex-col gap-1">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-purple-300/80">Total Tenure (Mo)</span>
+              <input type="number" name="emi_total_installments" id="expEmiTotalInstallments" min="1" max="120"
+                     class="input input-bordered input-sm w-full font-bold tabular-nums bg-base-100 rounded-lg" placeholder="e.g. 12" oninput="Expenses.syncEmiPending()">
+            </label>
+          </div>
+          <div class="text-[11px] font-medium" id="expEmiPendingNote"></div>
+        </div>
       </div>
 
-      <label class="flex items-start gap-2.5 cursor-pointer hidden p-2 rounded-lg bg-base-200/50 border border-base-content/10" id="expRememberRow">
-        <input type="checkbox" name="remember" id="expRemember" class="checkbox checkbox-sm checkbox-primary mt-0.5 cursor-pointer">
-        <span class="text-xs leading-snug opacity-80">Also apply this category to other past and future transactions for <strong id="expRememberName">this merchant</strong></span>
+      {# Remember category row #}
+      <label class="flex items-start gap-2.5 cursor-pointer hidden p-2.5 rounded-xl bg-primary/8 border border-primary/20" id="expRememberRow">
+        <input type="checkbox" name="remember" id="expRemember" class="checkbox checkbox-sm checkbox-primary mt-0.5 cursor-pointer rounded">
+        <span class="text-xs leading-snug text-base-content/80">Also apply this category to past and future transactions for <strong id="expRememberName" class="text-primary font-bold">this merchant</strong></span>
       </label>
 
-      <div class="grid grid-cols-2 gap-3">
+      {# Payment Source & Member Grid #}
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label class="flex flex-col gap-1">
-          <span class="text-xs font-bold uppercase tracking-wider opacity-50">Paid with</span>
-          <select name="payment_source" id="expSource" class="select select-bordered w-full cursor-pointer">
+          <span class="text-[11px] font-semibold text-base-content/70">Payment Instrument</span>
+          <select name="payment_source" id="expSource" class="select select-bordered select-sm w-full cursor-pointer bg-base-100 rounded-lg text-xs">
             <option value="">-</option>
             {% for s in payment_sources %}<option value="{{ s.pk }}">{{ s.display_name }}</option>{% endfor %}
           </select>
         </label>
         <label class="flex flex-col gap-1">
-          <span class="text-xs font-bold uppercase tracking-wider opacity-50">Spent by</span>
-          <select name="member" id="expMember" class="select select-bordered w-full cursor-pointer">
+          <span class="text-[11px] font-semibold text-base-content/70">Cardholder / Member</span>
+          <select name="member" id="expMember" class="select select-bordered select-sm w-full cursor-pointer bg-base-100 rounded-lg text-xs">
             <option value="">-</option>
             {% for m in members %}<option value="{{ m.pk }}" {% if m.pk == user.pk %}data-self="1"{% endif %}>{{ m.first_name|default:m.username }}</option>{% endfor %}
           </select>
         </label>
       </div>
 
+      {# Notes textarea #}
       <label class="flex flex-col gap-1">
-        <span class="text-xs font-bold uppercase tracking-wider opacity-50">Notes</span>
-        <textarea name="notes" id="expNotes" rows="2" class="textarea textarea-bordered w-full" placeholder="Optional notes"></textarea>
+        <span class="text-[11px] font-semibold text-base-content/70">Notes (Optional)</span>
+        <textarea name="notes" id="expNotes" rows="2" class="textarea textarea-bordered w-full bg-base-100 rounded-xl text-xs" placeholder="Add context, bill breakdown, or tags"></textarea>
       </label>
 
-      <details id="expMeta" class="hidden text-xs bg-base-200/60 rounded-xl px-3 py-2">
-        <summary class="cursor-pointer font-semibold opacity-60">Where this came from</summary>
-        <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 mt-2 opacity-75">
-          <dt class="opacity-60">Source</dt><dd id="expMetaSource"></dd>
-          <dt class="opacity-60">Category by</dt><dd id="expMetaCat"></dd>
-          <dt class="opacity-60" id="expMetaRawLbl">Raw text</dt><dd id="expMetaRaw" class="break-words"></dd>
-          <dt class="opacity-60" id="expMetaSubjLbl">Email</dt><dd id="expMetaSubject" class="break-words"></dd>
+      {# Progressive disclosure metadata #}
+      <details id="expMeta" class="hidden text-xs bg-base-200/60 rounded-xl px-3.5 py-2.5 border border-base-content/6">
+        <summary class="cursor-pointer font-semibold text-base-content/60 hover:text-base-content text-[11px] uppercase tracking-wider">Source &amp; Audit Trace</summary>
+        <dl class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 mt-2.5 opacity-80 text-[11px]">
+          <dt class="opacity-50 font-medium">Ingestion</dt><dd id="expMetaSource" class="font-mono"></dd>
+          <dt class="opacity-50 font-medium">Categorisation</dt><dd id="expMetaCat" class="font-mono"></dd>
+          <dt class="opacity-50 font-medium" id="expMetaRawLbl">Raw Line</dt><dd id="expMetaRaw" class="break-words font-mono text-[10px]"></dd>
+          <dt class="opacity-50 font-medium" id="expMetaSubjLbl">Email Header</dt><dd id="expMetaSubject" class="break-words font-mono text-[10px]"></dd>
         </dl>
       </details>
 
-      <div class="flex items-center gap-2 pt-1">
-        <button type="button" id="expDeleteBtn" class="btn btn-ghost btn-sm text-error hidden cursor-pointer" onclick="Expenses.remove()">
-          <span class="material-symbols-outlined text-base">delete</span>Remove
+      {# Actions Bar #}
+      <div class="flex items-center gap-2 pt-2 border-t border-base-content/8">
+        <button type="button" id="expDeleteBtn" class="btn btn-ghost btn-sm text-error/80 hover:text-error hover:bg-error/10 hidden cursor-pointer gap-1 rounded-lg" onclick="Expenses.remove()">
+          <span class="material-symbols-outlined text-base">delete</span>Delete
         </button>
         <div class="flex-1"></div>
-        <button type="button" class="btn btn-ghost btn-sm cursor-pointer" onclick="closeModal('expenseModal')">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm cursor-pointer" id="expSubmit">Save</button>
+        <button type="button" class="btn btn-ghost btn-sm cursor-pointer rounded-lg text-base-content/70 hover:text-base-content" onclick="closeModal('expenseModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm px-5 cursor-pointer rounded-lg font-bold" id="expSubmit">Save Expense</button>
       </div>
     </form>
 

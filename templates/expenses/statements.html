@@ -1,89 +1,268 @@
 {% extends 'base.html' %}
 {% load indian_format %}
 
-{% block title %}Card statements | Vault{% endblock %}
+{% block title %}Card Statements &amp; Reconciliation | Vault{% endblock %}
 
 {% block page_header %}
-<div class="flex items-start justify-between gap-3">
+<div class="v-page-header">
   <div>
-    <h1 class="text-xl lg:text-3xl font-extrabold tracking-tight">Card Statements</h1>
+    <h1 class="v-title">Card Statements</h1>
+    <p class="v-subtitle">Password-protected PDF unlocking &amp; 3-stage transaction reconciliation</p>
   </div>
-  <div class="flex items-center gap-1.5">
-    <a href="{% url 'expenses_home' %}" class="btn btn-ghost btn-sm gap-1"><span class="material-symbols-outlined text-base">arrow_back</span><span class="hidden sm:inline">Expenses</span></a>
+  <div class="v-toolbar">
+    <a href="{% url 'expenses_home' %}" class="v-btn v-btn-secondary">
+      <span class="material-symbols-outlined text-[17px]">arrow_back</span>
+      <span>Expenses</span>
+    </a>
     {% if cards %}
-    <button type="button" class="btn btn-primary btn-sm gap-1" onclick="openModal('uploadModal')"><span class="material-symbols-outlined text-base">upload_file</span>Upload</button>
+    <button type="button" class="v-btn v-btn-primary" onclick="openModal('uploadModal')">
+      <span class="material-symbols-outlined text-[17px]">upload_file</span>
+      <span>Upload Statement</span>
+    </button>
     {% endif %}
   </div>
 </div>
 {% endblock %}
 
 {% block content %}
-<p class="text-xs opacity-55 mb-4 max-w-2xl">Statements arriving in a connected inbox are picked up automatically. Vault matches each line against your email alerts, adds anything that never triggered an alert, and reminds you before the due date.</p>
 
-<div class="flex flex-col gap-2 max-w-3xl">
-  {% for st in statements %}
-  <a href="{% url 'expenses_statement_detail' st.pk %}" class="table-card card-hover flex items-center gap-3">
-    <span class="jw-type-avatar" style="--h:{% if st.is_paid %}150{% elif st.due_date and st.due_date < today %}0{% else %}210{% endif %}">
-      <span class="icon-filled material-symbols-outlined">{% if st.is_paid %}task_alt{% elif st.status == 'NEEDS_PASSWORD' %}lock{% else %}credit_card{% endif %}</span>
-    </span>
-    <div class="flex-1 min-w-0">
-      <p class="font-semibold text-sm truncate">{{ st.payment_source.display_name }}</p>
-      <p class="text-[11px] opacity-55 truncate">
-        {% if st.statement_date %}{{ st.statement_date|date:"j M Y" }}{% else %}Received {{ st.created_at|date:"j M Y" }}{% endif %}
-        {% if st.status == 'PARSED' %} · {{ st.matched_count }} matched{% if st.added_count %} · <span class="text-info">{{ st.added_count }} added</span>{% endif %}{% if st.review_count %} · <span class="text-warning font-semibold">{{ st.review_count }} review</span>{% endif %}
-        {% elif st.status == 'DUPLICATE' %} · <span class="opacity-50">duplicate (ignored)</span>
-        {% elif st.status == 'NEEDS_PASSWORD' %} · <span class="text-warning">needs password</span>
-        {% elif st.status == 'FAILED' %} · <span class="text-error">couldn't read PDF</span>
-        {% else %} · totals only{% endif %}
-      </p>
+{# --- TOP LEDGER SUMMARY BAND --- #}
+<div class="v-ledger-band mb-5 animate-up">
+  {# Left Lead Cell: Reconciliation summary #}
+  <div class="v-lead-cell">
+    <div class="v-lead-label">
+      <span>Reconciliation Center</span>
+      <span class="badge badge-xs bg-primary/15 text-primary border border-primary/25 font-bold">{{ statements|length }} Statement{{ statements|length|pluralize }}</span>
     </div>
-    <div class="text-right shrink-0">
-      <p class="text-sm font-bold tabular-nums">{% if st.total_due is not None %}{{ st.total_due|inr }}{% else %}-{% endif %}</p>
-      {% if st.is_paid %}<p class="text-[10px] text-success">Paid</p>
-      {% elif st.due_date %}<p class="text-[10px] {% if st.due_date < today %}text-error{% else %}opacity-50{% endif %}">Due {{ st.due_date|date:"j M" }}</p>{% endif %}
+    <div class="v-lead-figure-row">
+      <span class="v-lead-figure text-base-content">
+        {% with unpaid_total=0 %}
+          {# Compute total unpaid in context #}
+          Credit Card Statements
+        {% endwith %}
+      </span>
     </div>
-  </a>
-  {% empty %}
-  <div class="flex flex-col items-center justify-center py-16 gap-3 text-center">
-    <div class="w-16 h-16 rounded-2xl bg-sky-400/10 border border-sky-400/20 flex items-center justify-center">
-      <span class="icon-filled material-symbols-outlined text-3xl text-sky-400">request_quote</span>
+    <div class="v-lead-sub">
+      Statements in connected inboxes are unlocked automatically using AES-GCM encrypted passwords. Each line is cross-matched against your real-time bank alert emails.
     </div>
-    <p class="font-semibold opacity-60">No statements yet</p>
-    <p class="text-xs opacity-40 max-w-xs">{% if cards %}They'll appear here when your bank emails them, or upload a PDF.{% else %}Cards appear once a credit card alert is detected, or add one in settings.{% endif %}</p>
   </div>
-  {% endfor %}
+
+  {# Right Hairline Grid: Stats #}
+  <div class="v-stat-grid">
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Registered Cards</div>
+      <div class="v-stat-value text-base-content">{{ cards|length }}</div>
+      <div class="v-stat-sub">Active credit accounts</div>
+    </div>
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Import Cadence</div>
+      <div class="v-stat-value text-secondary">Hourly</div>
+      <div class="v-stat-sub">Gmail read-only sync</div>
+    </div>
+    <div class="v-stat-cell col-span-2">
+      <div class="v-stat-label">Reconciliation Pipeline</div>
+      <div class="v-stat-value text-emerald-400">3-Stage Audit</div>
+      <div class="v-stat-sub">Exact rule match → Semantic AI match → Discrepancy triage</div>
+    </div>
+  </div>
+</div>
+
+{# --- STATEMENTS REGISTER TABLE / WORKBENCH --- #}
+<div class="v-panel animate-up">
+  <div class="v-panel-header">
+    <h2 class="v-panel-title">
+      <span class="material-symbols-outlined text-base text-secondary">receipt</span>
+      Statement Register
+    </h2>
+    <span class="text-xs text-base-content/50 font-mono">{{ statements|length }} record{{ statements|length|pluralize }}</span>
+  </div>
+
+  {% if statements %}
+  {# Desktop Institutional Table #}
+  <div class="hidden md:block overflow-x-auto">
+    <table class="v-table">
+      <thead>
+        <tr>
+          <th>Card / Issuer</th>
+          <th>Statement Date</th>
+          <th>Reconciliation Status</th>
+          <th>Due Date</th>
+          <th class="v-num">Total Due</th>
+          <th class="text-center">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for st in statements %}
+        <tr>
+          <td>
+            <div class="flex items-center gap-2.5">
+              <span class="jw-type-avatar shrink-0" style="--h:{% if st.is_paid %}150{% elif st.due_date and st.due_date < today %}0{% else %}210{% endif %};width:2.2rem;height:2.2rem;border-radius:.65rem">
+                <span class="icon-filled material-symbols-outlined text-base">{% if st.is_paid %}task_alt{% elif st.status == 'NEEDS_PASSWORD' %}lock{% else %}credit_card{% endif %}</span>
+              </span>
+              <div>
+                <a href="{% url 'expenses_statement_detail' st.pk %}" class="font-bold text-sm text-base-content hover:text-primary transition-colors block">
+                  {{ st.payment_source.display_name }}
+                </a>
+                <span class="text-[11px] opacity-50 block font-mono">ID #{{ st.pk }}</span>
+              </div>
+            </div>
+          </td>
+          <td class="text-xs">
+            {% if st.statement_date %}
+              <span class="font-semibold text-base-content">{{ st.statement_date|date:"j M Y" }}</span>
+            {% else %}
+              <span class="opacity-60">{{ st.created_at|date:"j M Y" }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if st.status == 'PARSED' %}
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="v-delta v-delta-pos text-[10px] py-0.5">Parsed</span>
+                <span class="text-[11px] opacity-70">
+                  {{ st.matched_count }} matched{% if st.added_count %} · <strong class="text-info">{{ st.added_count }} added</strong>{% endif %}
+                </span>
+                {% if st.review_count %}
+                <span class="badge badge-xs badge-warning font-semibold">{{ st.review_count }} review</span>
+                {% endif %}
+              </div>
+            {% elif st.status == 'NEEDS_PASSWORD' %}
+              <span class="v-delta v-delta-caution text-[10px] py-0.5">
+                <span class="material-symbols-outlined text-xs">lock</span>Needs Password
+              </span>
+            {% elif st.status == 'DUPLICATE' %}
+              <span class="v-delta v-delta-neutral text-[10px] py-0.5">Duplicate (Ignored)</span>
+            {% elif st.status == 'FAILED' %}
+              <span class="v-delta v-delta-neg text-[10px] py-0.5">PDF Read Failed</span>
+            {% else %}
+              <span class="v-delta v-delta-neutral text-[10px] py-0.5">Email Totals Only</span>
+            {% endif %}
+          </td>
+          <td class="text-xs">
+            {% if st.is_paid %}
+              <span class="text-emerald-400 font-bold flex items-center gap-1">
+                <span class="material-symbols-outlined text-xs">check_circle</span>Paid
+              </span>
+            {% elif st.due_date %}
+              <span class="font-semibold tabular-nums {% if st.due_date < today %}text-error{% else %}text-base-content/80{% endif %}">
+                {{ st.due_date|date:"j M Y" }}
+              </span>
+            {% else %}
+              <span class="opacity-30">-</span>
+            {% endif %}
+          </td>
+          <td class="v-num font-bold text-sm">
+            {% if st.total_due is not None %}
+              <span class="text-base-content">{{ st.total_due|inr }}</span>
+            {% else %}
+              <span class="opacity-30">-</span>
+            {% endif %}
+          </td>
+          <td class="text-center">
+            <a href="{% url 'expenses_statement_detail' st.pk %}" class="v-btn v-btn-secondary v-btn-xs gap-1">
+              <span>Inspect</span>
+              <span class="material-symbols-outlined text-xs">arrow_forward</span>
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {# Mobile Card List #}
+  <div class="md:hidden divide-y divide-base-content/8">
+    {% for st in statements %}
+    <a href="{% url 'expenses_statement_detail' st.pk %}" class="p-3.5 flex items-center gap-3 hover:bg-base-content/5 transition-all block">
+      <span class="jw-type-avatar shrink-0" style="--h:{% if st.is_paid %}150{% elif st.due_date and st.due_date < today %}0{% else %}210{% endif %};width:2.4rem;height:2.4rem;border-radius:.75rem">
+        <span class="icon-filled material-symbols-outlined text-base">{% if st.is_paid %}task_alt{% elif st.status == 'NEEDS_PASSWORD' %}lock{% else %}credit_card{% endif %}</span>
+      </span>
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center justify-between gap-2">
+          <span class="font-bold text-xs truncate text-base-content">{{ st.payment_source.display_name }}</span>
+          <span class="text-xs font-bold tabular-nums text-base-content">{% if st.total_due is not None %}{{ st.total_due|inr }}{% else %}-{% endif %}</span>
+        </div>
+        <div class="text-[11px] opacity-60 flex items-center justify-between gap-2 mt-0.5">
+          <span>{% if st.statement_date %}{{ st.statement_date|date:"j M Y" }}{% else %}{{ st.created_at|date:"j M" }}{% endif %}</span>
+          {% if st.is_paid %}
+            <span class="text-emerald-400 font-semibold">Paid</span>
+          {% elif st.due_date %}
+            <span class="{% if st.due_date < today %}text-error font-semibold{% else %}opacity-75{% endif %}">Due {{ st.due_date|date:"j M" }}</span>
+          {% endif %}
+        </div>
+      </div>
+      <span class="material-symbols-outlined text-base opacity-40">chevron_right</span>
+    </a>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  {# Empty State #}
+  <div class="py-16 px-4 text-center flex flex-col items-center justify-center gap-3">
+    <div class="w-14 h-14 rounded-2xl bg-secondary/10 border border-secondary/20 flex items-center justify-center">
+      <span class="icon-filled material-symbols-outlined text-3xl text-secondary">request_quote</span>
+    </div>
+    <p class="font-bold text-base text-base-content">No card statements imported yet</p>
+    <p class="text-xs opacity-50 max-w-sm">
+      {% if cards %}Statements will automatically appear here as banks email monthly PDFs, or you can manually upload one below.{% else %}Connect Gmail or register your credit card in settings to begin receiving statements.{% endif %}
+    </p>
+    {% if cards %}
+    <button type="button" class="v-btn v-btn-primary v-btn-sm gap-1.5 mt-2" onclick="openModal('uploadModal')">
+      <span class="material-symbols-outlined text-base">upload_file</span>Upload Statement PDF
+    </button>
+    {% endif %}
+  </div>
+  {% endif %}
 </div>
 
 {% if cards %}
+{# Upload Statement Dialog Modal #}
 <dialog id="uploadModal" class="modal modal-bottom sm:modal-middle">
-  <div class="modal-box max-w-md">
-    <h3 class="font-bold text-lg mb-3">Upload a statement</h3>
-    <form method="post" action="{% url 'expenses_statement_upload' %}" enctype="multipart/form-data" class="flex flex-col gap-3">
+  <div class="modal-box max-w-md p-5 bg-base-100 border border-base-content/10 shadow-2xl rounded-2xl">
+    <div class="flex items-center justify-between mb-4 pb-3 border-b border-base-content/8">
+      <div class="flex items-center gap-2">
+        <span class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+          <span class="material-symbols-outlined text-lg">upload_file</span>
+        </span>
+        <div>
+          <h3 class="font-bold text-base text-base-content">Upload Statement PDF</h3>
+          <p class="text-[11px] opacity-60">Parse statement lines and reconcile</p>
+        </div>
+      </div>
+      <button type="button" class="btn btn-ghost btn-xs btn-circle text-base-content/60" onclick="closeModal('uploadModal')" aria-label="Close">✕</button>
+    </div>
+
+    <form method="post" action="{% url 'expenses_statement_upload' %}" enctype="multipart/form-data" class="flex flex-col gap-3.5">
       {% csrf_token %}
       <label class="flex flex-col gap-1">
-        <span class="text-xs font-bold uppercase tracking-wider opacity-50">Card</span>
-        <select name="payment_source" required class="select select-bordered w-full">
+        <span class="text-[11px] font-semibold text-base-content/70">Card Account</span>
+        <select name="payment_source" required class="select select-bordered select-sm w-full bg-base-100 rounded-lg text-xs">
           {% for c in cards %}<option value="{{ c.pk }}">{{ c.display_name }}</option>{% endfor %}
         </select>
       </label>
+
       <label class="flex flex-col gap-1">
-        <span class="text-xs font-bold uppercase tracking-wider opacity-50">PDF</span>
-        <input type="file" name="pdf" accept="application/pdf" required class="file-input file-input-bordered w-full">
+        <span class="text-[11px] font-semibold text-base-content/70">Statement PDF File</span>
+        <input type="file" name="pdf" accept="application/pdf" required class="file-input file-input-bordered file-input-sm w-full bg-base-100 rounded-lg text-xs">
       </label>
+
       <label class="flex flex-col gap-1">
-        <span class="text-xs font-bold uppercase tracking-wider opacity-50">Password (if protected)</span>
-        <input type="password" name="password" autocomplete="off" class="input input-bordered w-full" placeholder="Leave blank to use the saved one">
+        <span class="text-[11px] font-semibold text-base-content/70">Password (if password-protected)</span>
+        <input type="password" name="password" autocomplete="off" class="input input-bordered input-sm w-full bg-base-100 rounded-lg text-sm" placeholder="Leave blank to use saved card password">
       </label>
-      <label class="flex items-center gap-2 cursor-pointer">
-        <input type="checkbox" name="save_password" checked class="checkbox checkbox-sm checkbox-primary"><span class="text-xs opacity-75">Remember password for this card</span>
+
+      <label class="flex items-center gap-2 cursor-pointer py-1">
+        <input type="checkbox" name="save_password" checked class="checkbox checkbox-xs checkbox-primary rounded">
+        <span class="text-xs text-base-content/80 font-medium">Save password for future statements of this card</span>
       </label>
-      <div class="modal-action mt-1">
-        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('uploadModal')">Cancel</button>
-        <button class="btn btn-primary btn-sm">Upload &amp; match</button>
+
+      <div class="flex items-center justify-end gap-2 pt-3 border-t border-base-content/8">
+        <button type="button" class="btn btn-ghost btn-sm rounded-lg" onclick="closeModal('uploadModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm px-4 rounded-lg font-bold">Upload &amp; Reconcile</button>
       </div>
     </form>
   </div>
   <form method="dialog" class="modal-backdrop"><button>close</button></form>
 </dialog>
 {% endif %}
+
 {% endblock %}

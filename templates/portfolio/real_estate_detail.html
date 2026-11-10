@@ -5,169 +5,196 @@
 {% block title %}Real Estate Investments | Portfolio | Vault{% endblock %}
 
 {% block page_header %}
-<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+<div class="v-page-header">
   <div>
-    <h1 class="text-xl lg:text-3xl font-extrabold tracking-tight flex items-center gap-2.5">
-      <span class="material-symbols-outlined text-primary text-2xl">domain</span> Real Estate Investments
+    <h1 class="v-title flex items-center gap-2">
+      <span class="material-symbols-outlined text-primary text-2xl">domain</span>
+      Real Estate Investments
     </h1>
-    <p class="text-xs opacity-50 mt-0.5">Land, Plots, Residential, Commercial assets with North Indian measurement units &amp; AI research</p>
+    <p class="v-subtitle">Land, plots, residential, and commercial real assets measured in Gaj &amp; SqFt with AI market research</p>
   </div>
-  <div class="flex flex-wrap items-center gap-2">
-    <button type="button" class="btn btn-primary btn-sm gap-1" onclick="openAddRealEstateModal()">
-      <span class="material-symbols-outlined text-base">add_home</span> Add Property
+  <div class="v-toolbar">
+    <button type="button" class="v-btn v-btn-primary" onclick="openAddRealEstateModal()">
+      <span class="material-symbols-outlined text-sm">add_home</span>Add Property
     </button>
-    <a href="{% url 'portfolio_tracker' %}" class="btn btn-ghost btn-sm gap-1">
-      <span class="material-symbols-outlined text-base">arrow_back</span> Portfolio
+    <a href="{% url 'portfolio_tracker' %}" class="v-btn v-btn-secondary">
+      <span class="material-symbols-outlined text-sm">arrow_back</span>Portfolio
     </a>
   </div>
 </div>
 {% endblock %}
 
 {% block content %}
-{# Hero Summary #}
-<div class="card hero-gradient-portfolio shadow-sm card-hover animate-up mb-4">
-  <div class="card-body p-4 lg:p-6">
-    <div class="flex flex-wrap items-center justify-between gap-6">
-      <div>
-        <p class="text-[10px] font-bold uppercase tracking-widest opacity-40">Total Real Estate Valuation</p>
-        <p class="text-3xl lg:text-4xl font-extrabold mt-1 text-base-content">{{ total_current|inr }}</p>
-        <div class="mt-2 flex flex-wrap items-center gap-2">
-          <span class="badge {% if total_pnl >= 0 %}badge-success{% else %}badge-error{% endif %} badge-sm gap-1">
-            {% if total_pnl >= 0 %}+{% endif %}{{ total_pnl|inr }} ({{ pnl_pct }}%) Total P&amp;L
-          </span>
-          {% if annual_rental > 0 %}
-          <span class="badge badge-info badge-sm gap-1">
-            <span class="material-symbols-outlined text-xs">key</span> {{ total_rental|inr }}/mo ({{ portfolio_yield }}% Yield)
-          </span>
-          {% endif %}
-        </div>
+
+{# --- SIGNATURE LEDGER SUMMARY BAND --- #}
+<div class="v-ledger-band">
+  <div class="v-lead-cell">
+    <div>
+      <div class="v-lead-label">
+        <span>Total Real Estate Valuation</span>
+        <span class="v-delta v-delta-neutral text-[10px] py-0 px-2 font-semibold">{{ holdings|length }} Properties</span>
       </div>
-      <div class="flex flex-wrap gap-3">
-        <div class="stat-card">
-          <div class="text-[10px] uppercase tracking-wider opacity-50">Total Cost Basis</div>
-          <div class="text-base font-bold mt-0.5">{{ total_invested|inr }}</div>
-        </div>
-        <div class="stat-card stat-card-success">
-          <div class="text-[10px] uppercase tracking-wider opacity-50">Unrealized Gain</div>
-          <div class="text-base font-bold mt-0.5 {% if total_pnl >= 0 %}text-success{% else %}text-error{% endif %}">
-            {% if total_pnl >= 0 %}+{% endif %}{{ total_pnl|inr }}
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="text-[10px] uppercase tracking-wider opacity-50">Annual Rental</div>
-          <div class="text-base font-bold mt-0.5 text-primary">{{ annual_rental|inr }}</div>
-        </div>
+      <div class="v-lead-figure-row">
+        <span class="v-lead-figure">{{ total_current|inr }}</span>
+        <span class="v-delta {% if total_pnl >= 0 %}v-delta-pos{% else %}v-delta-neg{% endif %} text-xs font-bold">
+          <span class="material-symbols-outlined text-xs">{% if total_pnl >= 0 %}trending_up{% else %}trending_down{% endif %}</span>
+          {% if total_pnl >= 0 %}+{% endif %}{{ total_pnl|inr }} ({{ pnl_pct }}%) Total P&amp;L
+        </span>
       </div>
+      <div class="v-lead-sub">
+        {% if annual_rental > 0 %}
+        <span class="text-indigo-400 font-semibold">{{ total_rental|inr }}/mo</span> ({{ portfolio_yield }}% Rental Yield) &middot;
+        {% endif %}
+        Cost Basis: <strong class="text-base-content/80 tabular-nums">{{ total_invested|inr }}</strong>
+      </div>
+    </div>
+  </div>
+
+  <div class="v-stat-grid">
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Total Cost Basis</div>
+      <div class="v-stat-value">{{ total_invested|inr }}</div>
+      <div class="v-stat-sub">Purchase price &amp; stamp duty</div>
+    </div>
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Capital Appreciation</div>
+      <div class="v-stat-value {% if total_pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+        {% if total_pnl >= 0 %}+{% endif %}{{ total_pnl|inr }}
+      </div>
+      <div class="v-stat-sub">{{ pnl_pct }}% overall gain</div>
+    </div>
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Annual Gross Rental</div>
+      <div class="v-stat-value text-indigo-400">{{ annual_rental|inr }}</div>
+      <div class="v-stat-sub">Across leased assets</div>
+    </div>
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Portfolio Properties</div>
+      <div class="v-stat-value">{{ holdings|length }}</div>
+      <div class="v-stat-sub">Registered land &amp; plots</div>
     </div>
   </div>
 </div>
 
-{# Property List #}
-<div class="card bg-base-200 shadow-sm card-hover animate-up mb-4" style="animation-delay:0.1s">
-  <div class="card-body p-4">
-    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-      <h2 class="card-title text-base flex items-center gap-1.5">
-        <span class="material-symbols-outlined text-primary text-lg">apartment</span> All Properties
+{# --- PROPERTY REGISTRY & VALUATION BLOTTER --- #}
+<div class="v-panel mb-6">
+  <div class="v-panel-header">
+    <div class="flex items-center gap-2">
+      <h2 class="v-panel-title">
+        <span class="material-symbols-outlined text-base text-primary">apartment</span>
+        Property Registry &amp; Valuation Blotter
       </h2>
-      <span class="badge badge-ghost badge-sm">{{ holdings|length }} Properties</span>
+      <span class="v-delta v-delta-neutral text-xs font-semibold">{{ holdings|length }} Properties</span>
     </div>
-
+    <button type="button" class="v-btn v-btn-secondary v-btn-xs" onclick="openAddRealEstateModal()">
+      <span class="material-symbols-outlined text-sm">add</span>Add Property
+    </button>
+  </div>
+  <div class="v-panel-body p-0">
     {% if holdings %}
-    {# Desktop Table #}
-    <div class="hidden lg:block overflow-x-auto">
-      <table class="table table-sm" id="realEstateTable">
+    <div class="v-table-wrap">
+      <table class="v-table" id="realEstateTable">
         <thead>
           <tr>
-            <th class="sortable-th">Property &amp; Location <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
-            <th class="sortable-th">Type / Status <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
-            <th class="sortable-th text-right">Area (Gaj / SqFt) <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
-            <th class="sortable-th text-right">Cost Basis <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
-            <th class="sortable-th text-right">Current Valuation <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
-            <th class="sortable-th text-right">Rate / Gaj <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
-            <th class="sortable-th text-right">Returns (P&amp;L) <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
-            <th class="sortable-th text-right">CAGR <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
-            <th class="text-right">Actions</th>
+            <th class="sortable-th cursor-pointer select-none">Property &amp; Location <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none">Classification <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Area (Gaj / SqFt) <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Cost Basis <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Current Valuation <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Rate / Gaj <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Net Return (P&amp;L) <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">CAGR <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="text-center w-24">Actions</th>
           </tr>
         </thead>
         <tbody>
           {% for p in holdings %}
-          <tr class="hover">
+          <tr>
             <td>
               <div class="font-bold text-sm text-base-content flex items-center gap-1.5">
                 {{ p.name }}
                 {% if p.google_maps_url %}
-                <a href="{{ p.google_maps_url }}" target="_blank" rel="noopener noreferrer" class="text-primary hover:opacity-80" title="View on Google Maps">
+                <a href="{{ p.google_maps_url }}" target="_blank" rel="noopener noreferrer" class="text-primary hover:opacity-80" title="Open Google Maps Location">
                   <span class="material-symbols-outlined text-sm">pin_drop</span>
                 </a>
                 {% endif %}
               </div>
-              <div class="text-xs opacity-60 flex items-center gap-1 mt-0.5">
+              <div class="text-[11px] text-base-content/50 flex items-center gap-1 mt-0.5">
                 <span class="material-symbols-outlined text-xs">location_on</span>
                 {{ p.locality }}, {{ p.city }}
-                {% if p.micro_market_tag %}<span class="badge badge-xs badge-neutral">{{ p.micro_market_tag }}</span>{% endif %}
+                {% if p.micro_market_tag %}<span class="v-delta v-delta-neutral text-[9px] py-0 px-1">{{ p.micro_market_tag }}</span>{% endif %}
               </div>
             </td>
             <td>
-              <div class="flex flex-col gap-1 items-start">
-                <span class="badge badge-primary badge-outline badge-xs font-semibold">{{ p.get_property_type_display }}</span>
-                <span class="text-[11px] opacity-60">{{ p.get_status_display }}</span>
+              <div class="flex flex-col gap-0.5 items-start">
+                <span class="v-delta v-delta-neutral text-[10px] py-0 px-1.5 font-semibold">{{ p.get_property_type_display }}</span>
+                <span class="text-[10px] text-base-content/50">{{ p.get_status_display }}</span>
               </div>
             </td>
-            <td class="text-right" data-val="{{ p.area_in_gaj }}">
-              <div class="font-bold text-sm">{{ p.area_in_gaj|floatformat:0|indian_number }} Gaj</div>
-              <div class="text-xs opacity-50">{{ p.area_in_sqft|floatformat:0|indian_number }} sq.ft</div>
+            <td class="v-num" data-val="{{ p.area_in_gaj }}">
+              <div class="font-bold text-xs">{{ p.area_in_gaj|floatformat:0|indian_number }} Gaj</div>
+              <div class="text-[10px] text-base-content/50">{{ p.area_in_sqft|floatformat:0|indian_number }} sq.ft</div>
             </td>
-            <td class="text-right" data-val="{{ p.total_cost_basis }}">
-              <div class="font-semibold">{{ p.total_cost_basis|inr }}</div>
-              <div class="text-[11px] opacity-40">{{ p.purchase_date|date:"M Y" }}</div>
+            <td class="v-num" data-val="{{ p.total_cost_basis }}">
+              <div class="font-semibold text-xs text-base-content/80">{{ p.total_cost_basis|inr }}</div>
+              <div class="text-[10px] text-base-content/40">{{ p.purchase_date|date:"M Y" }}</div>
             </td>
-            <td class="text-right font-bold" data-val="{{ p.current_valuation }}">
-              <div class="text-primary font-bold">{{ p.current_valuation|inr }}</div>
+            <td class="v-num font-bold text-primary" data-val="{{ p.current_valuation }}">
+              <div class="text-xs">{{ p.current_valuation|inr }}</div>
               {% if p.monthly_rental_income > 0 %}
-              <div class="text-[11px] text-info">{{ p.monthly_rental_income|inr }}/mo ({{ p.rental_yield_pct }}%)</div>
+              <div class="text-[10px] text-indigo-400 font-medium">{{ p.monthly_rental_income|inr }}/mo ({{ p.rental_yield_pct }}%)</div>
               {% endif %}
             </td>
-            <td class="text-right font-semibold" data-val="{{ p.current_rate_per_gaj }}">
+            <td class="v-num text-xs font-semibold" data-val="{{ p.current_rate_per_gaj }}">
               {{ p.current_rate_per_gaj|inr }}/Gaj
-              <div class="text-[11px] opacity-40">Bought: {{ p.purchase_rate_per_gaj|inr }}</div>
+              <div class="text-[10px] text-base-content/40">Bought: {{ p.purchase_rate_per_gaj|inr }}</div>
             </td>
-            <td class="text-right font-semibold" data-val="{{ p.pnl }}">
-              <span class="{% if p.pnl >= 0 %}text-success{% else %}text-error{% endif %}">
+            <td class="v-num" data-val="{{ p.pnl }}">
+              <div class="text-xs font-bold {% if p.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
                 {% if p.pnl >= 0 %}+{% endif %}{{ p.pnl|inr }}
-              </span>
-              <div class="text-[11px] {% if p.pnl >= 0 %}text-success{% else %}text-error{% endif %}">
+              </div>
+              <div class="text-[10px] font-semibold {% if p.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
                 {% if p.pnl >= 0 %}+{% endif %}{{ p.pnl_pct }}%
               </div>
             </td>
-            <td class="text-right font-semibold" data-val="{{ p.cagr_pct }}">
+            <td class="v-num text-xs font-semibold" data-val="{{ p.cagr_pct }}">
               {% if p.cagr_pct > 0 %}
-              <span class="text-success">{{ p.cagr_pct }}%</span>
+              <span class="text-emerald-400">{{ p.cagr_pct }}%</span>
               {% else %}
-              <span class="opacity-40">-</span>
+              <span class="text-base-content/30">&mdash;</span>
               {% endif %}
             </td>
-            <td class="text-right">
-              <div class="flex items-center justify-end gap-1">
-                <button type="button" class="btn btn-ghost btn-xs btn-square text-info" title="AI Market Research & Valuation Prompt" onclick="openLlmPromptModal({{ p.id }}, '{{ p.name|escapejs }}')">
-                  <span class="material-symbols-outlined text-base">psychology</span>
+            <td class="text-center">
+              <div class="flex items-center justify-center gap-1">
+                <button type="button" class="v-btn v-btn-ghost v-btn-xs text-indigo-400" title="AI Market Research & Valuation Prompt" onclick="openLlmPromptModal({{ p.id }}, '{{ p.name|escapejs }}')">
+                  <span class="material-symbols-outlined text-sm">psychology</span>
                 </button>
-                <button type="button" class="btn btn-ghost btn-xs btn-square text-success" title="Update Valuation" onclick="openValuationModal({{ p.id }}, '{{ p.name|escapejs }}', '{{ p.current_valuation }}', '{{ p.last_valuation_date|date:'Y-m-d'|default:'' }}', '{{ p.monthly_rental_income }}', '{{ p.remarks|escapejs }}')">
-                  <span class="material-symbols-outlined text-base">price_change</span>
+                <button type="button" class="v-btn v-btn-ghost v-btn-xs text-emerald-400" title="Update Valuation" onclick="openValuationModal({{ p.id }}, '{{ p.name|escapejs }}', '{{ p.current_valuation }}', '{{ p.last_valuation_date|date:'Y-m-d'|default:'' }}', '{{ p.monthly_rental_income }}', '{{ p.remarks|escapejs }}')">
+                  <span class="material-symbols-outlined text-sm">price_change</span>
                 </button>
-                <button type="button" class="btn btn-ghost btn-xs btn-square" data-edit-re data-id="{{ p.id }}" data-name="{{ p.name }}" data-type="{{ p.property_type }}" data-status="{{ p.status }}" data-area="{{ p.area_value }}" data-unit="{{ p.area_unit }}" data-locality="{{ p.locality }}" data-city="{{ p.city }}" data-state="{{ p.state }}" data-landmark="{{ p.landmark }}" data-pincode="{{ p.pincode }}" data-micro="{{ p.micro_market_tag }}" data-maps="{{ p.google_maps_url }}" data-khasra="{{ p.khasra_khata_number }}" data-date="{{ p.purchase_date|date:'Y-m-d' }}" data-price="{{ p.purchase_price }}" data-stamp="{{ p.stamp_duty_charges }}" data-valuation="{{ p.current_valuation }}" data-vdate="{{ p.last_valuation_date|date:'Y-m-d'|default:'' }}" data-rent="{{ p.monthly_rental_income }}" data-remarks="{{ p.remarks }}">
-                  <span class="material-symbols-outlined text-base">edit</span>
+                <button type="button" class="v-btn v-btn-ghost v-btn-xs" data-edit-re
+                        data-id="{{ p.id }}" data-name="{{ p.name }}" data-type="{{ p.property_type }}"
+                        data-status="{{ p.status }}" data-area="{{ p.area_value }}" data-unit="{{ p.area_unit }}"
+                        data-locality="{{ p.locality }}" data-city="{{ p.city }}" data-state="{{ p.state }}"
+                        data-landmark="{{ p.landmark }}" data-pincode="{{ p.pincode }}"
+                        data-micro="{{ p.micro_market_tag }}" data-maps="{{ p.google_maps_url }}"
+                        data-khasra="{{ p.khasra_khata_number }}" data-date="{{ p.purchase_date|date:'Y-m-d' }}"
+                        data-price="{{ p.purchase_price }}" data-stamp="{{ p.stamp_duty_charges }}"
+                        data-valuation="{{ p.current_valuation }}" data-vdate="{{ p.last_valuation_date|date:'Y-m-d'|default:'' }}"
+                        data-rent="{{ p.monthly_rental_income }}" data-remarks="{{ p.remarks }}">
+                  <span class="material-symbols-outlined text-sm">edit</span>
                 </button>
               </div>
             </td>
           </tr>
           {% endfor %}
-          <tr class="total-row border-t-2 border-base-300">
-            <td class="font-bold text-primary">Total ({{ holdings|length }} properties)</td>
+          <tr class="total-row border-t-2 border-base-content/10 font-bold">
+            <td class="text-primary">Total ({{ holdings|length }} properties)</td>
             <td colspan="2"></td>
-            <td class="text-right font-bold text-primary" data-val="{{ total_invested }}">{{ total_invested|inr }}</td>
-            <td class="text-right font-bold text-primary" data-val="{{ total_current }}">{{ total_current|inr }}</td>
+            <td class="v-num text-primary" data-val="{{ total_invested }}">{{ total_invested|inr }}</td>
+            <td class="v-num text-primary font-bold" data-val="{{ total_current }}">{{ total_current|inr }}</td>
             <td></td>
-            <td class="text-right font-bold {% if total_pnl >= 0 %}text-success{% else %}text-error{% endif %}" data-val="{{ total_pnl }}">
+            <td class="v-num font-bold {% if total_pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}" data-val="{{ total_pnl }}">
               {% if total_pnl >= 0 %}+{% endif %}{{ total_pnl|inr }}
             </td>
             <td colspan="2"></td>
@@ -176,13 +203,13 @@
       </table>
     </div>
 
-    {# Mobile View #}
-    <div class="lg:hidden space-y-3">
+    {# Mobile Card View #}
+    <div class="lg:hidden divide-y divide-base-content/6">
       {% for p in holdings %}
-      <div class="table-card p-3 rounded-lg bg-base-300/40 border border-base-content/5 space-y-2.5">
+      <div class="p-3.5 space-y-2">
         <div class="flex items-start justify-between gap-2">
           <div class="min-w-0">
-            <div class="font-bold text-sm text-base-content flex items-center gap-1">
+            <div class="font-bold text-xs text-base-content flex items-center gap-1">
               {{ p.name }}
               {% if p.google_maps_url %}
               <a href="{{ p.google_maps_url }}" target="_blank" rel="noopener noreferrer" class="text-primary">
@@ -190,41 +217,50 @@
               </a>
               {% endif %}
             </div>
-            <div class="text-xs opacity-60 flex items-center gap-1 mt-0.5">
+            <div class="text-[10px] text-base-content/50 flex items-center gap-1 mt-0.5">
               <span class="material-symbols-outlined text-xs">location_on</span> {{ p.locality }}, {{ p.city }}
             </div>
           </div>
           <div class="flex items-center gap-1 shrink-0">
-            <button type="button" class="btn btn-ghost btn-xs btn-square text-info" title="AI Prompt" onclick="openLlmPromptModal({{ p.id }}, '{{ p.name|escapejs }}')">
-              <span class="material-symbols-outlined text-base">psychology</span>
+            <button type="button" class="v-btn v-btn-ghost v-btn-xs text-indigo-400" title="AI Prompt" onclick="openLlmPromptModal({{ p.id }}, '{{ p.name|escapejs }}')">
+              <span class="material-symbols-outlined text-sm">psychology</span>
             </button>
-            <button type="button" class="btn btn-ghost btn-xs btn-square text-success" title="Update Valuation" onclick="openValuationModal({{ p.id }}, '{{ p.name|escapejs }}', '{{ p.current_valuation }}', '{{ p.last_valuation_date|date:'Y-m-d'|default:'' }}', '{{ p.monthly_rental_income }}', '{{ p.remarks|escapejs }}')">
-              <span class="material-symbols-outlined text-base">price_change</span>
+            <button type="button" class="v-btn v-btn-ghost v-btn-xs text-emerald-400" title="Update Valuation" onclick="openValuationModal({{ p.id }}, '{{ p.name|escapejs }}', '{{ p.current_valuation }}', '{{ p.last_valuation_date|date:'Y-m-d'|default:'' }}', '{{ p.monthly_rental_income }}', '{{ p.remarks|escapejs }}')">
+              <span class="material-symbols-outlined text-sm">price_change</span>
             </button>
-            <button type="button" class="btn btn-ghost btn-xs btn-square" data-edit-re data-id="{{ p.id }}" data-name="{{ p.name }}" data-type="{{ p.property_type }}" data-status="{{ p.status }}" data-area="{{ p.area_value }}" data-unit="{{ p.area_unit }}" data-locality="{{ p.locality }}" data-city="{{ p.city }}" data-state="{{ p.state }}" data-landmark="{{ p.landmark }}" data-pincode="{{ p.pincode }}" data-micro="{{ p.micro_market_tag }}" data-maps="{{ p.google_maps_url }}" data-khasra="{{ p.khasra_khata_number }}" data-date="{{ p.purchase_date|date:'Y-m-d' }}" data-price="{{ p.purchase_price }}" data-stamp="{{ p.stamp_duty_charges }}" data-valuation="{{ p.current_valuation }}" data-vdate="{{ p.last_valuation_date|date:'Y-m-d'|default:'' }}" data-rent="{{ p.monthly_rental_income }}" data-remarks="{{ p.remarks }}">
-              <span class="material-symbols-outlined text-base">edit</span>
+            <button type="button" class="v-btn v-btn-ghost v-btn-xs" data-edit-re
+                    data-id="{{ p.id }}" data-name="{{ p.name }}" data-type="{{ p.property_type }}"
+                    data-status="{{ p.status }}" data-area="{{ p.area_value }}" data-unit="{{ p.area_unit }}"
+                    data-locality="{{ p.locality }}" data-city="{{ p.city }}" data-state="{{ p.state }}"
+                    data-landmark="{{ p.landmark }}" data-pincode="{{ p.pincode }}"
+                    data-micro="{{ p.micro_market_tag }}" data-maps="{{ p.google_maps_url }}"
+                    data-khasra="{{ p.khasra_khata_number }}" data-date="{{ p.purchase_date|date:'Y-m-d' }}"
+                    data-price="{{ p.purchase_price }}" data-stamp="{{ p.stamp_duty_charges }}"
+                    data-valuation="{{ p.current_valuation }}" data-vdate="{{ p.last_valuation_date|date:'Y-m-d'|default:'' }}"
+                    data-rent="{{ p.monthly_rental_income }}" data-remarks="{{ p.remarks }}">
+              <span class="material-symbols-outlined text-sm">edit</span>
             </button>
           </div>
         </div>
 
         <div class="flex flex-wrap items-center gap-1.5">
-          <span class="badge badge-primary badge-outline badge-xs">{{ p.get_property_type_display }}</span>
-          <span class="badge badge-ghost badge-xs">{{ p.area_in_gaj|floatformat:0|indian_number }} Gaj</span>
-          {% if p.cagr_pct > 0 %}<span class="badge badge-success badge-xs">{{ p.cagr_pct }}% CAGR</span>{% endif %}
+          <span class="v-delta v-delta-neutral text-[9px] py-0 px-1">{{ p.get_property_type_display }}</span>
+          <span class="v-delta v-delta-neutral text-[9px] py-0 px-1">{{ p.area_in_gaj|floatformat:0|indian_number }} Gaj</span>
+          {% if p.cagr_pct > 0 %}<span class="v-delta v-delta-pos text-[9px] py-0 px-1">{{ p.cagr_pct }}% CAGR</span>{% endif %}
         </div>
 
-        <div class="grid grid-cols-3 gap-2 text-xs pt-1 border-t border-base-content/5">
+        <div class="grid grid-cols-3 gap-2 text-[11px] pt-1 border-t border-base-content/6 tabular-nums">
           <div>
-            <span class="opacity-50 text-[10px] uppercase">Cost Basis</span>
-            <div class="font-semibold">{{ p.total_cost_basis|inr }}</div>
+            <span class="text-base-content/50 text-[10px] uppercase">Cost Basis</span>
+            <div class="font-semibold text-base-content/80 mt-0.5">{{ p.total_cost_basis|inr }}</div>
           </div>
           <div>
-            <span class="opacity-50 text-[10px] uppercase">Current Val</span>
-            <div class="font-bold text-primary">{{ p.current_valuation|inr }}</div>
+            <span class="text-base-content/50 text-[10px] uppercase">Current Val</span>
+            <div class="font-bold text-primary mt-0.5">{{ p.current_valuation|inr }}</div>
           </div>
           <div>
-            <span class="opacity-50 text-[10px] uppercase">Returns</span>
-            <div class="font-semibold {% if p.pnl >= 0 %}text-success{% else %}text-error{% endif %}">
+            <span class="text-base-content/50 text-[10px] uppercase">Returns</span>
+            <div class="font-bold mt-0.5 {% if p.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
               {% if p.pnl >= 0 %}+{% endif %}{{ p.pnl|inr }}
             </div>
           </div>
@@ -233,11 +269,14 @@
       {% endfor %}
     </div>
     {% else %}
-    <div class="text-center py-12 opacity-50 space-y-2">
-      <span class="material-symbols-outlined text-4xl">domain_disabled</span>
-      <p class="text-sm">No real estate holdings added yet.</p>
-      <button type="button" class="btn btn-primary btn-sm mt-2 gap-1" onclick="openAddRealEstateModal()">
-        <span class="material-symbols-outlined text-base">add_home</span> Add First Property
+    <div class="v-empty py-10">
+      <div class="v-empty-icon text-primary">
+        <span class="material-symbols-outlined text-3xl">domain_disabled</span>
+      </div>
+      <h3 class="v-empty-title">No Real Estate Holdings Recorded</h3>
+      <p class="v-empty-desc">Catalogue agricultural land, residential plots, or commercial property with circle rates and Gaj/SqFt calculations.</p>
+      <button type="button" class="v-btn v-btn-primary" onclick="openAddRealEstateModal()">
+        <span class="material-symbols-outlined text-sm">add_home</span>Add First Property
       </button>
     </div>
     {% endif %}
@@ -249,72 +288,77 @@
 
 {# Quick Valuation Update Modal #}
 <dialog class="modal" id="valuationUpdateModal">
-  <div class="modal-box max-w-md bg-base-100 border border-base-content/10 shadow-2xl">
-    <div class="flex items-start justify-between gap-2 mb-3 pb-2 border-b border-base-content/10">
-      <h3 class="font-bold text-base flex items-center gap-2" id="valModalTitle">
-        <span class="material-symbols-outlined text-success">price_change</span> Update Property Valuation
-      </h3>
-      <button type="button" class="btn btn-ghost btn-xs btn-square" onclick="closeModal('valuationUpdateModal')">
-        <span class="material-symbols-outlined">close</span>
-      </button>
-    </div>
-    <form id="valUpdateForm" method="post" action="">{% csrf_token %}
-      <input type="hidden" name="next" value="{{ request.get_full_path }}">
-      <div class="space-y-3">
-        <div class="form-field">
-          <label class="label text-xs font-semibold">New Estimated Valuation (₹)</label>
-          {{ valuation_form.current_valuation }}
-        </div>
-        <div class="form-field">
-          <label class="label text-xs font-semibold">Appraisal / Valuation Date</label>
-          {{ valuation_form.last_valuation_date }}
-        </div>
-        <div class="form-field">
-          <label class="label text-xs font-semibold">Monthly Rental Income (₹) <span class="opacity-40 font-normal">optional</span></label>
-          {{ valuation_form.monthly_rental_income }}
-        </div>
-        <div class="form-field">
-          <label class="label text-xs font-semibold">Notes / Market Valuation Context</label>
-          {{ valuation_form.remarks }}
-        </div>
-      </div>
-      <div class="modal-action mt-5">
-        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('valuationUpdateModal')">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm gap-1">
-          <span class="material-symbols-outlined text-base">save</span> Update Valuation
+  <div class="modal-box w-full max-w-md bg-base-100 p-6 flex flex-col justify-between">
+    <div>
+      <div class="flex items-center justify-between pb-3 border-b border-base-content/8">
+        <h3 class="font-bold text-base flex items-center gap-2 text-emerald-400" id="valModalTitle">
+          <span class="material-symbols-outlined">price_change</span>Update Property Valuation
+        </h3>
+        <button type="button" class="v-btn v-btn-ghost v-btn-xs" onclick="closeModal('valuationUpdateModal')">
+          <span class="material-symbols-outlined text-lg">close</span>
         </button>
       </div>
-    </form>
+
+      <form id="valUpdateForm" method="post" action="" class="v-form-grid mt-4">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <div class="v-field">
+          <label class="v-label">New Estimated Valuation (₹)</label>
+          {{ valuation_form.current_valuation }}
+        </div>
+        <div class="v-field">
+          <label class="v-label">Appraisal / Valuation Date</label>
+          {{ valuation_form.last_valuation_date }}
+        </div>
+        <div class="v-field">
+          <label class="v-label">Monthly Rental Income (₹) <span class="opacity-40 font-normal">optional</span></label>
+          {{ valuation_form.monthly_rental_income }}
+        </div>
+        <div class="v-field">
+          <label class="v-label">Notes / Market Valuation Context</label>
+          {{ valuation_form.remarks }}
+        </div>
+        <div class="flex justify-end gap-2 pt-4 border-t border-base-content/8 mt-4">
+          <button type="button" class="v-btn v-btn-ghost v-btn-sm" onclick="closeModal('valuationUpdateModal')">Cancel</button>
+          <button type="submit" class="v-btn v-btn-primary v-btn-sm">
+            <span class="material-symbols-outlined text-sm">save</span>Save Valuation
+          </button>
+        </div>
+      </form>
+    </div>
   </div>
   <form method="dialog" class="modal-backdrop"><button>close</button></form>
 </dialog>
 
 {# LLM Research Prompt Modal #}
 <dialog class="modal" id="llmPromptModal">
-  <div class="modal-box max-w-xl bg-base-100 border border-base-content/10 shadow-2xl">
-    <div class="flex items-start justify-between gap-2 mb-3 pb-2 border-b border-base-content/10">
-      <h3 class="font-bold text-base flex items-center gap-2 text-primary" id="llmPromptTitle">
-        <span class="material-symbols-outlined">psychology</span> AI Market Research Prompt
-      </h3>
-      <button type="button" class="btn btn-ghost btn-xs btn-square" onclick="closeModal('llmPromptModal')">
-        <span class="material-symbols-outlined">close</span>
-      </button>
-    </div>
-    <p class="text-xs opacity-60 mb-3">
-      Copy this curated prompt to feed into Gemini / LLMs to analyze circle rates, micro-market growth, upcoming infrastructure, and expected capital appreciation.
-    </p>
-    <div class="relative">
-      <textarea id="llmPromptText" class="textarea textarea-bordered w-full font-mono text-xs leading-relaxed h-64 bg-base-300/40 p-3 rounded-lg" readonly></textarea>
-      <button type="button" class="btn btn-primary btn-xs absolute bottom-3 right-3 gap-1 shadow-md" onclick="copyPromptToClipboard()">
-        <span class="material-symbols-outlined text-sm">content_copy</span> <span id="copyBtnText">Copy Prompt</span>
-      </button>
-    </div>
-    <div class="modal-action mt-4">
-      <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('llmPromptModal')">Done</button>
+  <div class="modal-box w-full max-w-xl bg-base-100 p-6 flex flex-col justify-between">
+    <div>
+      <div class="flex items-center justify-between pb-3 border-b border-base-content/8">
+        <h3 class="font-bold text-base flex items-center gap-2 text-primary" id="llmPromptTitle">
+          <span class="material-symbols-outlined">psychology</span>AI Market Research Prompt
+        </h3>
+        <button type="button" class="v-btn v-btn-ghost v-btn-xs" onclick="closeModal('llmPromptModal')">
+          <span class="material-symbols-outlined text-lg">close</span>
+        </button>
+      </div>
+      <p class="text-xs text-base-content/60 mt-1 mb-3">
+        Copy this structured prompt into Gemini or Claude to analyze micro-market circle rates, infrastructure corridors, and expected capital appreciation.
+      </p>
+      <div class="relative">
+        <textarea id="llmPromptText" class="w-full font-mono text-xs leading-relaxed h-56 bg-base-content/4 p-3 rounded-xl border border-base-content/10" readonly></textarea>
+        <button type="button" class="v-btn v-btn-primary v-btn-xs absolute bottom-3 right-3 gap-1 shadow-md" onclick="copyPromptToClipboard()">
+          <span class="material-symbols-outlined text-xs">content_copy</span><span id="copyBtnText">Copy Prompt</span>
+        </button>
+      </div>
+      <div class="flex justify-end pt-3 border-t border-base-content/8 mt-4">
+        <button type="button" class="v-btn v-btn-ghost v-btn-sm" onclick="closeModal('llmPromptModal')">Done</button>
+      </div>
     </div>
   </div>
   <form method="dialog" class="modal-backdrop"><button>close</button></form>
 </dialog>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -322,17 +366,26 @@
 <script>
 function openAddRealEstateModal() {
   var form = document.getElementById('realEstateForm');
+  if (!form) return;
   form.action = "{% url 'add_real_estate' %}";
   form.reset();
-  document.getElementById('realEstateDeleteBtn').style.display = 'none';
-  document.getElementById('realEstateModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">add_home</span> Add Real Estate Property';
+  var delBtn = document.getElementById('realEstateDeleteBtn');
+  if (delBtn) delBtn.style.display = 'none';
+  var titleEl = document.getElementById('realEstateModalTitle');
+  if (titleEl) {
+    titleEl.innerHTML = '<span class="material-symbols-outlined text-primary">add_home</span> Add Real Estate Property';
+  }
   openModal('addRealEstateModal');
 }
 
 function openValuationModal(id, name, valuation, vdate, rent, remarks) {
   var form = document.getElementById('valUpdateForm');
+  if (!form) return;
   form.action = "{% url 'update_real_estate_valuation' pk=0 %}".replace('/0/', '/' + id + '/');
-  document.getElementById('valModalTitle').innerHTML = '<span class="material-symbols-outlined text-success">price_change</span> Valuation — ' + escapeHtml(name);
+  var titleEl = document.getElementById('valModalTitle');
+  if (titleEl) {
+    titleEl.innerHTML = '<span class="material-symbols-outlined text-emerald-400">price_change</span> Valuation — ' + escapeHtml(name);
+  }
   form.querySelector('[name=current_valuation]').value = valuation || '';
   form.querySelector('[name=last_valuation_date]').value = vdate || new Date().toISOString().split('T')[0];
   form.querySelector('[name=monthly_rental_income]').value = rent || '0';
@@ -341,30 +394,36 @@ function openValuationModal(id, name, valuation, vdate, rent, remarks) {
 }
 
 function openLlmPromptModal(id, name) {
-  document.getElementById('llmPromptTitle').innerHTML = '<span class="material-symbols-outlined">psychology</span> AI Market Research — ' + escapeHtml(name);
-  document.getElementById('llmPromptText').value = 'Loading prompt data...';
-  document.getElementById('copyBtnText').textContent = 'Copy Prompt';
+  var titleEl = document.getElementById('llmPromptTitle');
+  if (titleEl) {
+    titleEl.innerHTML = '<span class="material-symbols-outlined">psychology</span> AI Market Research — ' + escapeHtml(name);
+  }
+  var txtEl = document.getElementById('llmPromptText');
+  if (txtEl) txtEl.value = 'Loading prompt data...';
+  var copyBtn = document.getElementById('copyBtnText');
+  if (copyBtn) copyBtn.textContent = 'Copy Prompt';
   openModal('llmPromptModal');
 
   fetch("{% url 'real_estate_llm_prompt_json' pk=0 %}".replace('/0/', '/' + id + '/'))
     .then(function(r) { return r.json(); })
     .then(function(data) {
-      if (data.prompt) {
-        document.getElementById('llmPromptText').value = data.prompt;
+      if (data.prompt && txtEl) {
+        txtEl.value = data.prompt;
       }
     })
     .catch(function(err) {
-      document.getElementById('llmPromptText').value = 'Failed to load research prompt.';
+      if (txtEl) txtEl.value = 'Failed to load research prompt.';
     });
 }
 
 function copyPromptToClipboard() {
   var txt = document.getElementById('llmPromptText').value;
   navigator.clipboard.writeText(txt).then(function() {
-    document.getElementById('copyBtnText').textContent = 'Copied!';
-    setTimeout(function() {
-      document.getElementById('copyBtnText').textContent = 'Copy Prompt';
-    }, 2000);
+    var copyBtn = document.getElementById('copyBtnText');
+    if (copyBtn) {
+      copyBtn.textContent = 'Copied!';
+      setTimeout(function() { copyBtn.textContent = 'Copy Prompt'; }, 2000);
+    }
   });
 }
 
@@ -374,9 +433,14 @@ document.addEventListener('click', function(e) {
   var form = document.getElementById('realEstateForm');
   var id = btn.dataset.id;
   form.action = "{% url 'edit_real_estate' pk=0 %}".replace('/0/', '/' + id + '/');
-  document.getElementById('deleteRealEstateForm').action = "{% url 'delete_real_estate' pk=0 %}".replace('/0/', '/' + id + '/');
-  document.getElementById('realEstateDeleteBtn').style.display = 'inline-flex';
-  document.getElementById('realEstateModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">edit</span> Edit Property';
+  var delForm = document.getElementById('deleteRealEstateForm');
+  if (delForm) delForm.action = "{% url 'delete_real_estate' pk=0 %}".replace('/0/', '/' + id + '/');
+  var delBtn = document.getElementById('realEstateDeleteBtn');
+  if (delBtn) delBtn.style.display = 'inline-flex';
+  var titleEl = document.getElementById('realEstateModalTitle');
+  if (titleEl) {
+    titleEl.innerHTML = '<span class="material-symbols-outlined text-primary">edit</span> Edit Property';
+  }
 
   form.querySelector('[name=name]').value = btn.dataset.name || '';
   form.querySelector('[name=property_type]').value = btn.dataset.type || 'PLOT_LAND';

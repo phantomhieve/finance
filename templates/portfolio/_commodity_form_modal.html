@@ -1,29 +1,53 @@
 <dialog class="modal modal-bottom sm:modal-middle" id="{{ modal_id }}">
-  <div class="modal-box max-h-[90vh] overflow-y-auto overscroll-contain">
-    <h3 class="font-bold text-lg flex items-center gap-2" id="{{ title_id }}">
-      <span class="material-symbols-outlined text-primary">add_circle</span>Add Commodity
-    </h3>
+  <div class="modal-box max-w-lg max-h-[90vh] overflow-y-auto overscroll-contain">
+    <div class="flex items-start justify-between gap-2 mb-4">
+      <h3 class="font-bold text-lg flex items-center gap-2" id="{{ title_id }}">
+        <span class="material-symbols-outlined text-primary">add_circle</span>Add Commodity
+      </h3>
+      <button type="button" class="btn btn-ghost btn-xs btn-square" onclick="closeModal('{{ modal_id }}')" aria-label="Close">
+        <span class="material-symbols-outlined">close</span>
+      </button>
+    </div>
     <form id="{{ form_id }}" method="post" action="{% url 'add_commodity' %}">
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ request.get_full_path }}">
       {% if is_baby %}
         <input type="hidden" name="is_baby" value="True">
       {% endif %}
-      <div class="grid grid-cols-2 gap-4 mt-4">
-        <div class="form-field"><label class="label text-xs font-semibold">Type</label>{{ form_obj.commodity_type }}</div>
-        <div class="form-field"><label class="label text-xs font-semibold">Purity</label>{{ form_obj.purity }}</div>
+      <div class="space-y-3.5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="form-field">
+            <label class="label text-xs font-semibold">Commodity Type</label>
+            {{ form_obj.commodity_type }}
+          </div>
+          <div class="form-field">
+            <label class="label text-xs font-semibold">Purity</label>
+            {{ form_obj.purity }}
+          </div>
+        </div>
+        <div class="form-field">
+          <label class="label text-xs font-semibold">Description / Item Name</label>
+          {{ form_obj.description }}
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="form-field">
+            <label class="label text-xs font-semibold">Weight (grams)</label>
+            {{ form_obj.weight_grams }}
+          </div>
+          <div class="form-field">
+            <label class="label text-xs font-semibold">Purchase Price / gram (₹)</label>
+            {{ form_obj.purchase_price_per_gram }}
+          </div>
+        </div>
       </div>
-      <div class="form-field mt-3"><label class="label text-xs font-semibold">Description</label>{{ form_obj.description }}</div>
-      <div class="grid grid-cols-2 gap-4 mt-3">
-        <div class="form-field"><label class="label text-xs font-semibold">Weight (grams)</label>{{ form_obj.weight_grams }}</div>
-        <div class="form-field"><label class="label text-xs font-semibold">Purchase Price / gram (₹)</label>{{ form_obj.purchase_price_per_gram }}</div>
-      </div>
-      <div class="modal-action">
+      <div class="modal-action flex-wrap gap-2 mt-6">
         <button type="button" id="{{ delete_btn_id }}" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('{{ delete_form_id }}')">
           <span class="material-symbols-outlined text-base">delete</span>Delete
         </button>
         <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('{{ modal_id }}')">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm"><span class="material-symbols-outlined text-base">save</span>Save</button>
+        <button type="submit" class="btn btn-primary btn-sm gap-1">
+          <span class="material-symbols-outlined text-base">save</span>Save
+        </button>
       </div>
     </form>
     <form id="{{ delete_form_id }}" method="post" action="" style="display:none">

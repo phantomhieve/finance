@@ -2,273 +2,344 @@
 {% load indian_format %}
 {% load static %}
 
-{% block title %}Monthly Savings | Vault{% endblock %}
+{% block title %}Monthly Savings · {{ fy_label }} | Vault{% endblock %}
 
 {% block page_header %}
-<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-  <div>
-    <h1 class="text-xl lg:text-3xl font-extrabold tracking-tight">{{ fy_label }}</h1>
-    <p class="text-xs opacity-50 mt-0.5">{{ fy_start_date|date:"d M Y" }} → {{ fy_end_date|date:"d M Y" }}</p>
-  </div>
-  <div class="flex flex-wrap items-center gap-2 sm:gap-2 justify-center sm:justify-start w-full sm:w-auto">
-    <div class="fy-tabs" id="fySwitcher">
-      {% for fy in fy_options %}
-      <a href="?fy={{ fy }}" class="fy-tab {% if fy == fy_start %}fy-tab-active{% endif %}">{{ fy }}-{{ fy|add:1 }}</a>
-      {% endfor %}
+<header class="v-page-header">
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
+    <div>
+      <h1 class="v-title">{{ fy_label }}</h1>
+      <p class="v-subtitle">{{ fy_start_date|date:"d M Y" }} → {{ fy_end_date|date:"d M Y" }}</p>
     </div>
-    {% if user.can_edit_savings %}
-    <button class="btn btn-primary btn-sm gap-1" onclick="newTransaction()">
-      <span class="material-symbols-outlined text-base">add_circle</span><span class="hidden sm:inline">Add Entry</span><span class="sm:hidden">Add</span>
-    </button>
-    <button class="btn btn-outline btn-primary btn-sm gap-1" onclick="openModal('goalModal')">
-      <span class="material-symbols-outlined text-base">flag</span><span class="hidden sm:inline">Manage Goals</span><span class="sm:hidden">Goals</span>
-    </button>
-    {% endif %}
+    <div class="v-toolbar">
+      <div class="fy-tabs" id="fySwitcher">
+        {% for fy in fy_options %}
+        <a href="?fy={{ fy }}" class="fy-tab {% if fy == fy_start %}fy-tab-active{% endif %}">{{ fy }}-{{ fy|add:1 }}</a>
+        {% endfor %}
+      </div>
+      {% if user.can_edit_savings %}
+      <div class="flex items-center gap-1.5">
+        <button type="button" class="v-btn v-btn-primary text-xs gap-1" onclick="newTransaction()">
+          <span class="material-symbols-outlined text-sm">add_circle</span><span>Add Entry</span>
+        </button>
+        <button type="button" class="v-btn v-btn-ghost text-xs gap-1" onclick="openModal('goalModal')">
+          <span class="material-symbols-outlined text-sm">flag</span><span>Goals</span>
+        </button>
+      </div>
+      {% endif %}
+    </div>
   </div>
-</div>
+</header>
 {% endblock %}
 
 {% block content %}
 
-{# --- GOAL HERO --- #}
-<div class="card hero-gradient shadow-sm animate-up mb-4 card-hover">
-  <div class="card-body p-4 lg:p-6">
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div>
-        <p class="text-xs font-bold uppercase tracking-wider opacity-40">Annual Goal</p>
-        <p class="text-3xl lg:text-4xl font-extrabold mt-1 text-primary tabular-nums">{{ total_goal|inr }}</p>
-        <div class="flex flex-wrap gap-2 mt-2 text-xs opacity-60">
-          <span>Base {{ monthly_goal|inr }}/mo</span>
-          {% if increments %}<span class="badge badge-success badge-sm">{{ increments|length }} increment{{ increments|length|pluralize }}</span>{% endif %}
-          {% if adjustments %}<span class="badge badge-secondary badge-sm">{{ adjustments|length }} adjustment{{ adjustments|length|pluralize }}</span>{% endif %}
-        </div>
+{# --- SIGNATURE LEDGER BAND --- #}
+<section class="v-ledger-band mb-5" aria-label="Savings goal and position">
+  <div class="v-lead-cell">
+    <div class="flex items-center justify-between gap-2 flex-wrap mb-1">
+      <span class="text-[10px] font-bold tracking-wider uppercase opacity-60">Annual Savings Goal · {{ fy_label }}</span>
+      {% if pace.state == 'open' %}
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold {% if pace.gap >= 0 %}bg-emerald-500/15 text-emerald-400 border border-emerald-500/25{% else %}bg-amber-500/15 text-amber-300 border border-amber-500/25{% endif %}">
+        <span class="material-symbols-outlined text-xs">{% if pace.gap >= 0 %}trending_up{% else %}schedule{% endif %}</span>
+        <span>{{ pace.gap_abs|inr_short }} {% if pace.gap >= 0 %}ahead{% else %}behind{% endif %} pace</span>
+      </span>
+      {% elif pace.state == 'closed' %}
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold {% if pace.hit %}bg-emerald-500/15 text-emerald-400 border border-emerald-500/25{% else %}bg-amber-500/15 text-amber-300 border border-amber-500/25{% endif %}">
+        <span class="material-symbols-outlined text-xs">{% if pace.hit %}verified{% else %}flag{% endif %}</span>
+        <span>{% if pace.hit %}Goal achieved{% else %}Closed short{% endif %}</span>
+      </span>
+      {% endif %}
+    </div>
+
+    <div class="v-lead-figure">{{ total_goal|inr }}</div>
+
+    {# Progress Bar & Numbers #}
+    <div class="mt-3">
+      <div class="flex justify-between items-baseline text-xs mb-1.5">
+        <span class="text-[11px] opacity-60">Goal Progress</span>
+        <span class="font-extrabold text-primary tabular-nums">{{ goal_pct }}%</span>
       </div>
-      <div>
-        <div class="flex justify-between text-xs mb-1.5">
-          <span class="opacity-40">Goal progress</span>
-          <span class="font-bold text-primary">{{ goal_pct }}%</span>
+      <div class="v-horizon" style="height: 7px;">
+        <div class="v-horizon-seg bg-primary" style="width: {% if goal_pct > 100 %}100{% else %}{{ goal_pct }}{% endif %}%;"></div>
+      </div>
+      <div class="flex justify-between items-center text-xs mt-2.5">
+        <div>
+          <span class="text-[10px] uppercase tracking-wider opacity-50 block">Achieved</span>
+          <span class="font-bold tabular-nums {% if goal_achieved >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">{{ goal_achieved|inr }}</span>
         </div>
-        <progress class="progress progress-primary w-full h-2.5" value="{{ goal_pct }}" max="100"></progress>
-        <div class="flex justify-between mt-3">
-          <div>
-            <p class="text-[10px] uppercase tracking-wider opacity-40">Achieved</p>
-            <p class="text-sm font-bold tabular-nums {% if goal_achieved >= 0 %}text-success{% else %}text-error{% endif %}">{{ goal_achieved|inr }}</p>
-          </div>
-          <div class="text-right">
-            <p class="text-[10px] uppercase tracking-wider opacity-40">{% if goal_remaining > 0 %}Remaining{% else %}Over goal{% endif %}</p>
-            <p class="text-sm font-bold tabular-nums {% if goal_remaining > 0 %}text-base-content{% else %}text-success{% endif %}">{% if goal_remaining > 0 %}{{ goal_remaining|inr }}{% else %}+{{ goal_surplus|inr }}{% endif %}</p>
-          </div>
-        </div>
-        {% if pace.state == 'open' %}
-        <p class="text-xs mt-3 flex items-start gap-1.5 {% if pace.gap >= 0 %}text-success{% else %}text-warning{% endif %}">
-          <span class="material-symbols-outlined text-sm">{% if pace.gap >= 0 %}trending_up{% else %}schedule{% endif %}</span>
-          <span>
-            {{ pace.gap_abs|inr_short }} {% if pace.gap >= 0 %}ahead of{% else %}behind{% endif %} pace
-            {% if goal_remaining > 0 %}<span class="opacity-70 text-base-content">· need {{ pace.need_per_month|inr }}/mo for {{ pace.months_left }} more month{{ pace.months_left|pluralize }}</span>{% endif %}
+        <div class="text-right">
+          <span class="text-[10px] uppercase tracking-wider opacity-50 block">{% if goal_remaining > 0 %}Remaining{% else %}Surplus{% endif %}</span>
+          <span class="font-bold tabular-nums {% if goal_remaining > 0 %}text-base-content{% else %}text-emerald-400{% endif %}">
+            {% if goal_remaining > 0 %}{{ goal_remaining|inr }}{% else %}+{{ goal_surplus|inr }}{% endif %}
           </span>
-        </p>
-        {% elif pace.state == 'closed' %}
-        <p class="text-xs mt-3 flex items-center gap-1.5 {% if pace.hit %}text-success{% else %}text-warning{% endif %}">
-          <span class="material-symbols-outlined text-sm">{% if pace.hit %}verified{% else %}flag{% endif %}</span>
-          {% if pace.hit %}Goal achieved for {{ fy_label }}{% else %}Closed {{ pace.gap_abs|inr_short }} short of the goal{% endif %}
-        </p>
-        {% endif %}
+        </div>
       </div>
-      <div class="grid grid-cols-2 gap-2.5 content-start">
-        <div class="stat-card stat-card-primary"{% if total_expense %} title="Savings minus {{ total_expense|inr }} of expenses"{% endif %}>
-          <div class="text-[10px] uppercase tracking-wider opacity-50">{% if total_expense %}Net Savings{% else %}Savings{% endif %}</div>
-          <div class="text-base font-bold mt-0.5 text-primary tabular-nums">{{ total_savings|inr }}</div>
-        </div>
-        <div class="stat-card stat-card-success">
-          <div class="text-[10px] uppercase tracking-wider opacity-50">Extra Income</div>
-          <div class="text-base font-bold mt-0.5 text-success tabular-nums">{{ total_income|inr }}</div>
-        </div>
-        <div class="stat-card stat-card-accent">
-          <div class="text-[10px] uppercase tracking-wider opacity-50">Transfers</div>
-          <div class="text-base font-bold mt-0.5 tabular-nums">{{ total_transfers|inr }}</div>
-        </div>
-        <a href="{% url 'hra_tracker' %}" class="stat-card no-underline text-inherit {% if hra_balance >= 0 %}stat-card-success{% else %}stat-card-error{% endif %}" title="HRA transfers minus HRA expenses this FY">
-          <div class="text-[10px] uppercase tracking-wider opacity-50">HRA Balance</div>
-          <div class="text-base font-bold mt-0.5 tabular-nums {% if hra_balance >= 0 %}text-success{% else %}text-error{% endif %}">{% if hra_balance >= 0 %}+{% endif %}{{ hra_balance|inr }}</div>
-        </a>
+    </div>
+
+    {# Goal details & pacing notes #}
+    <div class="mt-4 pt-3 border-t border-base-content/10 flex flex-wrap items-center justify-between gap-2 text-xs">
+      <div class="flex items-center gap-2 flex-wrap opacity-65">
+        <span>Base {{ monthly_goal|inr }}/mo</span>
+        {% if increments %}<span class="text-[10px] font-semibold px-2 py-0.2 rounded bg-emerald-500/15 text-emerald-400">{{ increments|length }} step-up{{ increments|length|pluralize }}</span>{% endif %}
+        {% if adjustments %}<span class="text-[10px] font-semibold px-2 py-0.2 rounded bg-violet-500/15 text-violet-400">{{ adjustments|length }} adjustment{{ adjustments|length|pluralize }}</span>{% endif %}
       </div>
+      {% if pace.state == 'open' and goal_remaining > 0 %}
+      <span class="text-[11px] opacity-75 font-medium">Need {{ pace.need_per_month|inr }}/mo for {{ pace.months_left }} mo</span>
+      {% endif %}
     </div>
   </div>
-</div>
 
-{# --- MONTH GRID --- #}
-<div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.1s">
-  <div class="card-body p-4 lg:p-6">
-    <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-      <h2 class="card-title text-base">Monthly Performance</h2>
-      <div class="hidden sm:flex gap-2 text-xs">
-        <span class="badge badge-success badge-sm gap-1">Beat goal</span>
-        <span class="badge badge-warning badge-sm gap-1">Below goal</span>
-        <span class="badge badge-error badge-sm gap-1 opacity-60">Missed</span>
+  {# 4 Semantic Stat Cells #}
+  <div class="v-stat-grid grid-cols-2 lg:grid-cols-2">
+    <div class="v-stat-cell" {% if total_expense %}title="Savings minus {{ total_expense|inr }} of expenses"{% endif %}>
+      <div class="text-[10px] font-bold tracking-wider uppercase opacity-55">{% if total_expense %}Net Savings{% else %}Savings{% endif %}</div>
+      <div class="text-lg sm:text-xl font-extrabold tabular-nums text-primary mt-0.5">{{ total_savings|inr }}</div>
+      <div class="text-[11px] opacity-50 mt-0.5 truncate">
+        {% if total_expense %}Excl. {{ total_expense|inr_short }} spends{% else %}Total saved this FY{% endif %}
       </div>
     </div>
+
+    <div class="v-stat-cell">
+      <div class="text-[10px] font-bold tracking-wider uppercase opacity-55">Extra Income</div>
+      <div class="text-lg sm:text-xl font-extrabold tabular-nums text-emerald-400 mt-0.5">{{ total_income|inr }}</div>
+      <div class="text-[11px] opacity-50 mt-0.5 truncate">Bonuses &amp; secondary cash</div>
+    </div>
+
+    <div class="v-stat-cell">
+      <div class="text-[10px] font-bold tracking-wider uppercase opacity-55">Transfers</div>
+      <div class="text-lg sm:text-xl font-extrabold tabular-nums text-sky-400 mt-0.5">{{ total_transfers|inr }}</div>
+      <div class="text-[11px] opacity-50 mt-0.5 truncate">Internal allocations</div>
+    </div>
+
+    <a href="{% url 'hra_tracker' %}" class="v-stat-cell no-underline text-inherit group hover:border-emerald-400/40 transition-colors cursor-pointer" title="HRA transfers minus HRA expenses this FY">
+      <div class="text-[10px] font-bold tracking-wider uppercase opacity-55">HRA Balance</div>
+      <div class="text-lg sm:text-xl font-extrabold tabular-nums {% if hra_balance >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %} mt-0.5">
+        {% if hra_balance >= 0 %}+{% endif %}{{ hra_balance|inr }}
+      </div>
+      <div class="text-[11px] opacity-50 mt-0.5 truncate">Rent &amp; allowances</div>
+    </a>
+  </div>
+</section>
+
+{# --- 12-MONTH FISCAL PACING GRID --- #}
+<section class="v-panel mb-5">
+  <div class="v-panel-header flex flex-wrap items-center justify-between gap-2">
+    <div>
+      <h2 class="v-panel-title">Monthly Performance</h2>
+      <p class="text-[11px] opacity-50 mt-0.5">April → March fiscal cycle pacing</p>
+    </div>
+    <div class="hidden sm:flex items-center gap-2 text-xs">
+      <span class="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">Beat goal</span>
+      <span class="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/25">Below goal</span>
+      <span class="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded bg-rose-500/15 text-rose-400 border border-rose-500/25">Missed</span>
+    </div>
+  </div>
+
+  <div class="v-panel-body">
     <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-2">
       {% for m in monthly_data %}
-      <div class="month-card group rounded-xl p-2.5 text-center text-xs border relative {% if m.status == 'good' %}border-success/30 bg-success/5{% elif m.status == 'partial' %}border-warning/30 bg-warning/5{% elif m.status == 'missed' %}border-error/20 bg-error/5{% else %}border-base-300/50 bg-base-300/20{% endif %}">
-        <div class="font-semibold opacity-60 mb-1.5 text-[10px] uppercase tracking-wider" title="{{ m.name }}">{{ m.short }}</div>
+      <div class="rounded-xl p-2.5 text-center text-xs border relative transition-all {% if m.status == 'good' %}border-emerald-500/30 bg-emerald-500/5{% elif m.status == 'partial' %}border-amber-500/30 bg-amber-500/5{% elif m.status == 'missed' %}border-rose-500/25 bg-rose-500/5{% else %}border-base-content/10 bg-base-300/20{% endif %}">
+        <div class="font-bold opacity-60 mb-1 text-[10px] uppercase tracking-wider" title="{{ m.name }}">{{ m.short }}</div>
         {% if m.started %}
-        <div class="font-bold text-sm tabular-nums" title="{{ m.total|inr }} saved of {{ m.goal|inr }}">{{ m.total|inr_short }}</div>
-        <div class="text-[10px] tabular-nums {% if m.surplus >= 0 %}text-success{% else %}text-error/80{% endif %} font-semibold mt-0.5">{% if m.surplus >= 0 %}+{% endif %}{{ m.surplus|inr_short }}</div>
-        <progress class="progress progress-xs w-full mt-1.5 {% if m.status == 'good' %}progress-success{% elif m.status == 'partial' %}progress-warning{% else %}progress-error{% endif %}" value="{{ m.pct }}" max="100"></progress>
-        <div class="text-[10px] opacity-40 mt-0.5">{{ m.pct }}%</div>
-        {# Comment indicator / add button absolutely positioned to maintain grid height consistency #}
+        <div class="font-extrabold text-sm tabular-nums" title="{{ m.total|inr }} saved of {{ m.goal|inr }}">{{ m.total|inr_short }}</div>
+        <div class="text-[10px] tabular-nums {% if m.surplus >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %} font-semibold mt-0.5">
+          {% if m.surplus >= 0 %}+{% endif %}{{ m.surplus|inr_short }}
+        </div>
+        <div class="w-full h-1 bg-base-content/10 rounded-full overflow-hidden mt-1.5">
+          <div class="h-full {% if m.status == 'good' %}bg-emerald-400{% elif m.status == 'partial' %}bg-amber-400{% else %}bg-rose-400{% endif %}" style="width: {% if m.pct > 100 %}100{% else %}{{ m.pct }}{% endif %}%;"></div>
+        </div>
+        <div class="text-[10px] opacity-40 tabular-nums mt-1">{{ m.pct }}%</div>
+
+        {# Comment indicator / trigger #}
         {% if m.comment %}
-        <button class="absolute top-1.5 right-1.5 btn btn-ghost btn-xs btn-square h-5 w-5 p-0 min-h-0 text-info opacity-75 hover:opacity-100" title="{{ m.comment }}" onclick="openMonthComment('{{ m.month_date }}', '{{ m.name }}', '{{ m.comment|escapejs }}')">
+        <button type="button" class="absolute top-1 right-1 p-0.5 text-sky-400 opacity-80 hover:opacity-100 transition-opacity cursor-pointer" title="{{ m.comment }}" onclick="openMonthComment('{{ m.month_date }}', '{{ m.name }}', '{{ m.comment|escapejs }}')">
           <span class="icon-filled material-symbols-outlined text-xs">chat_bubble</span>
         </button>
         {% elif user.can_edit_savings and m.status != 'good' %}
-        <button class="absolute top-1.5 right-1.5 btn btn-ghost btn-xs btn-square h-5 w-5 p-0 min-h-0 opacity-25 sm:opacity-0 group-hover:opacity-60 transition-opacity {% if m.status == 'missed' %}text-error{% elif m.status == 'partial' %}text-warning{% endif %}" title="Add comment" onclick="openMonthComment('{{ m.month_date }}', '{{ m.name }}', '')">
+        <button type="button" class="absolute top-1 right-1 p-0.5 opacity-25 hover:opacity-100 transition-opacity cursor-pointer {% if m.status == 'missed' %}text-rose-400{% elif m.status == 'partial' %}text-amber-300{% endif %}" title="Add comment" onclick="openMonthComment('{{ m.month_date }}', '{{ m.name }}', '')">
           <span class="material-symbols-outlined text-xs">add_comment</span>
         </button>
         {% endif %}
         {% else %}
-        <div class="text-sm opacity-30 mt-1 tabular-nums" title="{{ m.goal|inr }}">{{ m.goal|inr_short }}</div>
-        <div class="text-[10px] opacity-30">Target</div>
+        <div class="text-sm opacity-30 mt-1 tabular-nums font-semibold" title="{{ m.goal|inr }}">{{ m.goal|inr_short }}</div>
+        <div class="text-[10px] opacity-30 uppercase font-medium mt-1">Target</div>
         {% endif %}
       </div>
       {% endfor %}
     </div>
   </div>
+</section>
+
+{# --- CHARTS WORKBENCH --- #}
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-5 mb-5">
+  <section class="v-panel lg:col-span-7">
+    <div class="v-panel-header">
+      <h2 class="v-panel-title">Savings vs Monthly Goal</h2>
+      <p class="text-[11px] opacity-50 mt-0.5">Actual savings comparison against targeted pace</p>
+    </div>
+    <div class="v-panel-body">
+      <div class="chart-wrap">
+        <canvas id="barChart" aria-label="Savings vs Monthly Goal"></canvas>
+      </div>
+    </div>
+  </section>
+
+  <section class="v-panel lg:col-span-5">
+    <div class="v-panel-header">
+      <h2 class="v-panel-title">Cumulative Trajectory</h2>
+      <p class="text-[11px] opacity-50 mt-0.5">Year-to-date accumulation vs target line</p>
+    </div>
+    <div class="v-panel-body">
+      <div class="chart-wrap">
+        <canvas id="lineChart" aria-label="Cumulative Savings"></canvas>
+      </div>
+    </div>
+  </section>
 </div>
+
+{# --- TRANSACTIONS REGISTER --- #}
+<section class="v-panel">
+  <div class="v-panel-header flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <h2 class="v-panel-title">Transactions</h2>
+      {% if transactions %}
+      <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-base-300/70 border border-base-content/10 opacity-70 tabular-nums">{{ transactions|length }} in {{ fy_label }}</span>
+      {% endif %}
+    </div>
+  </div>
+
+  {# Desktop Table #}
+  <div class="v-panel-table hidden md:block">
+    <table class="v-table w-full text-xs" id="txnTable">
+      <thead>
+        <tr class="border-b border-base-content/10 text-[10px] uppercase opacity-55">
+          <th class="py-2.5 pl-3 text-left">Date</th>
+          <th class="py-2.5 text-left">Amount</th>
+          <th class="py-2.5 text-left">Type</th>
+          <th class="py-2.5 text-left">Remarks</th>
+          <th class="py-2.5 pr-3 text-right w-10"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in transactions %}
+        <tr class="border-b border-base-content/5 hover:bg-base-content/5 transition-colors">
+          <td class="py-2.5 pl-3 opacity-65 whitespace-nowrap">{{ t.date|date:"d M Y" }}</td>
+          <td class="py-2.5 font-bold whitespace-nowrap tabular-nums">
+            {% if t.type == 'EXPENSE' %}<span class="text-rose-400">−{{ t.amount|inr }}</span>
+            {% elif t.type == 'EXTRA_INCOME' or t.type == 'SAVINGS' %}<span class="text-emerald-400">+{{ t.amount|inr }}</span>
+            {% else %}{{ t.amount|inr }}{% endif %}
+          </td>
+          <td class="py-2.5">
+            {% if t.type == 'SAVINGS' %}<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-primary/20 text-primary border border-primary/30">Savings</span>
+            {% elif t.type == 'TRANSFER' %}<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-sky-500/15 text-sky-400 border border-sky-500/25">Transfer</span>
+            {% elif t.type == 'EXTRA_INCOME' %}<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">Income</span>
+            {% elif t.type == 'EXPENSE' %}<span class="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-500/15 text-rose-400 border border-rose-500/25">Expense</span>
+            {% else %}<span class="text-[10px] font-medium px-2 py-0.5 rounded bg-base-content/10 opacity-70">Other</span>{% endif %}
+          </td>
+          <td class="py-2.5 opacity-55 max-w-xs truncate">{{ t.remarks|default:"—" }}</td>
+          <td class="py-2.5 pr-3 text-right">
+            {% if user.can_edit_savings %}
+            <button type="button" class="v-btn v-btn-ghost p-1" onclick="editTransaction({{ t.id }}, '{{ t.date|date:'Y-m-d' }}', '{{ t.type }}', '{{ t.amount }}', '{{ t.remarks|escapejs }}')">
+              <span class="material-symbols-outlined text-sm">edit</span>
+            </button>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-center opacity-50 py-10">No transactions recorded yet{% if user.can_edit_savings %} — select <strong>Add Entry</strong> above{% endif %}.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {# Mobile Card / Row View #}
+  <div class="md:hidden p-3 space-y-2" id="txnCards">
+    {% for t in transactions %}
+    <div class="v-mobile-row flex items-center justify-between gap-3">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2">
+          <span class="font-bold text-sm tabular-nums whitespace-nowrap">
+            {% if t.type == 'EXPENSE' %}<span class="text-rose-400">−{{ t.amount|inr }}</span>
+            {% elif t.type == 'EXTRA_INCOME' or t.type == 'SAVINGS' %}<span class="text-emerald-400">+{{ t.amount|inr }}</span>
+            {% else %}{{ t.amount|inr }}{% endif %}
+          </span>
+          {% if t.type == 'SAVINGS' %}<span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-primary/20 text-primary">Savings</span>
+          {% elif t.type == 'TRANSFER' %}<span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-sky-500/15 text-sky-400">Transfer</span>
+          {% elif t.type == 'EXTRA_INCOME' %}<span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-400">Income</span>
+          {% elif t.type == 'EXPENSE' %}<span class="text-[9px] font-bold px-1.5 py-0.2 rounded bg-rose-500/15 text-rose-400">Expense</span>
+          {% else %}<span class="text-[9px] font-medium px-1.5 py-0.2 rounded bg-base-content/10 opacity-70">Other</span>{% endif %}
+        </div>
+        <div class="text-[11px] opacity-50 mt-0.5 truncate">{{ t.date|date:"d M Y" }}{% if t.remarks %} · {{ t.remarks }}{% endif %}</div>
+      </div>
+      {% if user.can_edit_savings %}
+      <button type="button" class="v-btn v-btn-ghost p-1 shrink-0" onclick="editTransaction({{ t.id }}, '{{ t.date|date:'Y-m-d' }}', '{{ t.type }}', '{{ t.amount }}', '{{ t.remarks|escapejs }}')">
+        <span class="material-symbols-outlined text-base">edit</span>
+      </button>
+      {% endif %}
+    </div>
+    {% empty %}
+    <p class="text-center opacity-50 py-8 text-xs">No transactions recorded yet{% if user.can_edit_savings %} — tap <strong>Add Entry</strong> above{% endif %}.</p>
+    {% endfor %}
+  </div>
+</section>
 
 {# --- MONTH COMMENT MODAL --- #}
 <dialog class="modal" id="monthCommentModal">
-  <div class="modal-box max-w-sm">
-    <h3 class="font-bold text-lg flex items-center gap-2" id="monthCommentTitle">
-      <span class="icon-filled material-symbols-outlined text-info">chat_bubble</span>Month Comment
+  <div class="modal-box max-w-sm rounded-2xl bg-base-200 border border-base-content/10 p-5">
+    <h3 class="font-bold text-base flex items-center gap-2" id="monthCommentTitle">
+      <span class="icon-filled material-symbols-outlined text-sky-400">chat_bubble</span>Month Comment
     </h3>
     <form method="post" action="{% url 'save_month_comment' %}" id="monthCommentForm">
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ request.get_full_path }}">
       <input type="hidden" name="month" id="monthCommentDate" value="">
-      <div class="form-field mt-4">
-        <label class="label text-xs font-semibold">Comment</label>
+      <div class="mt-4">
+        <label class="block text-xs font-semibold opacity-70 mb-1">Comment</label>
         {{ comment_form.comment }}
       </div>
-      <p class="text-xs opacity-40 mt-2">Why did you miss or fall short this month?</p>
-      <div class="modal-action">
+      <p class="text-[11px] opacity-45 mt-2">Document reason for miss or variance this month.</p>
+      <div class="modal-action mt-5 flex items-center justify-between">
         {% if user.can_edit_savings %}
-        <button type="button" id="deleteMonthCommentBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="document.getElementById('id_month_comment').value=''; document.getElementById('monthCommentForm').submit();"><span class="material-symbols-outlined text-base">delete</span>Delete</button>
+        <button type="button" id="deleteMonthCommentBtn" class="v-btn v-btn-ghost text-xs text-rose-400 px-2.5 py-1" style="display:none" onclick="document.getElementById('id_month_comment').value=''; document.getElementById('monthCommentForm').submit();">
+          <span class="material-symbols-outlined text-sm">delete</span>Delete
+        </button>
         {% endif %}
-        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('monthCommentModal')">Close</button>
-        {% if user.can_edit_savings %}
-        <button type="submit" class="btn btn-primary btn-sm"><span class="material-symbols-outlined text-base">save</span>Save</button>
-        {% endif %}
+        <div class="flex items-center gap-2 ml-auto">
+          <button type="button" class="v-btn v-btn-ghost text-xs px-3 py-1" onclick="closeModal('monthCommentModal')">Close</button>
+          {% if user.can_edit_savings %}
+          <button type="submit" class="v-btn v-btn-primary text-xs px-3 py-1 gap-1"><span class="material-symbols-outlined text-sm">save</span>Save</button>
+          {% endif %}
+        </div>
       </div>
     </form>
   </div>
   <form method="dialog" class="modal-backdrop"><button>close</button></form>
 </dialog>
 
-{# --- CHARTS --- #}
-<div class="grid grid-cols-1 lg:grid-cols-5 gap-4 animate-up mb-4" style="animation-delay:0.2s">
-  <div class="card bg-base-200 shadow-sm lg:col-span-3 card-hover">
-    <div class="card-body p-4"><h2 class="card-title text-base mb-2">Savings vs Monthly Goal</h2><div class="chart-wrap"><canvas id="barChart"></canvas></div></div>
-  </div>
-  <div class="card bg-base-200 shadow-sm lg:col-span-2 card-hover">
-    <div class="card-body p-4"><h2 class="card-title text-base mb-2">Cumulative</h2><div class="chart-wrap"><canvas id="lineChart"></canvas></div></div>
-  </div>
-</div>
-
-{# --- TRANSACTIONS --- #}
-<div class="card bg-base-200 shadow-sm animate-up" style="animation-delay:0.3s">
-  <div class="card-body p-4">
-    <h2 class="card-title text-base mb-2">Transactions {% if transactions %}<span class="badge badge-ghost badge-sm font-normal">{{ transactions|length }} in {{ fy_label }}</span>{% endif %}</h2>
-
-    {# Desktop table #}
-    <div class="hidden md:block overflow-x-auto">
-      <table class="table table-sm" id="txnTable">
-        <thead><tr><th>Date</th><th>Amount</th><th>Type</th><th>Remarks</th><th class="w-10"></th></tr></thead>
-        <tbody>
-          {% for t in transactions %}
-          <tr class="hover">
-            <td class="opacity-60 text-sm whitespace-nowrap">{{ t.date|date:"d M Y" }}</td>
-            <td class="font-semibold whitespace-nowrap">
-              {% if t.type == 'EXPENSE' %}<span class="text-error">−{{ t.amount|inr }}</span>
-              {% elif t.type == 'EXTRA_INCOME' or t.type == 'SAVINGS' %}<span class="text-success">+{{ t.amount|inr }}</span>
-              {% else %}{{ t.amount|inr }}{% endif %}
-            </td>
-            <td>
-              {% if t.type == 'SAVINGS' %}<span class="badge badge-primary badge-sm">Savings</span>
-              {% elif t.type == 'TRANSFER' %}<span class="badge badge-info badge-sm">Transfer</span>
-              {% elif t.type == 'EXTRA_INCOME' %}<span class="badge badge-success badge-sm">Income</span>
-              {% elif t.type == 'EXPENSE' %}<span class="badge badge-error badge-sm">Expense</span>
-              {% else %}<span class="badge badge-ghost badge-sm">Other</span>{% endif %}
-            </td>
-            <td class="opacity-50 text-sm">{{ t.remarks|default:"-" }}</td>
-            <td>
-              {% if user.can_edit_savings %}
-              <button class="btn btn-ghost btn-xs btn-square" onclick="editTransaction({{ t.id }}, '{{ t.date|date:'Y-m-d' }}', '{{ t.type }}', '{{ t.amount }}', '{{ t.remarks|escapejs }}')">
-                <span class="material-symbols-outlined text-base">edit</span>
-              </button>
-              {% endif %}
-            </td>
-          </tr>
-          {% empty %}
-          <tr><td colspan="5" class="text-center opacity-50 py-8">No transactions yet{% if user.can_edit_savings %} — click <strong>Add Entry</strong> above{% endif %}.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-
-    {# Mobile card view #}
-    <div class="md:hidden space-y-2" id="txnCards">
-      {% for t in transactions %}
-      <div class="table-card flex items-center justify-between gap-3">
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2">
-            <span class="font-semibold text-sm whitespace-nowrap">
-              {% if t.type == 'EXPENSE' %}<span class="text-error">−{{ t.amount|inr }}</span>
-              {% elif t.type == 'EXTRA_INCOME' or t.type == 'SAVINGS' %}<span class="text-success">+{{ t.amount|inr }}</span>
-              {% else %}{{ t.amount|inr }}{% endif %}
-            </span>
-            {% if t.type == 'SAVINGS' %}<span class="badge badge-primary badge-xs">Savings</span>
-            {% elif t.type == 'TRANSFER' %}<span class="badge badge-info badge-xs">Transfer</span>
-            {% elif t.type == 'EXTRA_INCOME' %}<span class="badge badge-success badge-xs">Income</span>
-            {% elif t.type == 'EXPENSE' %}<span class="badge badge-error badge-xs">Expense</span>
-            {% else %}<span class="badge badge-ghost badge-xs">Other</span>{% endif %}
-          </div>
-          <div class="text-xs opacity-50 mt-0.5 truncate">{{ t.date|date:"d M Y" }}{% if t.remarks %} · {{ t.remarks }}{% endif %}</div>
-        </div>
-        {% if user.can_edit_savings %}
-        <button class="btn btn-ghost btn-xs btn-square shrink-0" onclick="editTransaction({{ t.id }}, '{{ t.date|date:'Y-m-d' }}', '{{ t.type }}', '{{ t.amount }}', '{{ t.remarks|escapejs }}')">
-          <span class="material-symbols-outlined text-base">edit</span>
-        </button>
-        {% endif %}
-      </div>
-      {% empty %}
-      <p class="text-center opacity-50 py-8 text-sm">No transactions yet{% if user.can_edit_savings %} — tap <strong>Add</strong> above{% endif %}.</p>
-      {% endfor %}
-    </div>
-  </div>
-</div>
-
 {# --- ADD/EDIT TRANSACTION MODAL --- #}
 <dialog class="modal" id="addTxnModal">
-  <div class="modal-box">
-    <h3 class="font-bold text-lg flex items-center gap-2" id="txnModalTitle">
+  <div class="modal-box max-w-md rounded-2xl bg-base-200 border border-base-content/10 p-5">
+    <h3 class="font-bold text-base flex items-center gap-2" id="txnModalTitle">
       <span class="material-symbols-outlined text-primary">add_circle</span>Add Savings Entry
     </h3>
     <form id="addTxnForm" method="post" action="{% url 'add_transaction' %}">
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ request.get_full_path }}">
-      <div class="grid grid-cols-2 gap-4 mt-4">
-        <div class="form-field"><label class="label text-xs font-semibold">Date</label>{{ txn_form.date }}</div>
-        <div class="form-field"><label class="label text-xs font-semibold">Type</label>{{ txn_form.type }}</div>
+      <div class="grid grid-cols-2 gap-3 mt-4">
+        <div><label class="block text-xs font-semibold opacity-70 mb-1">Date</label>{{ txn_form.date }}</div>
+        <div><label class="block text-xs font-semibold opacity-70 mb-1">Type</label>{{ txn_form.type }}</div>
       </div>
-      <div class="form-field mt-3"><label class="label text-xs font-semibold">Amount (₹)</label>{{ txn_form.amount }}</div>
-      <div class="form-field mt-3"><label class="label text-xs font-semibold">Remarks</label>{{ txn_form.remarks }}</div>
-      <div class="modal-action">
-        <button type="button" id="txnDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteTxnForm')">
-          <span class="material-symbols-outlined text-base">delete</span>Delete
+      <div class="mt-3"><label class="block text-xs font-semibold opacity-70 mb-1">Amount (₹)</label>{{ txn_form.amount }}</div>
+      <div class="mt-3"><label class="block text-xs font-semibold opacity-70 mb-1">Remarks</label>{{ txn_form.remarks }}</div>
+      <div class="modal-action mt-5 flex items-center justify-between">
+        <button type="button" id="txnDeleteBtn" class="v-btn v-btn-ghost text-xs text-rose-400 px-2.5 py-1" style="display:none" onclick="confirmDelete('deleteTxnForm')">
+          <span class="material-symbols-outlined text-sm">delete</span>Delete
         </button>
-        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addTxnModal')">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm"><span class="material-symbols-outlined text-base">save</span>Save</button>
+        <div class="flex items-center gap-2 ml-auto">
+          <button type="button" class="v-btn v-btn-ghost text-xs px-3 py-1" onclick="closeModal('addTxnModal')">Cancel</button>
+          <button type="submit" class="v-btn v-btn-primary text-xs px-3 py-1 gap-1"><span class="material-symbols-outlined text-sm">save</span>Save</button>
+        </div>
       </div>
     </form>
     <form id="deleteTxnForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form>
@@ -278,25 +349,35 @@
 
 {# --- GOAL MODAL --- #}
 <dialog class="modal" id="goalModal">
-  <div class="modal-box max-w-lg">
-    <h3 class="font-bold text-lg flex items-center gap-2">
+  <div class="modal-box max-w-lg rounded-2xl bg-base-200 border border-base-content/10 p-5">
+    <h3 class="font-bold text-base flex items-center gap-2">
       <span class="material-symbols-outlined text-primary">flag</span>Manage Goals
     </h3>
-    <div role="tablist" class="tabs tabs-bordered mt-4" id="goalTabs">
-      <a role="tab" class="tab tab-active" data-tab="tab-fy" onclick="switchTab('tab-fy',this)">Set FY Goal</a>
-      <a role="tab" class="tab" data-tab="tab-inc" onclick="switchTab('tab-inc',this)">Increment</a>
-      <a role="tab" class="tab" data-tab="tab-adj" onclick="switchTab('tab-adj',this)">Adjust</a>
+    <div class="flex items-center gap-1.5 mt-4 p-1 rounded-xl bg-base-300/40 border border-base-content/10" id="goalTabs">
+      <button type="button" class="flex-1 py-1 px-2.5 rounded-lg text-xs font-bold bg-primary text-primary-content transition-colors cursor-pointer" data-tab="tab-fy" onclick="switchTab('tab-fy',this)">Set FY Goal</button>
+      <button type="button" class="flex-1 py-1 px-2.5 rounded-lg text-xs font-semibold opacity-65 hover:opacity-100 transition-colors cursor-pointer" data-tab="tab-inc" onclick="switchTab('tab-inc',this)">Increment</button>
+      <button type="button" class="flex-1 py-1 px-2.5 rounded-lg text-xs font-semibold opacity-65 hover:opacity-100 transition-colors cursor-pointer" data-tab="tab-adj" onclick="switchTab('tab-adj',this)">Adjust</button>
     </div>
 
     {# Tab 1: Set FY Goal #}
     <div id="tab-fy" class="tab-pane mt-4">
       <form method="post" action="{% url 'set_annual_goal' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
-        <div class="alert alert-info text-xs mb-4"><span class="material-symbols-outlined text-sm">info</span>Set the annual savings goal and base monthly target for any financial year.</div>
-        <div class="form-field"><label class="label text-xs font-semibold">Financial Year <span class="opacity-40">(April start year)</span></label>{{ fy_goal_form.fy_year }}<p class="text-xs opacity-40 mt-1">e.g. enter <strong>2025</strong> for FY 2025-26. Currently viewing: <strong>{{ fy_start }}</strong></p></div>
-        <div class="form-field mt-3"><label class="label text-xs font-semibold">Base Monthly Goal (₹)</label>{{ fy_goal_form.monthly_goal }}</div>
-        <div class="modal-action">
-          <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('goalModal')">Cancel</button>
-          <button type="submit" class="btn btn-primary btn-sm">Save FY Goal</button>
+        <div class="p-3 rounded-xl bg-sky-500/10 border border-sky-500/20 text-xs mb-3 text-sky-300 flex items-start gap-2">
+          <span class="material-symbols-outlined text-sm shrink-0 mt-0.5">info</span>
+          <span>Set the annual savings goal and base monthly target for any financial year.</span>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold opacity-70 mb-1">Financial Year <span class="opacity-40">(April start year)</span></label>
+          {{ fy_goal_form.fy_year }}
+          <p class="text-[11px] opacity-40 mt-1">e.g. enter <strong>2025</strong> for FY 2025-26. Currently viewing: <strong>{{ fy_start }}</strong></p>
+        </div>
+        <div class="mt-3">
+          <label class="block text-xs font-semibold opacity-70 mb-1">Base Monthly Goal (₹)</label>
+          {{ fy_goal_form.monthly_goal }}
+        </div>
+        <div class="modal-action mt-5 flex justify-end gap-2">
+          <button type="button" class="v-btn v-btn-ghost text-xs px-3 py-1" onclick="closeModal('goalModal')">Cancel</button>
+          <button type="submit" class="v-btn v-btn-primary text-xs px-3 py-1">Save FY Goal</button>
         </div>
       </form>
     </div>
@@ -304,33 +385,36 @@
     {# Tab 2: Increment #}
     <div id="tab-inc" class="tab-pane hidden mt-4">
       <form method="post" action="{% url 'add_goal_increment' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><input type="hidden" name="increment_id" id="inc_id_field" value="">
-        <div class="alert alert-info text-xs mb-4"><span class="material-symbols-outlined text-sm">info</span>Add a step-up or step-down to the monthly goal from a specific month.</div>
+        <div class="p-3 rounded-xl bg-sky-500/10 border border-sky-500/20 text-xs mb-3 text-sky-300 flex items-start gap-2">
+          <span class="material-symbols-outlined text-sm shrink-0 mt-0.5">info</span>
+          <span>Step-up or step-down to the monthly goal from a specific effective month.</span>
+        </div>
         {% if increments %}
-        <div class="bg-base-300/50 rounded-lg p-3 mb-4 text-xs space-y-2">
-          <p class="font-semibold opacity-50">Existing increments in {{ fy_label }}</p>
+        <div class="bg-base-300/40 border border-base-content/10 rounded-xl p-3 mb-3 text-xs space-y-2">
+          <p class="font-bold opacity-50 uppercase tracking-wider text-[10px]">Existing increments in {{ fy_label }}</p>
           {% for inc in increments %}
           <div class="flex justify-between items-center">
             <span>
-              <span class="material-symbols-outlined text-sm text-warning align-middle">{% if inc.increment_amount < 0 %}arrow_downward{% else %}arrow_upward{% endif %}</span>
+              <span class="material-symbols-outlined text-xs text-amber-300 align-middle">{% if inc.increment_amount < 0 %}arrow_downward{% else %}arrow_upward{% endif %}</span>
               {% if inc.increment_amount > 0 %}+{% endif %}{{ inc.increment_amount|inr }}/mo from {{ inc.effective_month|date:"M Y" }}
               {% if inc.reason %}<span class="opacity-40">— {{ inc.reason }}</span>{% endif %}
             </span>
             <span class="flex gap-1">
-              <button type="button" class="btn btn-ghost btn-xs" onclick="editIncrement('{{ inc.id }}', '{{ inc.effective_month|date:'Y-m-d' }}', '{{ inc.increment_amount }}', '{{ inc.reason|escapejs|default:'' }}')">Edit</button>
-              <button type="button" class="btn btn-ghost btn-xs text-error" onclick="confirmDelete('deleteInc{{ inc.id }}', 'Remove this goal increment?')">Del</button>
+              <button type="button" class="v-btn v-btn-ghost text-xs px-2 py-0.5" onclick="editIncrement('{{ inc.id }}', '{{ inc.effective_month|date:'Y-m-d' }}', '{{ inc.increment_amount }}', '{{ inc.reason|escapejs|default:'' }}')">Edit</button>
+              <button type="button" class="v-btn v-btn-ghost text-xs text-rose-400 px-2 py-0.5" onclick="confirmDelete('deleteInc{{ inc.id }}', 'Remove this goal increment?')">Del</button>
             </span>
           </div>
           {% endfor %}
         </div>
         {% endif %}
-        <div class="grid grid-cols-2 gap-4">
-          <div class="form-field"><label class="label text-xs font-semibold">Effective From</label>{{ goal_form.effective_month }}</div>
-          <div class="form-field"><label class="label text-xs font-semibold">Increment Amount (+/- ₹)</label>{{ goal_form.increment_amount }}</div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="block text-xs font-semibold opacity-70 mb-1">Effective From</label>{{ goal_form.effective_month }}</div>
+          <div><label class="block text-xs font-semibold opacity-70 mb-1">Increment (+/- ₹)</label>{{ goal_form.increment_amount }}</div>
         </div>
-        <div class="form-field mt-3"><label class="label text-xs font-semibold">Reason <span class="opacity-40">optional</span></label>{{ goal_form.reason }}</div>
-        <div class="modal-action">
-          <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('goalModal')">Cancel</button>
-          <button type="submit" class="btn btn-primary btn-sm">Save Increment</button>
+        <div class="mt-3"><label class="block text-xs font-semibold opacity-70 mb-1">Reason <span class="opacity-40">optional</span></label>{{ goal_form.reason }}</div>
+        <div class="modal-action mt-5 flex justify-end gap-2">
+          <button type="button" class="v-btn v-btn-ghost text-xs px-3 py-1" onclick="closeModal('goalModal')">Cancel</button>
+          <button type="submit" class="v-btn v-btn-primary text-xs px-3 py-1">Save Increment</button>
         </div>
       </form>
       {% for inc in increments %}
@@ -341,33 +425,36 @@
     {# Tab 3: Adjust #}
     <div id="tab-adj" class="tab-pane hidden mt-4">
       <form method="post" action="{% url 'add_goal_adjustment' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"><input type="hidden" name="adjustment_id" id="adj_id_field" value="">
-        <div class="alert alert-info text-xs mb-4"><span class="material-symbols-outlined text-sm">info</span>Tweak the goal for <strong>one specific month only</strong>.</div>
+        <div class="p-3 rounded-xl bg-sky-500/10 border border-sky-500/20 text-xs mb-3 text-sky-300 flex items-start gap-2">
+          <span class="material-symbols-outlined text-sm shrink-0 mt-0.5">info</span>
+          <span>Tweak the goal for <strong>one specific month only</strong>.</span>
+        </div>
         {% if adjustments %}
-        <div class="bg-base-300/50 rounded-lg p-3 mb-4 text-xs space-y-2">
-          <p class="font-semibold opacity-50">Monthly adjustments in {{ fy_label }}</p>
+        <div class="bg-base-300/40 border border-base-content/10 rounded-xl p-3 mb-3 text-xs space-y-2">
+          <p class="font-bold opacity-50 uppercase tracking-wider text-[10px]">Monthly adjustments in {{ fy_label }}</p>
           {% for adj in adjustments %}
           <div class="flex justify-between items-center">
             <span>
-              <span class="material-symbols-outlined text-sm text-warning align-middle">{% if adj.adjustment_amount < 0 %}remove{% else %}add{% endif %}</span>
+              <span class="material-symbols-outlined text-xs text-amber-300 align-middle">{% if adj.adjustment_amount < 0 %}remove{% else %}add{% endif %}</span>
               {% if adj.adjustment_amount > 0 %}+{% endif %}{{ adj.adjustment_amount|inr }} only for {{ adj.month|date:"M Y" }}
               {% if adj.reason %}<span class="opacity-40">— {{ adj.reason }}</span>{% endif %}
             </span>
             <span class="flex gap-1">
-              <button type="button" class="btn btn-ghost btn-xs" onclick="editAdjustment('{{ adj.id }}', '{{ adj.month|date:'Y-m-d' }}', '{{ adj.adjustment_amount }}', '{{ adj.reason|escapejs|default:'' }}')">Edit</button>
-              <button type="button" class="btn btn-ghost btn-xs text-error" onclick="confirmDelete('deleteAdj{{ adj.id }}', 'Remove this monthly adjustment?')">Del</button>
+              <button type="button" class="v-btn v-btn-ghost text-xs px-2 py-0.5" onclick="editAdjustment('{{ adj.id }}', '{{ adj.month|date:'Y-m-d' }}', '{{ adj.adjustment_amount }}', '{{ adj.reason|escapejs|default:'' }}')">Edit</button>
+              <button type="button" class="v-btn v-btn-ghost text-xs text-rose-400 px-2 py-0.5" onclick="confirmDelete('deleteAdj{{ adj.id }}', 'Remove this monthly adjustment?')">Del</button>
             </span>
           </div>
           {% endfor %}
         </div>
         {% endif %}
-        <div class="grid grid-cols-2 gap-4">
-          <div class="form-field"><label class="label text-xs font-semibold">Month</label>{{ adjust_form.month }}</div>
-          <div class="form-field"><label class="label text-xs font-semibold">Adjustment (+/- ₹)</label>{{ adjust_form.adjustment_amount }}</div>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="block text-xs font-semibold opacity-70 mb-1">Month</label>{{ adjust_form.month }}</div>
+          <div><label class="block text-xs font-semibold opacity-70 mb-1">Adjustment (+/- ₹)</label>{{ adjust_form.adjustment_amount }}</div>
         </div>
-        <div class="form-field mt-3"><label class="label text-xs font-semibold">Reason <span class="opacity-40">optional</span></label>{{ adjust_form.reason }}</div>
-        <div class="modal-action">
-          <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('goalModal')">Cancel</button>
-          <button type="submit" class="btn btn-primary btn-sm">Save Adjustment</button>
+        <div class="mt-3"><label class="block text-xs font-semibold opacity-70 mb-1">Reason <span class="opacity-40">optional</span></label>{{ adjust_form.reason }}</div>
+        <div class="modal-action mt-5 flex justify-end gap-2">
+          <button type="button" class="v-btn v-btn-ghost text-xs px-3 py-1" onclick="closeModal('goalModal')">Cancel</button>
+          <button type="submit" class="v-btn v-btn-primary text-xs px-3 py-1">Save Adjustment</button>
         </div>
       </form>
       {% for adj in adjustments %}
@@ -394,9 +481,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
 function switchTab(targetId, btnEl) {
   var container = btnEl.closest('.modal-box');
-  container.querySelectorAll('[role=tab]').forEach(function(b) { b.classList.remove('tab-active'); });
+  container.querySelectorAll('#goalTabs button').forEach(function(b) {
+    b.classList.remove('bg-primary', 'text-primary-content');
+    b.classList.add('opacity-65');
+  });
   container.querySelectorAll('.tab-pane').forEach(function(p) { p.classList.add('hidden'); });
-  btnEl.classList.add('tab-active');
+  btnEl.classList.add('bg-primary', 'text-primary-content');
+  btnEl.classList.remove('opacity-65');
   document.getElementById(targetId).classList.remove('hidden');
 }
 
@@ -440,9 +531,10 @@ function editTransaction(id, date, type, amount, remarks) {
   document.getElementById('id_remarks').value = remarks;
   openModal('addTxnModal');
 }
+
 function openMonthComment(monthDate, monthName, existingComment) {
   document.getElementById('monthCommentDate').value = monthDate;
-  document.getElementById('monthCommentTitle').innerHTML = '<span class="icon-filled material-symbols-outlined text-info">chat_bubble</span>' + monthName + ' Comment';
+  document.getElementById('monthCommentTitle').innerHTML = '<span class="icon-filled material-symbols-outlined text-sky-400">chat_bubble</span>' + monthName + ' Comment';
   document.getElementById('id_month_comment').value = existingComment;
   var delBtn = document.getElementById('deleteMonthCommentBtn');
   if (delBtn) {

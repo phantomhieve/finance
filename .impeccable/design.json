@@ -1,0 +1,160 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-11T02:51:39+05:30",
+  "title": "Design System: Vault Family Office & Private Ledger System",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Sovereign Indigo",
+        "canonical": "#6366f1",
+        "tonalRamp": ["#1e1b4b", "#312e81", "#3730a3", "#4f46e5", "#6366f1", "#818cf8", "#a5b4fc", "#e0e7ff"]
+      },
+      "folio-ground": {
+        "role": "neutral",
+        "displayName": "Folio Ground",
+        "canonical": "#0b0f17",
+        "tonalRamp": ["#0b0f17", "#111722", "#182030", "#1e293b", "#334155", "#64748b", "#cbd5e1", "#f8fafc"]
+      },
+      "ledger-sheet": {
+        "role": "neutral",
+        "displayName": "Ledger Sheet",
+        "canonical": "#111722",
+        "tonalRamp": ["#0b0f17", "#111722", "#182030", "#222d42", "#334155", "#64748b", "#e2e8f0", "#ffffff"]
+      },
+      "gain": {
+        "role": "secondary",
+        "displayName": "Fiduciary Emerald",
+        "canonical": "#10b981",
+        "tonalRamp": ["#064e3b", "#065f46", "#047857", "#059669", "#10b981", "#34d399", "#6ee7b7", "#d1fae5"]
+      },
+      "outflow": {
+        "role": "tertiary",
+        "displayName": "Ledger Rose",
+        "canonical": "#f43f5e",
+        "tonalRamp": ["#4c0519", "#881337", "#be123c", "#e11d48", "#f43f5e", "#fb7185", "#fda4af", "#ffe4e6"]
+      },
+      "bullion-gold": {
+        "role": "tertiary",
+        "displayName": "Bullion Gold",
+        "canonical": "#eab308",
+        "tonalRamp": ["#422006", "#713f12", "#a16207", "#ca8a04", "#eab308", "#facc15", "#fde047", "#fef9c3"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display Figure", "purpose": "Lead monetary figure inside a page's Ledger Band." },
+      "headline": { "displayName": "Page Headline", "purpose": "Route title in the Page Header bar." },
+      "title": { "displayName": "Section Title", "purpose": "Direct panel and workbench headings." },
+      "body": { "displayName": "Body & Table Data", "purpose": "Ledger rows, descriptions, and form controls." },
+      "label": { "displayName": "Column & Cell Label", "purpose": "Table column headers, stat cell labels, and filter pills." }
+    },
+    "shadows": [
+      { "name": "interactive-lift", "value": "0 8px 24px -4px rgba(0, 0, 0, 0.35), 0 2px 6px rgba(0, 0, 0, 0.2)", "purpose": "Clickable navigation tiles or floating popovers on hover." },
+      { "name": "overlay-drawer", "value": "0 24px 48px -12px rgba(0, 0, 0, 0.65), 0 4px 16px rgba(0, 0, 0, 0.35)", "purpose": "Slide-over drawers and modal dialogs." }
+    ],
+    "motion": [
+      { "name": "ease-out-expo", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Snappy deceleration for drawers, modals, and tab switches." },
+      { "name": "ease-standard", "value": "cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Default 150ms state transition for controls and rows." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Action Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Primary CTA button reserved for the single main action on a route.",
+      "html": "<button class=\"ds-btn-primary\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.2\"><path d=\"M12 5v14M5 12h14\"/></svg>Add Entry</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; gap: 8px; background: #6366f1; color: #f1f5f9; padding: 8px 16px; border-radius: 8px; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600; border: 1px solid rgba(255,255,255,0.08); cursor: pointer; transition: background 0.15s, transform 0.1s; } .ds-btn-primary:hover { background: #4f46e5; } .ds-btn-primary:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; } .ds-btn-primary:active { transform: scale(0.97); }"
+    },
+    {
+      "name": "Secondary Toolbar Button",
+      "kind": "button",
+      "refersTo": "panel-surface",
+      "description": "Low-salience utility button for sync, refresh, filter, and secondary actions.",
+      "html": "<button class=\"ds-btn-secondary\"><svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M21 12a9 9 0 0 1-9 9 9 9 0 0 1-6.36-2.64L3 16M3 12a9 9 0 0 1 9-9 9 9 0 0 1 6.36 2.64L21 8\"/></svg>Refresh Prices</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; gap: 6px; background: rgba(226, 232, 240, 0.05); color: #f1f5f9; padding: 7px 13px; border-radius: 8px; font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500; border: 1px solid rgba(226, 232, 240, 0.12); cursor: pointer; transition: background 0.15s, border-color 0.15s; } .ds-btn-secondary:hover { background: rgba(226, 232, 240, 0.10); border-color: rgba(226, 232, 240, 0.20); } .ds-btn-secondary:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }"
+    },
+    {
+      "name": "Ledger Summary Band",
+      "kind": "card",
+      "refersTo": "ledger-band",
+      "description": "Full-width ruled statement header combining lead figure, delta pill, horizon bar, and hairline-divided stat cells.",
+      "html": "<div class=\"ds-ledger-band\"><div class=\"ds-lead\"><div class=\"ds-label\">Total Portfolio Value</div><div class=\"ds-figure-row\"><span class=\"ds-figure\">₹1,42,85,400</span><span class=\"ds-delta\">+₹18,40,200 (14.8%)</span></div><div class=\"ds-horizon\"><span style=\"width:48%;background:#6366f1\"></span><span style=\"width:24%;background:#14b8a6\"></span><span style=\"width:18%;background:#eab308\"></span><span style=\"width:10%;background:#8b5cf6\"></span></div></div><div class=\"ds-cells\"><div class=\"ds-cell\"><div class=\"ds-label\">Invested Capital</div><div class=\"ds-val\">₹1,24,45,200</div></div><div class=\"ds-cell\"><div class=\"ds-label\">FY 25-26 Gain</div><div class=\"ds-val ds-pos\">+₹9,12,000</div></div></div></div>",
+      "css": ".ds-ledger-band { display: grid; grid-template-columns: 1.4fr 1fr; background: #111722; color: #f1f5f9; border: 1px solid rgba(226, 232, 240, 0.10); border-radius: 12px; font-family: 'Inter', sans-serif; font-variant-numeric: tabular-nums; overflow: hidden; } .ds-lead { padding: 18px 22px; border-right: 1px solid rgba(226, 232, 240, 0.08); } .ds-label { font-size: 11px; font-weight: 600; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.04em; } .ds-figure-row { display: flex; align-items: baseline; gap: 10px; margin-top: 6px; } .ds-figure { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; } .ds-delta { font-size: 12px; font-weight: 600; color: #10b981; background: rgba(16, 185, 129, 0.12); padding: 2px 8px; border-radius: 999px; } .ds-horizon { display: flex; gap: 3px; height: 6px; margin-top: 14px; border-radius: 4px; overflow: hidden; } .ds-horizon span { display: block; height: 100%; border-radius: 2px; } .ds-cells { display: grid; grid-template-columns: 1fr 1fr; } .ds-cell { padding: 18px 16px; display: flex; flex-direction: column; justify-content: center; border-right: 1px solid rgba(226, 232, 240, 0.08); } .ds-val { font-size: 17px; font-weight: 700; margin-top: 4px; } .ds-pos { color: #10b981; }"
+    },
+    {
+      "name": "Filter Pill",
+      "kind": "chip",
+      "refersTo": "panel-surface",
+      "description": "Selectable pill for filtering locations, asset classes, or fiscal periods.",
+      "html": "<div class=\"ds-pills\"><button class=\"ds-pill ds-pill-active\">All Holdings</button><button class=\"ds-pill\">Bank Locker</button><button class=\"ds-pill\">Home Safe</button></div>",
+      "css": ".ds-pills { display: flex; gap: 6px; font-family: 'Inter', sans-serif; } .ds-pill { padding: 6px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; background: rgba(226, 232, 240, 0.04); color: #94a3b8; border: 1px solid rgba(226, 232, 240, 0.10); cursor: pointer; transition: all 0.15s; } .ds-pill:hover { color: #f1f5f9; background: rgba(226, 232, 240, 0.08); } .ds-pill-active { background: #6366f1; color: #ffffff; border-color: #6366f1; }"
+    },
+    {
+      "name": "Form Input Field",
+      "kind": "input",
+      "refersTo": "panel-surface",
+      "description": "Standard form control with crisp border and Sovereign Indigo focus ring.",
+      "html": "<div class=\"ds-field\"><label class=\"ds-field-label\">Amount (₹)</label><input class=\"ds-input\" type=\"text\" value=\"1,25,000\" /></div>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 6px; font-family: 'Inter', sans-serif; } .ds-field-label { font-size: 12px; font-weight: 600; color: #94a3b8; } .ds-input { height: 40px; padding: 0 12px; border-radius: 8px; background: #0b0f17; border: 1px solid rgba(226, 232, 240, 0.14); color: #f1f5f9; font-size: 14px; font-variant-numeric: tabular-nums; outline: none; transition: border-color 0.15s, box-shadow 0.15s; } .ds-input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.20); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Private Bank Consolidated Statement & Family Office Folio",
+    "overview": "Vault rejects the generic SaaS dashboard cliché of floating, equal-sized cards, glowing neon halos, and decorative sparklines. Instead, its replacement visual world is modeled on an institutional Private Bank Consolidated Portfolio Statement & Family Office Folio: an authoritative, ruled fiduciary ledger engineered for rapid scanning, structural clarity, and zero-distraction operation.\n\nEvery screen opens with a Full-Width Ledger Summary Band (.v-ledger-band) divided by crisp 1px structural hairlines (1px solid rgba(226, 232, 240, 0.07)) rather than loose grids of separated cards. Inside the Ledger Band, the primary figure (₹ net worth, monthly net spend, FY savings goal, or bullion valuation) commands immediate hierarchy alongside its period delta badge and a Signature Multi-Segment Horizon Bar (.v-horizon) that encodes asset allocation, spend pace vs. prior month, FY goal progress, or custody split in a single glance. Below the band, pages organize into purposeful Asymmetric Workbenches (.v-workbench) or Tabbed Ledger Folios, keeping primary tables and feeds dominant while secondary breakdowns, AI methodology notes, and mutation forms live in progressive disclosures, drawers, or side rails.",
+    "keyCharacteristics": [
+      "Ruled Hairline Architecture over Card Soup: Metrics and list items sit inside contiguous, hairline-divided strips (.v-ledger-band, .v-stat-strip, .v-divide-list) rather than separate floating boxes.",
+      "Zero-Exception Tabular Numerals: Every rupee figure, Lakh/Crore shorthand, gram weight, percentage, and date enforces font-variant-numeric: tabular-nums so vertical columns lock to the pixel.",
+      "Signature Horizon Strip: A proportional, color-coded horizontal bar with an inline legend appears inside the top ledger band of every major route to show composition or pacing before the user scrolls.",
+      "Action-Only Primary Saturation: Sovereign Indigo (#6366f1) is reserved strictly for interactive primary actions, active route indicators, and focused controls — never wasted on decorative backgrounds or static labels.",
+      "No Eyebrow Kickers or Nested Cards: Section headings speak directly for themselves at 1rem (16px) bold without tiny uppercase kickers above them, and cards never nest inside cards."
+    ],
+    "rules": [
+      {
+        "name": "The Action-Only Accent Rule",
+        "body": "Sovereign Indigo (#6366f1) marks things the operator can press or has selected. Never tint large hero backgrounds or static metric numbers in primary indigo; primary figures sit in crisp Primary Ink (#f1f5f9 / #0f172a) while semantic delta pills carry Emerald or Rose.",
+        "section": "colors"
+      },
+      {
+        "name": "The Single-Hairline Rule",
+        "body": "Adjacent cells in a metric strip or ledger table share a single 1px border (1px solid var(--v-hairline)). Never place a thick colored border-left or border-right (>1px) on cards, callouts, or list rows.",
+        "section": "colors"
+      },
+      {
+        "name": "The No-Kicker Rule",
+        "body": "Never place a small uppercase eyebrow or kicker label above a page headline or section title. A heading carries its own hierarchy; let the title and its inline count or subtitle speak directly.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Lock Rule",
+        "body": "Every element displaying currency (₹), percentages (%), weights (g), land units (Gaj, Bigha, Sq.ft), quantities, or dates MUST apply font-variant-numeric: tabular-nums.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-At-Rest Rule",
+        "body": "Panels, metric strips, and tables never cast drop shadows at rest and never jump upward (translateY) when hovered unless the entire panel is an anchor link to another route.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do open every primary dashboard and detail page with a .v-ledger-band (or .v-stat-strip on subpages) that presents the primary figure, delta, and .v-horizon bar in one unified, hairline-ruled block.",
+      "Do right-align all monetary amounts, percentages, and weights in tables and list rows, and enforce tabular-nums on every numeric element.",
+      "Do group secondary actions (Sync Sheets, Refresh Prices, Export, Biometrics) into a clean action bar or overflow menu so the primary CTA stands alone.",
+      "Do use asymmetric 2-column workbenches (8/4 or 7/5 split on lg+) or segmented tabs to prevent endless vertical scrolling of stacked full-width boxes.",
+      "Do preserve every Django template block, URL tag, CSRF token, form field name, and JS hook (openModal, closeModal, confirmDelete, initPagination, Chart.js canvas IDs)."
+    ],
+    "donts": [
+      "Don't nest cards inside cards (e.g., putting bordered .stat-card boxes with gradients inside a .card.hero-gradient). Use hairline-divided .v-stat-cell segments inside .v-ledger-band instead.",
+      "Don't place a small uppercase kicker/eyebrow label above an <h1>, <h2>, or <h3> heading.",
+      "Don't use thick colored left borders (border-l-4) on callouts, AI insights, or transaction rows; use a 1px border with a subtle semantic tint fill (8%) and a crisp status badge or icon dot.",
+      "Don't use gradient text (bg-clip-text) or animated shimmer lines on financial headers.",
+      "Don't use raw emoji (📈, 💳, 🏠) as UI icons; use Material Symbols Outlined or authored inline SVG everywhere."
+    ]
+  }
+}

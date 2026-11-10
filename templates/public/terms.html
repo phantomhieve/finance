@@ -1,42 +1,83 @@
 {% extends 'public/base.html' %}
 {% block title %}Terms of Service — Vault{% endblock %}
 {% block description %}Terms governing use of Vault, a private household finance dashboard.{% endblock %}
+
 {% block content %}
-<article class="doc">
-  <h1>Terms of Service</h1>
-  <p class="updated">Last updated: {{ updated }}</p>
+<article class="max-w-3xl mx-auto animate-up">
+  {# Document Header #}
+  <div class="border-b border-white/10 pb-6 mb-8">
+    <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 mb-3">
+      <span class="w-2 h-2 rounded-full bg-indigo-400"></span>Household Governance
+    </div>
+    <h1 class="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">Terms of Service</h1>
+    <p class="text-xs text-slate-400 mt-2">Last updated: <span class="text-slate-200 font-medium">{{ updated }}</span></p>
+  </div>
 
-  <h2>1. About Vault</h2>
-  <p>Vault ({{ site_url }}) is a private, invite-only personal finance dashboard operated for the members of one household.
-     By signing in, you agree to these terms and to our <a href="{% url 'privacy' %}">Privacy Policy</a>.</p>
+  {# Terms Sections #}
+  <div class="space-y-8 text-sm sm:text-base text-slate-300 leading-relaxed">
 
-  <h2>2. Eligibility and accounts</h2>
-  <ul>
-    <li>Access is limited to people approved by the administrator. You sign in with your Google account.</li>
-    <li>You are responsible for keeping your Google account and devices secure.</li>
-  </ul>
+    <section class="border-b border-white/5 pb-8">
+      <h2 class="text-lg sm:text-xl font-bold text-white mb-3">1. About Vault</h2>
+      <p>
+        Vault (<a href="{{ site_url }}" class="text-indigo-400 underline font-medium">{{ site_url }}</a>) is a private, invite-only personal finance and portfolio dashboard operated strictly for the members of a single household. By signing in to Vault, you agree to these terms and to our <a href="{% url 'privacy' %}" class="text-indigo-400 underline font-semibold">Privacy Policy</a>.
+      </p>
+    </section>
 
-  <h2>3. Acceptable use</h2>
-  <p>Only connect email accounts and enter financial information that you own or are authorised to use. Do not try to access
-     other users' data or disrupt the service.</p>
+    <section class="border-b border-white/5 pb-8">
+      <h2 class="text-lg sm:text-xl font-bold text-white mb-3">2. Eligibility and accounts</h2>
+      <ul class="space-y-2.5 list-disc pl-5 text-slate-300">
+        <li>Access is strictly limited to authorized individuals approved by the primary household administrator. You authenticate via your verified Google account.</li>
+        <li>You are solely responsible for maintaining the physical and digital security of your Google account, authenticated devices, and biometric credentials.</li>
+      </ul>
+    </section>
 
-  <h2>4. No financial advice</h2>
-  <p>Figures, categorisations and AI-generated insights are provided for information only and may be incomplete or inaccurate.
-     They are not financial, tax or investment advice. Check important figures against your bank and card statements.</p>
+    <section class="border-b border-white/5 pb-8">
+      <h2 class="text-lg sm:text-xl font-bold text-white mb-3">3. Acceptable use</h2>
+      <p>
+        Only connect email inboxes and enter financial accounts, cards, and assets that you legally own or are explicitly authorized by your household to manage. Do not attempt to access another tenant&rsquo;s data or compromise the underlying host server infrastructure.
+      </p>
+    </section>
 
-  <h2>5. Third-party services</h2>
-  <p>Vault uses Google services (Sign-In, Gmail API, Gemini, Cloud Storage). Your use of them is also subject to Google's terms.</p>
+    <section class="border-b border-white/5 pb-8">
+      <h2 class="text-lg sm:text-xl font-bold text-white mb-3">4. No financial advice</h2>
+      <p>
+        All figures, valuations, spend categorization, and AI-generated insights are provided solely for informational and record-keeping purposes. They do not constitute financial, investment, accounting, or tax advice. Always verify figures against authoritative bank and card statements.
+      </p>
+    </section>
 
-  <h2>6. Availability</h2>
-  <p>Vault is provided "as is", without warranties of any kind. It may be changed, suspended or discontinued at any time.</p>
+    <section class="border-b border-white/5 pb-8">
+      <h2 class="text-lg sm:text-xl font-bold text-white mb-3">5. Third-party services</h2>
+      <p>
+        Vault connects with Google services (Google Sign-In, Gmail API, Gemini API, Cloud Storage). Your use of these services within Vault is also governed by Google&rsquo;s applicable terms and service policies.
+      </p>
+    </section>
 
-  <h2>7. Limitation of liability</h2>
-  <p>To the extent permitted by law, the operator is not liable for any indirect or consequential loss arising from use of Vault.</p>
+    <section class="border-b border-white/5 pb-8">
+      <h2 class="text-lg sm:text-xl font-bold text-white mb-3">6. Availability</h2>
+      <p>
+        Vault is provided on an &ldquo;as is&rdquo; and &ldquo;as available&rdquo; basis without warranties of any kind. As a self-hosted private tool, it may be updated, modified, or suspended at any time by the administrator.
+      </p>
+    </section>
 
-  <h2>8. Termination</h2>
-  <p>You can stop using Vault and disconnect Gmail at any time. Access may be removed if these terms are breached.</p>
+    <section class="border-b border-white/5 pb-8">
+      <h2 class="text-lg sm:text-xl font-bold text-white mb-3">7. Limitation of liability</h2>
+      <p>
+        To the maximum extent permitted by applicable law, the operator and authors are not liable for any direct, indirect, incidental, or consequential damages resulting from the use or inability to use Vault.
+      </p>
+    </section>
 
-  <h2>9. Contact</h2>
-  <p><a href="mailto:{{ contact_email }}">{{ contact_email }}</a></p>
+    <section class="border-b border-white/5 pb-8">
+      <h2 class="text-lg sm:text-xl font-bold text-white mb-3">8. Termination</h2>
+      <p>
+        You may discontinue using Vault and disconnect your Gmail integration at any time from your account settings. Access may be revoked if these terms are violated.
+      </p>
+    </section>
+
+    <section>
+      <h2 class="text-lg sm:text-xl font-bold text-white mb-3">9. Contact</h2>
+      <p>For questions or notices regarding these terms, reach the administrator at: <a href="mailto:{{ contact_email }}" class="text-indigo-400 font-semibold underline">{{ contact_email }}</a></p>
+    </section>
+
+  </div>
 </article>
 {% endblock %}

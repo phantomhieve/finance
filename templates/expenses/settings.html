@@ -1,227 +1,232 @@
 {% extends 'base.html' %}
 
-{% block title %}Expense settings | Vault{% endblock %}
+{% block title %}Expense Settings | Vault{% endblock %}
 
 {% block page_header %}
-<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-  <div class="flex items-start justify-between gap-2">
-    <div>
-      <h1 class="text-xl lg:text-3xl font-extrabold tracking-tight">Expense Settings</h1>
-      <p class="text-xs opacity-50 mt-0.5">Connected Gmail inboxes, cards &amp; PDF passwords, categories, and learned merchant rules</p>
+<header class="v-page-header">
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
+    <div class="flex items-start justify-between gap-3">
+      <div>
+        <h1 class="v-title">Expense Settings</h1>
+        <p class="v-subtitle">Connected Gmail inboxes, cards &amp; PDF passwords, categories, and learned merchant rules</p>
+      </div>
+      <div class="flex items-center gap-1 sm:hidden shrink-0">
+        <a href="{% url 'expenses_home' %}" class="v-btn v-btn-ghost text-xs px-2.5 py-1">
+          <span class="material-symbols-outlined text-sm">arrow_back</span>Expenses
+        </a>
+      </div>
     </div>
-    <div class="flex items-center gap-1 sm:hidden shrink-0">
-      <a href="{% url 'expenses_home' %}" class="btn btn-ghost btn-sm gap-1 cursor-pointer">
-        <span class="material-symbols-outlined text-base">arrow_back</span>Expenses
+    <div class="v-toolbar hidden sm:flex items-center gap-1.5">
+      <a href="{% url 'expenses_home' %}" class="v-btn v-btn-ghost text-xs">
+        <span class="material-symbols-outlined text-sm">arrow_back</span>Monthly view
+      </a>
+      <a href="{% url 'expenses_year' %}" class="v-btn v-btn-ghost p-1.5" aria-label="Year view" title="Year view">
+        <span class="material-symbols-outlined text-base">calendar_month</span>
+      </a>
+      <a href="{% url 'expenses_statements' %}" class="v-btn v-btn-ghost p-1.5" aria-label="Card statements" title="Card statements">
+        <span class="material-symbols-outlined text-base">request_quote</span>
       </a>
     </div>
   </div>
-  <div class="hidden sm:flex items-center gap-1.5 shrink-0">
-    <a href="{% url 'expenses_home' %}" class="btn btn-ghost btn-sm gap-1 cursor-pointer">
-      <span class="material-symbols-outlined text-base">arrow_back</span>Monthly view
-    </a>
-    <a href="{% url 'expenses_year' %}" class="btn btn-ghost btn-sm btn-square cursor-pointer" aria-label="Year view" title="Year view">
-      <span class="material-symbols-outlined text-lg">calendar_month</span>
-    </a>
-    <a href="{% url 'expenses_statements' %}" class="btn btn-ghost btn-sm btn-square cursor-pointer" aria-label="Card statements" title="Card statements">
-      <span class="material-symbols-outlined text-lg">request_quote</span>
-    </a>
-  </div>
-</div>
+</header>
 {% endblock %}
 
 {% block content %}
 
-{# --- SETTINGS OVERVIEW HERO CARD --- #}
-<div class="card hero-gradient-portfolio shadow-sm mb-4 animate-up card-hover border border-base-content/10">
-  <div class="card-body p-3.5 sm:p-5 lg:p-6">
-    <div class="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-8">
-
-      {# Left side: Automation Health & Quick Action #}
-      <div class="flex-1 min-w-0">
-        <div class="flex items-center flex-wrap gap-2">
-          <p class="text-[10px] font-bold uppercase tracking-widest opacity-50">Automation &amp; Classification</p>
-          {% if reconnect_count %}
-          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-error/15 text-error border border-error/30 leading-none">
-            <span class="material-symbols-outlined text-[12px]">sync_problem</span>
-            <span>{{ reconnect_count }} inbox{{ reconnect_count|pluralize:"es" }} need{{ reconnect_count|pluralize:"s," }} attention</span>
-          </span>
-          {% elif accounts %}
-          <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 leading-none">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>Auto-sync active</span>
-          </span>
-          {% else %}
-          <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-warning/15 text-warning border border-warning/30 leading-none">
-            <span class="material-symbols-outlined text-[12px]">mail</span>
-            <span>No inbox connected yet</span>
-          </span>
-          {% endif %}
-        </div>
-
-        <h2 class="text-lg sm:text-xl font-extrabold mt-1.5">
-          {% if reconnect_count %}
-            Reconnect your Gmail inbox to resume automatic expense imports
-          {% elif accounts %}
-            {{ accounts|length }} Gmail inbox{{ accounts|length|pluralize:"es" }} feeding {{ sources|length }} payment source{{ sources|length|pluralize }}
-          {% else %}
-            Connect your Gmail to import bank &amp; card alerts automatically
-          {% endif %}
-        </h2>
-        <p class="text-xs opacity-55 mt-1 max-w-2xl">
-          Vault reads bank and card alert emails in read-only mode, matches PDF credit card statements using your encrypted passwords, and categorises merchants using your {{ user_rules_count }} custom rule{{ user_rules_count|pluralize }} and {{ ai_rules_count }} AI-learned rule{{ ai_rules_count|pluralize }}.
-        </p>
-      </div>
-
-      {# Right side: 4 Interactive Stat Cards that jump/switch to each section #}
-      <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 gap-2.5 shrink-0 lg:w-88">
-        <a href="#gmail" onclick="selectSettingsTab('gmail')" class="stat-card stat-card-primary p-2.5 sm:p-3 no-underline text-inherit cursor-pointer hover:border-primary/40 transition-all">
-          <div class="text-[9px] sm:text-[10px] uppercase tracking-wider opacity-60">Inboxes</div>
-          <div class="text-sm sm:text-base font-bold mt-0.5 tabular-nums text-primary">{{ accounts|length }} connected</div>
-          <div class="text-[10px] opacity-50 mt-0.5 truncate">
-            {% if reconnect_count %}<span class="text-error font-semibold">{{ reconnect_count }} need reconnect</span>{% elif accounts %}{{ active_accounts_count }} syncing hourly{% else %}Tap to connect{% endif %}
-          </div>
-        </a>
-
-        <a href="#cards" onclick="selectSettingsTab('cards')" class="stat-card stat-card-accent p-2.5 sm:p-3 no-underline text-inherit cursor-pointer hover:border-accent/40 transition-all">
-          <div class="text-[9px] sm:text-[10px] uppercase tracking-wider opacity-60">Cards &amp; Banks</div>
-          <div class="text-sm sm:text-base font-bold mt-0.5 tabular-nums text-accent">{{ sources|length }} source{{ sources|length|pluralize }}</div>
-          <div class="text-[10px] opacity-50 mt-0.5 truncate">
-            {{ cards_with_pwd_count }}/{{ cards_count }} card PDFs unlocked
-          </div>
-        </a>
-
-        <a href="#categories" onclick="selectSettingsTab('categories')" class="stat-card stat-card-secondary p-2.5 sm:p-3 no-underline text-inherit cursor-pointer hover:border-secondary/40 transition-all">
-          <div class="text-[9px] sm:text-[10px] uppercase tracking-wider opacity-60">Categories</div>
-          <div class="text-sm sm:text-base font-bold mt-0.5 tabular-nums text-secondary">{{ categories|length }} active</div>
-          <div class="text-[10px] opacity-50 mt-0.5 truncate">Spend, Transfer &amp; Income</div>
-        </a>
-
-        <a href="#rules" onclick="selectSettingsTab('rules')" class="stat-card stat-card-success p-2.5 sm:p-3 no-underline text-inherit cursor-pointer hover:border-success/40 transition-all">
-          <div class="text-[9px] sm:text-[10px] uppercase tracking-wider opacity-60">Learned Rules</div>
-          <div class="text-sm sm:text-base font-bold mt-0.5 tabular-nums text-success">{{ rules|length }} merchant{{ rules|length|pluralize }}</div>
-          <div class="text-[10px] opacity-50 mt-0.5 truncate">{{ user_rules_count }} yours · {{ ai_rules_count }} AI</div>
-        </a>
-      </div>
-
+{# --- SETTINGS OVERVIEW LEDGER BAND --- #}
+<section class="v-ledger-band mb-5" aria-label="Settings and automation overview">
+  <div class="v-lead-cell">
+    <div class="flex items-center justify-between gap-2 flex-wrap mb-1">
+      <span class="text-[10px] font-bold tracking-wider uppercase opacity-60">Automation &amp; Classification Engine</span>
+      {% if reconnect_count %}
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-400 border border-rose-500/25">
+        <span class="material-symbols-outlined text-xs">sync_problem</span>
+        <span>{{ reconnect_count }} inbox{{ reconnect_count|pluralize:"es" }} need{{ reconnect_count|pluralize:"s," }} attention</span>
+      </span>
+      {% elif accounts %}
+      <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+        <span>Auto-sync active</span>
+      </span>
+      {% else %}
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/25">
+        <span class="material-symbols-outlined text-xs">mail</span>
+        <span>No inbox connected</span>
+      </span>
+      {% endif %}
     </div>
-  </div>
-</div>
 
-{# --- STICKY / MOBILE-FIRST SECTION NAVIGATION BAR --- #}
-<div class="flex items-center gap-1.5 overflow-x-auto scrollbar-hide pb-1 mb-4">
-  <button type="button" id="stgTabBtn-all" class="filter-pill is-active cursor-pointer" onclick="selectSettingsTab('all')">
-    <span class="material-symbols-outlined text-sm">dashboard</span>All sections
+    <div class="v-lead-figure text-2xl sm:text-3xl">
+      {% if reconnect_count %}
+        Reconnect Required
+      {% elif accounts %}
+        {{ accounts|length }} Connected Inbox{{ accounts|length|pluralize:"es" }}
+      {% else %}
+        Setup Automation
+      {% endif %}
+    </div>
+
+    <p class="text-xs opacity-60 mt-1 max-w-2xl leading-relaxed">
+      Vault monitors bank and card alert emails in read-only mode, reconciles PDF statements using your encrypted passwords, and auto-classifies transactions with {{ user_rules_count }} custom rule{{ user_rules_count|pluralize }} and {{ ai_rules_count }} AI-learned pattern{{ ai_rules_count|pluralize }}.
+    </p>
+
+    {% if rules %}
+    <div class="mt-4 pt-3 border-t border-base-content/10">
+      <div class="flex items-center justify-between text-[11px] mb-1.5">
+        <span class="opacity-55 font-medium">Merchant rules split</span>
+        <span class="opacity-80 font-bold tabular-nums">{{ user_rules_count }} Custom · {{ ai_rules_count }} AI</span>
+      </div>
+      <div class="v-horizon" style="height: 5px;">
+        <div class="v-horizon-seg bg-primary" style="width: {% widthratio user_rules_count rules|length 100 %}%;" title="User rules: {{ user_rules_count }}"></div>
+        <div class="v-horizon-seg bg-purple-500/70" style="width: {% widthratio ai_rules_count rules|length 100 %}%;" title="AI rules: {{ ai_rules_count }}"></div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  {# 4 Navigation Stat Cells #}
+  <div class="v-stat-grid grid-cols-2 lg:grid-cols-2">
+    <a href="#gmail" onclick="selectSettingsTab('gmail')" class="v-stat-cell no-underline text-inherit group hover:border-primary/40 transition-colors cursor-pointer">
+      <div class="text-[10px] font-bold tracking-wider uppercase opacity-55">Inboxes</div>
+      <div class="text-lg sm:text-xl font-extrabold tabular-nums text-primary mt-0.5">{{ accounts|length }} connected</div>
+      <div class="text-[11px] opacity-50 mt-0.5 truncate">
+        {% if reconnect_count %}<span class="text-rose-400 font-semibold">{{ reconnect_count }} need reconnect</span>{% elif accounts %}{{ active_accounts_count }} syncing hourly{% else %}Select to connect{% endif %}
+      </div>
+    </a>
+
+    <a href="#cards" onclick="selectSettingsTab('cards')" class="v-stat-cell no-underline text-inherit group hover:border-sky-400/40 transition-colors cursor-pointer">
+      <div class="text-[10px] font-bold tracking-wider uppercase opacity-55">Cards &amp; Accounts</div>
+      <div class="text-lg sm:text-xl font-extrabold tabular-nums text-sky-400 mt-0.5">{{ sources|length }} source{{ sources|length|pluralize }}</div>
+      <div class="text-[11px] opacity-50 mt-0.5 truncate">
+        {{ cards_with_pwd_count }}/{{ cards_count }} PDF passwords set
+      </div>
+    </a>
+
+    <a href="#categories" onclick="selectSettingsTab('categories')" class="v-stat-cell no-underline text-inherit group hover:border-amber-400/40 transition-colors cursor-pointer">
+      <div class="text-[10px] font-bold tracking-wider uppercase opacity-55">Categories</div>
+      <div class="text-lg sm:text-xl font-extrabold tabular-nums text-amber-400 mt-0.5">{{ categories|length }} active</div>
+      <div class="text-[11px] opacity-50 mt-0.5 truncate">Spend, Transfer &amp; Income</div>
+    </a>
+
+    <a href="#rules" onclick="selectSettingsTab('rules')" class="v-stat-cell no-underline text-inherit group hover:border-emerald-400/40 transition-colors cursor-pointer">
+      <div class="text-[10px] font-bold tracking-wider uppercase opacity-55">Learned Rules</div>
+      <div class="text-lg sm:text-xl font-extrabold tabular-nums text-emerald-400 mt-0.5">{{ rules|length }} rule{{ rules|length|pluralize }}</div>
+      <div class="text-[11px] opacity-50 mt-0.5 truncate">{{ user_rules_count }} yours · {{ ai_rules_count }} AI</div>
+    </a>
+  </div>
+</section>
+
+{# --- STICKY SECTION FILTER NAVIGATION BAR --- #}
+<div class="flex items-center gap-1.5 overflow-x-auto scrollbar-hide pb-1 mb-5">
+  <button type="button" id="stgTabBtn-all" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-primary text-primary-content cursor-pointer transition-colors" onclick="selectSettingsTab('all')">
+    All sections
   </button>
-  <a href="#gmail" id="stgTabBtn-gmail" class="filter-pill cursor-pointer" onclick="selectSettingsTab('gmail', event)">
-    <span class="material-symbols-outlined text-sm">mail</span>Gmail
+  <a href="#gmail" id="stgTabBtn-gmail" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-base-300/40 border border-base-content/10 opacity-70 hover:opacity-100 cursor-pointer transition-colors flex items-center gap-1" onclick="selectSettingsTab('gmail', event)">
+    <span>Gmail</span>
     <span class="opacity-50 text-[10px]">({{ accounts|length }})</span>
   </a>
-  <a href="#cards" id="stgTabBtn-cards" class="filter-pill cursor-pointer" onclick="selectSettingsTab('cards', event)">
-    <span class="material-symbols-outlined text-sm">credit_card</span>Cards &amp; accounts
+  <a href="#cards" id="stgTabBtn-cards" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-base-300/40 border border-base-content/10 opacity-70 hover:opacity-100 cursor-pointer transition-colors flex items-center gap-1" onclick="selectSettingsTab('cards', event)">
+    <span>Cards &amp; Accounts</span>
     <span class="opacity-50 text-[10px]">({{ sources|length }})</span>
   </a>
-  <a href="#categories" id="stgTabBtn-categories" class="filter-pill cursor-pointer" onclick="selectSettingsTab('categories', event)">
-    <span class="material-symbols-outlined text-sm">category</span>Categories
+  <a href="#categories" id="stgTabBtn-categories" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-base-300/40 border border-base-content/10 opacity-70 hover:opacity-100 cursor-pointer transition-colors flex items-center gap-1" onclick="selectSettingsTab('categories', event)">
+    <span>Categories</span>
     <span class="opacity-50 text-[10px]">({{ categories|length }})</span>
   </a>
-  <a href="#rules" id="stgTabBtn-rules" class="filter-pill cursor-pointer" onclick="selectSettingsTab('rules', event)">
-    <span class="material-symbols-outlined text-sm">auto_awesome</span>Learned rules
+  <a href="#rules" id="stgTabBtn-rules" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-base-300/40 border border-base-content/10 opacity-70 hover:opacity-100 cursor-pointer transition-colors flex items-center gap-1" onclick="selectSettingsTab('rules', event)">
+    <span>Learned Rules</span>
     <span class="opacity-50 text-[10px]">({{ rules|length }})</span>
   </a>
 </div>
 
-{# --- MAIN TWO-COLUMN BENTO GRID --- #}
-<div class="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-start">
+{# --- MAIN ASYMMETRIC TWO-COLUMN WORKBENCH --- #}
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
 
-  {# --- LEFT COLUMN (5 cols on desktop): Gmail Inboxes + Cards & Accounts --- #}
-  <div id="stgLeftCol" class="lg:col-span-5 flex flex-col gap-4 lg:gap-6">
+  {# --- LEFT COLUMN (5 cols): Gmail Inboxes + Cards & Accounts --- #}
+  <div id="stgLeftCol" class="lg:col-span-5 flex flex-col gap-5">
 
     {# --- 1. Gmail Inboxes --- #}
-    <section id="gmail" class="card bg-base-200/80 shadow-sm border border-base-content/10 scroll-mt-20 animate-up card-hover">
-      <div class="card-body p-4 lg:p-5">
-        <div class="flex items-center justify-between gap-2 mb-1">
-          <div class="flex items-center gap-2">
-            <div class="w-8 h-8 rounded-lg bg-primary/15 text-primary flex items-center justify-center shrink-0">
-              <span class="material-symbols-outlined text-lg">mail</span>
-            </div>
-            <div>
-              <h2 class="text-sm font-bold">Connected inboxes</h2>
-              <p class="text-[11px] opacity-50">Read-only bank &amp; card alert sync</p>
-            </div>
+    <section id="gmail" class="v-panel scroll-mt-20">
+      <div class="v-panel-header flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-primary/15 text-primary flex items-center justify-center shrink-0">
+            <span class="material-symbols-outlined text-base">mail</span>
           </div>
-          {% if gmail_configured %}
-          <a href="{% url 'expenses_gmail_connect' %}" class="btn btn-primary btn-xs sm:btn-sm gap-1 shrink-0">
-            <span class="material-symbols-outlined text-base">add</span>{% if accounts %}Add inbox{% else %}Connect Gmail{% endif %}
-          </a>
-          {% endif %}
-        </div>
-
-        {% if gmail_configured %}
-        <p class="text-xs opacity-55 mb-3">
-          Connect as many inboxes as you like — yours, your partner's, or an secondary address your bank emails. Each inbox syncs independently and rolls into your household view.
-        </p>
-        {% else %}
-        <div class="alert alert-warning alert-soft text-sm items-start my-2">
-          <span class="material-symbols-outlined">key_off</span>
           <div>
-            <p class="font-semibold">Gmail isn't configured on this server yet</p>
-            <p class="text-xs opacity-80 mt-1">Enable the Gmail API in the same Google Cloud project used for sign-in, add the <code>gmail.readonly</code> scope to the consent screen, publish it "In production", and add this redirect URI to the OAuth client:</p>
-            <code class="text-[11px] break-all block mt-1.5 p-2 rounded bg-base-300/70 opacity-90">{{ redirect_uri }}</code>
+            <h2 class="v-panel-title">Connected Inboxes</h2>
+            <p class="text-[11px] opacity-50">Read-only bank &amp; card alert sync</p>
           </div>
+        </div>
+        {% if gmail_configured %}
+        <a href="{% url 'expenses_gmail_connect' %}" class="v-btn v-btn-primary text-xs px-2.5 py-1 shrink-0">
+          <span class="material-symbols-outlined text-sm">add</span>{% if accounts %}Add Inbox{% else %}Connect Gmail{% endif %}
+        </a>
+        {% endif %}
+      </div>
+
+      <div class="v-panel-body">
+        {% if not gmail_configured %}
+        <div class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs mb-3">
+          <div class="flex items-center gap-2 font-bold text-amber-300">
+            <span class="material-symbols-outlined text-base">key_off</span>
+            <span>Gmail isn't configured on this server</span>
+          </div>
+          <p class="opacity-80 mt-1 leading-relaxed">Enable the Gmail API in your Google Cloud console with <code>gmail.readonly</code> scope, and set this redirect URI in OAuth credentials:</p>
+          <code class="text-[10px] break-all block mt-2 p-2 rounded bg-base-300/80 font-mono">{{ redirect_uri }}</code>
         </div>
         {% endif %}
 
         <div class="flex flex-col gap-2">
           {% for a in accounts %}
-          <div class="p-3 rounded-xl bg-base-300/50 border {% if a.needs_reconnect %}border-error/40 bg-error/5{% else %}border-base-content/8{% endif %} transition-all">
+          <div class="p-3 rounded-xl bg-base-300/30 border {% if a.needs_reconnect %}border-rose-500/30 bg-rose-500/5{% else %}border-base-content/10{% endif %} transition-all">
             <div class="flex items-center gap-3">
-              <span class="jw-type-avatar shrink-0" style="--h:{% if a.needs_reconnect %}0{% else %}265{% endif %};width:2.35rem;height:2.35rem;border-radius:.75rem">
-                <span class="icon-filled material-symbols-outlined text-lg">{% if a.needs_reconnect %}sync_problem{% else %}mail{% endif %}</span>
+              <span class="jw-type-avatar shrink-0" style="--h:{% if a.needs_reconnect %}0{% else %}265{% endif %};width:2.25rem;height:2.25rem;border-radius:.65rem">
+                <span class="icon-filled material-symbols-outlined text-base">{% if a.needs_reconnect %}sync_problem{% else %}mail{% endif %}</span>
               </span>
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-1.5 flex-wrap">
                   <p class="font-bold text-xs sm:text-sm truncate">{{ a.email }}</p>
                   {% if a.needs_reconnect %}
-                  <span class="badge badge-xs badge-error font-semibold">Reconnect needed</span>
+                  <span class="text-[10px] font-bold px-1.5 py-0.2 rounded bg-rose-500/15 text-rose-400 border border-rose-500/25">Reconnect needed</span>
                   {% elif a.last_synced_at %}
-                  <span class="badge badge-xs bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 font-semibold">Active</span>
+                  <span class="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">Active</span>
                   {% endif %}
                 </div>
                 <p class="text-[11px] opacity-55 truncate mt-0.5">
                   {{ a.user.first_name|default:a.user.username }} ·
-                  {% if a.needs_reconnect %}<span class="text-error font-medium"> Needs reconnecting</span>
+                  {% if a.needs_reconnect %}<span class="text-rose-400 font-medium">Needs reconnecting</span>
                   {% elif a.last_synced_at %}Synced {{ a.last_synced_at|timesince }} ago{% if a.last_sync_new %} · <span class="text-primary font-semibold">{{ a.last_sync_new }} new</span>{% endif %}
                   {% else %}First import pending{% endif %}
                 </p>
               </div>
               <div class="flex items-center gap-1 shrink-0">
                 {% if a.needs_reconnect %}
-                <a href="{% url 'expenses_gmail_connect' %}?hint={{ a.email|urlencode }}" class="btn btn-error btn-xs">Reconnect</a>
+                <a href="{% url 'expenses_gmail_connect' %}?hint={{ a.email|urlencode }}" class="v-btn v-btn-primary text-xs px-2 py-1 bg-rose-600 border-rose-500 hover:bg-rose-700">Reconnect</a>
                 {% else %}
                 <form method="post" action="{% url 'expenses_gmail_sync' a.pk %}">{% csrf_token %}
-                  <button class="btn btn-ghost btn-xs gap-1 border border-base-content/10" title="Sync now" aria-label="Sync {{ a.email }} now">
+                  <button class="v-btn v-btn-ghost text-xs px-2 py-1" title="Sync now" aria-label="Sync {{ a.email }} now">
                     <span class="material-symbols-outlined text-sm">sync</span><span class="hidden sm:inline">Sync</span>
                   </button>
                 </form>
                 {% endif %}
                 {% if a.user_id == user.pk or user.is_primary %}
                 <form method="post" action="{% url 'expenses_gmail_disconnect' a.pk %}" id="gmailDisc{{ a.pk }}">{% csrf_token %}</form>
-                <button type="button" class="btn btn-ghost btn-xs btn-square text-error/80 hover:text-error" title="Disconnect" aria-label="Disconnect {{ a.email }}"
+                <button type="button" class="v-btn v-btn-ghost p-1 text-rose-400/80 hover:text-rose-400" title="Disconnect" aria-label="Disconnect {{ a.email }}"
                         onclick="confirmDelete('gmailDisc{{ a.pk }}', 'Disconnect {{ a.email|escapejs }}? Vault will stop reading it and revoke access. Imported expenses are kept.')">
-                  <span class="material-symbols-outlined text-sm">link_off</span>
+                  <span class="material-symbols-outlined text-base">link_off</span>
                 </button>
                 {% endif %}
               </div>
             </div>
             {% if a.last_error and not a.needs_reconnect %}
-            <p class="text-[11px] text-warning mt-2 px-2 py-1 rounded bg-warning/10 border border-warning/20">Last sync warning: {{ a.last_error|truncatechars:140 }}</p>
+            <p class="text-[11px] text-amber-300 mt-2 px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20">Last sync warning: {{ a.last_error|truncatechars:140 }}</p>
             {% endif %}
           </div>
           {% empty %}
-          <div class="p-4 rounded-xl bg-base-300/40 border border-dashed border-base-content/15 text-center">
+          <div class="p-6 rounded-xl bg-base-300/30 border border-dashed border-base-content/15 text-center">
             <span class="material-symbols-outlined text-2xl opacity-40 mb-1">mark_email_unread</span>
             <p class="text-xs font-bold opacity-75">No inboxes connected</p>
-            <p class="text-[11px] opacity-55 mt-1">Each household member can connect their own Gmail. Vault asks for <strong>read-only</strong> access, only looks at bank &amp; card emails, and never stores the email body.</p>
+            <p class="text-[11px] opacity-50 mt-1 max-w-xs mx-auto">Each household member can connect their own Gmail. Vault asks for read-only access and only parses bank &amp; card alert emails.</p>
           </div>
           {% endfor %}
         </div>
@@ -229,46 +234,42 @@
     </section>
 
     {# --- 2. Cards & Accounts --- #}
-    <section id="cards" class="card bg-base-200/80 shadow-sm border border-base-content/10 scroll-mt-20 animate-up card-hover" style="animation-delay:.05s">
-      <div class="card-body p-4 lg:p-5">
-        <div class="flex items-center justify-between gap-2 mb-1">
-          <div class="flex items-center gap-2">
-            <div class="w-8 h-8 rounded-lg bg-sky-400/15 text-sky-400 flex items-center justify-center shrink-0">
-              <span class="material-symbols-outlined text-lg">credit_card</span>
-            </div>
-            <div>
-              <h2 class="text-sm font-bold">Cards &amp; accounts</h2>
-              <p class="text-[11px] opacity-50">Nicknames, owners &amp; encrypted PDF statement passwords</p>
-            </div>
+    <section id="cards" class="v-panel scroll-mt-20">
+      <div class="v-panel-header flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-sky-400/15 text-sky-400 flex items-center justify-center shrink-0">
+            <span class="material-symbols-outlined text-base">credit_card</span>
           </div>
-          <span class="badge badge-sm badge-ghost opacity-65 font-semibold">{{ sources|length }}</span>
+          <div>
+            <h2 class="v-panel-title">Cards &amp; Accounts</h2>
+            <p class="text-[11px] opacity-50">Nicknames, owners &amp; encrypted PDF passwords</p>
+          </div>
         </div>
+        <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-base-300/70 border border-base-content/10 opacity-70">{{ sources|length }}</span>
+      </div>
 
-        <p class="text-xs opacity-55 mb-3">
-          Detected automatically from transaction alerts. Save a credit card's statement password so monthly PDF statements unlock and reconcile automatically.
-        </p>
-
-        {# Add a card or account drawer at top for quick access #}
-        <details class="rounded-xl bg-primary/8 border border-primary/25 p-3 mb-2.5 group">
+      <div class="v-panel-body">
+        {# Add Card Drawer #}
+        <details class="rounded-xl bg-primary/10 border border-primary/25 p-3 mb-3 group">
           <summary class="flex items-center justify-between gap-2 cursor-pointer list-none text-xs sm:text-sm font-bold text-primary">
             <span class="flex items-center gap-1.5"><span class="material-symbols-outlined text-base">add_card</span>Add a card or bank account</span>
             <span class="material-symbols-outlined text-base opacity-60 group-open:rotate-180 transition-transform">expand_more</span>
           </summary>
-          <form method="post" action="{% url 'expenses_source_add' %}" class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 pt-3 border-t border-primary/15">
+          <form method="post" action="{% url 'expenses_source_add' %}" class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 pt-3 border-t border-primary/20">
             {% csrf_token %}
             {% include 'expenses/_source_fields.html' with s=None %}
             <div class="sm:col-span-2 flex justify-end">
-              <button class="btn btn-primary btn-sm gap-1"><span class="material-symbols-outlined text-base">add</span>Add source</button>
+              <button class="v-btn v-btn-primary text-xs gap-1"><span class="material-symbols-outlined text-sm">add</span>Add source</button>
             </div>
           </form>
         </details>
 
         <div class="flex flex-col gap-2">
           {% for s in sources %}
-          <details class="table-card group !p-3">
+          <details class="p-3 rounded-xl bg-base-300/30 border border-base-content/10 group transition-all">
             <summary class="flex items-center gap-3 cursor-pointer list-none">
-              <span class="jw-type-avatar shrink-0" style="--h:{% if s.kind == 'CREDIT_CARD' %}210{% elif s.kind == 'BANK_ACCOUNT' %}150{% else %}40{% endif %};width:2.35rem;height:2.35rem;border-radius:.75rem">
-                <span class="icon-filled material-symbols-outlined text-lg">{{ s.icon }}</span>
+              <span class="jw-type-avatar shrink-0" style="--h:{% if s.kind == 'CREDIT_CARD' %}210{% elif s.kind == 'BANK_ACCOUNT' %}150{% else %}40{% endif %};width:2.25rem;height:2.25rem;border-radius:.65rem">
+                <span class="icon-filled material-symbols-outlined text-base">{{ s.icon }}</span>
               </span>
               <div class="flex-1 min-w-0">
                 <p class="font-bold text-xs sm:text-sm truncate">{{ s.display_name }}</p>
@@ -277,19 +278,19 @@
                 </p>
               </div>
               {% if s.kind == 'CREDIT_CARD' %}
-              <span class="badge badge-xs {% if s.statement_password_enc %}bg-emerald-500/15 text-emerald-400 border border-emerald-500/30{% else %}bg-amber-500/15 text-amber-300 border border-amber-500/30{% endif %} font-semibold gap-1 shrink-0"
-                    title="{% if s.statement_password_enc %}Statement PDF password saved{% else %}Tap to add statement PDF password{% endif %}">
-                <span class="material-symbols-outlined text-[11px]">{% if s.statement_password_enc %}lock_open{% else %}lock{% endif %}</span>
+              <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full {% if s.statement_password_enc %}bg-emerald-500/15 text-emerald-400 border border-emerald-500/25{% else %}bg-amber-500/15 text-amber-300 border border-amber-500/25{% endif %} flex items-center gap-1 shrink-0"
+                    title="{% if s.statement_password_enc %}Statement PDF password saved{% else %}Set statement PDF password{% endif %}">
+                <span class="material-symbols-outlined text-xs">{% if s.statement_password_enc %}lock_open{% else %}lock{% endif %}</span>
                 <span>{% if s.statement_password_enc %}PDF ready{% else %}Set PDF pwd{% endif %}</span>
               </span>
               {% endif %}
-              <span class="material-symbols-outlined opacity-40 group-open:rotate-180 transition-transform">expand_more</span>
+              <span class="material-symbols-outlined text-base opacity-40 group-open:rotate-180 transition-transform">expand_more</span>
             </summary>
             <form method="post" action="{% url 'expenses_source_edit' s.pk %}" class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 pt-3 border-t border-base-content/10">
               {% csrf_token %}
               {% include 'expenses/_source_fields.html' with s=s %}
               <div class="sm:col-span-2 flex justify-end">
-                <button class="btn btn-primary btn-sm gap-1"><span class="material-symbols-outlined text-base">check</span>Save changes</button>
+                <button class="v-btn v-btn-primary text-xs gap-1"><span class="material-symbols-outlined text-sm">check</span>Save changes</button>
               </div>
             </form>
           </details>
@@ -300,32 +301,32 @@
 
   </div>
 
-  {# --- RIGHT COLUMN (7 cols on desktop): Categories + Learned Rules --- #}
-  <div id="stgRightCol" class="lg:col-span-7 flex flex-col gap-4 lg:gap-6">
+  {# --- RIGHT COLUMN (7 cols): Categories + Learned Rules --- #}
+  <div id="stgRightCol" class="lg:col-span-7 flex flex-col gap-5">
 
     {# --- 3. Categories --- #}
-    <section id="categories" class="card bg-base-200/80 shadow-sm border border-base-content/10 scroll-mt-20 animate-up card-hover" style="animation-delay:.1s">
-      <div class="card-body p-4 lg:p-5">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1">
-          <div class="flex items-center gap-2">
-            <div class="w-8 h-8 rounded-lg bg-orange-400/15 text-orange-400 flex items-center justify-center shrink-0">
-              <span class="material-symbols-outlined text-lg">category</span>
-            </div>
-            <div>
-              <h2 class="text-sm font-bold">Categories</h2>
-              <p class="text-[11px] opacity-50"><strong>Transfer</strong> categories (investments, card bill payments) never count as spend</p>
-            </div>
+    <section id="categories" class="v-panel scroll-mt-20">
+      <div class="v-panel-header flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-amber-400/15 text-amber-400 flex items-center justify-center shrink-0">
+            <span class="material-symbols-outlined text-base">category</span>
           </div>
-          <span class="badge badge-sm badge-ghost opacity-65 font-semibold self-start sm:self-auto">{{ categories|length }} total</span>
+          <div>
+            <h2 class="v-panel-title">Categories</h2>
+            <p class="text-[11px] opacity-50">Transfer categories never count against spend</p>
+          </div>
         </div>
+        <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-base-300/70 border border-base-content/10 opacity-70 self-start sm:self-auto">{{ categories|length }} total</span>
+      </div>
 
+      <div class="v-panel-body">
         {# Filter bar + Search for Categories #}
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 my-2.5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
           <div class="flex items-center gap-1 overflow-x-auto scrollbar-hide">
-            <button type="button" class="btn btn-xs rounded-lg bg-primary text-primary-content border-0 cat-filter-btn cursor-pointer" data-kind="ALL" onclick="filterSettingsCategories('ALL', this)">All</button>
-            <button type="button" class="btn btn-xs rounded-lg btn-ghost opacity-65 cat-filter-btn cursor-pointer" data-kind="SPEND" onclick="filterSettingsCategories('SPEND', this)">Spend</button>
-            <button type="button" class="btn btn-xs rounded-lg btn-ghost opacity-65 cat-filter-btn cursor-pointer" data-kind="TRANSFER" onclick="filterSettingsCategories('TRANSFER', this)">Transfer</button>
-            <button type="button" class="btn btn-xs rounded-lg btn-ghost opacity-65 cat-filter-btn cursor-pointer" data-kind="INCOME" onclick="filterSettingsCategories('INCOME', this)">Income</button>
+            <button type="button" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-primary text-primary-content cat-filter-btn cursor-pointer transition-colors" data-kind="ALL" onclick="filterSettingsCategories('ALL', this)">All</button>
+            <button type="button" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-base-300/40 border border-base-content/10 opacity-65 hover:opacity-100 cat-filter-btn cursor-pointer transition-colors" data-kind="SPEND" onclick="filterSettingsCategories('SPEND', this)">Spend</button>
+            <button type="button" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-base-300/40 border border-base-content/10 opacity-65 hover:opacity-100 cat-filter-btn cursor-pointer transition-colors" data-kind="TRANSFER" onclick="filterSettingsCategories('TRANSFER', this)">Transfer</button>
+            <button type="button" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-base-300/40 border border-base-content/10 opacity-65 hover:opacity-100 cat-filter-btn cursor-pointer transition-colors" data-kind="INCOME" onclick="filterSettingsCategories('INCOME', this)">Income</button>
           </div>
           <div class="relative sm:w-52">
             <span class="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none opacity-45">
@@ -333,36 +334,36 @@
             </span>
             <input type="search" id="catSearchInput" placeholder="Find category…" autocomplete="off"
                    oninput="filterSettingsCategories()"
-                   class="input input-bordered input-xs w-full pl-8 h-7 rounded-lg bg-base-100 text-xs">
+                   class="w-full pl-8 pr-2.5 py-1 rounded-lg bg-base-300/50 border border-base-content/15 text-xs focus:outline-none focus:border-primary">
           </div>
         </div>
 
         {# New Category Drawer #}
-        <details class="rounded-xl bg-primary/8 border border-primary/25 p-3 mb-3 group">
+        <details class="rounded-xl bg-primary/10 border border-primary/25 p-3 mb-3 group">
           <summary class="flex items-center justify-between gap-2 cursor-pointer list-none text-xs sm:text-sm font-bold text-primary">
             <span class="flex items-center gap-1.5"><span class="material-symbols-outlined text-base">add_circle</span>New category</span>
             <span class="material-symbols-outlined text-base opacity-60 group-open:rotate-180 transition-transform">expand_more</span>
           </summary>
-          <form method="post" action="{% url 'expenses_category_add' %}" class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 pt-3 border-t border-primary/15">
+          <form method="post" action="{% url 'expenses_category_add' %}" class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 pt-3 border-t border-primary/20">
             {% csrf_token %}
             {% include 'expenses/_category_fields.html' with c=None %}
             <div class="sm:col-span-2 flex justify-end">
-              <button class="btn btn-primary btn-sm gap-1"><span class="material-symbols-outlined text-base">add</span>Create category</button>
+              <button class="v-btn v-btn-primary text-xs gap-1"><span class="material-symbols-outlined text-sm">add</span>Create category</button>
             </div>
           </form>
         </details>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-2" id="settingsCategoriesGrid">
           {% for c in categories %}
-          <details class="table-card group !p-2.5 settings-cat-item" data-kind="{{ c.kind }}" data-name="{{ c.name|lower }}">
+          <details class="p-2.5 rounded-xl bg-base-300/30 border border-base-content/10 group settings-cat-item transition-all" data-kind="{{ c.kind }}" data-name="{{ c.name|lower }}">
             <summary class="flex items-center gap-2.5 cursor-pointer list-none">
-              <span class="jw-type-avatar shrink-0" style="--h:{{ c.hue }};width:2.25rem;height:2.25rem;border-radius:.7rem">
-                <span class="icon-filled material-symbols-outlined text-lg">{{ c.icon }}</span>
+              <span class="jw-type-avatar shrink-0" style="--h:{{ c.hue }};width:2.2rem;height:2.2rem;border-radius:.65rem">
+                <span class="icon-filled material-symbols-outlined text-base">{{ c.icon }}</span>
               </span>
               <div class="flex-1 min-w-0">
                 <p class="font-bold text-xs sm:text-sm truncate">{{ c.name }}</p>
                 <div class="flex items-center gap-1.5 mt-0.5">
-                  <span class="badge badge-xs {% if c.kind == 'TRANSFER' %}badge-secondary badge-soft{% elif c.kind == 'INCOME' %}badge-success badge-soft{% else %}badge-ghost opacity-75{% endif %} text-[9px] font-semibold">
+                  <span class="text-[9px] font-bold px-1.5 py-0.2 rounded {% if c.kind == 'TRANSFER' %}bg-violet-500/15 text-violet-400{% elif c.kind == 'INCOME' %}bg-emerald-500/15 text-emerald-400{% else %}bg-base-content/10 opacity-75{% endif %}">
                     {{ c.get_kind_display }}
                   </span>
                   <span class="text-[10px] opacity-50 tabular-nums">{{ c.n }} txn{{ c.n|pluralize }}</span>
@@ -374,11 +375,11 @@
               {% csrf_token %}
               {% include 'expenses/_category_fields.html' with c=c %}
               <div class="sm:col-span-2 flex items-center justify-between pt-1">
-                <button type="button" class="btn btn-ghost btn-xs text-error gap-1"
+                <button type="button" class="v-btn v-btn-ghost text-xs text-rose-400 gap-1 px-2 py-1"
                         onclick="confirmDelete('catDel{{ c.pk }}', 'Delete {{ c.name|escapejs }}? Its {{ c.n }} transaction{{ c.n|pluralize }} will become uncategorised.')">
                   <span class="material-symbols-outlined text-sm">delete</span>Delete
                 </button>
-                <button class="btn btn-primary btn-sm gap-1"><span class="material-symbols-outlined text-base">check</span>Save</button>
+                <button class="v-btn v-btn-primary text-xs gap-1 px-3 py-1"><span class="material-symbols-outlined text-sm">check</span>Save</button>
               </div>
             </form>
             <form method="post" action="{% url 'expenses_category_delete' c.pk %}" id="catDel{{ c.pk }}" class="hidden">{% csrf_token %}</form>
@@ -389,35 +390,35 @@
     </section>
 
     {# --- 4. Learned Rules --- #}
-    <section id="rules" class="card bg-base-200/80 shadow-sm border border-base-content/10 scroll-mt-20 animate-up card-hover" style="animation-delay:.15s">
-      <div class="card-body p-4 lg:p-5">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1">
-          <div class="flex items-center gap-2">
-            <div class="w-8 h-8 rounded-lg bg-purple-400/15 text-purple-400 flex items-center justify-center shrink-0">
-              <span class="material-symbols-outlined text-lg">auto_awesome</span>
-            </div>
-            <div>
-              <h2 class="text-sm font-bold">Learned rules</h2>
-              <p class="text-[11px] opacity-50">
-                <span class="badge badge-xs badge-primary badge-soft font-bold">You</span> rules always win;
-                <span class="badge badge-xs badge-ghost font-semibold">AI</span> rules are cached guesses
-              </p>
-            </div>
+    <section id="rules" class="v-panel scroll-mt-20">
+      <div class="v-panel-header flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <div class="w-7 h-7 rounded-lg bg-purple-400/15 text-purple-400 flex items-center justify-center shrink-0">
+            <span class="material-symbols-outlined text-base">auto_awesome</span>
           </div>
-          <span class="badge badge-sm badge-ghost opacity-65 font-semibold self-start sm:self-auto">{{ rules|length }} rule{{ rules|length|pluralize }}</span>
+          <div>
+            <h2 class="v-panel-title">Learned Rules</h2>
+            <p class="text-[11px] opacity-50">
+              <span class="text-primary font-bold">You</span> rules always win;
+              <span class="opacity-70 font-semibold">AI</span> rules are predictive guesses
+            </p>
+          </div>
         </div>
+        <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-base-300/70 border border-base-content/10 opacity-70 self-start sm:self-auto">{{ rules|length }} rule{{ rules|length|pluralize }}</span>
+      </div>
 
+      <div class="v-panel-body">
         {% if rules %}
         {# Filter & Search bar for Rules #}
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 my-2.5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
           <div class="flex items-center gap-1 overflow-x-auto scrollbar-hide">
-            <button type="button" class="btn btn-xs rounded-lg bg-primary text-primary-content border-0 rule-filter-btn cursor-pointer" data-source="ALL" onclick="filterSettingsRules('ALL', this)">
+            <button type="button" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-primary text-primary-content rule-filter-btn cursor-pointer transition-colors" data-source="ALL" onclick="filterSettingsRules('ALL', this)">
               All ({{ rules|length }})
             </button>
-            <button type="button" class="btn btn-xs rounded-lg btn-ghost opacity-65 rule-filter-btn cursor-pointer" data-source="USER" onclick="filterSettingsRules('USER', this)">
+            <button type="button" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-base-300/40 border border-base-content/10 opacity-65 hover:opacity-100 rule-filter-btn cursor-pointer transition-colors" data-source="USER" onclick="filterSettingsRules('USER', this)">
               You ({{ user_rules_count }})
             </button>
-            <button type="button" class="btn btn-xs rounded-lg btn-ghost opacity-65 rule-filter-btn cursor-pointer" data-source="AI" onclick="filterSettingsRules('AI', this)">
+            <button type="button" class="px-2.5 py-1 rounded-lg text-xs font-semibold bg-base-300/40 border border-base-content/10 opacity-65 hover:opacity-100 rule-filter-btn cursor-pointer transition-colors" data-source="AI" onclick="filterSettingsRules('AI', this)">
               AI ({{ ai_rules_count }})
             </button>
           </div>
@@ -427,26 +428,26 @@
             </span>
             <input type="search" id="ruleSearchInput" placeholder="Search merchant or category…" autocomplete="off"
                    oninput="filterSettingsRules()"
-                   class="input input-bordered input-xs w-full pl-8 h-7 rounded-lg bg-base-100 text-xs">
+                   class="w-full pl-8 pr-2.5 py-1 rounded-lg bg-base-300/50 border border-base-content/15 text-xs focus:outline-none focus:border-primary">
           </div>
         </div>
 
         <div class="flex flex-col gap-1.5 max-h-[460px] overflow-y-auto pr-0.5 scrollbar-thin" id="settingsRulesList">
           {% for r in rules %}
-          <div class="table-card flex items-center gap-2.5 !py-2 !px-3 settings-rule-item"
+          <div class="p-2.5 rounded-xl bg-base-300/30 border border-base-content/10 flex items-center gap-2.5 settings-rule-item"
                data-source="{{ r.source }}"
                data-search="{{ r.merchant_label|default:r.merchant_key|lower }} {{ r.category.name|lower }}">
-            <span class="badge badge-xs {% if r.source == 'USER' %}badge-primary badge-soft font-bold{% else %}badge-ghost opacity-70{% endif %} w-9 justify-center shrink-0">
+            <span class="text-[9px] font-bold px-1.5 py-0.5 rounded {% if r.source == 'USER' %}bg-primary/20 text-primary border border-primary/30{% else %}bg-base-content/10 opacity-70{% endif %} w-9 text-center shrink-0">
               {% if r.source == 'USER' %}You{% else %}AI{% endif %}
             </span>
             <span class="text-xs sm:text-sm font-semibold truncate flex-1 min-w-0">{{ r.merchant_label|default:r.merchant_key }}</span>
             <span class="material-symbols-outlined text-xs opacity-30 shrink-0">arrow_forward</span>
-            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-base-300/70 border border-base-content/10 text-xs font-medium truncate max-w-[42%] shrink-0">
+            <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-base-200/80 border border-base-content/10 text-xs font-medium truncate max-w-[42%] shrink-0">
               <span class="icon-filled material-symbols-outlined text-xs" style="color:hsl({{ r.category.hue|default:230 }} 70% 68%)">{{ r.category.icon|default:'category' }}</span>
               <span class="truncate">{{ r.category.name }}</span>
             </span>
             <form method="post" action="{% url 'expenses_rule_delete' r.pk %}" class="shrink-0">{% csrf_token %}
-              <button class="btn btn-ghost btn-xs btn-square opacity-60 hover:opacity-100 hover:text-error" title="Forget rule" aria-label="Forget rule">
+              <button class="v-btn v-btn-ghost p-1 opacity-60 hover:opacity-100 hover:text-rose-400" title="Forget rule" aria-label="Forget rule">
                 <span class="material-symbols-outlined text-sm">close</span>
               </button>
             </form>
@@ -455,7 +456,7 @@
         </div>
         <p id="settingsRulesEmpty" class="text-xs opacity-50 text-center py-6 hidden">No matching rules found.</p>
         {% else %}
-        <div class="p-6 rounded-xl bg-base-300/40 border border-dashed border-base-content/15 text-center mt-2">
+        <div class="p-6 rounded-xl bg-base-300/30 border border-dashed border-base-content/15 text-center mt-2">
           <span class="material-symbols-outlined text-2xl opacity-40 mb-1">psychology</span>
           <p class="text-xs font-bold opacity-75">Nothing learned yet</p>
           <p class="text-[11px] opacity-50 mt-0.5">Edit any transaction's category and check "Remember for this merchant" to teach Vault.</p>
@@ -505,7 +506,7 @@ function filterSettingsCategories(kind, btnEl) {
       var active = b === btnEl;
       b.classList.toggle('bg-primary', active);
       b.classList.toggle('text-primary-content', active);
-      b.classList.toggle('btn-ghost', !active);
+      b.classList.toggle('bg-base-300/40', !active);
       b.classList.toggle('opacity-65', !active);
     });
   }
@@ -524,7 +525,7 @@ function filterSettingsRules(source, btnEl) {
       var active = b === btnEl;
       b.classList.toggle('bg-primary', active);
       b.classList.toggle('text-primary-content', active);
-      b.classList.toggle('btn-ghost', !active);
+      b.classList.toggle('bg-base-300/40', !active);
       b.classList.toggle('opacity-65', !active);
     });
   }
@@ -544,9 +545,22 @@ function filterSettingsRules(source, btnEl) {
 function selectSettingsTab(tab, evt) {
   if (evt) evt.preventDefault();
   var sections = ['gmail', 'cards', 'categories', 'rules'];
-  sections.concat(['all']).forEach(function (k) {
-    var btn = document.getElementById('stgTabBtn-' + k);
-    if (btn) btn.classList.toggle('is-active', k === tab);
+  var allButtons = {
+    all: document.getElementById('stgTabBtn-all'),
+    gmail: document.getElementById('stgTabBtn-gmail'),
+    cards: document.getElementById('stgTabBtn-cards'),
+    categories: document.getElementById('stgTabBtn-categories'),
+    rules: document.getElementById('stgTabBtn-rules')
+  };
+
+  Object.keys(allButtons).forEach(function (k) {
+    var btn = allButtons[k];
+    if (!btn) return;
+    var active = k === tab;
+    btn.classList.toggle('bg-primary', active);
+    btn.classList.toggle('text-primary-content', active);
+    btn.classList.toggle('bg-base-300/40', !active);
+    btn.classList.toggle('opacity-70', !active);
   });
 
   var leftCol = document.getElementById('stgLeftCol');

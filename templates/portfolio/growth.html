@@ -2,22 +2,22 @@
 {% load indian_format %}
 {% load static %}
 
-{% block title %}Growth | Portfolio | Vault{% endblock %}
+{% block title %}Capital Growth &amp; Compounding | Vault{% endblock %}
 
 {% block page_header %}
-<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+<div class="v-page-header">
   <div>
-    <h1 class="text-xl lg:text-3xl font-extrabold tracking-tight">{{ fy_label }}</h1>
-    <p class="text-xs opacity-50 mt-0.5">Track money added vs returns over time</p>
+    <h1 class="v-title">{{ fy_label }} Capital Growth &amp; Compounding</h1>
+    <p class="v-subtitle">Deconstruct monthly capital additions from market compounding gains</p>
   </div>
-  <div class="flex flex-wrap items-center gap-2 sm:gap-2 justify-center sm:justify-start w-full sm:w-auto">
+  <div class="v-toolbar">
     <div class="fy-tabs" id="fySwitcher">
       {% for fy in fy_options %}
       <a href="?fy={{ fy }}" class="fy-tab {% if fy == fy_year %}fy-tab-active{% endif %}">{{ fy }}-{{ fy|add:1 }}</a>
       {% endfor %}
     </div>
-    <a href="{% url 'portfolio_tracker' %}" class="btn btn-ghost btn-sm gap-1">
-      <span class="material-symbols-outlined text-base">arrow_back</span>Portfolio
+    <a href="{% url 'portfolio_tracker' %}" class="v-btn v-btn-secondary">
+      <span class="material-symbols-outlined text-sm">arrow_back</span>Portfolio
     </a>
   </div>
 </div>
@@ -25,190 +25,254 @@
 
 {% block content %}
 
-{# --- VIEW TOGGLE --- #}
-<div class="join animate-up mb-4">
-  <button type="button" class="join-item btn btn-sm btn-primary gap-1" id="btnMonthly" onclick="switchView('monthly')">
-    <span class="material-symbols-outlined text-base">calendar_view_month</span>Monthly
-  </button>
-  <button type="button" class="join-item btn btn-sm btn-ghost gap-1" id="btnYearly" onclick="switchView('yearly')">
-    <span class="material-symbols-outlined text-base">bar_chart</span>Yearly
-  </button>
+{# --- VIEW TOGGLE & KPI STRIP --- #}
+<div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+  <div class="v-segmented">
+    <button type="button" class="v-segmented-item is-active" id="btnMonthly" onclick="switchView('monthly')">
+      <span class="material-symbols-outlined text-sm">calendar_view_month</span>Monthly Trajectory
+    </button>
+    <button type="button" class="v-segmented-item" id="btnYearly" onclick="switchView('yearly')">
+      <span class="material-symbols-outlined text-sm">bar_chart</span>Multi-Year History
+    </button>
+  </div>
 </div>
 
-{# --- MONTHLY VIEW --- #}
+{# --- MONTHLY VIEW WORKBENCH --- #}
 <div id="monthlyView">
-
-{# Charts #}
-<div class="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4 animate-up">
-  <div class="card bg-base-200 shadow-sm card-hover lg:col-span-3">
-    <div class="card-body p-4">
-      <h2 class="card-title text-base">Monthly Growth Breakdown</h2>
-      <div class="chart-wrap"><canvas id="growthBar"></canvas></div>
+  {# Side-by-side Chart Panels #}
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
+    <div class="lg:col-span-7">
+      <div class="v-panel h-full">
+        <div class="v-panel-header">
+          <h2 class="v-panel-title">
+            <span class="material-symbols-outlined text-base text-primary">stacked_bar_chart</span>
+            Monthly Capital Additions vs. Market P&amp;L
+          </h2>
+          <span class="text-xs text-base-content/50">12 Months</span>
+        </div>
+        <div class="v-panel-body">
+          <div class="chart-wrap" style="height:260px"><canvas id="growthBar"></canvas></div>
+        </div>
+      </div>
+    </div>
+    <div class="lg:col-span-5">
+      <div class="v-panel h-full">
+        <div class="v-panel-header">
+          <h2 class="v-panel-title">
+            <span class="material-symbols-outlined text-base text-emerald-400">trending_up</span>
+            Portfolio Net Worth Trajectory
+          </h2>
+          <span class="text-xs text-base-content/50">FY Close Curves</span>
+        </div>
+        <div class="v-panel-body">
+          <div class="chart-wrap" style="height:260px"><canvas id="valueChart"></canvas></div>
+        </div>
+      </div>
     </div>
   </div>
-  <div class="card bg-base-200 shadow-sm card-hover lg:col-span-2">
-    <div class="card-body p-4">
-      <h2 class="card-title text-base">Portfolio Value</h2>
-      <div class="chart-wrap"><canvas id="valueChart"></canvas></div>
-    </div>
-  </div>
-</div>
 
-{# Monthly table #}
-<div class="card bg-base-200 shadow-sm card-hover animate-up mb-4" style="animation-delay:0.1s">
-  <div class="card-body p-4">
-    <h2 class="card-title text-base mb-2">Monthly Snapshots</h2>
-    {# Desktop table #}
-    <div class="hidden md:block overflow-x-auto">
-      <table class="table table-sm hover">
-        <thead>
-          <tr>
-            <th>Month</th>
-            <th class="text-right">Total Value</th>
-            <th class="text-right">Invested</th>
-            <th class="text-right">Returns</th>
-            <th class="text-right">Money Added</th>
-            <th class="text-right">Returns Gained</th>
-          </tr>
-        </thead>
-        <tbody>
+  {# Monthly Snapshot Ledger Table #}
+  <div class="v-panel mb-4">
+    <div class="v-panel-header">
+      <h2 class="v-panel-title">
+        <span class="material-symbols-outlined text-base text-primary">table_chart</span>
+        Monthly Fiscal Snapshots
+      </h2>
+      <span class="text-xs text-base-content/50">{{ fy_label }} Audit Trail</span>
+    </div>
+    <div class="v-panel-body p-0">
+      {# Desktop Table #}
+      <div class="v-table-wrap">
+        <table class="v-table">
+          <thead>
+            <tr>
+              <th>Fiscal Month</th>
+              <th class="v-num">Closing Net Worth</th>
+              <th class="v-num">Invested Capital</th>
+              <th class="v-num">Cumulative Returns</th>
+              <th class="v-num">Fresh Capital Added</th>
+              <th class="v-num">Market Compounding</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in months %}
+            <tr {% if not m.snapshot %}class="opacity-40"{% endif %}>
+              <td class="font-bold text-base-content">{{ m.name }}</td>
+              <td class="v-num font-bold text-base-content">
+                {% if m.snapshot %}{{ m.total_value|inr }}{% else %}&mdash;{% endif %}
+              </td>
+              <td class="v-num text-base-content/70">
+                {% if m.snapshot %}{{ m.invested|inr }}{% else %}&mdash;{% endif %}
+              </td>
+              <td class="v-num">
+                {% if m.snapshot %}
+                  <span class="{% if m.returns >= 0 %}text-emerald-400 font-semibold{% else %}text-rose-400 font-semibold{% endif %}">
+                    {% if m.returns >= 0 %}+{% endif %}{{ m.returns|inr }}
+                  </span>
+                {% else %}&mdash;{% endif %}
+              </td>
+              <td class="v-num">
+                {% if m.snapshot and m.money_added %}
+                  <span class="text-emerald-400 font-semibold">+{{ m.money_added|inr }}</span>
+                {% elif m.snapshot %}<span class="text-base-content/40">₹0</span>{% else %}&mdash;{% endif %}
+              </td>
+              <td class="v-num">
+                {% if m.snapshot %}
+                  <span class="{% if m.returns_gained >= 0 %}text-emerald-400 font-semibold{% else %}text-rose-400 font-semibold{% endif %}">
+                    {% if m.returns_gained >= 0 %}+{% endif %}{{ m.returns_gained|inr }}
+                  </span>
+                {% else %}&mdash;{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {# Mobile Row View #}
+      <div class="md:hidden divide-y divide-base-content/6">
         {% for m in months %}
-        <tr{% if not m.snapshot %} class="opacity-40"{% endif %}>
-          <td class="font-bold">{{ m.name }}</td>
-          <td class="text-right font-bold">
-            {% if m.snapshot %}{{ m.total_value|inr }}{% else %}-{% endif %}
-          </td>
-          <td class="text-right">
-            {% if m.snapshot %}{{ m.invested|inr }}{% else %}-{% endif %}
-          </td>
-          <td class="text-right">
-            {% if m.snapshot %}
-              <span class="{% if m.returns >= 0 %}text-success{% else %}text-error{% endif %}">
-                {% if m.returns >= 0 %}+{% endif %}{{ m.returns|inr }}
-              </span>
-            {% else %}-{% endif %}
-          </td>
-          <td class="text-right whitespace-nowrap">
-            {% if m.snapshot and m.money_added %}
-              <span class="text-success">+{{ m.money_added|inr }}</span>
-            {% elif m.snapshot %}<span class="opacity-40">₹0</span>{% else %}-{% endif %}
-          </td>
-          <td class="text-right whitespace-nowrap">
-            {% if m.snapshot %}
-              <span class="{% if m.returns_gained >= 0 %}text-success{% else %}text-error{% endif %}">
+        <div class="p-3.5 {% if not m.snapshot %}opacity-40{% endif %}">
+          <div class="flex items-center justify-between gap-2">
+            <span class="font-bold text-xs text-base-content">{{ m.name }}</span>
+            <span class="font-bold text-xs tabular-nums text-base-content">
+              {% if m.snapshot %}{{ m.total_value|inr }}{% else %}&mdash;{% endif %}
+            </span>
+          </div>
+          {% if m.snapshot %}
+          <div class="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-base-content/6 text-[11px]">
+            <div class="flex justify-between">
+              <span class="text-base-content/50">Capital Added</span>
+              <span class="text-emerald-400 font-semibold tabular-nums">{% if m.money_added %}+{{ m.money_added|inr }}{% else %}₹0{% endif %}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-base-content/50">Market Return</span>
+              <span class="{% if m.returns_gained >= 0 %}text-emerald-400 font-semibold{% else %}text-rose-400 font-semibold{% endif %} tabular-nums">
                 {% if m.returns_gained >= 0 %}+{% endif %}{{ m.returns_gained|inr }}
               </span>
-            {% else %}-{% endif %}
-          </td>
-        </tr>
+            </div>
+          </div>
+          {% endif %}
+        </div>
         {% endfor %}
-        </tbody>
-      </table>
-    </div>
-    {# Mobile card view #}
-    <div class="md:hidden space-y-2">
-      {% for m in months %}
-      <div class="table-card {% if not m.snapshot %}opacity-40{% endif %}">
-        <div class="flex items-center justify-between gap-2">
-          <span class="font-bold text-sm">{{ m.name }}</span>
-          <span class="font-bold text-sm">{% if m.snapshot %}{{ m.total_value|inr }}{% else %}-{% endif %}</span>
-        </div>
-        {% if m.snapshot %}
-        <div class="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-xs">
-          <div class="flex justify-between"><span class="opacity-50">Added</span><span class="text-success font-semibold">{% if m.money_added %}+{{ m.money_added|inr }}{% else %}₹0{% endif %}</span></div>
-          <div class="flex justify-between"><span class="opacity-50">Returns</span><span class="{% if m.returns_gained >= 0 %}text-success{% else %}text-error{% endif %} font-semibold">{% if m.returns_gained >= 0 %}+{% endif %}{{ m.returns_gained|inr }}</span></div>
-        </div>
-        {% endif %}
       </div>
-      {% endfor %}
     </div>
   </div>
-</div>
-
 </div>{# /monthlyView #}
 
-{# --- YEARLY VIEW --- #}
+{# --- YEARLY VIEW WORKBENCH --- #}
 <div id="yearlyView" class="hidden">
-
-<div class="grid grid-cols-1 lg:grid-cols-5 gap-4 mb-4 animate-up">
-  <div class="card bg-base-200 shadow-sm card-hover lg:col-span-3">
-    <div class="card-body p-4">
-      <h2 class="card-title text-base">Yearly Growth Breakdown</h2>
-      <div class="chart-wrap"><canvas id="yearlyBar"></canvas></div>
-    </div>
-  </div>
-  <div class="card bg-base-200 shadow-sm card-hover lg:col-span-2">
-    <div class="card-body p-4">
-      <h2 class="card-title text-base">Portfolio Value (Year-End)</h2>
-      <div class="chart-wrap"><canvas id="yearlyValueChart"></canvas></div>
-    </div>
-  </div>
-</div>
-
-<div class="card bg-base-200 shadow-sm card-hover animate-up mb-4" style="animation-delay:0.1s">
-  <div class="card-body p-4">
-    <h2 class="card-title text-base mb-2">Yearly Summary</h2>
-    {# Desktop table #}
-    <div class="hidden md:block overflow-x-auto">
-      <table class="table table-sm hover">
-        <thead>
-          <tr>
-            <th>Financial Year</th>
-            <th class="text-right">Total Value</th>
-            <th class="text-right">Invested</th>
-            <th class="text-right">Returns</th>
-            <th class="text-right">Money Added</th>
-            <th class="text-right">Returns Gained</th>
-          </tr>
-        </thead>
-        <tbody>
-        {% for y in yearly %}
-        <tr>
-          <td class="font-bold">{{ y.label }}</td>
-          <td class="text-right font-bold">{{ y.total_value|inr }}</td>
-          <td class="text-right">{{ y.invested|inr }}</td>
-          <td class="text-right">
-            <span class="{% if y.returns >= 0 %}text-success{% else %}text-error{% endif %}">
-              {% if y.returns >= 0 %}+{% endif %}{{ y.returns|inr }}
-            </span>
-          </td>
-          <td class="text-right whitespace-nowrap">
-            <span class="text-success">+{{ y.money_added|inr }}</span>
-          </td>
-          <td class="text-right whitespace-nowrap">
-            <span class="{% if y.returns_gained >= 0 %}text-success{% else %}text-error{% endif %}">
-              {% if y.returns_gained >= 0 %}+{% endif %}{{ y.returns_gained|inr }}
-            </span>
-          </td>
-        </tr>
-        {% endfor %}
-        {% if not yearly %}
-        <tr><td colspan="6" class="text-center opacity-60 py-4">No yearly data yet. Snapshots will accumulate over time.</td></tr>
-        {% endif %}
-        </tbody>
-      </table>
-    </div>
-    {# Mobile card view #}
-    <div class="md:hidden space-y-2">
-      {% for y in yearly %}
-      <div class="table-card">
-        <div class="flex items-center justify-between gap-2">
-          <span class="font-bold text-sm">{{ y.label }}</span>
-          <span class="font-bold text-sm">{{ y.total_value|inr }}</span>
+  {# Yearly Charts #}
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-4">
+    <div class="lg:col-span-7">
+      <div class="v-panel h-full">
+        <div class="v-panel-header">
+          <h2 class="v-panel-title">
+            <span class="material-symbols-outlined text-base text-primary">stacked_bar_chart</span>
+            Multi-Year Capital Flow vs. Market Gain
+          </h2>
+          <span class="text-xs text-base-content/50">Annual Breakdown</span>
         </div>
-        <div class="grid grid-cols-2 gap-x-4 gap-y-1 mt-2 text-xs">
-          <div class="flex justify-between"><span class="opacity-50">Added</span><span class="text-success font-semibold">+{{ y.money_added|inr }}</span></div>
-          <div class="flex justify-between"><span class="opacity-50">Returns</span><span class="{% if y.returns_gained >= 0 %}text-success{% else %}text-error{% endif %} font-semibold">{% if y.returns_gained >= 0 %}+{% endif %}{{ y.returns_gained|inr }}</span></div>
+        <div class="v-panel-body">
+          <div class="chart-wrap" style="height:260px"><canvas id="yearlyBar"></canvas></div>
         </div>
       </div>
-      {% endfor %}
-      {% if not yearly %}
-      <p class="text-center opacity-60 py-4 text-sm">No yearly data yet.</p>
-      {% endif %}
+    </div>
+    <div class="lg:col-span-5">
+      <div class="v-panel h-full">
+        <div class="v-panel-header">
+          <h2 class="v-panel-title">
+            <span class="material-symbols-outlined text-base text-emerald-400">show_chart</span>
+            Annual Net Worth Compounding
+          </h2>
+          <span class="text-xs text-base-content/50">March 31 Snapshots</span>
+        </div>
+        <div class="v-panel-body">
+          <div class="chart-wrap" style="height:260px"><canvas id="yearlyValueChart"></canvas></div>
+        </div>
+      </div>
     </div>
   </div>
-</div>
 
+  {# Yearly Summary Table #}
+  <div class="v-panel mb-4">
+    <div class="v-panel-header">
+      <h2 class="v-panel-title">
+        <span class="material-symbols-outlined text-base text-primary">history</span>
+        Annual Fiscal Year Summary Ledger
+      </h2>
+      <span class="text-xs text-base-content/50">Cumulative Track Record</span>
+    </div>
+    <div class="v-panel-body p-0">
+      <div class="v-table-wrap">
+        <table class="v-table">
+          <thead>
+            <tr>
+              <th>Financial Year</th>
+              <th class="v-num">Year-End Net Worth</th>
+              <th class="v-num">Invested Capital</th>
+              <th class="v-num">Total Returns</th>
+              <th class="v-num">Fresh Capital Added</th>
+              <th class="v-num">Market Compounding</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for y in yearly %}
+            <tr>
+              <td class="font-bold text-base-content">{{ y.label }}</td>
+              <td class="v-num font-bold text-base-content">{{ y.total_value|inr }}</td>
+              <td class="v-num text-base-content/70">{{ y.invested|inr }}</td>
+              <td class="v-num">
+                <span class="{% if y.returns >= 0 %}text-emerald-400 font-semibold{% else %}text-rose-400 font-semibold{% endif %}">
+                  {% if y.returns >= 0 %}+{% endif %}{{ y.returns|inr }}
+                </span>
+              </td>
+              <td class="v-num">
+                <span class="text-emerald-400 font-semibold">+{{ y.money_added|inr }}</span>
+              </td>
+              <td class="v-num">
+                <span class="{% if y.returns_gained >= 0 %}text-emerald-400 font-semibold{% else %}text-rose-400 font-semibold{% endif %}">
+                  {% if y.returns_gained >= 0 %}+{% endif %}{{ y.returns_gained|inr }}
+                </span>
+              </td>
+            </tr>
+            {% endfor %}
+            {% if not yearly %}
+            <tr>
+              <td colspan="6" class="text-center text-xs text-base-content/50 py-6">
+                No closed yearly snapshots available. Historical financial year closures will accumulate automatically on March 31.
+              </td>
+            </tr>
+            {% endif %}
+          </tbody>
+        </table>
+      </div>
+
+      {# Mobile Yearly View #}
+      <div class="md:hidden divide-y divide-base-content/6">
+        {% for y in yearly %}
+        <div class="p-3.5">
+          <div class="flex items-center justify-between gap-2">
+            <span class="font-bold text-xs text-base-content">{{ y.label }}</span>
+            <span class="font-bold text-xs tabular-nums text-base-content">{{ y.total_value|inr }}</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-base-content/6 text-[11px]">
+            <div class="flex justify-between">
+              <span class="text-base-content/50">Capital Added</span>
+              <span class="text-emerald-400 font-semibold tabular-nums">+{{ y.money_added|inr }}</span>
+            </div>
+            <div class="flex justify-between">
+              <span class="text-base-content/50">Market Return</span>
+              <span class="{% if y.returns_gained >= 0 %}text-emerald-400 font-semibold{% else %}text-rose-400 font-semibold{% endif %} tabular-nums">
+                {% if y.returns_gained >= 0 %}+{% endif %}{{ y.returns_gained|inr }}
+              </span>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
 </div>{# /yearlyView #}
 
 {{ growth_chart_data|json_script:"growth-data" }}
@@ -221,8 +285,6 @@
 
 {% block extra_js %}
 <script>
-
-
 function switchView(view) {
   var monthly = document.getElementById('monthlyView');
   var yearly = document.getElementById('yearlyView');
@@ -231,17 +293,13 @@ function switchView(view) {
   if (view === 'yearly') {
     monthly.classList.add('hidden');
     yearly.classList.remove('hidden');
-    btnM.classList.remove('btn-primary');
-    btnM.classList.add('btn-ghost');
-    btnY.classList.remove('btn-ghost');
-    btnY.classList.add('btn-primary');
+    btnM.classList.remove('is-active');
+    btnY.classList.add('is-active');
   } else {
     monthly.classList.remove('hidden');
     yearly.classList.add('hidden');
-    btnM.classList.remove('btn-ghost');
-    btnM.classList.add('btn-primary');
-    btnY.classList.remove('btn-primary');
-    btnY.classList.add('btn-ghost');
+    btnY.classList.remove('is-active');
+    btnM.classList.add('is-active');
   }
 }
 </script>

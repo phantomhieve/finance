@@ -1,194 +1,333 @@
 {% extends 'base.html' %}
 {% load indian_format %}
 
-{% block title %}{{ statement.payment_source.display_name }} statement | Vault{% endblock %}
+{% block title %}{{ statement.payment_source.display_name }} Statement | Vault{% endblock %}
 
 {% block page_header %}
-<div class="flex items-start justify-between gap-3">
+<div class="v-page-header">
   <div class="min-w-0">
-    <h1 class="text-xl lg:text-3xl font-extrabold tracking-tight truncate">{{ statement.payment_source.display_name }}</h1>
-    {% if statement.statement_date %}<p class="text-xs opacity-50 mt-0.5">{% if statement.period_start %}{{ statement.period_start|date:"j M" }} → {% endif %}{{ statement.statement_date|date:"j M Y" }}</p>{% endif %}
+    <div class="flex items-center gap-2">
+      <h1 class="v-title truncate">{{ statement.payment_source.display_name }}</h1>
+      {% if statement.is_paid %}
+      <span class="v-delta v-delta-pos text-[10px] py-0.5">
+        <span class="material-symbols-outlined text-xs">check_circle</span>Paid
+      </span>
+      {% elif statement.due_date and statement.due_date < today %}
+      <span class="v-delta v-delta-neg text-[10px] py-0.5">Overdue</span>
+      {% endif %}
+    </div>
+    {% if statement.statement_date %}
+    <p class="v-subtitle">
+      {% if statement.period_start %}{{ statement.period_start|date:"j M" }} → {% endif %}{{ statement.statement_date|date:"j M Y" }} Statement Cycle
+    </p>
+    {% endif %}
   </div>
-  <a href="{% url 'expenses_statements' %}" class="btn btn-ghost btn-sm gap-1 shrink-0"><span class="material-symbols-outlined text-base">arrow_back</span><span class="hidden sm:inline">Statements</span></a>
+
+  <div class="v-toolbar">
+    <a href="{% url 'expenses_statements' %}" class="v-btn v-btn-secondary">
+      <span class="material-symbols-outlined text-[17px]">arrow_back</span>
+      <span>All Statements</span>
+    </a>
+
+    <form method="post" action="{% url 'expenses_statement_paid' statement.pk %}">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <button class="v-btn {% if statement.is_paid %}v-btn-secondary{% else %}v-btn-primary bg-emerald-600 hover:bg-emerald-500 border-emerald-600{% endif %}">
+        <span class="material-symbols-outlined text-[17px]">{% if statement.is_paid %}undo{% else %}task_alt{% endif %}</span>
+        <span>{% if statement.is_paid %}Mark Unpaid{% else %}Mark as Paid{% endif %}</span>
+      </button>
+    </form>
+  </div>
 </div>
 {% endblock %}
 
 {% block content %}
-<div class="max-w-3xl flex flex-col gap-4">
 
-  <div class="card hero-gradient-portfolio shadow-sm animate-up">
-    <div class="card-body p-4 lg:p-5">
-      <div class="flex items-start justify-between gap-3">
-        <div>
-          <p class="text-[10px] font-bold uppercase tracking-widest opacity-40">Total due</p>
-          <p class="text-3xl font-extrabold tabular-nums mt-1">{% if statement.total_due is not None %}{{ statement.total_due|inr }}{% else %}-{% endif %}</p>
-          <p class="text-xs mt-1 {% if not statement.is_paid and statement.due_date and statement.due_date < today %}text-error{% else %}opacity-55{% endif %}">
-            {% if statement.is_paid %}Paid{% if statement.paid_at %} on {{ statement.paid_at|date:"j M" }}{% endif %}{% if statement.paid_amount %} · {{ statement.paid_amount|inr }}{% endif %}
-            {% elif statement.due_date %}Due {{ statement.due_date|date:"D, j M Y" }}{% endif %}
-            {% if statement.min_due %} · Minimum {{ statement.min_due|inr }}{% endif %}
-          </p>
-        </div>
-        <form method="post" action="{% url 'expenses_statement_paid' statement.pk %}" class="shrink-0">{% csrf_token %}
-          <input type="hidden" name="next" value="{{ request.get_full_path }}">
-          <button class="btn btn-sm {% if statement.is_paid %}btn-ghost{% else %}btn-success{% endif %} gap-1 whitespace-nowrap">
-            <span class="material-symbols-outlined text-base">{% if statement.is_paid %}undo{% else %}task_alt{% endif %}</span>{% if statement.is_paid %}Mark unpaid{% else %}Mark paid{% endif %}
-          </button>
-        </form>
-      </div>
+{# --- 1. STATEMENT LEDGER SUMMARY BAND --- #}
+<div class="v-ledger-band mb-5 animate-up">
+  {# Left Lead Cell: Statement Balance #}
+  <div class="v-lead-cell">
+    <div class="v-lead-label">
+      <span>Statement Amount Due</span>
+      {% if statement.due_date %}
+      <span class="text-[10px] font-semibold {% if not statement.is_paid and statement.due_date < today %}text-error{% else %}opacity-60{% endif %} tabular-nums">
+        {% if statement.is_paid %}Settled{% if statement.paid_at %} on {{ statement.paid_at|date:"j M" }}{% endif %}{% else %}Due {{ statement.due_date|date:"D, j M Y" }}{% endif %}
+      </span>
+      {% endif %}
+    </div>
 
-      {% if statement.status == 'PARSED' %}
-      <div class="grid {% if statement.review_count %}grid-cols-4{% else %}grid-cols-3{% endif %} gap-2 mt-4">
-        <div class="stat-card"><div class="text-[10px] uppercase tracking-wider opacity-50">Lines</div><div class="text-base font-bold mt-0.5">{{ lines|length }}</div></div>
-        <div class="stat-card"><div class="text-[10px] uppercase tracking-wider opacity-50">Matched</div><div class="text-base font-bold mt-0.5 text-success">{{ statement.matched_count }}</div></div>
-        <div class="stat-card"><div class="text-[10px] uppercase tracking-wider opacity-50">Added</div><div class="text-base font-bold mt-0.5 text-info">{{ statement.added_count }}</div></div>
+    <div class="v-lead-figure-row">
+      <span class="v-lead-figure text-secondary tabular-nums">
+        {% if statement.total_due is not None %}{{ statement.total_due|inr }}{% else %}-{% endif %}
+      </span>
+      {% if statement.min_due and statement.min_due != statement.total_due %}
+      <span class="v-delta v-delta-caution text-[10px] py-0.5" title="Minimum payment due">
+        Min {{ statement.min_due|inr }}
+      </span>
+      {% endif %}
+    </div>
+
+    <div class="v-lead-sub">
+      {% if statement.is_paid %}
+        Full statement cycle balance settled{% if statement.paid_amount %} ({{ statement.paid_amount|inr }}){% endif %}
+      {% elif statement.due_date %}
+        Payment due on {{ statement.due_date|date:"j F Y" }}
+      {% else %}
+        Credit card billing cycle summary
+      {% endif %}
+    </div>
+
+    {# 3-Segment Reconciliation Horizon Bar (if parsed) #}
+    {% if statement.status == 'PARSED' and lines %}
+    <div class="v-horizon">
+      <div class="v-horizon-bar">
+        {% if statement.matched_count %}
+        <span class="v-horizon-seg" style="width:calc(({{ statement.matched_count }} / {{ lines|length }}) * 100%);background:var(--v-gain);" title="Matched Alerts: {{ statement.matched_count }}"></span>
+        {% endif %}
+        {% if statement.added_count %}
+        <span class="v-horizon-seg" style="width:calc(({{ statement.added_count }} / {{ lines|length }}) * 100%);background:var(--v-secondary);" title="Added from PDF: {{ statement.added_count }}"></span>
+        {% endif %}
         {% if statement.review_count %}
-        <div class="stat-card"><div class="text-[10px] uppercase tracking-wider opacity-50">Needs review</div><div class="text-base font-bold mt-0.5 text-warning">{{ statement.review_count }}</div></div>
+        <span class="v-horizon-seg" style="width:calc(({{ statement.review_count }} / {{ lines|length }}) * 100%);background:var(--v-caution);" title="Needs Review: {{ statement.review_count }}"></span>
         {% endif %}
       </div>
-      {% endif %}
-    </div>
-  </div>
-
-  {% if statement.status == 'PARSED' and math %}
-  <div class="card bg-base-200/70 border border-base-content/10 shadow-sm animate-up">
-    <div class="card-body p-4">
-      <div class="flex items-center justify-between mb-2">
-        <h2 class="text-xs font-bold uppercase tracking-widest text-primary flex items-center gap-1.5">
-          <span class="material-symbols-outlined text-sm">calculate</span>Statement Bill Reconciliation
-        </h2>
-        <span class="text-xs font-extrabold tabular-nums text-primary">Statement Total: {{ statement.total_due|inr }}</span>
-      </div>
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-        <div class="p-2.5 rounded-xl bg-base-300/50">
-          <div class="opacity-50 text-[10px] uppercase font-bold">New Purchases ({{ math.debit_count }})</div>
-          <div class="font-bold tabular-nums text-sm mt-0.5">{{ math.total_debits|inr }}</div>
+      <div class="v-horizon-legend">
+        <div class="v-horizon-item">
+          <span class="v-horizon-dot" style="background:var(--v-gain);"></span>
+          <span>Matched Alerts:</span>
+          <span class="v-horizon-amount">{{ statement.matched_count }}</span>
         </div>
-        <div class="p-2.5 rounded-xl bg-base-300/50">
-          <div class="opacity-50 text-[10px] uppercase font-bold text-emerald-400">Refunds ({{ math.refund_count }})</div>
-          <div class="font-bold tabular-nums text-sm mt-0.5 text-emerald-400">-{{ math.total_refunds|inr }}</div>
+        {% if statement.added_count %}
+        <div class="v-horizon-item">
+          <span class="v-horizon-dot" style="background:var(--v-secondary);"></span>
+          <span>Added from PDF:</span>
+          <span class="v-horizon-amount">{{ statement.added_count }}</span>
         </div>
-        <div class="p-2.5 rounded-xl bg-base-300/50">
-          <div class="opacity-50 text-[10px] uppercase font-bold text-primary">Net Spends Due</div>
-          <div class="font-bold tabular-nums text-sm mt-0.5 text-primary">{{ math.net_new_spends|inr }}</div>
-        </div>
-        <div class="p-2.5 rounded-xl bg-base-300/50">
-          <div class="opacity-50 text-[10px] uppercase font-bold">Bill Payments ({{ math.payment_count }})</div>
-          <div class="font-bold tabular-nums text-sm mt-0.5 opacity-70">{{ math.total_payments|inr }}</div>
-        </div>
-      </div>
-      <p class="text-[11px] opacity-50 mt-2">
-        * Bill payments cleared the previous billing cycle balance. Total Due equals New Purchases minus Refunds.
-      </p>
-    </div>
-  </div>
-  {% endif %}
-
-  {% if statement.status == 'NEEDS_PASSWORD' %}
-  <div class="card bg-base-200 shadow-sm animate-up">
-    <div class="card-body p-4">
-      <h2 class="font-semibold flex items-center gap-2"><span class="material-symbols-outlined text-warning">lock</span>This PDF is password-protected</h2>
-      <p class="text-xs opacity-60">Banks usually use the first 4 letters of your name + date of birth (DDMM), or digits from the card number. The statement email normally says which.</p>
-      <form method="post" action="{% url 'expenses_statement_unlock' statement.pk %}" class="flex flex-col sm:flex-row gap-2 mt-2">
-        {% csrf_token %}
-        <input type="password" name="password" required autocomplete="off" class="input input-bordered input-sm flex-1" placeholder="Statement password">
-        <label class="flex items-center gap-2 text-xs cursor-pointer"><input type="checkbox" name="save_password" checked class="checkbox checkbox-xs checkbox-primary">Remember for this card</label>
-        <button class="btn btn-primary btn-sm">Unlock &amp; match</button>
-      </form>
-    </div>
-  </div>
-  {% elif statement.status == 'DUPLICATE' %}
-  <div class="card bg-base-200 border border-warning/30 shadow-sm animate-up">
-    <div class="card-body p-4">
-      <h2 class="font-semibold flex items-center gap-2"><span class="material-symbols-outlined text-warning">content_copy</span>Duplicate Statement</h2>
-      <p class="text-xs opacity-75">This statement PDF or billing cycle was already imported. All transactions are tracked under the primary statement to prevent duplicate expenses.</p>
-      {% if statement.duplicate_of %}
-      <div class="mt-2">
-        <a href="{% url 'expenses_statement_detail' statement.duplicate_of.pk %}" class="btn btn-primary btn-xs gap-1">
-          <span class="material-symbols-outlined text-sm">visibility</span>View original statement
-        </a>
-      </div>
-      {% endif %}
-    </div>
-  </div>
-  {% elif statement.status == 'BODY_ONLY' %}
-  <p class="text-sm opacity-55">Only the totals were in the email: there was no PDF to match line items against. You can upload the PDF from the statements page.</p>
-  {% elif statement.status == 'FAILED' %}
-  <p class="text-sm text-error/80">The PDF opened but no transaction lines could be read from it.</p>
-  {% endif %}
-
-  {% if statement.review_count %}
-  <div class="alert alert-warning text-xs shadow-sm flex items-center gap-2 py-2.5">
-    <span class="material-symbols-outlined text-base">warning</span>
-    <span><strong>{{ statement.review_count }} line{{ statement.review_count|pluralize }}</strong> look like existing expenses. Please confirm if they are duplicates or new spending below.</span>
-  </div>
-  {% endif %}
-
-  {% if lines %}
-  <div class="animate-up" style="animation-delay:.05s">
-    <div class="flex items-center justify-between mb-2">
-      <h2 class="section-group-header !mb-0">Transactions</h2>
-      <form method="post" action="{% url 'expenses_statement_reconcile' statement.pk %}">{% csrf_token %}
-        <button class="btn btn-ghost btn-xs gap-1"><span class="material-symbols-outlined text-sm">sync</span>Re-match</button>
-      </form>
-    </div>
-    <div class="flex flex-col gap-2">
-      {% for ln in lines %}
-      <div class="table-card flex flex-col gap-2 !py-2.5 {% if ln.needs_review %}border border-warning/40 bg-warning/5{% endif %}">
-        <div class="flex items-center gap-3">
-          <span class="material-symbols-outlined text-lg shrink-0 {% if ln.needs_review %}text-warning{% elif ln.match_method == 'SKIP' %}opacity-40{% elif ln.was_added %}text-info{% elif ln.matched_expense %}text-success{% else %}opacity-30{% endif %}"
-                title="{% if ln.needs_review %}Possible duplicate (needs review){% elif ln.match_method == 'SKIP' %}Bill payment / skipped{% elif ln.was_added %}No email alert: added from statement{% elif ln.matched_expense %}Matched an alert{% else %}Credit / not tracked{% endif %}">
-            {% if ln.needs_review %}help{% elif ln.match_method == 'SKIP' %}payments{% elif ln.was_added %}add_circle{% elif ln.matched_expense %}check_circle{% else %}remove{% endif %}
-          </span>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-1.5 flex-wrap">
-              <p class="text-sm font-medium truncate">{{ ln.description }}</p>
-              {% if ln.match_method == 'RULE' %}<span class="badge badge-xs badge-success/20 text-success">Rule match</span>
-              {% elif ln.match_method == 'AI' %}<span class="badge badge-xs badge-info/20 text-info">AI match</span>
-              {% elif ln.match_method == 'USER' %}<span class="badge badge-xs badge-primary/20 text-primary">Confirmed</span>
-              {% elif ln.match_method == 'SKIP' %}<span class="badge badge-xs bg-base-300 text-base-content/60 border border-base-content/10">Bill payment</span>{% endif %}
-            </div>
-            <p class="text-[11px] opacity-50">
-              {{ ln.txn_date|date:"j M" }}
-              {% if ln.matched_expense and ln.matched_expense.category %} · {{ ln.matched_expense.category.name }}{% endif %}
-              {% if ln.match_method == 'SKIP' %} · <span class="opacity-75">Paid previous bill</span>
-              {% elif ln.was_added %} · <span class="text-info font-medium">added</span>{% endif %}
-            </p>
-          </div>
-          <span class="text-sm font-bold tabular-nums shrink-0 {% if ln.is_credit %}text-emerald-400{% endif %}">{% if ln.is_credit %}+{% endif %}{{ ln.amount|inr }}</span>
-        </div>
-
-        {% if ln.needs_review and ln.suggested_expense %}
-        <div class="mt-1 p-2.5 rounded-lg bg-base-300/60 border border-warning/20 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div class="min-w-0">
-            <p class="font-semibold text-warning flex items-center gap-1">
-              <span class="material-symbols-outlined text-sm">psychology</span>{{ ln.match_reason|default:"Possible duplicate of existing expense" }}
-            </p>
-            <p class="opacity-75 mt-0.5 truncate">
-              Recorded on {{ ln.suggested_expense.txn_date|date:"j M Y" }}: <strong>{{ ln.suggested_expense.merchant }}</strong> · {{ ln.suggested_expense.amount|inr }} ({{ ln.suggested_expense.get_source_display }})
-            </p>
-          </div>
-          <div class="flex items-center gap-1.5 shrink-0">
-            <form method="post" action="{% url 'expenses_statement_line_resolve' ln.pk %}">
-              {% csrf_token %}
-              <input type="hidden" name="action" value="link">
-              <button class="btn btn-success btn-xs gap-1" title="Mark as the same expense so it won't be added again">
-                <span class="material-symbols-outlined text-xs">link</span>Same (Link)
-              </button>
-            </form>
-            <form method="post" action="{% url 'expenses_statement_line_resolve' ln.pk %}">
-              {% csrf_token %}
-              <input type="hidden" name="action" value="add">
-              <button class="btn btn-ghost btn-xs gap-1" title="Treat as a separate purchase and add to expenses">
-                <span class="material-symbols-outlined text-xs">add</span>New (Add)
-              </button>
-            </form>
-          </div>
+        {% endif %}
+        {% if statement.review_count %}
+        <div class="v-horizon-item">
+          <span class="v-horizon-dot" style="background:var(--v-caution);"></span>
+          <span>Needs Review:</span>
+          <span class="v-horizon-amount text-amber-300">{{ statement.review_count }}</span>
         </div>
         {% endif %}
       </div>
-      {% endfor %}
     </div>
+    {% endif %}
+  </div>
+
+  {# Right Hairline Grid: Statement Line Statistics #}
+  <div class="v-stat-grid">
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Statement Lines</div>
+      <div class="v-stat-value text-base-content">{{ lines|length }}</div>
+      <div class="v-stat-sub">Parsed transactions</div>
+    </div>
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Email Alert Matches</div>
+      <div class="v-stat-value text-emerald-400">{{ statement.matched_count }}</div>
+      <div class="v-stat-sub">Verified against inbox</div>
+    </div>
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Missing Lines Added</div>
+      <div class="v-stat-value text-sky-400">{{ statement.added_count }}</div>
+      <div class="v-stat-sub">Created from statement</div>
+    </div>
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Review Items</div>
+      <div class="v-stat-value {% if statement.review_count %}text-amber-400{% else %}text-base-content/40{% endif %}">{{ statement.review_count|default:"0" }}</div>
+      <div class="v-stat-sub">Discrepancy confirmations</div>
+    </div>
+  </div>
+</div>
+
+{# --- 2. BILL RECONCILIATION MATH WATERFALL --- #}
+{% if statement.status == 'PARSED' and math %}
+<div class="v-panel mb-5 animate-up">
+  <div class="v-panel-header">
+    <h2 class="v-panel-title">
+      <span class="material-symbols-outlined text-base text-primary">calculate</span>
+      Statement Reconciliation Waterfall
+    </h2>
+    <span class="text-xs font-bold tabular-nums text-secondary">Due: {{ statement.total_due|inr }}</span>
+  </div>
+
+  <div class="p-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+    <div class="p-3 rounded-xl bg-base-300/40 border border-base-content/6">
+      <div class="text-[10px] font-bold uppercase tracking-wider text-base-content/50">New Purchases ({{ math.debit_count }})</div>
+      <div class="font-extrabold text-sm tabular-nums text-base-content mt-1">{{ math.total_debits|inr }}</div>
+      <div class="text-[10px] opacity-40 mt-0.5">Total cycle charges</div>
+    </div>
+
+    <div class="p-3 rounded-xl bg-base-300/40 border border-base-content/6">
+      <div class="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Refunds &amp; Credits ({{ math.refund_count }})</div>
+      <div class="font-extrabold text-sm tabular-nums text-emerald-400 mt-1">-{{ math.total_refunds|inr }}</div>
+      <div class="text-[10px] opacity-40 mt-0.5">Net reversals credited</div>
+    </div>
+
+    <div class="p-3 rounded-xl bg-primary/10 border border-primary/25">
+      <div class="text-[10px] font-bold uppercase tracking-wider text-primary">Net Spends Due</div>
+      <div class="font-extrabold text-sm tabular-nums text-primary mt-1">{{ math.net_new_spends|inr }}</div>
+      <div class="text-[10px] opacity-60 mt-0.5">Purchases minus refunds</div>
+    </div>
+
+    <div class="p-3 rounded-xl bg-base-300/40 border border-base-content/6">
+      <div class="text-[10px] font-bold uppercase tracking-wider text-base-content/50">Previous Payments ({{ math.payment_count }})</div>
+      <div class="font-extrabold text-sm tabular-nums text-base-content/70 mt-1">{{ math.total_payments|inr }}</div>
+      <div class="text-[10px] opacity-40 mt-0.5">Cleared last month's bill</div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# --- 3. AUDIT & RECOVERY CALLOUTS --- #}
+{% if statement.status == 'NEEDS_PASSWORD' %}
+<div class="v-panel border-amber-500/30 bg-amber-500/5 mb-5 animate-up p-5">
+  <div class="flex items-center gap-2 mb-2">
+    <span class="material-symbols-outlined text-amber-400">lock</span>
+    <h3 class="font-bold text-sm text-amber-300">Statement PDF is Password Protected</h3>
+  </div>
+  <p class="text-xs text-base-content/70 max-w-2xl leading-relaxed">
+    Banks typically construct passwords from the first 4 letters of your name + date of birth (DDMM), or digits from your credit card. Enter it below to unlock and parse the statement lines.
+  </p>
+  <form method="post" action="{% url 'expenses_statement_unlock' statement.pk %}" class="flex flex-col sm:flex-row gap-3 mt-3 items-stretch sm:items-center">
+    {% csrf_token %}
+    <input type="password" name="password" required autocomplete="off" class="input input-bordered input-sm flex-1 bg-base-100 rounded-lg text-sm" placeholder="Statement password">
+    <label class="flex items-center gap-2 text-xs cursor-pointer">
+      <input type="checkbox" name="save_password" checked class="checkbox checkbox-xs checkbox-primary rounded">
+      <span class="text-base-content/80 font-medium">Remember for this card</span>
+    </label>
+    <button type="submit" class="v-btn v-btn-primary v-btn-sm font-bold">Unlock &amp; Parse</button>
+  </form>
+</div>
+
+{% elif statement.status == 'DUPLICATE' %}
+<div class="v-panel border-amber-500/25 bg-amber-500/5 mb-5 animate-up p-4">
+  <div class="flex items-center gap-2">
+    <span class="material-symbols-outlined text-amber-400">content_copy</span>
+    <h3 class="font-bold text-sm text-amber-300">Duplicate Statement</h3>
+  </div>
+  <p class="text-xs text-base-content/70 mt-1">
+    This billing cycle or PDF hash was previously imported. Transactions are linked to the primary statement to prevent duplicate accounting.
+  </p>
+  {% if statement.duplicate_of %}
+  <div class="mt-2.5">
+    <a href="{% url 'expenses_statement_detail' statement.duplicate_of.pk %}" class="v-btn v-btn-secondary v-btn-xs gap-1">
+      <span class="material-symbols-outlined text-xs">visibility</span>View Original Statement
+    </a>
   </div>
   {% endif %}
 </div>
+{% endif %}
+
+{# Discrepancy Alert Banner #}
+{% if statement.review_count %}
+<div class="v-panel border-amber-500/30 bg-amber-500/5 p-4 mb-5 animate-up flex items-center justify-between gap-3 flex-wrap">
+  <div class="flex items-center gap-2.5">
+    <span class="w-8 h-8 rounded-lg bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0">
+      <span class="material-symbols-outlined text-base">warning</span>
+    </span>
+    <div>
+      <span class="text-xs font-bold text-amber-300 block">{{ statement.review_count }} statement line{{ statement.review_count|pluralize }} require confirmation</span>
+      <span class="text-[11px] opacity-70 block">Confirm whether these match existing email alerts or represent new purchases</span>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# --- 4. TRANSACTION LINES REGISTER --- #}
+{% if lines %}
+<div class="v-panel animate-up">
+  <div class="v-panel-header">
+    <h2 class="v-panel-title">
+      <span class="material-symbols-outlined text-base text-secondary">receipt_long</span>
+      Line Items Register
+    </h2>
+    <div class="flex items-center gap-2">
+      <span class="text-xs text-base-content/50 font-mono">{{ lines|length }} items</span>
+      <form method="post" action="{% url 'expenses_statement_reconcile' statement.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="v-btn v-btn-secondary v-btn-xs gap-1 cursor-pointer">
+          <span class="material-symbols-outlined text-xs">sync</span>
+          <span>Re-match</span>
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="divide-y divide-base-content/8">
+    {% for ln in lines %}
+    <div class="p-3.5 flex flex-col gap-2 hover:bg-base-content/3 transition-colors {% if ln.needs_review %}bg-amber-500/5{% endif %}">
+      <div class="flex items-center gap-3">
+        <span class="material-symbols-outlined text-lg shrink-0 {% if ln.needs_review %}text-amber-400{% elif ln.match_method == 'SKIP' %}opacity-30{% elif ln.was_added %}text-sky-400{% elif ln.matched_expense %}text-emerald-400{% else %}opacity-30{% endif %}"
+              title="{% if ln.needs_review %}Possible duplicate (needs confirmation){% elif ln.match_method == 'SKIP' %}Bill payment / skipped{% elif ln.was_added %}No alert: added from statement{% elif ln.matched_expense %}Matched an alert{% else %}Credit / untracked{% endif %}">
+          {% if ln.needs_review %}help{% elif ln.match_method == 'SKIP' %}payments{% elif ln.was_added %}add_circle{% elif ln.matched_expense %}check_circle{% else %}remove{% endif %}
+        </span>
+
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="font-semibold text-xs sm:text-sm text-base-content truncate">{{ ln.description }}</span>
+            {% if ln.match_method == 'RULE' %}
+              <span class="badge badge-xs bg-emerald-500/15 text-emerald-400 border border-emerald-500/25">Rule Match</span>
+            {% elif ln.match_method == 'AI' %}
+              <span class="badge badge-xs bg-sky-500/15 text-sky-400 border border-sky-500/25">AI Match</span>
+            {% elif ln.match_method == 'USER' %}
+              <span class="badge badge-xs bg-primary/15 text-primary border border-primary/25">Confirmed</span>
+            {% elif ln.match_method == 'SKIP' %}
+              <span class="badge badge-xs badge-ghost opacity-60">Payment Skipped</span>
+            {% endif %}
+          </div>
+
+          <div class="text-[11px] opacity-60 mt-0.5 flex items-center gap-1.5">
+            <span class="font-mono">{{ ln.txn_date|date:"j M" }}</span>
+            {% if ln.matched_expense and ln.matched_expense.category %}
+              <span>· {{ ln.matched_expense.category.name }}</span>
+            {% endif %}
+            {% if ln.was_added %}
+              <span class="text-sky-400 font-medium">· added to ledger</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <span class="text-sm font-bold tabular-nums shrink-0 {% if ln.is_credit %}text-emerald-400{% else %}text-base-content{% endif %}">
+          {% if ln.is_credit %}+{% endif %}{{ ln.amount|inr }}
+        </span>
+      </div>
+
+      {# Discrepancy Resolver Sub-card #}
+      {% if ln.needs_review and ln.suggested_expense %}
+      <div class="mt-1 p-3 rounded-xl bg-base-300/60 border border-amber-500/25 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+        <div class="min-w-0">
+          <p class="font-bold text-amber-300 flex items-center gap-1">
+            <span class="material-symbols-outlined text-sm">psychology</span>
+            {{ ln.match_reason|default:"Possible duplicate of existing expense" }}
+          </p>
+          <p class="opacity-75 mt-0.5 truncate">
+            Recorded on {{ ln.suggested_expense.txn_date|date:"j M Y" }}: <strong>{{ ln.suggested_expense.merchant }}</strong> · {{ ln.suggested_expense.amount|inr }}
+          </p>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <form method="post" action="{% url 'expenses_statement_line_resolve' ln.pk %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="link">
+            <button class="v-btn v-btn-primary v-btn-xs bg-emerald-600 hover:bg-emerald-500 border-emerald-600 gap-1 font-bold" title="Mark as same transaction to avoid double counting">
+              <span class="material-symbols-outlined text-xs">link</span>Same (Link)
+            </button>
+          </form>
+          <form method="post" action="{% url 'expenses_statement_line_resolve' ln.pk %}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="add">
+            <button class="v-btn v-btn-secondary v-btn-xs gap-1" title="Treat as a separate purchase and add to expenses">
+              <span class="material-symbols-outlined text-xs">add</span>New (Add)
+            </button>
+          </form>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 {% endblock %}

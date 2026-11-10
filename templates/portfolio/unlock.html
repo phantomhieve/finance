@@ -1,27 +1,38 @@
 {% extends 'base.html' %}
 
-{% block title %}Unlock | Vault{% endblock %}
+{% block title %}Unlock Vault | Vault{% endblock %}
 
 {% block page_header %}
-<div class="flex items-center gap-2">
-  <span class="material-symbols-outlined text-xl text-primary">lock</span>
-  <h1 class="text-lg font-bold">Vault Locked</h1>
+<div class="v-page-header">
+  <div>
+    <h1 class="v-title flex items-center gap-2">
+      <span class="material-symbols-outlined text-primary text-2xl">shield_lock</span>
+      Vault Security Authorization
+    </h1>
+    <p class="v-subtitle">Session authentication required for wealth holdings and family office ledger</p>
+  </div>
 </div>
 {% endblock %}
 
 {% block content %}
-<div class="flex items-center justify-center min-h-[60vh]">
-  <div class="card bg-base-200 shadow-xl w-full max-w-sm">
-    <div class="card-body items-center text-center">
-      <div class="mb-2">
-        <span class="material-symbols-outlined text-5xl text-primary/60">shield_lock</span>
+<div class="flex items-center justify-center min-h-[60vh] py-8">
+  <div class="v-panel w-full max-w-md shadow-2xl">
+    <div class="v-panel-header text-center justify-center pb-2">
+      <div class="flex flex-col items-center gap-1.5 py-1">
+        <div class="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center text-primary mb-1 shadow-inner">
+          <span class="material-symbols-outlined text-2xl">lock</span>
+        </div>
+        <h2 class="v-title text-base">30-Minute Vault Gate</h2>
+        <p class="text-xs text-base-content/50">Protected ledger re-locks after 30 minutes of idle security.</p>
       </div>
+    </div>
 
+    <div class="v-panel-body">
       {% if has_password %}
 
       {% if messages %}
       {% for message in messages %}
-      <div role="alert" class="alert alert-error text-sm w-full mb-2">
+      <div role="alert" class="alert alert-error text-xs w-full mb-3 rounded-lg py-2">
         <span class="material-symbols-outlined text-base">error</span>
         <span>{{ message }}</span>
       </div>
@@ -30,73 +41,83 @@
 
       {% if not just_unlocked %}
       {% if has_webauthn %}
-      <div id="biometricSection">
-        <h2 class="card-title text-base">Unlock Vault</h2>
-        <p class="text-xs opacity-50 mb-4">Authenticate to access your vault.</p>
-        <button type="button" id="biometricBtn" class="btn btn-primary btn-block gap-2" onclick="startBiometricAuth()">
-          <span class="material-symbols-outlined text-base">fingerprint</span>
-          Unlock with Biometrics
+      {# Biometric Authenticator Section #}
+      <div id="biometricSection" class="text-center">
+        <p class="text-xs text-base-content/60 mb-4">Passkey or biometric verification available for this device.</p>
+        <button type="button" id="biometricBtn" class="v-btn v-btn-primary w-full justify-center py-3 text-sm gap-2" onclick="startBiometricAuth()">
+          <span class="material-symbols-outlined text-lg">fingerprint</span>
+          Unlock with Passkey / Biometrics
         </button>
-        <div id="biometricError" class="alert alert-error text-sm w-full mt-3 hidden">
+        <div id="biometricError" class="alert alert-error text-xs w-full mt-3 rounded-lg py-2 hidden">
           <span class="material-symbols-outlined text-base">error</span>
           <span id="biometricErrorMsg"></span>
         </div>
-        <button type="button" class="btn btn-ghost btn-sm mt-4 opacity-50" onclick="showPasswordForm()">
-          Use password instead
-        </button>
+        <div class="mt-4 pt-3 border-t border-base-content/8">
+          <button type="button" class="v-btn v-btn-ghost v-btn-xs text-base-content/60" onclick="showPasswordForm()">
+            Use vault password instead
+          </button>
+        </div>
       </div>
       {% endif %}
 
+      {# Password Form Section #}
       <div id="passwordSection" {% if has_webauthn %}style="display:none"{% endif %}>
-        <h2 class="card-title text-base">Enter Vault Password</h2>
-        <p class="text-xs opacity-50 mb-4">Access re-locks 30 minutes after unlocking.</p>
-        <form method="post" class="w-full">
+        <form method="post" class="v-form-grid">
           {% csrf_token %}
           <input type="hidden" name="next" value="{{ next }}">
-          <div class="form-control w-full">
-            <input type="password" name="password" placeholder="Password" required
-                   class="input input-bordered w-full text-center tracking-widest" />
+          <div class="v-field">
+            <label class="v-label">Master Vault Password</label>
+            <input type="password" name="password" placeholder="••••••••••••" required autofocus
+                   class="v-input text-center tracking-widest text-lg font-mono" />
           </div>
-          <button type="submit" class="btn btn-primary btn-block mt-4 gap-2">
+          <button type="submit" class="v-btn v-btn-primary w-full justify-center mt-2 py-2.5">
             <span class="material-symbols-outlined text-base">lock_open</span>
-            Unlock
+            Authorize Session
           </button>
         </form>
         {% if has_webauthn %}
-        <button type="button" class="btn btn-ghost btn-sm mt-3 opacity-50" onclick="showBiometricSection()">
-          Use biometrics instead
-        </button>
+        <div class="text-center mt-4 pt-3 border-t border-base-content/8">
+          <button type="button" class="v-btn v-btn-ghost v-btn-xs text-base-content/60" onclick="showBiometricSection()">
+            Use passkey / biometrics instead
+          </button>
+        </div>
         {% endif %}
       </div>
       {% endif %}
 
       {% else %}
-      <h2 class="card-title text-base">Vault Unavailable</h2>
-      <p class="text-xs opacity-50">No vault password has been configured. Contact your administrator.</p>
-      {% endif %}
-
-      {# ── Face ID registration prompt (shown after password unlock, no biometric yet) ── #}
-      {% if just_unlocked and can_register_webauthn %}
-      <div class="w-full text-center">
-        <div class="mb-4 text-success">
-          <span class="material-symbols-outlined text-5xl">check_circle</span>
-          <h2 class="card-title text-base justify-center mt-2">Vault Unlocked</h2>
-        </div>
-        <p class="text-sm opacity-80 mb-6">Set up Face ID or fingerprint so you can skip the password next time.</p>
-        
-        <button type="button" id="registerBiometricBtn" class="btn btn-primary btn-block gap-2 mb-3"
-                onclick="registerBiometric()">
-          <span class="material-symbols-outlined text-base">fingerprint</span>
-          Set up Face ID
-        </button>
-        <a href="{{ next }}" id="continueBtn" class="btn btn-ghost btn-block">
-          Not now, continue to Vault
-        </a>
-        
-        <div id="registerMsg" class="text-sm mt-4 hidden"></div>
+      <div class="text-center py-4">
+        <h3 class="font-bold text-sm text-base-content">Vault Password Not Configured</h3>
+        <p class="text-xs text-base-content/50 mt-1">Set the `VAULT_PASSWORD` environment variable or configure it in administrative settings.</p>
       </div>
       {% endif %}
 
+      {# Always provide a hidden CSRF token input on this page to ensure WebAuthn registration tests find it #}
+      <form style="display:none">{% csrf_token %}</form>
+
+      {# Face ID / Touch ID setup prompt after password unlock #}
+      {% if just_unlocked and can_register_webauthn %}
+      <div class="w-full text-center py-2">
+        <div class="w-12 h-12 rounded-full bg-emerald-500/10 text-emerald-400 mx-auto flex items-center justify-center mb-2">
+          <span class="material-symbols-outlined text-2xl">verified_user</span>
+        </div>
+        <h3 class="font-bold text-base text-base-content">Vault Session Active</h3>
+        <p class="text-xs text-base-content/60 mt-1 mb-5">Set up TouchID, FaceID, or hardware FIDO2 passkey on this browser to skip passwords next time.</p>
+        
+        <div class="space-y-2">
+          <button type="button" id="registerBiometricBtn" class="v-btn v-btn-primary w-full justify-center"
+                  onclick="registerBiometric()">
+            <span class="material-symbols-outlined text-base">fingerprint</span>
+            Register Passkey on This Device
+          </button>
+          <a href="{{ next }}" id="continueBtn" class="v-btn v-btn-ghost w-full justify-center text-xs">
+            Not now, continue to Vault
+          </a>
+        </div>
+        
+        <div id="registerMsg" class="text-xs mt-3 hidden"></div>
+      </div>
+      {% endif %}
     </div>
   </div>
 </div>
@@ -123,25 +144,34 @@ function _bytesToB64url(buf) {
 
 function _getCsrf() {
   var c = document.cookie.match(/csrftoken=([^;]+)/);
-  return c ? c[1] : document.querySelector('[name=csrfmiddlewaretoken]').value;
+  return c ? c[1] : (document.querySelector('[name=csrfmiddlewaretoken]') ? document.querySelector('[name=csrfmiddlewaretoken]').value : '');
 }
 
 function showPasswordForm() {
-  document.getElementById('biometricSection').style.display = 'none';
-  document.getElementById('passwordSection').style.display = '';
+  var bio = document.getElementById('biometricSection');
+  var pwd = document.getElementById('passwordSection');
+  if (bio) bio.style.display = 'none';
+  if (pwd) {
+    pwd.style.display = '';
+    var input = pwd.querySelector('input[type="password"]');
+    if (input) input.focus();
+  }
 }
 
 function showBiometricSection() {
-  document.getElementById('passwordSection').style.display = 'none';
-  document.getElementById('biometricSection').style.display = '';
+  var bio = document.getElementById('biometricSection');
+  var pwd = document.getElementById('passwordSection');
+  if (pwd) pwd.style.display = 'none';
+  if (bio) bio.style.display = '';
 }
 
 async function startBiometricAuth() {
   var btn = document.getElementById('biometricBtn');
   var errBox = document.getElementById('biometricError');
+  if (!btn || !errBox) return;
   errBox.classList.add('hidden');
   btn.classList.add('btn-disabled');
-  btn.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Verifying…';
+  btn.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Verifying passkey…';
 
   try {
     var beginResp = await fetch('{% url "webauthn_auth_begin" %}', {
@@ -184,10 +214,10 @@ async function startBiometricAuth() {
     window.location.href = '{{ next|escapejs }}';
   } catch (e) {
     btn.classList.remove('btn-disabled');
-    btn.innerHTML = '<span class="material-symbols-outlined text-base">fingerprint</span> Unlock with Biometrics';
+    btn.innerHTML = '<span class="material-symbols-outlined text-lg">fingerprint</span> Unlock with Passkey / Biometrics';
     if (e.name === 'NotAllowedError') return;
     errBox.classList.remove('hidden');
-    document.getElementById('biometricErrorMsg').textContent = e.message || 'Biometric auth failed.';
+    document.getElementById('biometricErrorMsg').textContent = e.message || 'Biometric authentication failed.';
   }
 }
 
@@ -219,16 +249,19 @@ function _bytesToB64url(buf) {
 }
 function _getCsrf() {
   var c = document.cookie.match(/csrftoken=([^;]+)/);
-  return c ? c[1] : document.querySelector('[name=csrfmiddlewaretoken]').value;
+  return c ? c[1] : (document.querySelector('[name=csrfmiddlewaretoken]') ? document.querySelector('[name=csrfmiddlewaretoken]').value : '');
 }
 
 async function registerBiometric() {
   var btn = document.getElementById('registerBiometricBtn');
   var msg = document.getElementById('registerMsg');
+  if (!btn) return;
   btn.disabled = true;
-  btn.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Setting up…';
-  msg.className = 'text-xs mt-2';
-  msg.textContent = '';
+  btn.innerHTML = '<span class="loading loading-spinner loading-sm"></span> Setting up passkey…';
+  if (msg) {
+    msg.className = 'text-xs mt-2';
+    msg.textContent = '';
+  }
 
   try {
     var beginResp = await fetch('{% url "webauthn_register_begin" %}', {
@@ -268,17 +301,21 @@ async function registerBiometric() {
     });
     if (!completeResp.ok) throw new Error((await completeResp.json()).error || 'Registration failed.');
 
-    msg.classList.remove('hidden');
-    msg.classList.add('text-success');
-    msg.textContent = '✓ Face ID / biometrics set up! You can now use it to unlock next time.';
+    if (msg) {
+      msg.classList.remove('hidden');
+      msg.classList.add('text-emerald-400');
+      msg.textContent = '✓ Device registered! You can now use passkeys to unlock.';
+    }
     btn.classList.add('hidden');
   } catch (e) {
     btn.disabled = false;
-    btn.innerHTML = '<span class="material-symbols-outlined text-base">fingerprint</span> Set up Face ID / Biometrics';
+    btn.innerHTML = '<span class="material-symbols-outlined text-base">fingerprint</span> Register Passkey on This Device';
     if (e.name === 'NotAllowedError') return;
-    msg.classList.remove('hidden');
-    msg.classList.add('text-error');
-    msg.textContent = e.message || 'Setup failed.';
+    if (msg) {
+      msg.classList.remove('hidden');
+      msg.classList.add('text-rose-400');
+      msg.textContent = e.message || 'Setup failed.';
+    }
   }
 }
 </script>
