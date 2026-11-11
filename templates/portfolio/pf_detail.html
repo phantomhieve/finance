@@ -27,34 +27,59 @@
 {% block content %}
 
 {# --- SIGNATURE LEDGER SUMMARY BAND --- #}
-<div class="v-ledger-band">
+<section class="v-ledger-band" aria-label="PPF Summary">
   <div class="v-lead-cell">
     <div>
       <div class="v-lead-label">
         <span>{% if selected_member %}{{ selected_member }}'s PF Balance{% else %}Consolidated PF Balance{% endif %}</span>
-        <span class="v-delta v-delta-pos text-[10px] py-0 px-2 font-semibold">Government Backed</span>
+        <span class="v-delta v-delta-pos text-xs py-0 px-2 font-semibold">Government Backed</span>
       </div>
       <div class="v-lead-figure-row">
-        <span class="v-lead-figure">{{ balance|inr }}</span>
-        <span class="v-delta v-delta-pos text-xs font-bold">
-          <span class="material-symbols-outlined text-xs">trending_up</span>+{{ total_interest|inr }} Total Interest
+        <span class="v-lead-figure tabular-nums">{{ balance|inr }}</span>
+        <span class="v-delta v-delta-pos text-xs font-bold tabular-nums">
+          <span class="material-symbols-outlined text-xs">trending_up</span>+{{ total_interest|inr }} ({{ interest_share_pct }}%)
         </span>
       </div>
       <div class="v-lead-sub">
-        Total Contributions: <strong class="text-base-content/80 tabular-nums">{{ total_contrib|inr }}</strong> &middot; Multi-member sovereign savings
+        Total Contributions: <strong class="text-base-content/85 tabular-nums">{{ total_contrib|inr }}</strong>
+        &middot;
+        Multi-member sovereign savings
       </div>
     </div>
 
+    {% if balance > 0 %}
+    <div class="v-horizon">
+      <div class="v-horizon-bar" role="img" aria-label="PF contributions versus compounded interest">
+        {% if total_contrib > 0 %}
+        <div class="v-horizon-seg" style="width: {% widthratio total_contrib balance 100 %}%; background: #14b8a6;" title="Contributions: {{ total_contrib|inr }}"></div>
+        {% endif %}
+        {% if total_interest > 0 %}
+        <div class="v-horizon-seg" style="width: {% widthratio total_interest balance 100 %}%; background: #10b981;" title="Compounded Interest: {{ total_interest|inr }}"></div>
+        {% endif %}
+      </div>
+      <div class="v-horizon-legend">
+        <span class="v-horizon-item">
+          <span class="v-horizon-dot" style="background: #14b8a6;"></span>
+          Contributions <strong>{% widthratio total_contrib balance 100 %}%</strong>
+        </span>
+        <span class="v-horizon-item">
+          <span class="v-horizon-dot" style="background: #10b981;"></span>
+          Interest <strong>{% widthratio total_interest balance 100 %}%</strong>
+        </span>
+      </div>
+    </div>
+    {% endif %}
+
     {# Family Member Filter Chips #}
     {% if pf_accounts|length > 1 or selected_member %}
-    <div class="flex flex-wrap items-center gap-1.5 mt-4 pt-3 border-t border-base-content/8">
-      <a href="{% url 'pf_detail' %}" class="v-btn v-btn-xs {% if not selected_member %}v-btn-primary{% else %}v-btn-secondary{% endif %}">
+    <div class="v-pill-rail pt-3 mt-1 border-t border-[var(--v-hairline)]" role="navigation" aria-label="Filter PF by family member">
+      <a href="{% url 'pf_detail' %}" class="v-btn v-btn-sm {% if not selected_member %}v-btn-primary{% else %}v-btn-secondary{% endif %}">
         All Accounts
       </a>
       {% for m in pf_accounts %}
       <a href="{% url 'pf_detail' %}?member={{ m.account_name|urlencode }}"
-         class="v-btn v-btn-xs {% if selected_member|lower == m.account_name|lower %}v-btn-primary{% else %}v-btn-secondary{% endif %}">
-        {{ m.account_name }} ({{ m.balance|inr }})
+         class="v-btn v-btn-sm tabular-nums {% if selected_member|lower == m.account_name|lower %}v-btn-primary{% else %}v-btn-secondary{% endif %}">
+        {{ m.account_name }} &middot; {{ m.balance|inr }}
       </a>
       {% endfor %}
     </div>
@@ -64,39 +89,45 @@
   <div class="v-stat-grid">
     <div class="v-stat-cell">
       <div class="v-stat-label">Total Contributions</div>
-      <div class="v-stat-value text-base-content">{{ total_contrib|inr }}</div>
+      <div class="v-stat-value text-base-content tabular-nums">{{ total_contrib|inr }}</div>
       <div class="v-stat-sub">Principal deposited</div>
     </div>
     <div class="v-stat-cell">
       <div class="v-stat-label">Compounded Interest</div>
-      <div class="v-stat-value text-emerald-400">+{{ total_interest|inr }}</div>
-      <div class="v-stat-sub">Accrued sovereign return</div>
+      <div class="v-stat-value text-emerald-400 tabular-nums">+{{ total_interest|inr }}</div>
+      <div class="v-stat-sub">{{ interest_share_pct }}% of corpus</div>
     </div>
     <div class="v-stat-cell">
-      <div class="v-stat-label">Fiscal Year Entries</div>
-      <div class="v-stat-value text-indigo-400">{{ fy_entries|length }}</div>
+      <div class="v-stat-label">Growth Multiple</div>
+      <div class="v-stat-value text-base-content tabular-nums">{{ growth_multiplier }}x</div>
+      <div class="v-stat-sub">Corpus vs principal</div>
+    </div>
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Fiscal Years</div>
+      <div class="v-stat-value text-base-content tabular-nums">{{ years_tracked|default:fy_entries|length }}</div>
       <div class="v-stat-sub">Audited FY snapshots</div>
     </div>
   </div>
-</div>
+</section>
 
 {# --- FINANCIAL YEAR ENTRIES LEDGER --- #}
-<div class="v-panel mb-6">
+<section class="v-panel mb-6" aria-label="Financial Year Ledger">
   <div class="v-panel-header">
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-2 min-w-0">
       <h2 class="v-panel-title">
-        <span class="material-symbols-outlined text-base text-primary">calendar_month</span>
+        <span class="material-symbols-outlined text-base text-teal-400">calendar_month</span>
         Financial Year Ledger &amp; Compounding Trail
       </h2>
-      <span class="v-delta v-delta-neutral text-xs font-semibold">{{ fy_entries|length }} Fiscal Years</span>
+      <span class="v-delta v-delta-neutral text-xs font-semibold tabular-nums">{{ fy_entries|length }} Entries</span>
     </div>
-    <button type="button" class="v-btn v-btn-secondary v-btn-xs" onclick="openAddPfModal('{{ default_member|escapejs }}')">
+    <button type="button" class="v-btn v-btn-secondary v-btn-sm" onclick="openAddPfModal('{{ default_member|escapejs }}')">
       <span class="material-symbols-outlined text-sm">add</span>Add Entry
     </button>
   </div>
   <div class="v-panel-body p-0">
     {% if fy_entries %}
-    <div class="v-table-wrap">
+    {# Desktop Table #}
+    <div class="v-panel-table hidden md:block overflow-x-auto">
       <table class="v-table" id="pfTable">
         <thead>
           <tr>
@@ -108,34 +139,34 @@
             <th class="sortable-th cursor-pointer select-none v-num">Interest Credited <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
             <th class="sortable-th cursor-pointer select-none v-num">Closing Balance <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
             <th>Remarks</th>
-            <th class="text-center w-12">Action</th>
+            <th class="text-right w-16">Action</th>
           </tr>
         </thead>
         <tbody>
           {% for r in fy_entries %}
           <tr>
-            <td class="font-bold text-xs text-base-content whitespace-nowrap" data-val="{{ r.fy_year }}">
+            <td class="font-bold text-xs text-base-content whitespace-nowrap tabular-nums" data-val="{{ r.fy_year }}">
               {{ r.fy_label }}
             </td>
             {% if not selected_member %}
             <td data-val="{{ r.account_name|lower }}">
-              <a href="{% url 'pf_detail' %}?member={{ r.account_name|urlencode }}" class="v-delta v-delta-neutral text-[10px] py-0 px-2 font-semibold">
+              <a href="{% url 'pf_detail' %}?member={{ r.account_name|urlencode }}" class="v-delta v-delta-neutral text-xs px-2.5 font-semibold hover:text-primary inline-flex items-center !min-h-11 lg:!min-h-6">
                 {{ r.account_name }}
               </a>
             </td>
             {% endif %}
-            <td class="v-num font-semibold text-primary" data-val="{{ r.contribution }}">
+            <td class="v-num text-xs font-semibold text-base-content/85" data-val="{{ r.contribution }}">
               {% if r.contribution > 0 %}+{{ r.contribution|inr }}{% else %}&mdash;{% endif %}
             </td>
-            <td class="v-num font-semibold text-emerald-400" data-val="{{ r.interest }}">
+            <td class="v-num text-xs font-semibold text-emerald-400" data-val="{{ r.interest }}">
               {% if r.interest > 0 %}+{{ r.interest|inr }}{% else %}&mdash;{% endif %}
             </td>
-            <td class="v-num font-bold text-base-content" data-val="{{ r.closing_balance }}">
+            <td class="v-num text-xs font-bold text-base-content" data-val="{{ r.closing_balance }}">
               {{ r.closing_balance|inr }}
             </td>
-            <td class="text-xs text-base-content/60 max-w-xs truncate">{{ r.remarks|default:"-" }}</td>
-            <td class="text-center">
-              <button type="button" class="v-btn v-btn-ghost v-btn-xs" title="Edit entry"
+            <td class="text-xs text-base-content/60 max-w-xs truncate">{{ r.remarks|default:"—" }}</td>
+            <td class="text-right">
+              <button type="button" class="v-icon-btn" title="Edit entry" aria-label="Edit {{ r.account_name }} {{ r.fy_label }}"
                       data-edit-pf
                       data-member="{{ r.account_name }}"
                       data-fy="{{ r.fy_year }}"
@@ -154,34 +185,38 @@
     </div>
 
     {# Mobile View #}
-    <div class="md:hidden divide-y divide-base-content/6">
+    <div class="md:hidden divide-y divide-[var(--v-hairline)]">
       {% for r in fy_entries %}
-      <div class="p-3.5 flex items-center justify-between gap-3">
-        <div class="min-w-0">
-          <div class="flex items-center gap-2 flex-wrap">
-            <span class="font-bold text-xs text-base-content">{{ r.fy_label }}</span>
+      <div class="v-mobile-row flex-col !items-stretch gap-2">
+        <div class="w-full flex items-center justify-between gap-2">
+          <div class="min-w-0 flex items-center gap-2 flex-wrap">
+            <span class="font-bold text-sm text-base-content tabular-nums">{{ r.fy_label }}</span>
             {% if not selected_member %}
-            <span class="v-delta v-delta-neutral text-[9px] py-0 px-1">{{ r.account_name }}</span>
+            <span class="v-delta v-delta-neutral text-xs py-0 px-1.5">{{ r.account_name }}</span>
             {% endif %}
-            <span class="font-bold text-xs tabular-nums text-base-content">{{ r.closing_balance|inr }}</span>
           </div>
-          <div class="text-[10px] text-base-content/50 mt-1 flex items-center gap-2 tabular-nums">
-            {% if r.contribution > 0 %}<span class="text-primary font-semibold">+{{ r.contribution|inr }} contrib</span>{% endif %}
-            {% if r.interest > 0 %}<span class="text-emerald-400 font-semibold">+{{ r.interest|inr }} int</span>{% endif %}
-            {% if r.remarks %}<span>&middot; {{ r.remarks }}</span>{% endif %}
+          <div class="flex items-center gap-1.5 shrink-0">
+            <span class="font-bold text-sm tabular-nums text-base-content">{{ r.closing_balance|inr }}</span>
+            <button type="button" class="v-icon-btn" title="Edit entry" aria-label="Edit {{ r.account_name }} {{ r.fy_label }}"
+                    data-edit-pf
+                    data-member="{{ r.account_name }}"
+                    data-fy="{{ r.fy_year }}"
+                    data-fylabel="{{ r.fy_label }}"
+                    data-contrib="{{ r.contribution }}"
+                    data-interest="{{ r.interest }}"
+                    data-remarks="{{ r.remarks }}"
+                    data-baby="{{ r.is_baby|yesno:'true,false' }}">
+              <span class="material-symbols-outlined text-base">edit</span>
+            </button>
           </div>
         </div>
-        <button type="button" class="v-btn v-btn-ghost v-btn-xs shrink-0" title="Edit entry"
-                data-edit-pf
-                data-member="{{ r.account_name }}"
-                data-fy="{{ r.fy_year }}"
-                data-fylabel="{{ r.fy_label }}"
-                data-contrib="{{ r.contribution }}"
-                data-interest="{{ r.interest }}"
-                data-remarks="{{ r.remarks }}"
-                data-baby="{{ r.is_baby|yesno:'true,false' }}">
-          <span class="material-symbols-outlined text-sm">edit</span>
-        </button>
+        <div class="w-full flex items-center justify-between gap-2 pt-1.5 border-t border-[var(--v-hairline)] text-xs tabular-nums text-base-content/65">
+          <div class="flex items-center gap-3 flex-wrap">
+            {% if r.contribution > 0 %}<span>Contrib: <strong class="text-base-content">{{ r.contribution|inr }}</strong></span>{% endif %}
+            {% if r.interest > 0 %}<span class="text-emerald-400 font-semibold">+{{ r.interest|inr }} interest</span>{% endif %}
+          </div>
+          {% if r.remarks %}<span class="truncate max-w-[130px] text-xs text-base-content/45">{{ r.remarks }}</span>{% endif %}
+        </div>
       </div>
       {% endfor %}
     </div>
@@ -191,14 +226,14 @@
         <span class="material-symbols-outlined text-3xl">savings</span>
       </div>
       <h3 class="v-empty-title">No PF Entries Recorded</h3>
-      <p class="v-empty-desc">Add Public Provident Fund annual contributions and interest credits for Atul or Kanika.</p>
+      <p class="v-empty-desc">Add Public Provident Fund annual contributions and interest credits for family members.</p>
       <button type="button" class="v-btn v-btn-primary" onclick="openAddPfModal('{{ default_member|escapejs }}')">
         <span class="material-symbols-outlined text-sm">add</span>Add First Entry
       </button>
     </div>
     {% endif %}
   </div>
-</div>
+</section>
 
 {% include 'portfolio/_pf_form_modal.html' %}
 
@@ -212,6 +247,7 @@ function setPfMember(name) {
   if (inp) {
     inp.value = name;
     inp.focus();
+    checkPfExistingEntry();
   }
 }
 
@@ -320,7 +356,7 @@ document.addEventListener('click', function(e) {
 
   var titleEl = document.getElementById('pfModalTitle');
   if (titleEl) {
-    titleEl.innerHTML = '<span class="material-symbols-outlined text-primary">edit</span> Edit PF Entry · ' + fyLabel;
+    titleEl.innerHTML = '<span class="material-symbols-outlined text-primary">edit</span> Edit PF Entry &middot; ' + fyLabel;
   }
   document.getElementById('pfAccountName').value = member;
   document.getElementById('pfOrigMember').value = member;

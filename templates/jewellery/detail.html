@@ -8,82 +8,77 @@
 <div class="v-page-header">
   <div>
     <div class="flex items-center gap-2 mb-1.5">
-      <a href="{% if request.GET.next %}{{ request.GET.next }}{% else %}{% url 'jewellery_dashboard' %}{% endif %}" class="v-btn v-btn-ghost v-btn-xs -ml-2 text-base-content/60 hover:text-base-content">
-        <span class="material-symbols-outlined text-sm">arrow_back</span>Back to Collection
+      <a href="{% if request.GET.next %}{{ request.GET.next }}{% else %}{% url 'jewellery_dashboard' %}{% endif %}" class="v-btn v-btn-ghost v-btn-sm -ml-2 text-base-content/60 hover:text-base-content">
+        <span class="material-symbols-outlined text-base">arrow_back</span>Back to Collection
       </a>
     </div>
-    <div class="flex flex-wrap items-center gap-3">
+    <div class="flex flex-wrap items-center gap-2.5">
       <h1 class="v-title">{{ item.display_label }}</h1>
       <span class="jw-type-badge" style="--h:{{ item.category_hue }}">
         <span class="icon-filled material-symbols-outlined text-xs">{{ item.category_icon }}</span>{{ item.get_category_display }}
       </span>
-      <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-base-100 border border-base-content/10">
-        <span class="w-2 h-2 rounded-full {% if item.location == 'BANK_LOCKER' %}bg-rose-500{% else %}bg-amber-500{% endif %}"></span>
+      <span class="v-delta v-delta-neutral">
+        <span class="w-2 h-2 rounded-full {% if item.location == 'BANK_LOCKER' %}bg-teal-400{% else %}bg-amber-400{% endif %}"></span>
         {{ item.get_location_display }}
       </span>
     </div>
   </div>
+  {% if is_primary %}
   <div class="v-toolbar">
-    {% if is_primary %}
-    <button type="button" class="v-btn v-btn-danger v-btn-sm" onclick="confirmDelete('deleteJForm', 'Are you sure you want to delete this jewellery item?')">
-      <span class="material-symbols-outlined text-base">delete</span><span class="hidden sm:inline">Delete</span>
+    <button type="button" class="v-btn v-btn-danger" onclick="confirmDelete('deleteJForm', 'Are you sure you want to delete this jewellery item?')">
+      <span class="material-symbols-outlined text-base">delete</span><span>Delete</span>
     </button>
-    {% endif %}
-    <button type="button" class="v-btn v-btn-secondary v-btn-sm" onclick="toggleEditMode()">
+    <button type="button" class="v-btn v-btn-secondary" onclick="toggleEditMode()">
       <span class="material-symbols-outlined text-base">edit</span><span id="editBtnText">Edit</span>
     </button>
   </div>
+  {% endif %}
 </div>
 {% endblock %}
 
 {% block content %}
 
-{# --- VIEW MODE: 2-COLUMN ASSAY DOSSIER --- #}
+{# --- VIEW MODE: ASSAY & CUSTODY DOSSIER --- #}
 <div id="viewModeContainer" class="animate-up">
-  <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
 
-    {# Left Column: Visual Custody & Proof Frame (5 cols) #}
-    <div class="lg:col-span-5">
-      <div class="v-panel overflow-hidden">
-        <div class="relative aspect-square w-full overflow-hidden flex items-center justify-center jw-type-tile {% if item.photo %}cursor-pointer group{% endif %}"
-             style="--h:{{ item.category_hue }}"
-             {% if item.photo %}onclick="openPhotoModal()"{% endif %}>
-          <div class="flex flex-col items-center justify-center gap-2">
-            <span class="icon-filled material-symbols-outlined jw-type-icon text-7xl opacity-80">{{ item.category_icon }}</span>
-            <span class="text-xs uppercase font-bold tracking-widest jw-type-icon opacity-70">{{ item.get_category_display }}</span>
-          </div>
-          {% if item.photo %}
-          <img src="{% url 'jewellery_photo' item.pk %}?size=thumb&t={{ item.updated_at.timestamp }}" alt="{{ item.display_label }}" onerror="this.remove()" class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+    {% if item.photo %}
+    {# Left Column: Photographic Proof Frame (5 cols — ONLY when photo exists) #}
+    <div class="lg:col-span-5 flex">
+      <div class="v-panel v-panel-fill w-full overflow-hidden">
+        <div class="relative aspect-[4/3] w-full overflow-hidden bg-base-200/60 cursor-pointer group flex-1"
+             onclick="openPhotoModal()">
+          <img src="{% url 'jewellery_photo' item.pk %}?size=thumb&t={{ item.updated_at.timestamp }}" alt="{{ item.display_label }}" onerror="this.remove()" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
           <div class="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
             <span class="v-btn v-btn-secondary v-btn-sm text-white backdrop-blur-md bg-white/10 border-white/20">
-              <span class="material-symbols-outlined text-lg">zoom_in</span>Inspect High-Res
+              <span class="material-symbols-outlined text-lg">zoom_in</span>Inspect Full Size
             </span>
           </div>
-          {% endif %}
         </div>
-        <div class="v-panel-footer">
-          <span class="text-xs text-base-content/60">Custodial Record #{{ item.pk }}</span>
-          <span class="text-xs text-base-content/50">Verified in {{ item.get_location_display }}</span>
+        <div class="v-panel-footer tabular-nums">
+          <span class="text-xs text-base-content/60">Custody Record #{{ item.pk }}</span>
+          <span class="text-xs text-base-content/50">Verified · {{ item.get_location_display }}</span>
         </div>
       </div>
     </div>
 
     {# Right Column: Ruled Assay Certificate & Valuation (7 cols) #}
     <div class="lg:col-span-7 space-y-4">
-      {# Valuation Lead #}
       {% if is_primary %}
       <div class="v-panel">
         <div class="v-panel-body p-4 sm:p-5">
-          <div class="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 pb-3 border-b border-base-content/8">
+          <div class="flex flex-col sm:flex-row sm:items-baseline justify-between gap-2 pb-3 border-b border-[var(--v-hairline)]">
             <div>
-              <div class="text-xs font-semibold uppercase tracking-wider text-base-content/50">Estimated Market Value</div>
-              <div class="text-2xl sm:text-3xl font-extrabold text-indigo-400 tabular-nums mt-0.5">
+              <div class="v-lead-label">
+                <span>Estimated Market Value</span>
+              </div>
+              <div class="v-lead-figure mt-1 tabular-nums">
                 {% if item.estimated_value %}{{ item.estimated_value|inr }}{% else %}—{% endif %}
               </div>
             </div>
             <div class="text-left sm:text-right">
-              <span class="v-delta v-delta-pos">Live Bullion Spot Basis</span>
-              <div class="text-xs text-base-content/50 mt-1">
+              <span class="v-delta v-delta-caution">Live Bullion Spot Basis</span>
+              <div class="text-xs text-base-content/55 mt-1.5 tabular-nums">
                 {% if item.metal_type == 'GOLD' or item.metal_type == 'DIAMOND_OTHER' %}
                   24K Gold: {{ gold_rate|inr }}/g
                 {% elif item.metal_type == 'SILVER' %}
@@ -92,19 +87,18 @@
               </div>
             </div>
           </div>
-          <div class="pt-3 text-xs text-base-content/60 flex items-center gap-2">
-            <span class="material-symbols-outlined text-sm text-indigo-400">calculate</span>
-            <span>Formula: Net Weight ({{ item.weight_grams|floatformat:2 }}g) × Spot Rate × Fineness Factor = Current Valuation</span>
+          <div class="pt-3 text-xs text-base-content/60 flex items-center gap-2 tabular-nums">
+            <span class="material-symbols-outlined text-sm text-amber-400 shrink-0">calculate</span>
+            <span>Net Weight ({{ item.weight_grams|floatformat:2 }}g) × Live Spot Rate × Fineness Factor</span>
           </div>
         </div>
       </div>
       {% endif %}
 
-      {# Detailed Technical Specifications #}
       <div class="v-panel">
         <div class="v-panel-header">
           <h2 class="v-panel-title">
-            <span class="material-symbols-outlined text-base text-indigo-400">verified</span>
+            <span class="material-symbols-outlined text-base text-amber-400">verified</span>
             Assay &amp; Custody Specifications
           </h2>
         </div>
@@ -112,23 +106,23 @@
           <table class="v-table">
             <tbody>
               <tr>
-                <td class="font-medium text-base-content/60 w-1/3">Precious Metal</td>
+                <td class="font-medium text-base-content/60 w-2/5 sm:w-1/3">Precious Metal</td>
                 <td class="font-semibold text-base-content">
                   <div class="flex items-center gap-2">
-                    <span class="w-2.5 h-2.5 rounded-full {% if item.metal_type == 'GOLD' %}bg-amber-400{% elif item.metal_type == 'SILVER' %}bg-slate-300{% else %}bg-indigo-400{% endif %}"></span>
+                    <span class="w-2.5 h-2.5 rounded-full {% if item.metal_type == 'GOLD' %}bg-amber-400{% elif item.metal_type == 'SILVER' %}bg-slate-300{% else %}bg-sky-400{% endif %}"></span>
                     {{ item.get_metal_type_display }}
                   </div>
                 </td>
               </tr>
               <tr>
                 <td class="font-medium text-base-content/60">Purity / Fineness</td>
-                <td class="font-semibold text-base-content">
+                <td class="font-semibold text-base-content tabular-nums">
                   {% if item.purity %}{{ item.get_purity_display }}{% else %}<span class="text-base-content/40 font-normal">Standard / Unspecified</span>{% endif %}
                 </td>
               </tr>
               <tr>
                 <td class="font-medium text-base-content/60">Gross Weight</td>
-                <td class="font-mono font-bold text-indigo-400 tabular-nums">
+                <td class="font-mono font-bold text-base-content tabular-nums">
                   {{ item.weight_grams|floatformat:2 }} grams
                 </td>
               </tr>
@@ -136,7 +130,7 @@
                 <td class="font-medium text-base-content/60">Custody Location</td>
                 <td class="font-semibold text-base-content">
                   <div class="flex items-center gap-2">
-                    <span class="w-2 h-2 rounded-full {% if item.location == 'BANK_LOCKER' %}bg-rose-500{% else %}bg-amber-500{% endif %}"></span>
+                    <span class="w-2 h-2 rounded-full {% if item.location == 'BANK_LOCKER' %}bg-teal-400{% else %}bg-amber-400{% endif %}"></span>
                     {{ item.get_location_display }}
                   </div>
                 </td>
@@ -146,58 +140,179 @@
         </div>
       </div>
 
-      {# Provenance & Notes #}
       <div class="v-panel">
         <div class="v-panel-header">
           <h2 class="v-panel-title">
-            <span class="material-symbols-outlined text-base text-indigo-400">description</span>
+            <span class="material-symbols-outlined text-base text-base-content/60">description</span>
             Provenance &amp; Notes
           </h2>
         </div>
         <div class="v-panel-body">
           {% if item.notes %}
-          <div class="text-sm text-base-content/80 leading-relaxed font-normal bg-base-200/50 p-3.5 rounded-xl border border-base-content/6">
+          <div class="text-sm text-base-content/85 leading-relaxed">
             {{ item.notes|linebreaksbr }}
           </div>
           {% else %}
-          <div class="text-xs text-base-content/40 italic py-2">
-            No additional provenance notes or bill inscriptions recorded for this asset.
+          <p class="text-xs text-base-content/45 py-1">
+            No provenance notes, bill references, or hallmark inscriptions recorded for this piece.
+          </p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    {% else %}
+    {# Photo-less Dossier: Height-Matched 2-Column Assay & Valuation Ledger (Zero Empty Placeholder Square) #}
+    <div class="lg:col-span-5 flex">
+      <div class="v-panel v-panel-fill w-full">
+        <div class="v-panel-header">
+          <h2 class="v-panel-title">
+            <span class="material-symbols-outlined text-base text-amber-400">workspace_premium</span>
+            {% if is_primary %}Bullion Valuation &amp; Provenance{% else %}Custody &amp; Provenance{% endif %}
+          </h2>
+          <span class="text-xs text-base-content/45 tabular-nums">Record #{{ item.pk }}</span>
+        </div>
+        <div class="v-panel-body p-0 flex-1 flex flex-col justify-between">
+          <div>
+            {% if is_primary %}
+            <div class="p-4 sm:p-5 border-b border-[var(--v-hairline)]">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <span class="v-lead-label">Estimated Market Value</span>
+                <span class="v-delta v-delta-caution text-xs">Live Bullion Spot Basis</span>
+              </div>
+              <div class="v-lead-figure mt-1.5 tabular-nums">
+                {% if item.estimated_value %}{{ item.estimated_value|inr }}{% else %}—{% endif %}
+              </div>
+              <div class="text-xs text-base-content/55 mt-1.5 tabular-nums">
+                {% if item.metal_type == 'GOLD' or item.metal_type == 'DIAMOND_OTHER' %}
+                  24K Gold Spot: {{ gold_rate|inr }}/g
+                {% elif item.metal_type == 'SILVER' %}
+                  Silver Spot: {{ silver_rate|inr }}/g
+                {% endif %}
+                &middot; {{ item.weight_grams|floatformat:2 }}g × Fineness Factor
+              </div>
+            </div>
+            {% endif %}
+
+            <div class="p-4 sm:p-5">
+              <div class="text-xs font-semibold text-base-content/65 mb-2 flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-sm text-base-content/50">description</span>
+                Provenance &amp; Notes
+              </div>
+              {% if item.notes %}
+              <div class="text-sm text-base-content/85 leading-relaxed">
+                {{ item.notes|linebreaksbr }}
+              </div>
+              {% else %}
+              <p class="text-xs text-base-content/45 leading-relaxed">
+                No provenance notes, bill references, or hallmark inscriptions recorded for this piece.
+              </p>
+              {% endif %}
+            </div>
+          </div>
+
+          {% if is_primary %}
+          <div class="px-4 sm:px-5 py-3 border-t border-[var(--v-hairline)] bg-base-200/15 flex items-center justify-between gap-2 text-xs text-base-content/50">
+            <span>No custody photograph attached</span>
+            <button type="button" class="v-btn v-btn-ghost v-btn-xs text-primary" onclick="toggleEditMode()">
+              <span class="material-symbols-outlined text-xs">add_a_photo</span>Attach Photo
+            </button>
           </div>
           {% endif %}
         </div>
       </div>
-
     </div>
+
+    <div class="lg:col-span-7 flex">
+      <div class="v-panel v-panel-fill w-full">
+        <div class="v-panel-header">
+          <h2 class="v-panel-title">
+            <span class="material-symbols-outlined text-base text-amber-400">verified</span>
+            Assay &amp; Custody Specifications
+          </h2>
+        </div>
+        <div class="v-panel-table flex-1">
+          <table class="v-table">
+            <tbody>
+              <tr>
+                <td class="font-medium text-base-content/60 w-2/5 sm:w-1/3">Category</td>
+                <td class="font-semibold text-base-content">
+                  <div class="flex items-center gap-2">
+                    <span class="jw-type-avatar w-6 h-6 rounded-md inline-flex items-center justify-center" style="--h:{{ item.category_hue }}">
+                      <span class="icon-filled material-symbols-outlined text-sm">{{ item.category_icon }}</span>
+                    </span>
+                    {{ item.get_category_display }}
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="font-medium text-base-content/60">Precious Metal</td>
+                <td class="font-semibold text-base-content">
+                  <div class="flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full {% if item.metal_type == 'GOLD' %}bg-amber-400{% elif item.metal_type == 'SILVER' %}bg-slate-300{% else %}bg-sky-400{% endif %}"></span>
+                    {{ item.get_metal_type_display }}
+                  </div>
+                </td>
+              </tr>
+              <tr>
+                <td class="font-medium text-base-content/60">Purity / Fineness</td>
+                <td class="font-semibold text-base-content tabular-nums">
+                  {% if item.purity %}{{ item.get_purity_display }}{% else %}<span class="text-base-content/40 font-normal">Standard / Unspecified</span>{% endif %}
+                </td>
+              </tr>
+              <tr>
+                <td class="font-medium text-base-content/60">Gross Weight</td>
+                <td class="font-mono font-bold text-base-content tabular-nums">
+                  {{ item.weight_grams|floatformat:2 }} grams
+                </td>
+              </tr>
+              <tr>
+                <td class="font-medium text-base-content/60">Custody Location</td>
+                <td class="font-semibold text-base-content">
+                  <div class="flex items-center gap-2">
+                    <span class="w-2 h-2 rounded-full {% if item.location == 'BANK_LOCKER' %}bg-teal-400{% else %}bg-amber-400{% endif %}"></span>
+                    {{ item.get_location_display }}
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
   </div>
 </div>
 
-{# --- EDIT MODE CONTAINER --- #}
+{# --- EDIT MODE CONTAINER (PRIMARY ONLY) --- #}
+{% if is_primary %}
 <div id="editModeContainer" class="hidden animate-up">
   <div class="v-panel max-w-3xl mx-auto">
     <div class="v-panel-header">
       <h2 class="v-panel-title">
-        <span class="material-symbols-outlined text-indigo-400">edit_square</span>
+        <span class="material-symbols-outlined text-primary">edit_square</span>
         Update Jewellery Item Details
       </h2>
-      <button type="button" class="v-btn v-btn-ghost v-btn-xs" onclick="toggleEditMode()">Cancel</button>
+      <button type="button" class="v-btn v-btn-ghost v-btn-sm" onclick="toggleEditMode()">Cancel</button>
     </div>
 
-    <form id="jewelleryEditForm" method="POST" action="{% url 'edit_jewellery' item.pk %}{% if request.GET.next %}?next={{ request.GET.next|urlencode }}{% endif %}" enctype="multipart/form-data" class="v-panel-body p-5 sm:p-6">
+    <form id="jewelleryEditForm" method="POST" action="{% url 'edit_jewellery' item.pk %}{% if request.GET.next %}?next={{ request.GET.next|urlencode }}{% endif %}" enctype="multipart/form-data" class="v-panel-body p-4 sm:p-6">
       {% csrf_token %}
 
       <div class="v-form-grid">
         <div class="v-form-grid-2">
           <div class="v-field">
-            <label class="v-label">Type / Category</label>
-            <select name="category" id="je_category" class="v-input">
+            <label class="v-label" for="je_category">Type / Category</label>
+            <select name="category" id="je_category" class="v-select">
               {% for val, label in form.fields.category.choices %}
               <option value="{{ val }}" {% if item.category == val %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
             </select>
           </div>
           <div class="v-field">
-            <label class="v-label">Precious Metal</label>
-            <select name="metal_type" id="je_metal" data-init="{{ item.metal_type }}" class="v-input">
+            <label class="v-label" for="je_metal">Precious Metal</label>
+            <select name="metal_type" id="je_metal" data-init="{{ item.metal_type }}" class="v-select">
               {% for val, label in form.fields.metal_type.choices %}
               <option value="{{ val }}" {% if item.metal_type == val %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
@@ -207,12 +322,12 @@
 
         <div class="v-form-grid-2">
           <div class="v-field">
-            <label class="v-label">Purity / Fineness</label>
-            <select name="purity" id="je_purity" data-init="{{ item.purity }}" class="v-input"></select>
+            <label class="v-label" for="je_purity">Purity / Fineness</label>
+            <select name="purity" id="je_purity" data-init="{{ item.purity }}" class="v-select"></select>
           </div>
           <div class="v-field">
-            <label class="v-label">Net Weight (grams) *</label>
-            <input type="number" step="0.01" name="weight_grams" id="je_weight" value="{{ item.weight_grams }}" min="0" required class="v-input font-mono" />
+            <label class="v-label" for="je_weight">Net Weight (grams) *</label>
+            <input type="number" step="0.01" inputmode="decimal" name="weight_grams" id="je_weight" value="{{ item.weight_grams }}" min="0" required class="v-input font-mono tabular-nums" />
           </div>
         </div>
 
@@ -221,10 +336,10 @@
           <label class="v-label">Custody Location</label>
           <input type="hidden" name="location" id="je_location" value="{{ item.location }}" />
           <div class="grid grid-cols-2 gap-2" id="je_location_chips">
-            <button type="button" data-loc="BANK_LOCKER" class="v-btn v-btn-secondary gap-1.5 justify-start">
+            <button type="button" data-loc="BANK_LOCKER" class="v-btn v-btn-secondary gap-1.5 justify-center sm:justify-start">
               <span class="material-symbols-outlined text-base">account_balance</span>Bank Locker
             </button>
-            <button type="button" data-loc="HOME_SAFE" class="v-btn v-btn-secondary gap-1.5 justify-start">
+            <button type="button" data-loc="HOME_SAFE" class="v-btn v-btn-secondary gap-1.5 justify-center sm:justify-start">
               <span class="material-symbols-outlined text-base">lock</span>Home Safe
             </button>
           </div>
@@ -232,25 +347,25 @@
 
         {# Photo Upload #}
         <div class="v-field">
-          <label class="v-label">Ornament Photo</label>
+          <label class="v-label" for="je_photo">Ornament Photo</label>
 
-          <div id="je_photo_preview_container" class="{% if not item.photo %}hidden{% endif %} mb-2 relative group w-full max-w-sm h-48 rounded-xl overflow-hidden bg-base-200 border border-base-content/10">
+          <div id="je_photo_preview_container" class="{% if not item.photo %}hidden{% endif %} mb-2 relative group w-full max-w-sm h-48 rounded-xl overflow-hidden bg-base-200 border border-[var(--v-hairline)]">
             <img id="je_photo_preview_img" src="{% if item.photo %}{% url 'jewellery_photo' item.pk %}?size=thumb&t={{ item.updated_at.timestamp }}{% else %}data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7{% endif %}" alt="Photo preview" onerror="clearEditPhotoBroken()" class="w-full h-full object-cover transition-opacity duration-300" />
             <div data-photo-loader class="hidden absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-base-300/80 backdrop-blur-sm">
               <span class="loading loading-spinner loading-md text-primary"></span>
-              <span class="text-xs font-semibold uppercase tracking-wider text-base-content/60">Processing photo…</span>
+              <span class="text-xs font-medium text-base-content/70">Processing photo…</span>
             </div>
             <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" onclick="document.getElementById('je_photo').click()">
               <span class="text-xs font-semibold text-white flex items-center gap-1"><span class="material-symbols-outlined text-sm">cached</span>Change Photo</span>
             </div>
-            <button type="button" class="absolute top-2 right-2 v-btn v-btn-danger v-btn-xs shadow-lg" onclick="clearEditPhoto(event)">
+            <button type="button" class="absolute top-2 right-2 v-btn v-btn-danger v-btn-xs" onclick="clearEditPhoto(event)" aria-label="Remove photo">
               <span class="material-symbols-outlined text-xs">close</span>
             </button>
           </div>
 
           <label for="je_photo" id="je_photo_upload_box"
-                 class="{% if item.photo %}hidden{% endif %} flex flex-col items-center justify-center py-6 px-4 rounded-xl border border-dashed border-base-content/15 bg-base-200/50 cursor-pointer hover:border-indigo-500/40 hover:bg-base-200 transition-all group max-w-sm">
-            <span class="material-symbols-outlined text-3xl text-base-content/40 group-hover:text-indigo-400 group-hover:scale-105 transition-all mb-2">add_a_photo</span>
+                 class="{% if item.photo %}hidden{% endif %} flex flex-col items-center justify-center py-6 px-4 rounded-xl border border-dashed border-[var(--v-border-strong)] bg-base-200/40 cursor-pointer hover:border-primary/40 hover:bg-base-200/70 transition-colors group max-w-sm">
+            <span class="material-symbols-outlined text-3xl text-base-content/40 group-hover:text-primary transition-colors mb-2">add_a_photo</span>
             <span class="text-xs font-medium text-base-content/60 group-hover:text-base-content">Tap to upload a new photo</span>
           </label>
 
@@ -259,45 +374,44 @@
         </div>
 
         <div class="v-field">
-          <label class="v-label">Provenance Notes &amp; Hallmark</label>
-          <textarea name="notes" id="je_notes" rows="3" class="v-input h-auto py-2" placeholder="Optional notes…">{{ item.notes }}</textarea>
+          <label class="v-label" for="je_notes">Provenance Notes &amp; Hallmark</label>
+          <textarea name="notes" id="je_notes" rows="3" class="v-textarea" placeholder="Optional notes…">{{ item.notes }}</textarea>
         </div>
       </div>
 
-      <div class="flex justify-between items-center pt-5 border-t border-base-content/8 mt-6">
-        <div>
-          {% if is_primary %}
-          <button type="button" class="v-btn v-btn-danger v-btn-sm" onclick="confirmDelete('deleteJForm', 'Are you sure you want to delete this jewellery item?')">
-            <span class="material-symbols-outlined text-base">delete</span>Delete
-          </button>
-          {% endif %}
-        </div>
-        <div class="flex items-center gap-2">
+      <div class="flex flex-wrap justify-between items-center gap-2 pt-5 border-t border-[var(--v-hairline)] mt-6">
+        <button type="button" class="v-btn v-btn-danger" onclick="confirmDelete('deleteJForm', 'Are you sure you want to delete this jewellery item?')">
+          <span class="material-symbols-outlined text-base">delete</span>Delete
+        </button>
+        <div class="flex items-center gap-2 ml-auto">
           <button type="button" class="v-btn v-btn-ghost" onclick="toggleEditMode()">Cancel</button>
-          <button type="submit" class="v-btn v-btn-primary px-8">Save Changes</button>
+          <button type="submit" class="v-btn v-btn-primary">
+            <span class="material-symbols-outlined text-base">save</span>Save Changes
+          </button>
         </div>
       </div>
     </form>
   </div>
 </div>
 
-{% if is_primary %}
 <form id="deleteJForm" method="POST" action="{% url 'delete_jewellery' item.pk %}{% if request.GET.next %}?next={{ request.GET.next|urlencode }}{% endif %}" style="display:none">{% csrf_token %}</form>
 {% endif %}
 
 {# --- PHOTO VIEWER MODAL --- #}
 {% if item.photo %}
 <dialog id="photoModal" class="modal modal-bottom sm:modal-middle">
-  <div class="modal-box bg-base-100 p-0 overflow-hidden max-w-3xl rounded-2xl shadow-2xl border border-base-content/10">
-    <div class="bg-base-200/90 px-4 py-3 border-b border-base-content/8 flex justify-between items-center">
-      <h3 class="font-bold text-base text-base-content">{{ item.display_label }}</h3>
-      <form method="dialog"><button class="v-btn v-btn-ghost v-btn-xs">✕</button></form>
+  <div class="modal-box p-0 overflow-hidden max-w-3xl">
+    <div class="v-modal-header px-4 py-3 border-b border-[var(--v-hairline)] flex justify-between items-center">
+      <h3 class="font-semibold text-base text-base-content truncate pr-2">{{ item.display_label }}</h3>
+      <button type="button" class="v-icon-btn" onclick="closeModal('photoModal')" aria-label="Close">
+        <span class="material-symbols-outlined text-lg">close</span>
+      </button>
     </div>
-    <div class="p-4 flex justify-center bg-black/40 min-h-[40vh]">
-      <img src="{% url 'jewellery_photo' item.pk %}?size=full&t={{ item.updated_at.timestamp }}" alt="{{ item.display_label }}" class="max-h-[75vh] object-contain rounded-lg" />
+    <div class="p-3 sm:p-4 flex items-center justify-center bg-black/50 min-h-[40vh]">
+      <img src="{% url 'jewellery_photo' item.pk %}?size=full&t={{ item.updated_at.timestamp }}" alt="{{ item.display_label }}" class="max-h-[75dvh] object-contain rounded-lg" />
     </div>
   </div>
-  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+  <form method="dialog" class="modal-backdrop"><button aria-label="Close modal">close</button></form>
 </dialog>
 {% endif %}
 
@@ -310,16 +424,16 @@ function clearEditPhoto(e) {
   e.preventDefault();
   e.stopPropagation();
   var input = document.getElementById('je_photo');
+  if (!input) return;
   input.value = '';
   document.getElementById('je_photo_clear').value = 'true';
   handlePhotoSelect(input, 'je_photo_preview_container', 'je_photo_preview_img', 'je_photo_upload_box');
 }
 
-// Stored photo could not be loaded (missing / corrupt) — show the uploader instead of a broken image.
 function clearEditPhotoBroken() {
   var container = document.getElementById('je_photo_preview_container');
-  // Ignore errors from a blank src (no stored photo).
-  if (!document.getElementById('je_photo_preview_img').getAttribute('src')) return;
+  var img = document.getElementById('je_photo_preview_img');
+  if (!container || !img || !img.getAttribute('src')) return;
   container.classList.add('hidden');
   document.getElementById('je_photo_upload_box').classList.remove('hidden');
 }
@@ -328,14 +442,15 @@ function toggleEditMode() {
   var vMode = document.getElementById('viewModeContainer');
   var eMode = document.getElementById('editModeContainer');
   var btnText = document.getElementById('editBtnText');
+  if (!vMode || !eMode) return;
   if (vMode.classList.contains('hidden')) {
     vMode.classList.remove('hidden');
     eMode.classList.add('hidden');
-    btnText.textContent = 'Edit';
+    if (btnText) btnText.textContent = 'Edit';
   } else {
     vMode.classList.add('hidden');
     eMode.classList.remove('hidden');
-    btnText.textContent = 'Cancel';
+    if (btnText) btnText.textContent = 'Cancel';
   }
 }
 
@@ -347,11 +462,13 @@ function openPhotoModal() {
 document.addEventListener('DOMContentLoaded', function() {
   var mSelect = document.getElementById('je_metal');
   var pSelect = document.getElementById('je_purity');
-  Jewellery.updatePurityChoices(mSelect, pSelect, pSelect.dataset.init);
-  mSelect.addEventListener('change', function() {
-    Jewellery.updatePurityChoices(this, pSelect);
-  });
-  Jewellery.initLocation('je');
+  if (mSelect && pSelect) {
+    Jewellery.updatePurityChoices(mSelect, pSelect, pSelect.dataset.init);
+    mSelect.addEventListener('change', function() {
+      Jewellery.updatePurityChoices(this, pSelect);
+    });
+    Jewellery.initLocation('je');
+  }
 });
 </script>
 {% endblock %}

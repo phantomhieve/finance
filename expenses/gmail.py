@@ -61,7 +61,9 @@ def build_auth_url(redirect_uri, state, login_hint=''):
         'state': state,
     }
     if login_hint:
-        params['login_hint'] = login_hint
+        clean_hint = ''.join(ch for ch in str(login_hint) if ch.isprintable()).strip()[:254]
+        if clean_hint:
+            params['login_hint'] = clean_hint
     return f'{AUTH_URL}?{urlencode(params)}'
 
 

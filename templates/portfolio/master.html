@@ -6,7 +6,7 @@
 
 {% block page_header %}
 <div class="v-page-header">
-  <div class="flex flex-wrap items-center gap-3">
+  <div class="flex flex-wrap items-center gap-3 shrink-0">
     <div class="v-segmented">
       <a href="{% url 'portfolio_tracker' %}" class="v-segmented-item {% if not is_baby_view %}is-active{% endif %}">
         <span class="material-symbols-outlined text-sm">wallet</span>Master Portfolio
@@ -15,39 +15,40 @@
         <span class="material-symbols-outlined text-sm">child_care</span>Child Portfolio
       </a>
     </div>
-    <p class="v-subtitle hidden md:block">Consolidated balance sheet &amp; multi-asset wealth ledger</p>
+    <p class="v-subtitle hidden 2xl:block">Consolidated balance sheet &amp; multi-asset wealth ledger</p>
   </div>
 
-  <div class="v-toolbar">
+  <div class="v-toolbar lg:flex-nowrap shrink-0">
     <form method="post" action="{% url 'sync_from_sheets' %}" class="inline m-0">
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ request.get_full_path }}">
-      <button type="submit" class="v-btn v-btn-secondary" title="Sync asset data from Google Sheets">
+      <button type="submit" class="v-btn v-btn-secondary whitespace-nowrap" title="Sync asset data from Google Sheets" aria-label="Sync asset data from Google Sheets">
         <span class="material-symbols-outlined text-sm">sync</span>
-        <span class="hidden sm:inline">Sync Sheets</span>
+        <span class="hidden xl:inline">Sync Sheets</span>
       </button>
     </form>
     <form method="post" action="{% url 'refresh_prices' %}" class="inline m-0">
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ request.get_full_path }}">
-      <button type="submit" class="v-btn v-btn-secondary" title="Refresh market &amp; bullion prices">
+      <button type="submit" class="v-btn v-btn-secondary whitespace-nowrap" title="Refresh market &amp; bullion prices" aria-label="Refresh market and bullion prices">
         <span class="material-symbols-outlined text-sm">currency_exchange</span>
-        <span class="hidden sm:inline">Refresh Prices</span>
+        <span class="hidden xl:inline">Refresh Prices</span>
       </button>
     </form>
     <form method="post" action="{% url 'generate_insights' %}" class="inline m-0">
       {% csrf_token %}
-      <button type="submit" class="v-btn v-btn-secondary {% if not can_generate_insight %}opacity-50 cursor-not-allowed{% endif %}"
+      <button type="submit" class="v-btn v-btn-secondary whitespace-nowrap {% if not can_generate_insight %}opacity-50 cursor-not-allowed{% endif %}"
+              aria-label="Run AI Fiduciary Audit"
               {% if not can_generate_insight %}{% if insight_cooldown_days_hint %}title="Cooldown: minimum {{ insight_cooldown_days_hint }} day(s) between runs"{% else %}title="Dev mode: no cooldown"{% endif %}{% endif %}>
         <span class="material-symbols-outlined text-sm text-amber-400">auto_awesome</span>
-        <span class="hidden sm:inline">AI Audit</span>
+        <span class="hidden xl:inline">AI Audit</span>
       </button>
     </form>
-    <button type="button" class="v-btn v-btn-secondary biometric-setup-btn" id="biometricSetupBtn" onclick="openModal('biometricModal')" style="display:none">
+    <button type="button" class="v-btn v-btn-secondary whitespace-nowrap biometric-setup-btn" id="biometricSetupBtn" onclick="openModal('biometricModal')" style="display:none" aria-label="Configure Biometrics" title="Configure Passkey">
       <span class="material-symbols-outlined text-sm">fingerprint</span>
-      <span class="hidden sm:inline">Biometrics</span>
+      <span class="hidden 2xl:inline">Passkey</span>
     </button>
-    <a href="{% url 'portfolio_growth' %}" class="v-btn v-btn-primary">
+    <a href="{% url 'portfolio_growth' %}" class="v-btn v-btn-primary whitespace-nowrap">
       <span class="material-symbols-outlined text-sm">trending_up</span>Growth Analysis
     </a>
   </div>
@@ -57,14 +58,14 @@
 {% block content %}
 
 {# --- SIGNATURE LEDGER SUMMARY BAND --- #}
-<div class="v-ledger-band">
+<section class="v-ledger-band" aria-label="Master Portfolio Net Worth Summary">
   {# Left Lead Cell: Primary Portfolio Figure, Delta, and Proportional Horizon Bar #}
   <div class="v-lead-cell">
     <div>
       <div class="v-lead-label">
-        <span>{% if exclude_re %}Portfolio Value · excl. Real Estate{% else %}Total Portfolio Net Worth{% endif %}</span>
+        <span>{% if exclude_re %}Portfolio Value &middot; excl. Real Estate{% else %}Total Portfolio Net Worth{% endif %}</span>
         {% if has_real_estate %}
-        <label class="flex items-center gap-1.5 cursor-pointer text-xs normal-case opacity-75 select-none" title="Real estate is the largest and least liquid holding; toggle to inspect financial liquid assets">
+        <label class="inline-flex items-center gap-1.5 cursor-pointer text-xs normal-case tracking-normal text-base-content/75 select-none min-h-[32px]" title="Real estate is the largest and least liquid holding; toggle to inspect financial liquid assets">
           <span>Include real estate</span>
           <input type="checkbox" class="toggle toggle-primary toggle-xs" {% if not exclude_re %}checked{% endif %}
                  onchange="window.location.search = 'ex_re=' + (this.checked ? '0' : '1')" aria-label="Include real estate in portfolio totals">
@@ -73,8 +74,8 @@
       </div>
 
       <div class="v-lead-figure-row">
-        <span class="v-lead-figure">{{ total_value|inr }}</span>
-        <span class="v-delta {% if total_returns >= 0 %}v-delta-pos{% else %}v-delta-neg{% endif %} text-xs font-bold">
+        <span class="v-lead-figure tabular-nums">{{ total_value|inr }}</span>
+        <span class="v-delta {% if total_returns >= 0 %}v-delta-pos{% else %}v-delta-neg{% endif %} text-xs font-bold tabular-nums">
           <span class="material-symbols-outlined text-xs">{% if total_returns >= 0 %}trending_up{% else %}trending_down{% endif %}</span>
           {% if total_returns >= 0 %}+{% endif %}{{ total_returns|inr }} ({{ return_pct }}%)
         </span>
@@ -82,7 +83,7 @@
 
       <div class="v-lead-sub">
         {% if exclude_re %}
-        <a href="#alternates" class="text-amber-400 font-medium hover:underline inline-flex items-center gap-1 mr-1">
+        <a href="#alternates" class="text-amber-400 font-medium hover:underline inline-flex items-center min-h-11 lg:min-h-6 gap-1 mr-1">
           <span class="material-symbols-outlined text-xs">domain</span>{{ real_estate_current|inr }} in real estate set aside
         </a>
         &middot;
@@ -92,8 +93,8 @@
     </div>
 
     {# Proportional Signature Horizon Bar across Asset Classes #}
-    <div class="v-horizon mt-4">
-      <div class="v-horizon-bar">
+    <div class="v-horizon">
+      <div class="v-horizon-bar" role="img" aria-label="Portfolio asset allocation horizon">
         {% for a in assets %}
         {% if a.pct > 0 %}
         <span class="v-horizon-seg" style="width: {{ a.pct }}%; background: {% if a.name == 'Indian Stocks' or a.name == 'Mutual Funds' or a.name == 'US Stocks' %}var(--v-equity, #6366f1){% elif a.name == 'EPF' or a.name == 'PF' or a.name == 'Bonds' or a.name == 'NPS' %}var(--v-debt, #14b8a6){% elif a.name == 'Gold' or a.name == 'Silver' %}var(--v-gold, #eab308){% elif a.name == 'Real Estate' %}var(--v-realty, #f97316){% else %}#0ea5e9{% endif %};" title="{{ a.name }}: {{ a.value|inr }} ({{ a.pct }}%)"></span>
@@ -105,9 +106,9 @@
         {% if a.pct > 0 %}
         <div class="v-horizon-item">
           <span class="v-horizon-dot" style="background: {% if a.name == 'Indian Stocks' or a.name == 'Mutual Funds' or a.name == 'US Stocks' %}var(--v-equity, #6366f1){% elif a.name == 'EPF' or a.name == 'PF' or a.name == 'Bonds' or a.name == 'NPS' %}var(--v-debt, #14b8a6){% elif a.name == 'Gold' or a.name == 'Silver' %}var(--v-gold, #eab308){% elif a.name == 'Real Estate' %}var(--v-realty, #f97316){% else %}#0ea5e9{% endif %};"></span>
-          <span>{{ a.name }}:</span>
-          <span class="v-horizon-amount">{{ a.value|inr_short }}</span>
-          <span class="v-horizon-pct">({{ a.pct }}%)</span>
+          <span>{{ a.name }}</span>
+          <strong>{{ a.value|inr_short }}</strong>
+          <span class="text-base-content/45">({{ a.pct }}%)</span>
         </div>
         {% endif %}
         {% endfor %}
@@ -119,53 +120,54 @@
   <div class="v-stat-grid">
     <div class="v-stat-cell">
       <div class="v-stat-label">Invested Capital</div>
-      <div class="v-stat-value">{{ total_invested|inr }}</div>
-      <div class="v-stat-sub">Principal across all active holdings</div>
+      <div class="v-stat-value text-base-content tabular-nums">{{ total_invested|inr }}</div>
+      <div class="v-stat-sub">Principal across active holdings</div>
     </div>
     <div class="v-stat-cell">
       <div class="v-stat-label">Total Return P&amp;L</div>
-      <div class="v-stat-value {% if total_returns >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+      <div class="v-stat-value tabular-nums {% if total_returns >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
         {% if total_returns >= 0 %}+{% endif %}{{ total_returns|inr }}
       </div>
-      <div class="v-stat-sub">{{ return_pct }}% capital appreciation</div>
+      <div class="v-stat-sub tabular-nums">{{ return_pct }}% capital appreciation</div>
     </div>
     <div class="v-stat-cell">
       <div class="v-stat-label">{{ fy_performance.label|default:"FY Run-Rate" }}</div>
-      <div class="v-stat-value {% if fy_performance.change >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+      {% if fy_performance %}
+      <div class="v-stat-value tabular-nums {% if fy_performance.change >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
         {% if fy_performance.change >= 0 %}+{% endif %}{{ fy_performance.change_pct }}%
       </div>
-      <div class="v-stat-sub">
-        {% if fy_performance %}
-        {{ fy_performance.money_added|inr_short }} added · {{ fy_performance.market_gain|inr_short }} market
-        {% else %}
-        Net worth snapshot
-        {% endif %}
+      <div class="v-stat-sub tabular-nums">
+        {{ fy_performance.money_added|inr_short }} added &middot; {{ fy_performance.market_gain|inr_short }} market
       </div>
+      {% else %}
+      <div class="v-stat-value text-base-content/45 tabular-nums">&mdash;</div>
+      <div class="v-stat-sub">Capture FY opening snapshot</div>
+      {% endif %}
     </div>
     <div class="v-stat-cell">
       <div class="v-stat-label">FY Milestone Spotlight</div>
       {% with s=goal_roadmap.spotlight %}
       {% if s %}
-      <a href="#goals-section" class="v-stat-value text-indigo-400 hover:underline">
+      <a href="#goals-section" class="v-stat-value text-primary hover:underline tabular-nums inline-flex items-center min-h-11 lg:min-h-7">
         {{ s.fy_progress_pct }}%
       </a>
-      <div class="v-stat-sub flex items-center gap-1">
+      <div class="v-stat-sub flex items-center gap-1 truncate">
         <span class="{% if s.status == 'behind' %}text-amber-400{% else %}text-emerald-400{% endif %} font-semibold">
           {% if s.achieved %}Hit target{% elif s.status == 'ahead' %}Ahead of pace{% elif s.status == 'behind' %}Behind pace{% else %}On track{% endif %}
         </span>
-        <span>· {{ s.label }}</span>
+        <span class="truncate">&middot; {{ s.label }}</span>
       </div>
       {% else %}
-      <a href="#goals-section" class="v-stat-value text-base-content/40 hover:underline">Set Target</a>
+      <a href="#goals-section" class="v-stat-value text-primary hover:underline text-base inline-flex items-center min-h-11 lg:min-h-7">Set Target</a>
       <div class="v-stat-sub">Track FY annual pace</div>
       {% endif %}
       {% endwith %}
     </div>
   </div>
-</div>
+</section>
 
 {# --- STICKY FOLIO NAVIGATION RAIL --- #}
-<div class="section-nav mb-4 rounded-xl" id="sectionNav">
+<nav class="section-nav mb-5 rounded-xl" id="sectionNav" aria-label="Portfolio domains">
   <div class="flex overflow-x-auto gap-1 px-2 py-1.5 scrollbar-hide">
     <a href="#overview" class="section-tab active" data-section="overview"><span class="material-symbols-outlined text-sm">pie_chart</span>Allocation Matrix</a>
     <a href="#equity" class="section-tab" data-section="equity"><span class="material-symbols-outlined text-sm">trending_up</span>Market Equities</a>
@@ -173,275 +175,307 @@
     <a href="#debt" class="section-tab" data-section="debt"><span class="material-symbols-outlined text-sm">account_balance</span>Retirement &amp; Debt</a>
     <a href="#liquidity" class="section-tab" data-section="liquidity"><span class="material-symbols-outlined text-sm">payments</span>Liquidity &amp; FDs</a>
     <a href="#goals-section" class="section-tab" data-section="goals-section"><span class="material-symbols-outlined text-sm">flag</span>FY Goals</a>
-    {% if latest_insight %}
     <a href="#ai-insights" class="section-tab" data-section="ai-insights"><span class="material-symbols-outlined text-sm text-amber-400">auto_awesome</span>AI Fiduciary Brief</a>
-    {% endif %}
   </div>
-</div>
+</nav>
 
-{# --- OVERVIEW WORKBENCH: ASSET MATRIX & AI FIDUCIARY BRIEF --- #}
-<div class="mb-6 scroll-mt-24" id="overview">
-  {# Panel 1: Double Doughnut Charts #}
-  <div class="v-panel mb-4">
-    <div class="v-panel-header">
-      <div class="flex items-center gap-2">
-        <span class="material-symbols-outlined text-base text-primary">pie_chart</span>
-        <h2 class="v-panel-title">Asset Allocation &amp; Diversification</h2>
-      </div>
-      <span class="text-xs text-base-content/50 font-mono">11 Asset Classes</span>
+{# --- OVERVIEW WORKBENCH: ALLOCATION MATRIX (7fr) + AI FIDUCIARY BRIEF (5fr), FOLLOWED BY FULL-WIDTH DIVERSIFICATION FOLIO --- #}
+<div class="mb-8 scroll-mt-24" id="overview">
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+    {# Left 7 cols: Asset Class Allocation Matrix #}
+    <div class="lg:col-span-7 flex">
+      <section class="v-panel v-panel-fill w-full" aria-label="Asset Class Allocation Matrix">
+        <div class="v-panel-header">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="material-symbols-outlined text-base text-indigo-400">table_chart</span>
+            <h2 class="v-panel-title">Asset Class Allocation Matrix</h2>
+          </div>
+          <span class="text-xs text-base-content/55 tabular-nums">Net Worth: <strong class="text-base-content">{{ total_value|inr }}</strong></span>
+        </div>
+
+        <div class="v-panel-body p-0 flex-1 flex flex-col justify-between">
+          {# High-Density Desktop Table #}
+          <div class="hidden sm:block v-panel-table overflow-x-auto">
+            <table class="v-table">
+              <thead>
+                <tr>
+                  <th>Asset Class</th>
+                  <th class="v-num">Current Valuation</th>
+                  <th class="v-num">Allocation</th>
+                  <th class="text-right">Domain</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for a in assets %}
+                <tr>
+                  <td>
+                    <div class="flex items-center gap-2">
+                      <span class="material-symbols-outlined text-base text-base-content/50">{{ a.icon }}</span>
+                      <span class="font-semibold text-xs text-base-content">{{ a.name }}</span>
+                    </div>
+                  </td>
+                  <td class="v-num text-xs font-bold text-base-content">{{ a.value|inr }}</td>
+                  <td class="v-num">
+                    <span class="v-delta v-delta-neutral text-xs font-semibold tabular-nums">{{ a.pct }}%</span>
+                  </td>
+                  <td class="text-right">
+                    <a href="#{% if a.name == 'Real Estate' or a.name == 'Gold' or a.name == 'Silver' or a.name == 'Crypto' %}alternates{% elif a.name == 'EPF' or a.name == 'PF' or a.name == 'Bonds' or a.name == 'NPS' %}debt{% elif a.name == 'Cash' or a.name == 'FD' %}liquidity{% else %}equity{% endif %}"
+                       class="v-btn v-btn-ghost v-btn-xs text-primary">
+                      Inspect <span class="material-symbols-outlined text-xs">arrow_downward</span>
+                    </a>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+              <tfoot>
+                <tr class="total-row border-t-2 border-[var(--v-hairline)] font-bold">
+                  <td class="text-xs text-base-content">Total Portfolio Net Worth</td>
+                  <td class="v-num text-xs text-base-content">{{ total_value|inr }}</td>
+                  <td class="v-num text-xs text-base-content">100.0%</td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          {# Mobile Cardless Rows #}
+          <div class="sm:hidden divide-y divide-[var(--v-hairline)]">
+            {% for a in assets %}
+            <a href="#{% if a.name == 'Real Estate' or a.name == 'Gold' or a.name == 'Silver' or a.name == 'Crypto' %}alternates{% elif a.name == 'EPF' or a.name == 'PF' or a.name == 'Bonds' or a.name == 'NPS' %}debt{% elif a.name == 'Cash' or a.name == 'FD' %}liquidity{% else %}equity{% endif %}"
+               class="v-mobile-row gap-3 text-inherit no-underline active:bg-base-content/5">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <span class="material-symbols-outlined text-base text-base-content/50 shrink-0">{{ a.icon }}</span>
+                <div class="min-w-0">
+                  <div class="font-semibold text-sm text-base-content truncate">{{ a.name }}</div>
+                  <div class="text-xs text-base-content/50 tabular-nums">{{ a.pct }}% share</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-1.5 shrink-0">
+                <span class="tabular-nums font-bold text-sm text-base-content">{{ a.value|inr }}</span>
+                <span class="material-symbols-outlined text-sm text-primary">arrow_downward</span>
+              </div>
+            </a>
+            {% endfor %}
+            <div class="px-4 py-3 bg-base-200/40 flex items-center justify-between text-xs font-bold">
+              <span class="text-base-content/80">Total Net Worth</span>
+              <span class="text-base-content tabular-nums">{{ total_value|inr }} (100.0%)</span>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
 
-    <div class="v-panel-body">
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <div class="text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2">Detailed Asset Breakdown</div>
-          <div class="chart-wrap" style="height:240px"><canvas id="allocationChart"></canvas></div>
-        </div>
-        <div>
-          <div class="text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2">Consolidated Asset Split</div>
-          <div class="chart-wrap" style="height:240px"><canvas id="consolidatedChart"></canvas></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  {# Panel 2: AI Portfolio Audit & Risk Brief #}
-  <div id="ai-insights">
-    {% if latest_insight %}
-    {% with ins=latest_insight.insights %}
-    <div class="v-panel mb-4">
-      <div class="v-panel-header">
-        <div class="flex items-center gap-2">
-          <span class="material-symbols-outlined text-base text-amber-400">auto_awesome</span>
-          <h2 class="v-panel-title">AI Fiduciary Intelligence</h2>
-        </div>
-        <div class="flex items-center gap-1.5">
-          <span class="v-delta v-delta-neutral text-[10px] py-0.5 px-1.5">{{ latest_insight.model_used }}</span>
-          <span class="text-[11px] text-base-content/40">{{ latest_insight.generated_at|timesince }} ago</span>
-        </div>
-      </div>
-
-      <div class="v-panel-body">
-        {# Score Dial and Executive Summary Banner #}
-        <div class="flex flex-col sm:flex-row sm:items-center gap-4 p-4 rounded-xl bg-base-content/3 border border-base-content/6">
-          <div class="ai-score-ring flex-shrink-0 {% if ins.score >= 75 %}ai-score-high{% elif ins.score >= 50 %}ai-score-mid{% else %}ai-score-low{% endif %}">
-            <svg viewBox="0 0 64 64">
-              <circle class="ai-score-ring-bg" cx="32" cy="32" r="28"/>
-              <circle class="ai-score-ring-fg" cx="32" cy="32" r="28" stroke-dasharray="175.93" stroke-dashoffset="175.93" data-score="{{ ins.score }}"/>
-            </svg>
-            <span class="ai-score-ring-text">{{ ins.score }}</span>
+    {# Right 5 cols: AI Portfolio Audit & Risk Brief #}
+    <div class="lg:col-span-5 flex scroll-mt-24" id="ai-insights">
+      {% if latest_insight %}
+      {% with ins=latest_insight.insights %}
+      <section class="v-panel v-panel-fill w-full" aria-label="AI Fiduciary Intelligence">
+        <div class="v-panel-header">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="material-symbols-outlined text-base text-amber-400">auto_awesome</span>
+            <h2 class="v-panel-title">AI Fiduciary Intelligence</h2>
           </div>
-          <div class="min-w-0">
-            <div class="text-xs font-bold uppercase tracking-wider text-base-content/50">Fiduciary Health Score</div>
-            <p class="text-xs text-base-content/80 mt-1 leading-relaxed">{{ ins.summary }}</p>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <span class="v-delta v-delta-neutral text-xs py-0.5 px-1.5 font-mono">{{ latest_insight.model_used }}</span>
+            <span class="text-xs text-base-content/45 hidden sm:inline">{{ latest_insight.generated_at|timesince }} ago</span>
           </div>
         </div>
 
-        {# Balanced 3-Column Grid for Findings #}
-        <div class="mt-4">
-          <div class="text-xs font-semibold uppercase tracking-wider text-base-content/50 mb-2.5 flex items-center justify-between">
-            <span>Critical Findings &amp; Opportunities</span>
-            <span class="text-base-content/40">({{ ins.insights|length }})</span>
-          </div>
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {% for item in ins.insights|slice:":3" %}
-            <div class="p-3.5 rounded-xl bg-base-content/3 border border-base-content/6 flex flex-col justify-between text-xs">
-              <div>
-                <div class="flex items-center justify-between gap-2 mb-2">
-                  <span class="font-bold flex items-center gap-1.5 text-base-content">
-                    <span class="material-symbols-outlined text-sm text-indigo-400">
+        <div class="v-panel-body p-0 flex-1 flex flex-col justify-between">
+          <div>
+            {# Score Dial and Executive Summary Strip (Flush Hairline Band — No Nested Box) #}
+            <div class="flex flex-col sm:flex-row sm:items-center gap-4 px-4 py-3.5 bg-base-200/20 border-b border-[var(--v-hairline)]">
+              <div class="ai-score-ring shrink-0 {% if ins.score >= 75 %}ai-score-high{% elif ins.score >= 50 %}ai-score-mid{% else %}ai-score-low{% endif %}">
+                <svg viewBox="0 0 64 64" aria-hidden="true">
+                  <circle class="ai-score-ring-bg" cx="32" cy="32" r="28"/>
+                  <circle class="ai-score-ring-fg" cx="32" cy="32" r="28" stroke-dasharray="175.93" stroke-dashoffset="175.93" data-score="{{ ins.score }}"/>
+                </svg>
+                <span class="ai-score-ring-text tabular-nums">{{ ins.score }}</span>
+              </div>
+              <div class="min-w-0">
+                <div class="text-xs font-semibold text-base-content/75">Fiduciary Health Score</div>
+                <p class="text-xs text-base-content/70 mt-1 leading-relaxed">{{ ins.summary }}</p>
+              </div>
+            </div>
+
+            {# Primary Findings (Flush Hairline Rows — Zero Cards-Inside-Cards) #}
+            {% if ins.insights %}
+            <div class="px-4 py-2 bg-base-200/10 border-b border-[var(--v-hairline)] flex items-center justify-between text-xs font-semibold text-base-content/65">
+              <span>Key Findings &amp; Opportunities</span>
+              <span class="tabular-nums text-base-content/45 font-normal">{{ ins.insights|length }} items</span>
+            </div>
+            <div class="divide-y divide-[var(--v-hairline)]">
+              {% for item in ins.insights|slice:":3" %}
+              <div class="px-4 py-3 text-xs">
+                <div class="flex items-start justify-between gap-2 mb-1">
+                  <span class="font-semibold flex items-center gap-1.5 text-base-content leading-snug">
+                    <span class="material-symbols-outlined text-sm text-indigo-400 shrink-0">
                       {% if item.category == 'risk' %}shield{% elif item.category == 'opportunity' %}trending_up{% elif item.category == 'rebalancing' %}balance{% elif item.category == 'goal' %}flag{% elif item.category == 'tax' %}receipt_long{% elif item.category == 'macro' %}public{% elif item.category == 'consolidation' %}merge{% elif item.category == 'international' %}language{% else %}lightbulb{% endif %}
                     </span>
-                    {{ item.title }}
+                    <span>{{ item.title }}</span>
                   </span>
                   {% if item.severity == 'critical' %}
-                  <span class="v-delta v-delta-neg text-[10px] py-0.5 px-1.5 shrink-0">Critical</span>
+                  <span class="v-delta v-delta-neg text-xs py-0.5 px-1.5 shrink-0">Critical</span>
                   {% elif item.severity == 'warning' %}
-                  <span class="v-delta v-delta-caution text-[10px] py-0.5 px-1.5 shrink-0">Warning</span>
+                  <span class="v-delta v-delta-caution text-xs py-0.5 px-1.5 shrink-0">Warning</span>
                   {% elif item.severity == 'positive' %}
-                  <span class="v-delta v-delta-pos text-[10px] py-0.5 px-1.5 shrink-0">Positive</span>
+                  <span class="v-delta v-delta-pos text-xs py-0.5 px-1.5 shrink-0">Positive</span>
                   {% else %}
-                  <span class="v-delta v-delta-neutral text-[10px] py-0.5 px-1.5 shrink-0">Info</span>
+                  <span class="v-delta v-delta-neutral text-xs py-0.5 px-1.5 shrink-0">Info</span>
                   {% endif %}
                 </div>
-                <p class="text-base-content/60 leading-relaxed">{{ item.detail }}</p>
+                <p class="text-base-content/65 leading-relaxed">{{ item.detail }}</p>
+                {% if item.action %}
+                <div class="mt-1.5 text-primary font-medium flex items-start gap-1">
+                  <span class="material-symbols-outlined text-xs mt-0.5 shrink-0">arrow_forward</span>
+                  <span>{{ item.action }}</span>
+                </div>
+                {% endif %}
               </div>
-              {% if item.action %}
-              <div class="mt-2.5 pt-2 border-t border-base-content/4 text-primary font-medium flex items-center gap-1">
-                <span class="material-symbols-outlined text-xs">arrow_forward</span>{{ item.action }}
-              </div>
-              {% endif %}
+              {% endfor %}
             </div>
-            {% endfor %}
+            {% endif %}
+          </div>
+
+          {# Flush Hairline Progressive Disclosures at Bottom of Panel #}
+          <div class="mt-auto">
+            {% if ins.insights and ins.insights|length > 3 %}
+            <details class="group border-t border-[var(--v-hairline)]">
+              <summary class="px-4 py-3 min-h-[44px] flex items-center justify-between gap-2 text-xs font-semibold text-base-content/80 cursor-pointer list-none select-none hover:bg-base-content/4 transition-colors">
+                <span>Additional Audit Findings ({{ ins.insights|slice:"3:"|length }})</span>
+                <span class="material-symbols-outlined text-base text-base-content/45 transition-transform duration-200 group-open:rotate-180">expand_more</span>
+              </summary>
+              <div class="px-4 pb-3 pt-1 max-h-64 overflow-y-auto divide-y divide-[var(--v-hairline)] border-t border-[var(--v-hairline)] bg-base-200/15 text-xs">
+                {% for item in ins.insights|slice:"3:" %}
+                <div class="py-2.5 first:pt-2 last:pb-0">
+                  <div class="flex items-center justify-between gap-2 font-semibold text-base-content mb-1">
+                    <span>{{ item.title }}</span>
+                    <span class="v-delta {% if item.severity == 'critical' %}v-delta-neg{% elif item.severity == 'warning' %}v-delta-caution{% elif item.severity == 'positive' %}v-delta-pos{% else %}v-delta-neutral{% endif %} text-xs py-0 px-1.5 shrink-0">{{ item.severity|title }}</span>
+                  </div>
+                  <p class="text-base-content/65 leading-relaxed">{{ item.detail }}</p>
+                  {% if item.action %}
+                  <p class="text-primary font-medium mt-1">&rarr; {{ item.action }}</p>
+                  {% endif %}
+                </div>
+                {% endfor %}
+              </div>
+            </details>
+            {% endif %}
+
+            {% if ins.market_context or ins.outlook %}
+            <details class="group border-t border-[var(--v-hairline)]">
+              <summary class="px-4 py-3 min-h-[44px] flex items-center justify-between gap-2 text-xs font-semibold text-base-content/80 cursor-pointer list-none select-none hover:bg-base-content/4 transition-colors">
+                <span>Market Context &amp; Tactical Outlook</span>
+                <span class="material-symbols-outlined text-base text-base-content/45 transition-transform duration-200 group-open:rotate-180">expand_more</span>
+              </summary>
+              <div class="px-4 py-3 space-y-3 max-h-64 overflow-y-auto border-t border-[var(--v-hairline)] bg-base-200/15 text-xs leading-relaxed">
+                {% if ins.market_context %}
+                <div>
+                  <div class="font-semibold text-base-content/80 mb-1">Macro Backdrop</div>
+                  <p class="text-base-content/65">{{ ins.market_context }}</p>
+                </div>
+                {% endif %}
+                {% if ins.outlook %}
+                <div>
+                  <div class="font-semibold text-base-content/80 mb-1">Tactical Outlook</div>
+                  <p class="text-base-content/65">{{ ins.outlook }}</p>
+                </div>
+                {% endif %}
+              </div>
+            </details>
+            {% endif %}
           </div>
         </div>
-
-        {# Progressive Disclosure for Full Context #}
-        <details class="v-disclosure mt-4">
-          <summary>
-            <span>Market Context &amp; Outlook Analysis</span>
-            <span class="material-symbols-outlined text-sm transition-transform group-open:rotate-180">expand_more</span>
-          </summary>
-          <div class="v-disclosure-content space-y-3 text-xs leading-relaxed">
-            {% if ins.market_context %}
-            <div>
-              <div class="font-bold text-base-content/70 uppercase tracking-wider mb-1">Macro Backdrop</div>
-              <p class="text-base-content/60">{{ ins.market_context }}</p>
-            </div>
-            {% endif %}
-            {% if ins.outlook %}
-            <div>
-              <div class="font-bold text-base-content/70 uppercase tracking-wider mb-1">Tactical Outlook</div>
-              <p class="text-base-content/60">{{ ins.outlook }}</p>
-            </div>
-            {% endif %}
+      </section>
+      {% endwith %}
+      {% else %}
+      <section class="v-panel v-panel-fill w-full justify-center" aria-label="AI Fiduciary Intelligence Pending">
+        <div class="v-empty py-10 my-auto">
+          <div class="v-empty-icon text-amber-400">
+            <span class="material-symbols-outlined text-3xl">auto_awesome</span>
           </div>
-        </details>
-      </div>
+          <h2 class="v-empty-title">AI Fiduciary Intelligence Pending</h2>
+          <p class="v-empty-desc">Run an on-demand audit to evaluate asset allocation drift, concentration exposure, and family milestone solvency.</p>
+          <form method="post" action="{% url 'generate_insights' %}" class="m-0">
+            {% csrf_token %}
+            <button type="submit" class="v-btn v-btn-primary">
+              <span class="material-symbols-outlined text-sm">auto_awesome</span>Generate Portfolio Audit
+            </button>
+          </form>
+        </div>
+      </section>
+      {% endif %}
     </div>
-    {% endwith %}
-    {% else %}
-    <div class="v-panel p-6 text-center mb-4">
-      <span class="material-symbols-outlined text-3xl text-amber-400 mb-2">auto_awesome</span>
-      <h3 class="font-bold text-sm text-base-content">AI Fiduciary Intelligence Pending</h3>
-      <p class="text-xs text-base-content/50 mt-1 mb-4">Run an on-demand audit to evaluate asset allocation drift, tax exposure, and family milestone solvency.</p>
-      <form method="post" action="{% url 'generate_insights' %}" class="m-0">
-        {% csrf_token %}
-        <button type="submit" class="v-btn v-btn-secondary v-btn-sm justify-center">
-          <span class="material-symbols-outlined text-sm">auto_awesome</span>Generate Portfolio Audit
-        </button>
-      </form>
-    </div>
-    {% endif %}
   </div>
 
-  {# Panel 3: Full-Width Asset Class Allocation & Diversification Matrix #}
-  <div class="v-panel">
+  {# Full-Width Balanced Diversification Folio Band (Zero Dead Column Void) #}
+  <section class="v-panel mt-4" aria-label="Asset Allocation Charts">
     <div class="v-panel-header">
       <div class="flex items-center gap-2">
-        <span class="material-symbols-outlined text-base text-primary">table_chart</span>
-        <h3 class="v-panel-title">Asset Class Allocation Matrix</h3>
+        <span class="material-symbols-outlined text-base text-indigo-400">pie_chart</span>
+        <h2 class="v-panel-title">Diversification Breakdown</h2>
       </div>
-      <span class="text-xs text-base-content/50 font-mono">Total Portfolio Net Worth: <strong class="text-primary tabular-nums">{{ total_value|inr }}</strong></span>
+      <span class="text-xs text-base-content/50 tabular-nums">{{ assets|length }} Asset Classes</span>
     </div>
 
     <div class="v-panel-body p-0">
-      {# High-Density Desktop Table #}
-      <div class="hidden sm:block v-table-wrap">
-        <table class="v-table">
-          <thead>
-            <tr>
-              <th>Asset Class</th>
-              <th class="v-num">Current Valuation</th>
-              <th class="v-num">Allocation</th>
-              <th class="text-center">Domain</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for a in assets %}
-            <tr>
-              <td class="font-medium">
-                <div class="flex items-center gap-2">
-                  <span class="material-symbols-outlined text-base text-base-content/50">{{ a.icon }}</span>
-                  <span class="font-semibold text-base-content">{{ a.name }}</span>
-                </div>
-              </td>
-              <td class="v-num font-bold">{{ a.value|inr }}</td>
-              <td class="v-num">
-                <span class="v-delta v-delta-neutral text-xs font-semibold">{{ a.pct }}%</span>
-              </td>
-              <td class="text-center">
-                <a href="#{% if a.name == 'Real Estate' or a.name == 'Gold' or a.name == 'Silver' or a.name == 'Crypto' %}alternates{% elif a.name == 'EPF' or a.name == 'PF' or a.name == 'Bonds' or a.name == 'NPS' %}debt{% elif a.name == 'Cash' or a.name == 'FD' %}liquidity{% else %}equity{% endif %}"
-                   class="v-btn v-btn-ghost v-btn-xs">
-                  Inspect <span class="material-symbols-outlined text-xs">arrow_downward</span>
-                </a>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-          <tfoot>
-            <tr>
-              <td>Total Portfolio Net Worth</td>
-              <td class="v-num text-primary font-bold">{{ total_value|inr }}</td>
-              <td class="v-num text-primary font-bold">100.0%</td>
-              <td></td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-
-      {# Mobile Cardless Rows #}
-      <div class="sm:hidden divide-y divide-base-content/5">
-        {% for a in assets %}
-        <div class="v-mobile-row">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <span class="material-symbols-outlined text-base text-base-content/50">{{ a.icon }}</span>
-              <span class="font-semibold text-sm text-base-content">{{ a.name }}</span>
-            </div>
-            <span class="v-delta v-delta-neutral text-xs font-semibold">{{ a.pct }}%</span>
-          </div>
-          <div class="flex items-center justify-between mt-1 text-xs">
-            <span class="tabular-nums font-bold text-base-content">{{ a.value|inr }}</span>
-            <a href="#{% if a.name == 'Real Estate' or a.name == 'Gold' or a.name == 'Silver' or a.name == 'Crypto' %}alternates{% elif a.name == 'EPF' or a.name == 'PF' or a.name == 'Bonds' or a.name == 'NPS' %}debt{% elif a.name == 'Cash' or a.name == 'FD' %}liquidity{% else %}equity{% endif %}"
-               class="text-primary text-xs font-medium flex items-center gap-0.5">
-              Inspect <span class="material-symbols-outlined text-xs">arrow_downward</span>
-            </a>
-          </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-[var(--v-hairline)]">
+        <div class="p-4 sm:p-5">
+          <div class="text-xs font-semibold text-base-content/65 mb-2">Detailed Asset Breakdown</div>
+          <div class="chart-wrap h-[210px] sm:h-[235px]"><canvas id="allocationChart"></canvas></div>
         </div>
-        {% endfor %}
-        <div class="p-3 bg-base-content/2 flex items-center justify-between text-xs font-bold">
-          <span>Total Net Worth</span>
-          <span class="text-primary tabular-nums">{{ total_value|inr }} (100.0%)</span>
+        <div class="p-4 sm:p-5">
+          <div class="text-xs font-semibold text-base-content/65 mb-2">Consolidated Asset Split</div>
+          <div class="chart-wrap h-[210px] sm:h-[235px]"><canvas id="consolidatedChart"></canvas></div>
         </div>
       </div>
     </div>
-  </div>
+  </section>
 </div>
 
 {% comment %} DOMAIN 1: MARKET-LINKED ASSETS (EQUITY, ZERODHA & US STOCKS) {% endcomment %}
 <div class="mb-8 scroll-mt-24" id="equity">
-  <div class="flex items-center justify-between mb-3">
+  <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
     <div class="flex items-center gap-2">
       <span class="material-symbols-outlined text-indigo-400 text-xl">trending_up</span>
       <h2 class="v-title text-base lg:text-lg m-0">Market-Linked Equities &amp; Securities</h2>
     </div>
     <div class="flex items-center gap-2">
-      <span class="v-delta v-delta-neutral text-xs font-bold">{{ equity_total|inr }}</span>
-      <a href="{% url 'zerodha_consolidated' %}" class="v-btn v-btn-secondary v-btn-xs sm:v-btn-sm">
+      <span class="v-delta v-delta-neutral text-xs font-bold tabular-nums">{{ equity_total|inr }}</span>
+      <a href="{% url 'zerodha_consolidated' %}" class="v-btn v-btn-secondary v-btn-sm">
         <span class="material-symbols-outlined text-sm">table_chart</span>Equity Blotter
       </a>
     </div>
   </div>
 
-  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
     {# Equity Category Breakdown Panel (5 cols) #}
     <div class="lg:col-span-5">
-      <div class="v-panel">
+      <div class="v-panel v-panel-fill">
         <div class="v-panel-header">
           <h3 class="v-panel-title">Asset Class Distribution</h3>
           <span class="text-xs text-base-content/50">Market Securities</span>
         </div>
         <div class="v-panel-body">
-          <div class="flex justify-between items-baseline mb-3 pb-2 border-b border-base-content/6">
+          <div class="flex justify-between items-baseline mb-3 pb-2.5 border-b border-[var(--v-hairline)]">
             <div>
-              <div class="text-[10px] uppercase tracking-wider text-base-content/50">Invested Capital</div>
-              <div class="text-sm font-semibold tabular-nums text-base-content/80">{{ equity_invested|inr }}</div>
+              <div class="text-xs text-base-content/50">Invested Capital</div>
+              <div class="text-sm font-semibold tabular-nums text-base-content mt-0.5">{{ equity_invested|inr }}</div>
             </div>
             <div class="text-right">
-              <div class="text-[10px] uppercase tracking-wider text-base-content/50">Net Return</div>
-              <div class="text-sm font-bold tabular-nums {% if equity_returns >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+              <div class="text-xs text-base-content/50">Net Return</div>
+              <div class="text-sm font-bold tabular-nums mt-0.5 {% if equity_returns >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
                 {% if equity_returns >= 0 %}+{% endif %}{{ equity_returns|inr }}
               </div>
             </div>
           </div>
           <div class="space-y-2">
             {% for e in equity_items %}
-            <div class="flex items-center justify-between text-xs py-1.5 border-b border-base-content/4 last:border-0">
+            <div class="flex items-center justify-between text-xs py-1.5 border-b border-[var(--v-hairline)] last:border-0">
               <span class="font-medium text-base-content/80">{{ e.name }}</span>
-              <div class="flex items-center gap-2">
-                <span class="tabular-nums font-semibold">{{ e.value|inr }}</span>
-                <span class="v-delta v-delta-neutral text-[10px] py-0 px-1">{{ e.pct }}%</span>
+              <div class="flex items-center gap-2 tabular-nums">
+                <span class="font-semibold text-base-content">{{ e.value|inr }}</span>
+                <span class="v-delta v-delta-neutral text-xs py-0 px-1.5">{{ e.pct }}%</span>
               </div>
             </div>
             {% endfor %}
@@ -452,77 +486,77 @@
 
     {# Zerodha Multi-Account Cards (7 cols) #}
     <div class="lg:col-span-7">
-      <div class="v-panel">
+      <div class="v-panel v-panel-fill">
         <div class="v-panel-header">
           <h3 class="v-panel-title">Zerodha Demat Accounts</h3>
-          <a href="{% url 'zerodha_consolidated' %}" class="v-btn v-btn-ghost v-btn-xs">
+          <a href="{% url 'zerodha_consolidated' %}" class="v-btn v-btn-ghost v-btn-xs text-primary">
             Consolidated View <span class="material-symbols-outlined text-xs">arrow_forward</span>
           </a>
         </div>
-        <div class="v-panel-body">
+        <div class="v-panel-body p-0">
           {% if accounts %}
           {% if accounts|length == 1 %}
-          {# Rich horizontal executive card for single demat account #}
+          {# Rich horizontal executive strip for single demat account #}
           {% with a=accounts.0 %}
           <a href="{% url 'zerodha_detail' a.account.slug %}"
-             class="p-4 rounded-xl bg-base-content/3 border border-base-content/6 hover:border-primary/40 hover:bg-base-content/5 transition-all block text-inherit no-underline">
+             class="p-4 sm:p-5 hover:bg-base-content/[0.03] transition-colors block text-inherit no-underline">
             <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <div class="flex items-center gap-2">
                   <span class="font-bold text-sm text-base-content">{{ a.account.name }}</span>
-                  <span class="v-delta v-delta-neutral text-[10px] py-0.5 px-2">Primary Demat</span>
+                  <span class="v-delta v-delta-neutral text-xs py-0.5 px-2">Primary Demat</span>
                 </div>
-                <div class="text-2xl font-extrabold text-primary tabular-nums mt-1.5">{{ a.total|inr }}</div>
-                <div class="flex items-center gap-2 text-xs text-base-content/60 mt-1 tabular-nums">
+                <div class="text-2xl font-extrabold text-base-content tabular-nums mt-1.5">{{ a.total|inr }}</div>
+                <div class="flex flex-wrap items-center gap-2 text-xs text-base-content/60 mt-1 tabular-nums">
                   <span>Invested: <strong class="text-base-content font-medium">{{ a.invested|inr }}</strong></span>
-                  <span>&bull;</span>
+                  <span>&middot;</span>
                   <span class="{% if a.returns >= 0 %}text-emerald-400 font-semibold{% else %}text-rose-400 font-semibold{% endif %}">
                     {% if a.returns >= 0 %}+{% endif %}{{ a.returns|inr }}
                   </span>
                 </div>
               </div>
-              <div class="grid grid-cols-3 sm:flex sm:flex-col items-start sm:items-end gap-1.5 shrink-0 pt-2 sm:pt-0 border-t sm:border-0 border-base-content/6">
+              <div class="grid grid-cols-3 sm:flex sm:flex-col items-start sm:items-end gap-1.5 shrink-0 pt-2.5 sm:pt-0 border-t sm:border-0 border-[var(--v-hairline)]">
                 <div class="text-xs">
-                  <span class="text-base-content/50">Stocks:</span>
-                  <span class="tabular-nums font-semibold text-base-content ml-1">{{ a.stocks|inr_short }}</span>
+                  <span class="text-base-content/50">Stocks</span>
+                  <span class="tabular-nums font-semibold text-base-content block sm:inline sm:ml-1">{{ a.stocks|inr_short }}</span>
                 </div>
                 <div class="text-xs">
-                  <span class="text-base-content/50">Index MF:</span>
-                  <span class="tabular-nums font-semibold text-base-content ml-1">{{ a.index_mf|inr_short }}</span>
+                  <span class="text-base-content/50">Index MF</span>
+                  <span class="tabular-nums font-semibold text-base-content block sm:inline sm:ml-1">{{ a.index_mf|inr_short }}</span>
                 </div>
                 <div class="text-xs">
-                  <span class="text-base-content/50">Other MF:</span>
-                  <span class="tabular-nums font-semibold text-base-content ml-1">{{ a.other_mf|inr_short }}</span>
+                  <span class="text-base-content/50">Other MF</span>
+                  <span class="tabular-nums font-semibold text-base-content block sm:inline sm:ml-1">{{ a.other_mf|inr_short }}</span>
                 </div>
               </div>
             </div>
-            <div class="mt-3 pt-3 border-t border-base-content/6 flex items-center justify-between text-xs text-primary font-medium">
+            <div class="mt-3 pt-2.5 border-t border-[var(--v-hairline)] flex items-center justify-between text-xs text-primary font-medium">
               <span>Inspect holdings, capital gains &amp; allocations</span>
               <span class="material-symbols-outlined text-sm">arrow_forward</span>
             </div>
           </a>
           {% endwith %}
           {% else %}
-          {# Multi-account grid #}
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {# Hairline-ruled multi-account folio grid (no nested cards) #}
+          <div class="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-[var(--v-hairline)]">
             {% for a in accounts %}
             <a href="{% url 'zerodha_detail' a.account.slug %}"
-               class="p-3.5 rounded-xl bg-base-content/3 border border-base-content/6 hover:border-primary/40 hover:bg-base-content/5 transition-all block text-inherit no-underline">
+               class="p-4 hover:bg-base-content/[0.03] transition-colors block text-inherit no-underline {% if forloop.counter > 2 %}sm:border-t sm:border-[var(--v-hairline)]{% endif %}">
               <div class="flex items-center justify-between">
-                <span class="font-bold text-xs text-base-content">{{ a.account.name }}</span>
-                <span class="material-symbols-outlined text-sm text-base-content/40">arrow_forward</span>
+                <span class="font-bold text-xs text-base-content truncate">{{ a.account.name }}</span>
+                <span class="material-symbols-outlined text-sm text-primary">arrow_forward</span>
               </div>
-              <div class="text-lg font-extrabold text-primary tabular-nums mt-1">{{ a.total|inr }}</div>
-              <div class="flex justify-between text-[11px] text-base-content/60 mt-1 tabular-nums">
+              <div class="text-lg font-extrabold text-base-content tabular-nums mt-1">{{ a.total|inr }}</div>
+              <div class="flex justify-between text-xs text-base-content/60 mt-1 tabular-nums">
                 <span>Inv: {{ a.invested|inr_short }}</span>
                 <span class="{% if a.returns >= 0 %}text-emerald-400 font-semibold{% else %}text-rose-400 font-semibold{% endif %}">
                   {% if a.returns >= 0 %}+{% endif %}{{ a.returns|inr_short }}
                 </span>
               </div>
-              <div class="grid grid-cols-3 gap-1 mt-2.5 pt-2 border-t border-base-content/6 text-[10px] text-base-content/50">
-                <div>Stocks<br><span class="font-semibold text-base-content/80 tabular-nums">{{ a.stocks|inr_short }}</span></div>
-                <div>Index MF<br><span class="font-semibold text-base-content/80 tabular-nums">{{ a.index_mf|inr_short }}</span></div>
-                <div>Other MF<br><span class="font-semibold text-base-content/80 tabular-nums">{{ a.other_mf|inr_short }}</span></div>
+              <div class="grid grid-cols-3 gap-1 mt-2.5 pt-2 border-t border-[var(--v-hairline)] text-xs text-base-content/50">
+                <div>Stocks<br><span class="font-semibold text-base-content/85 tabular-nums">{{ a.stocks|inr_short }}</span></div>
+                <div>Index MF<br><span class="font-semibold text-base-content/85 tabular-nums">{{ a.index_mf|inr_short }}</span></div>
+                <div>Other MF<br><span class="font-semibold text-base-content/85 tabular-nums">{{ a.other_mf|inr_short }}</span></div>
               </div>
             </a>
             {% endfor %}
@@ -541,48 +575,48 @@
     <div class="v-panel-header">
       <div class="flex items-center gap-2">
         <h3 class="v-panel-title">US Stocks &amp; RSUs</h3>
-        <span class="v-delta v-delta-neutral text-xs font-semibold">{{ us_stocks_current|inr }}</span>
+        <span class="v-delta v-delta-neutral text-xs font-semibold tabular-nums">{{ us_stocks_current|inr }}</span>
       </div>
-      <button type="button" class="v-btn v-btn-secondary v-btn-xs" onclick="openModal('addUSStockModal')">
+      <button type="button" class="v-btn v-btn-secondary v-btn-sm" onclick="openAddUSStockModal()">
         <span class="material-symbols-outlined text-sm">add</span>Add RSU Vest
       </button>
     </div>
     <div class="v-panel-body p-0">
       {% if us_stocks %}
-      <div class="hidden sm:block v-table-wrap">
+      <div class="hidden md:block v-panel-table overflow-x-auto">
         <table class="v-table">
           <thead>
             <tr>
               <th>Symbol &amp; Company</th>
               <th class="v-num">Qty</th>
-              <th class="hidden sm:table-cell">Vest Date</th>
-              <th class="v-num hidden md:table-cell">Buy Price ($)</th>
+              <th>Vest Date</th>
+              <th class="v-num">Buy Price ($)</th>
               <th class="v-num">LTP ($)</th>
-              <th class="v-num hidden sm:table-cell">Invested (₹)</th>
+              <th class="v-num">Invested (₹)</th>
               <th class="v-num">Current (₹)</th>
               <th class="v-num">Unrealized P&amp;L</th>
-              <th class="text-center w-12">Action</th>
+              <th class="text-right w-14">Action</th>
             </tr>
           </thead>
           <tbody>
             {% for h in us_stocks %}
             <tr>
               <td>
-                <div class="font-bold text-base-content">{{ h.symbol }}</div>
-                <div class="text-[11px] text-base-content/50">{{ h.company_name }}</div>
+                <div class="font-bold text-xs text-base-content">{{ h.symbol }}</div>
+                <div class="text-xs text-base-content/50">{{ h.company_name }}</div>
               </td>
-              <td class="v-num font-semibold">{{ h.quantity }}</td>
-              <td class="text-xs text-base-content/60 whitespace-nowrap hidden sm:table-cell">{{ h.vest_date|date:"d M Y" }}</td>
-              <td class="v-num text-base-content/60 hidden md:table-cell">${{ h.purchase_price_usd|floatformat:2 }}</td>
-              <td class="v-num font-semibold text-base-content">${{ h.current_price_usd|floatformat:2 }}</td>
-              <td class="v-num text-base-content/80 hidden sm:table-cell">{{ h.purchase_value|inr }}</td>
-              <td class="v-num font-bold text-base-content">{{ h.current_value|inr }}</td>
-              <td class="v-num font-semibold {% if h.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+              <td class="v-num text-xs font-semibold">{{ h.quantity }}</td>
+              <td class="text-xs text-base-content/65 whitespace-nowrap tabular-nums">{{ h.vest_date|date:"d M Y" }}</td>
+              <td class="v-num text-xs text-base-content/65">${{ h.purchase_price_usd|floatformat:2 }}</td>
+              <td class="v-num text-xs font-semibold text-base-content">${{ h.current_price_usd|floatformat:2 }}</td>
+              <td class="v-num text-xs text-base-content/80">{{ h.purchase_value|inr }}</td>
+              <td class="v-num text-xs font-bold text-base-content">{{ h.current_value|inr }}</td>
+              <td class="v-num text-xs font-semibold {% if h.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
                 {% if h.pnl >= 0 %}+{% endif %}{{ h.pnl|inr }}
-                <div class="text-[10px] opacity-70">{{ h.pnl_pct }}%</div>
+                <div class="text-xs opacity-75">{{ h.pnl_pct }}%</div>
               </td>
-              <td class="text-center">
-                <button type="button" class="v-btn v-btn-ghost v-btn-xs" data-edit-usstock
+              <td class="text-right">
+                <button type="button" class="v-icon-btn" aria-label="Edit {{ h.symbol }} RSU" data-edit-usstock
                         data-id="{{ h.id }}" data-symbol="{{ h.symbol }}" data-company="{{ h.company_name }}"
                         data-qty="{{ h.quantity }}" data-vest="{{ h.vest_date|date:'Y-m-d' }}"
                         data-buyprice="{{ h.purchase_price_usd }}" data-buyrate="{{ h.purchase_usd_inr }}"
@@ -596,43 +630,39 @@
         </table>
       </div>
 
-      {# Mobile Cardless Rows #}
-      <div class="sm:hidden divide-y divide-base-content/5">
+      {# Mobile & Small Tablet Rows #}
+      <div class="md:hidden divide-y divide-[var(--v-hairline)]">
         {% for h in us_stocks %}
-        <div class="v-mobile-row">
-          <div class="flex items-start justify-between gap-2">
-            <div>
-              <div class="font-bold text-sm text-base-content">{{ h.symbol }} &middot; {{ h.company_name }}</div>
-              <div class="text-xs text-base-content/50 mt-0.5">
-                <span class="tabular-nums font-semibold">{{ h.quantity }} shares</span> &middot; Vest {{ h.vest_date|date:"d M Y" }}
+        <div class="v-mobile-row flex-col !items-stretch gap-2">
+          <div class="w-full flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <div class="font-bold text-sm text-base-content truncate">{{ h.symbol }} &middot; {{ h.company_name }}</div>
+              <div class="text-xs text-base-content/55 mt-0.5 tabular-nums">
+                <span class="font-semibold">{{ h.quantity }} shares</span> &middot; Vest {{ h.vest_date|date:"d M Y" }}
               </div>
             </div>
-            <button type="button" class="v-btn v-btn-ghost v-btn-xs shrink-0" data-edit-usstock
+            <button type="button" class="v-icon-btn shrink-0" aria-label="Edit {{ h.symbol }} RSU" data-edit-usstock
                     data-id="{{ h.id }}" data-symbol="{{ h.symbol }}" data-company="{{ h.company_name }}"
                     data-qty="{{ h.quantity }}" data-vest="{{ h.vest_date|date:'Y-m-d' }}"
                     data-buyprice="{{ h.purchase_price_usd }}" data-buyrate="{{ h.purchase_usd_inr }}"
                     data-remarks="{{ h.remarks }}">
-              <span class="material-symbols-outlined text-sm">edit</span>
+              <span class="material-symbols-outlined text-base">edit</span>
             </button>
           </div>
-          <div class="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-base-content/5 text-xs">
+          <div class="w-full grid grid-cols-3 gap-2 pt-2 border-t border-[var(--v-hairline)] text-xs tabular-nums">
             <div>
-              <div class="text-[10px] uppercase text-base-content/40 tracking-wider">LTP ($)</div>
-              <div class="tabular-nums font-medium text-base-content mt-0.5">${{ h.current_price_usd|floatformat:2 }}</div>
+              <span class="text-xs text-base-content/45 block">LTP ($)</span>
+              <span class="font-medium text-base-content mt-0.5 block">${{ h.current_price_usd|floatformat:2 }}</span>
             </div>
             <div>
-              <div class="text-[10px] uppercase text-base-content/40 tracking-wider">Current (₹)</div>
-              <div class="tabular-nums font-bold text-base-content mt-0.5">{{ h.current_value|inr }}</div>
+              <span class="text-xs text-base-content/45 block">Current (₹)</span>
+              <span class="font-bold text-base-content mt-0.5 block">{{ h.current_value|inr }}</span>
             </div>
-            <div>
-              <div class="text-[10px] uppercase text-base-content/40 tracking-wider">P&amp;L</div>
-              <div class="mt-0.5">
-                {% if h.pnl >= 0 %}
-                <span class="v-delta v-delta-pos text-[11px]">+{{ h.pnl|inr }}</span>
-                {% else %}
-                <span class="v-delta v-delta-neg text-[11px]">{{ h.pnl|inr }}</span>
-                {% endif %}
-              </div>
+            <div class="text-right">
+              <span class="text-xs text-base-content/45 block">P&amp;L</span>
+              <span class="font-bold mt-0.5 block {% if h.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+                {% if h.pnl >= 0 %}+{% endif %}{{ h.pnl|inr }}
+              </span>
             </div>
           </div>
         </div>
@@ -647,14 +677,14 @@
 
 {% comment %} DOMAIN 2: REAL ASSETS & BULLION (REAL ESTATE, COMMODITIES, CRYPTO) {% endcomment %}
 <div class="mb-8 scroll-mt-24" id="alternates">
-  <div class="flex items-center justify-between mb-3">
+  <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
     <div class="flex items-center gap-2">
-      <span class="material-symbols-outlined text-amber-400 text-xl">domain</span>
+      <span class="material-symbols-outlined text-orange-400 text-xl">domain</span>
       <h2 class="v-title text-base lg:text-lg m-0">Real Assets, Bullion &amp; Alternates</h2>
     </div>
     <div class="flex items-center gap-2">
-      <span class="v-delta v-delta-neutral text-xs font-bold">{{ real_estate_current|add:commodity_total|add:crypto_current|inr }}</span>
-      <a href="{% url 'real_estate_detail' %}" class="v-btn v-btn-secondary v-btn-xs sm:v-btn-sm">
+      <span class="v-delta v-delta-neutral text-xs font-bold tabular-nums">{{ real_estate_current|add:commodity_total|add:crypto_current|inr }}</span>
+      <a href="{% url 'real_estate_detail' %}" class="v-btn v-btn-secondary v-btn-sm">
         <span class="material-symbols-outlined text-sm">real_estate_agent</span>Land Appraisals
       </a>
     </div>
@@ -665,20 +695,21 @@
     <div class="v-panel-header">
       <div class="flex items-center gap-2">
         <h3 class="v-panel-title">Real Estate Holdings</h3>
-        <span class="v-delta v-delta-neutral text-xs font-semibold">{{ real_estate_current|inr }}</span>
+        <span class="v-delta v-delta-neutral text-xs font-semibold tabular-nums">{{ real_estate_current|inr }}</span>
       </div>
-      <div class="flex items-center gap-2">
-        <a href="{% url 'real_estate_detail' %}" class="v-btn v-btn-ghost v-btn-xs">
+      <div class="flex items-center gap-1.5">
+        <a href="{% url 'real_estate_detail' %}" class="v-btn v-btn-ghost v-btn-xs text-primary">
           View Detail <span class="material-symbols-outlined text-xs">arrow_forward</span>
         </a>
-        <button type="button" class="v-btn v-btn-secondary v-btn-xs" onclick="openModal('addRealEstateModal')">
+        <button type="button" class="v-btn v-btn-secondary v-btn-sm" onclick="openAddRealEstateMasterModal()">
           <span class="material-symbols-outlined text-sm">add</span>Add Property
         </button>
       </div>
     </div>
     <div class="v-panel-body p-0">
       {% if real_estate_holdings %}
-      <div class="v-table-wrap">
+      {# Desktop Table #}
+      <div class="v-panel-table hidden md:block overflow-x-auto">
         <table class="v-table">
           <thead>
             <tr>
@@ -687,38 +718,40 @@
               <th class="v-num">Area (Gaj)</th>
               <th class="v-num">Invested (₹)</th>
               <th class="v-num">Current Valuation</th>
-              <th class="v-num">Current Rate / Gaj</th>
+              <th class="v-num">Rate / Gaj</th>
               <th class="v-num">Appreciation</th>
-              <th class="text-center w-12">Action</th>
+              <th class="text-right w-14">Action</th>
             </tr>
           </thead>
           <tbody>
             {% for h in real_estate_holdings %}
             <tr>
               <td>
-                <div class="flex items-center gap-1.5 font-bold text-base-content">
-                  {{ h.name }}
+                <div class="flex items-center gap-1.5 font-bold text-xs text-base-content">
+                  <span>{{ h.name }}</span>
                   {% if h.google_maps_url %}
-                  <a href="{{ h.google_maps_url }}" target="_blank" rel="noopener noreferrer" class="text-primary hover:opacity-80" title="Open Google Maps Location">
-                    <span class="material-symbols-outlined text-xs">pin_drop</span>
+                  <a href="{{ h.google_maps_url }}" target="_blank" rel="noopener noreferrer" class="v-icon-btn text-primary" title="Open Google Maps Location" aria-label="Open {{ h.name }} on Google Maps">
+                    <span class="material-symbols-outlined text-sm">pin_drop</span>
                   </a>
                   {% endif %}
                 </div>
-                <div class="text-[11px] text-base-content/50">{{ h.get_property_type_display }} &middot; {{ h.get_status_display }}</div>
+                <div class="text-xs text-base-content/50">{{ h.get_property_type_display }} &middot; {{ h.get_status_display }}</div>
               </td>
               <td class="text-xs text-base-content/70 whitespace-nowrap">{{ h.locality }}, {{ h.city }}</td>
-              <td class="v-num font-semibold">{{ h.area_in_gaj|floatformat:0|indian_number }} Gaj</td>
-              <td class="v-num text-base-content/70">{{ h.total_cost_basis|inr }}</td>
-              <td class="v-num font-bold text-primary">{{ h.current_valuation|inr }}</td>
-              <td class="v-num font-semibold">{{ h.current_rate_per_gaj|inr }}</td>
-              <td class="v-num font-semibold {% if h.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+              <td class="v-num text-xs font-semibold">{{ h.area_in_gaj|floatformat:0|indian_number }} Gaj</td>
+              <td class="v-num text-xs text-base-content/75">{{ h.total_cost_basis|inr }}</td>
+              <td class="v-num text-xs font-bold text-base-content">{{ h.current_valuation|inr }}</td>
+              <td class="v-num text-xs font-semibold text-base-content/85">{{ h.current_rate_per_gaj|inr }}</td>
+              <td class="v-num text-xs font-semibold {% if h.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
                 {% if h.pnl >= 0 %}+{% endif %}{{ h.pnl|inr }}
-                <div class="text-[10px] opacity-70">{{ h.pnl_pct }}%</div>
+                <div class="text-xs opacity-75">{{ h.pnl_pct }}%</div>
               </td>
-              <td class="text-center">
-                <button type="button" class="v-btn v-btn-ghost v-btn-xs" data-edit-re
+              <td class="text-right">
+                <button type="button" class="v-icon-btn" aria-label="Edit {{ h.name }}" data-edit-re
                         data-id="{{ h.id }}" data-name="{{ h.name }}" data-type="{{ h.property_type }}"
-                        data-status="{{ h.status }}" data-area="{{ h.area_value }}" data-unit="{{ h.area_unit }}"
+                        data-status="{{ h.status }}" data-acquisition="{{ h.acquisition_type }}"
+                        data-owner="{{ h.original_owner|default:'' }}" data-inherited="{{ h.inherited_year|default:'' }}"
+                        data-area="{{ h.area_value }}" data-unit="{{ h.area_unit }}"
                         data-locality="{{ h.locality }}" data-city="{{ h.city }}" data-state="{{ h.state }}"
                         data-landmark="{{ h.landmark }}" data-pincode="{{ h.pincode }}"
                         data-micro="{{ h.micro_market_tag }}" data-maps="{{ h.google_maps_url }}"
@@ -734,6 +767,57 @@
           </tbody>
         </table>
       </div>
+
+      {# Mobile View #}
+      <div class="md:hidden divide-y divide-[var(--v-hairline)]">
+        {% for h in real_estate_holdings %}
+        <div class="v-mobile-row flex-col !items-stretch gap-2">
+          <div class="w-full flex items-start justify-between gap-2">
+            <div class="min-w-0">
+              <div class="font-bold text-sm text-base-content flex items-center gap-1 flex-wrap">
+                <span>{{ h.name }}</span>
+                {% if h.google_maps_url %}
+                <a href="{{ h.google_maps_url }}" target="_blank" rel="noopener noreferrer" class="v-icon-btn text-primary" aria-label="Open {{ h.name }} on Google Maps">
+                  <span class="material-symbols-outlined text-sm">pin_drop</span>
+                </a>
+                {% endif %}
+              </div>
+              <div class="text-xs text-base-content/55 mt-0.5 truncate">{{ h.locality }}, {{ h.city }} &middot; {{ h.area_in_gaj|floatformat:0|indian_number }} Gaj</div>
+            </div>
+            <button type="button" class="v-icon-btn shrink-0" aria-label="Edit {{ h.name }}" data-edit-re
+                    data-id="{{ h.id }}" data-name="{{ h.name }}" data-type="{{ h.property_type }}"
+                    data-status="{{ h.status }}" data-acquisition="{{ h.acquisition_type }}"
+                    data-owner="{{ h.original_owner|default:'' }}" data-inherited="{{ h.inherited_year|default:'' }}"
+                    data-area="{{ h.area_value }}" data-unit="{{ h.area_unit }}"
+                    data-locality="{{ h.locality }}" data-city="{{ h.city }}" data-state="{{ h.state }}"
+                    data-landmark="{{ h.landmark }}" data-pincode="{{ h.pincode }}"
+                    data-micro="{{ h.micro_market_tag }}" data-maps="{{ h.google_maps_url }}"
+                    data-khasra="{{ h.khasra_khata_number }}" data-date="{{ h.purchase_date|date:'Y-m-d' }}"
+                    data-price="{{ h.purchase_price }}" data-stamp="{{ h.stamp_duty_charges }}"
+                    data-valuation="{{ h.current_valuation }}" data-vdate="{{ h.last_valuation_date|date:'Y-m-d'|default:'' }}"
+                    data-rent="{{ h.monthly_rental_income }}" data-remarks="{{ h.remarks }}">
+              <span class="material-symbols-outlined text-base">edit</span>
+            </button>
+          </div>
+          <div class="w-full grid grid-cols-3 gap-2 pt-2 border-t border-[var(--v-hairline)] text-xs tabular-nums">
+            <div>
+              <span class="text-xs text-base-content/45 block">Invested</span>
+              <span class="font-semibold text-base-content/80 mt-0.5 block">{{ h.total_cost_basis|inr }}</span>
+            </div>
+            <div>
+              <span class="text-xs text-base-content/45 block">Valuation</span>
+              <span class="font-bold text-base-content mt-0.5 block">{{ h.current_valuation|inr }}</span>
+            </div>
+            <div class="text-right">
+              <span class="text-xs text-base-content/45 block">Appreciation</span>
+              <span class="font-bold mt-0.5 block {% if h.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+                {% if h.pnl >= 0 %}+{% endif %}{{ h.pnl|inr }}
+              </span>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
       {% else %}
       <div class="p-6 text-center text-xs text-base-content/50">No real estate holdings recorded.</div>
       {% endif %}
@@ -741,85 +825,89 @@
   </div>
 
   {# Physical Commodities (Gold / Silver) & Crypto Split #}
-  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+  <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
     {# Commodities (8 cols) #}
     <div class="lg:col-span-8">
-      <div class="v-panel">
+      <div class="v-panel v-panel-fill">
         <div class="v-panel-header">
           <div class="flex items-center gap-2">
             <h3 class="v-panel-title">Physical Bullion (Gold &amp; Silver)</h3>
-            <span class="v-delta v-delta-neutral text-xs font-semibold">{{ commodity_total|inr }}</span>
+            <span class="v-delta v-delta-neutral text-xs font-semibold tabular-nums">{{ commodity_total|inr }}</span>
           </div>
-          <div class="flex items-center gap-2">
-            <a href="{% url 'commodities_detail' %}" class="v-btn v-btn-ghost v-btn-xs">
+          <div class="flex items-center gap-1.5">
+            <a href="{% url 'commodities_detail' %}" class="v-btn v-btn-ghost v-btn-xs text-primary">
               View All <span class="material-symbols-outlined text-xs">arrow_forward</span>
             </a>
-            <button type="button" class="v-btn v-btn-secondary v-btn-xs" onclick="openAddCommodityModal()">
+            <button type="button" class="v-btn v-btn-secondary v-btn-sm" onclick="openAddCommodityModal()">
               <span class="material-symbols-outlined text-sm">add</span>Add Bullion
             </button>
           </div>
         </div>
-        <div class="v-panel-body">
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {# Gold Pot #}
-            <div class="p-3.5 rounded-xl bg-base-content/3 border border-base-content/6">
-              <div class="flex items-center justify-between mb-2">
-                <div class="flex items-center gap-2">
-                  <span class="material-symbols-outlined text-xl text-amber-400">diamond</span>
-                  <div>
+        <div class="v-panel-body p-0 flex-1">
+          <div class="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-[var(--v-hairline)] h-full">
+            {# Gold Pot (Flush Hairline Column — No Nested Box) #}
+            <div class="p-4 flex flex-col">
+              <div class="flex items-center justify-between gap-2 pb-2.5 border-b border-[var(--v-hairline)]">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="material-symbols-outlined text-xl text-amber-400 shrink-0">diamond</span>
+                  <div class="min-w-0">
                     <div class="text-xs font-bold text-base-content">Gold Bullion</div>
-                    <div class="text-[10px] text-base-content/50">{{ gold_rate|inr }}/g · {{ gold_weight|floatformat:0 }}g</div>
+                    <div class="text-xs text-base-content/50 tabular-nums">{{ gold_rate|inr }}/g &middot; {{ gold_weight|floatformat:0 }}g</div>
                   </div>
                 </div>
-                <div class="text-sm font-bold text-amber-400 tabular-nums">{{ gold_value|inr }}</div>
+                <div class="text-sm font-bold text-base-content tabular-nums shrink-0">{{ gold_value|inr }}</div>
               </div>
               {% if gold_holdings %}
-              <div class="divide-y divide-base-content/6 max-h-36 overflow-y-auto">
+              <div class="divide-y divide-[var(--v-hairline)] max-h-44 overflow-y-auto mt-1">
                 {% for h in gold_holdings %}
-                <div class="flex items-center justify-between py-1.5 text-xs">
-                  <span class="text-base-content/80 truncate max-w-[150px]">{{ h.description }}</span>
-                  <div class="flex items-center gap-2">
-                    <span class="text-base-content/50 tabular-nums">{{ h.weight_grams|floatformat:0 }}g</span>
-                    <button type="button" class="v-btn v-btn-ghost v-btn-xs" data-edit-commodity
+                <div class="flex items-center justify-between gap-2 py-1.5 text-xs">
+                  <span class="text-base-content/80 truncate">{{ h.description }}</span>
+                  <div class="flex items-center gap-1 shrink-0">
+                    <span class="text-base-content/55 tabular-nums">{{ h.weight_grams|floatformat:0 }}g</span>
+                    <button type="button" class="v-icon-btn" aria-label="Edit {{ h.description }}" data-edit-commodity
                             data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}"
                             data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}">
-                      <span class="material-symbols-outlined text-xs">edit</span>
+                      <span class="material-symbols-outlined text-sm">edit</span>
                     </button>
                   </div>
                 </div>
                 {% endfor %}
               </div>
+              {% else %}
+              <p class="text-xs text-base-content/45 py-4 my-auto text-center">No gold items recorded.</p>
               {% endif %}
             </div>
 
-            {# Silver Pot #}
-            <div class="p-3.5 rounded-xl bg-base-content/3 border border-base-content/6">
-              <div class="flex items-center justify-between mb-2">
-                <div class="flex items-center gap-2">
-                  <span class="material-symbols-outlined text-xl text-slate-400">toll</span>
-                  <div>
+            {# Silver Pot (Flush Hairline Column — No Nested Box) #}
+            <div class="p-4 flex flex-col">
+              <div class="flex items-center justify-between gap-2 pb-2.5 border-b border-[var(--v-hairline)]">
+                <div class="flex items-center gap-2 min-w-0">
+                  <span class="material-symbols-outlined text-xl text-slate-400 shrink-0">toll</span>
+                  <div class="min-w-0">
                     <div class="text-xs font-bold text-base-content">Silver Bullion</div>
-                    <div class="text-[10px] text-base-content/50">{{ silver_rate|inr }}/g · {{ silver_weight|floatformat:0|indian_number }}g</div>
+                    <div class="text-xs text-base-content/50 tabular-nums">{{ silver_rate|inr }}/g &middot; {{ silver_weight|floatformat:0|indian_number }}g</div>
                   </div>
                 </div>
-                <div class="text-sm font-bold text-slate-300 tabular-nums">{{ silver_value|inr }}</div>
+                <div class="text-sm font-bold text-base-content tabular-nums shrink-0">{{ silver_value|inr }}</div>
               </div>
               {% if silver_holdings %}
-              <div class="divide-y divide-base-content/6 max-h-36 overflow-y-auto">
+              <div class="divide-y divide-[var(--v-hairline)] max-h-44 overflow-y-auto mt-1">
                 {% for h in silver_holdings %}
-                <div class="flex items-center justify-between py-1.5 text-xs">
-                  <span class="text-base-content/80 truncate max-w-[150px]">{{ h.description }}</span>
-                  <div class="flex items-center gap-2">
-                    <span class="text-base-content/50 tabular-nums">{{ h.weight_grams|floatformat:0 }}g</span>
-                    <button type="button" class="v-btn v-btn-ghost v-btn-xs" data-edit-commodity
+                <div class="flex items-center justify-between gap-2 py-1.5 text-xs">
+                  <span class="text-base-content/80 truncate">{{ h.description }}</span>
+                  <div class="flex items-center gap-1 shrink-0">
+                    <span class="text-base-content/55 tabular-nums">{{ h.weight_grams|floatformat:0 }}g</span>
+                    <button type="button" class="v-icon-btn" aria-label="Edit {{ h.description }}" data-edit-commodity
                             data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}"
                             data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}">
-                      <span class="material-symbols-outlined text-xs">edit</span>
+                      <span class="material-symbols-outlined text-sm">edit</span>
                     </button>
                   </div>
                 </div>
                 {% endfor %}
               </div>
+              {% else %}
+              <p class="text-xs text-base-content/45 py-4 my-auto text-center">No silver items recorded.</p>
               {% endif %}
             </div>
           </div>
@@ -829,41 +917,44 @@
 
     {# Crypto (4 cols) #}
     <div class="lg:col-span-4">
-      <div class="v-panel">
+      <div class="v-panel v-panel-fill">
         <div class="v-panel-header">
           <div class="flex items-center gap-2">
             <h3 class="v-panel-title">Crypto Assets</h3>
-            <span class="v-delta v-delta-neutral text-xs font-semibold">{{ crypto_current|inr }}</span>
+            <span class="v-delta v-delta-neutral text-xs font-semibold tabular-nums">{{ crypto_current|inr }}</span>
           </div>
-          <button type="button" class="v-btn v-btn-secondary v-btn-xs" onclick="openModal('addCryptoModal')">
-            <span class="material-symbols-outlined text-sm">add</span>Add
-          </button>
+          <div class="flex items-center gap-1">
+            <a href="{% url 'crypto_detail' %}" class="v-btn v-btn-ghost v-btn-xs text-primary">View All</a>
+            <button type="button" class="v-btn v-btn-secondary v-btn-sm" onclick="openAddCryptoMasterModal()">
+              <span class="material-symbols-outlined text-sm">add</span>Add
+            </button>
+          </div>
         </div>
         <div class="v-panel-body p-0">
           {% if crypto_holdings %}
-          <div class="v-table-wrap">
+          <div class="v-panel-table overflow-x-auto">
             <table class="v-table">
               <thead>
                 <tr>
                   <th>Token</th>
                   <th class="v-num">Current</th>
                   <th class="v-num">P&amp;L</th>
-                  <th class="text-center w-10"></th>
+                  <th class="text-right w-12"></th>
                 </tr>
               </thead>
               <tbody>
                 {% for c in crypto_holdings %}
                 <tr>
                   <td class="font-bold text-xs text-base-content">{{ c.name }}</td>
-                  <td class="v-num font-semibold text-xs">{{ c.current_value|inr }}</td>
-                  <td class="v-num text-xs {% if c.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+                  <td class="v-num font-semibold text-xs text-base-content">{{ c.current_value|inr }}</td>
+                  <td class="v-num text-xs font-semibold {% if c.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
                     {% if c.pnl >= 0 %}+{% endif %}{{ c.pnl|inr }}
                   </td>
-                  <td class="text-center">
-                    <button type="button" class="v-btn v-btn-ghost v-btn-xs" data-edit-crypto
+                  <td class="text-right">
+                    <button type="button" class="v-icon-btn" aria-label="Edit {{ c.name }}" data-edit-crypto
                             data-id="{{ c.id }}" data-name="{{ c.name }}" data-invested="{{ c.amount_invested }}"
                             data-current="{{ c.current_value }}" data-remarks="{{ c.remarks }}">
-                      <span class="material-symbols-outlined text-xs">edit</span>
+                      <span class="material-symbols-outlined text-sm">edit</span>
                     </button>
                   </td>
                 </tr>
@@ -882,47 +973,47 @@
 
 {% comment %} DOMAIN 3: RETIREMENT & SOVEREIGN DEBT (EPF, PF / PPF, NPS, BONDS) {% endcomment %}
 <div class="mb-8 scroll-mt-24" id="debt">
-  <div class="flex items-center justify-between mb-3">
+  <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
     <div class="flex items-center gap-2">
       <span class="material-symbols-outlined text-teal-400 text-xl">account_balance</span>
       <h2 class="v-title text-base lg:text-lg m-0">Retirement, Sovereign &amp; Debt Instruments</h2>
     </div>
     <div class="flex items-center gap-2">
-      <span class="v-delta v-delta-neutral text-xs font-bold">{{ epf_balance|add:pf_balance|add:bonds_total|inr }}</span>
-      <a href="{% url 'epf_detail' %}" class="v-btn v-btn-secondary v-btn-xs sm:v-btn-sm">
+      <span class="v-delta v-delta-neutral text-xs font-bold tabular-nums">{{ epf_balance|add:pf_balance|add:bonds_total|inr }}</span>
+      <a href="{% url 'epf_detail' %}" class="v-btn v-btn-secondary v-btn-sm">
         <span class="material-symbols-outlined text-sm">savings</span>EPF Passbook
       </a>
     </div>
   </div>
 
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch mb-4">
     {# EPF Panel #}
-    <div class="v-panel">
+    <div class="v-panel v-panel-fill">
       <div class="v-panel-header">
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 min-w-0">
           <h3 class="v-panel-title">Employees' Provident Fund (EPF)</h3>
-          <span class="v-delta v-delta-pos text-xs font-semibold">{{ epf_balance|inr }}</span>
+          <span class="v-delta v-delta-pos text-xs font-semibold tabular-nums">{{ epf_balance|inr }}</span>
         </div>
-        <div class="flex items-center gap-2">
-          <a href="{% url 'epf_detail' %}" class="v-btn v-btn-ghost v-btn-xs">Passbook</a>
-          <button type="button" class="v-btn v-btn-secondary v-btn-xs" onclick="openModal('addEpfModal')">
+        <div class="flex items-center gap-1.5 shrink-0">
+          <a href="{% url 'epf_detail' %}" class="v-btn v-btn-ghost v-btn-xs text-primary">Passbook</a>
+          <button type="button" class="v-btn v-btn-secondary v-btn-sm" onclick="openAddEpfMasterModal()">
             <span class="material-symbols-outlined text-sm">add</span>Add Entry
           </button>
         </div>
       </div>
       <div class="v-panel-body">
-        <div class="flex justify-between items-baseline mb-3 pb-2 border-b border-base-content/6 text-xs">
+        <div class="flex flex-wrap justify-between items-baseline gap-2 mb-3 pb-2.5 border-b border-[var(--v-hairline)] text-xs">
           <div>
-            <span class="text-base-content/50">Total Contributions:</span>
+            <span class="text-base-content/55">Contributions:</span>
             <strong class="text-base-content ml-1 tabular-nums">{{ epf_total_contrib|inr }}</strong>
           </div>
           <div>
-            <span class="text-base-content/50">Accrued Interest:</span>
-            <strong class="text-emerald-400 ml-1 tabular-nums">{{ epf_total_interest|inr }}</strong>
+            <span class="text-base-content/55">Accrued Interest:</span>
+            <strong class="text-emerald-400 ml-1 tabular-nums">+{{ epf_total_interest|inr }}</strong>
           </div>
         </div>
         {% if epf_entries %}
-        <div class="v-table-wrap max-h-56 overflow-y-auto">
+        <div class="hidden sm:block v-table-wrap max-h-56 overflow-y-auto">
           <table class="v-table">
             <thead>
               <tr>
@@ -930,31 +1021,49 @@
                 <th>Type</th>
                 <th class="v-num">Amount</th>
                 <th>Remarks</th>
-                <th class="text-center w-10"></th>
+                <th class="text-right w-12"></th>
               </tr>
             </thead>
             <tbody>
               {% for e in epf_entries|slice:":6" %}
               <tr>
-                <td class="text-xs text-base-content/60 whitespace-nowrap">{{ e.date|date:"d M Y" }}</td>
+                <td class="text-xs text-base-content/65 whitespace-nowrap tabular-nums">{{ e.date|date:"d M Y" }}</td>
                 <td>
-                  <span class="v-delta {% if e.entry_type == 'CONTRIBUTION' %}v-delta-pos{% else %}v-delta-neutral{% endif %} text-[10px] py-0 px-1.5">
+                  <span class="v-delta {% if e.entry_type == 'CONTRIBUTION' %}v-delta-pos{% else %}v-delta-neutral{% endif %} text-xs py-0 px-1.5">
                     {{ e.get_entry_type_display }}
                   </span>
                 </td>
-                <td class="v-num font-semibold text-emerald-400">+{{ e.amount|inr }}</td>
-                <td class="text-xs text-base-content/50 truncate max-w-[120px]">{{ e.remarks|default:"-" }}</td>
-                <td class="text-center">
-                  <button type="button" class="v-btn v-btn-ghost v-btn-xs" data-edit-epf
+                <td class="v-num text-xs font-semibold text-emerald-400">+{{ e.amount|inr }}</td>
+                <td class="text-xs text-base-content/55 truncate max-w-[120px]">{{ e.remarks|default:"—" }}</td>
+                <td class="text-right">
+                  <button type="button" class="v-icon-btn" aria-label="Edit EPF entry from {{ e.date|date:'d M Y' }}" data-edit-epf
                           data-id="{{ e.id }}" data-date="{{ e.date|date:'Y-m-d' }}"
                           data-type="{{ e.entry_type }}" data-amount="{{ e.amount }}" data-remarks="{{ e.remarks }}">
-                    <span class="material-symbols-outlined text-xs">edit</span>
+                    <span class="material-symbols-outlined text-sm">edit</span>
                   </button>
                 </td>
               </tr>
               {% endfor %}
             </tbody>
           </table>
+        </div>
+        <div class="sm:hidden divide-y divide-[var(--v-hairline)]">
+          {% for e in epf_entries|slice:":5" %}
+          <div class="py-2 flex items-center justify-between gap-2">
+            <div class="min-w-0">
+              <div class="flex items-center gap-1.5">
+                <span class="font-bold text-xs text-emerald-400 tabular-nums">+{{ e.amount|inr }}</span>
+                <span class="v-delta {% if e.entry_type == 'CONTRIBUTION' %}v-delta-pos{% else %}v-delta-neutral{% endif %} text-xs py-0 px-1.5">{{ e.get_entry_type_display }}</span>
+              </div>
+              <div class="text-xs text-base-content/50 mt-0.5 tabular-nums truncate">{{ e.date|date:"d M Y" }}{% if e.remarks %} &middot; {{ e.remarks }}{% endif %}</div>
+            </div>
+            <button type="button" class="v-icon-btn shrink-0" aria-label="Edit EPF entry from {{ e.date|date:'d M Y' }}" data-edit-epf
+                    data-id="{{ e.id }}" data-date="{{ e.date|date:'Y-m-d' }}"
+                    data-type="{{ e.entry_type }}" data-amount="{{ e.amount }}" data-remarks="{{ e.remarks }}">
+              <span class="material-symbols-outlined text-base">edit</span>
+            </button>
+          </div>
+          {% endfor %}
         </div>
         {% else %}
         <div class="p-6 text-center text-xs text-base-content/50">No EPF passbook entries recorded.</div>
@@ -963,15 +1072,15 @@
     </div>
 
     {# PF (Per Family Member) Panel #}
-    <div class="v-panel">
+    <div class="v-panel v-panel-fill">
       <div class="v-panel-header">
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 min-w-0">
           <h3 class="v-panel-title">Public Provident Fund (PPF / PF)</h3>
-          <span class="v-delta v-delta-pos text-xs font-semibold">{{ pf_balance|inr }}</span>
+          <span class="v-delta v-delta-pos text-xs font-semibold tabular-nums">{{ pf_balance|inr }}</span>
         </div>
-        <div class="flex items-center gap-2">
-          <a href="{% url 'pf_detail' %}" class="v-btn v-btn-ghost v-btn-xs">Ledger</a>
-          <button type="button" class="v-btn v-btn-secondary v-btn-xs" onclick="openAddPfModal()">
+        <div class="flex items-center gap-1.5 shrink-0">
+          <a href="{% url 'pf_detail' %}" class="v-btn v-btn-ghost v-btn-xs text-primary">Ledger</a>
+          <button type="button" class="v-btn v-btn-secondary v-btn-sm" onclick="openAddPfModal()">
             <span class="material-symbols-outlined text-sm">add</span>Add Entry
           </button>
         </div>
@@ -982,18 +1091,18 @@
         <div class="flex flex-wrap items-center gap-2 mb-3">
           {% for m in pf_accounts %}
           <a href="{% url 'pf_detail' %}?member={{ m.account_name|urlencode }}"
-             class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-base-content/4 border border-base-content/6 hover:border-primary/40 text-xs no-underline text-inherit transition-all">
-            <span class="w-4 h-4 rounded-full bg-primary/20 text-primary text-[10px] font-bold flex items-center justify-center">{{ m.account_name|slice:":1"|upper }}</span>
-            <span class="text-base-content/70">{{ m.account_name }}:</span>
-            <strong class="text-primary tabular-nums">{{ m.balance|inr }}</strong>
-            <span class="text-[10px] text-base-content/40">({{ m.pct|floatformat:0 }}%)</span>
+             class="pf-member-chip inline-flex items-center gap-1.5 px-2.5 py-1.5 !min-h-11 lg:!min-h-[34px] rounded-lg bg-base-200/40 border border-[var(--v-hairline)] hover:border-primary/40 text-xs no-underline text-inherit transition-colors">
+            <span class="w-4 h-4 rounded-full bg-teal-500/20 text-teal-400 text-xs font-bold flex items-center justify-center">{{ m.account_name|slice:":1"|upper }}</span>
+            <span class="text-base-content/75">{{ m.account_name }}:</span>
+            <strong class="text-base-content tabular-nums">{{ m.balance|inr }}</strong>
+            <span class="text-xs text-base-content/45 tabular-nums">({{ m.pct|floatformat:0 }}%)</span>
           </a>
           {% endfor %}
         </div>
         {% endif %}
 
         {% if pf_entries %}
-        <div class="v-table-wrap max-h-56 overflow-y-auto">
+        <div class="hidden sm:block v-table-wrap max-h-56 overflow-y-auto">
           <table class="v-table">
             <thead>
               <tr>
@@ -1002,24 +1111,24 @@
                 <th class="v-num">Contrib</th>
                 <th class="v-num">Interest</th>
                 <th class="v-num">Balance</th>
-                <th class="text-center w-10"></th>
+                <th class="text-right w-12"></th>
               </tr>
             </thead>
             <tbody>
               {% for e in pf_entries|slice:":6" %}
               <tr>
-                <td class="font-bold text-xs text-base-content">{{ e.financial_year }}</td>
-                <td><span class="v-delta v-delta-neutral text-[10px] py-0 px-1.5">{{ e.account_name }}</span></td>
-                <td class="v-num text-xs">{% if e.contribution > 0 %}+{{ e.contribution|inr }}{% else %}&mdash;{% endif %}</td>
+                <td class="font-bold text-xs text-base-content tabular-nums">{{ e.financial_year }}</td>
+                <td><span class="v-delta v-delta-neutral text-xs py-0 px-1.5">{{ e.account_name }}</span></td>
+                <td class="v-num text-xs text-base-content/85">{% if e.contribution > 0 %}+{{ e.contribution|inr }}{% else %}&mdash;{% endif %}</td>
                 <td class="v-num text-xs text-emerald-400">{% if e.interest > 0 %}+{{ e.interest|inr }}{% else %}&mdash;{% endif %}</td>
-                <td class="v-num text-xs font-bold">{{ e.closing_balance|inr }}</td>
-                <td class="text-center">
-                  <button type="button" class="v-btn v-btn-ghost v-btn-xs" data-edit-pf
+                <td class="v-num text-xs font-bold text-base-content">{{ e.closing_balance|inr }}</td>
+                <td class="text-right">
+                  <button type="button" class="v-icon-btn" aria-label="Edit {{ e.account_name }} {{ e.financial_year }}" data-edit-pf
                           data-id="{{ e.id }}" data-account="{{ e.account_name }}" data-member="{{ e.account_name }}"
                           data-fy="{{ e.fy_year }}" data-fylabel="{{ e.financial_year }}"
                           data-contrib="{{ e.contribution }}" data-interest="{{ e.interest }}"
                           data-remarks="{{ e.remarks }}" data-baby="{{ e.is_baby|yesno:'true,false' }}">
-                    <span class="material-symbols-outlined text-xs">edit</span>
+                    <span class="material-symbols-outlined text-sm">edit</span>
                   </button>
                 </td>
               </tr>
@@ -1027,53 +1136,76 @@
             </tbody>
           </table>
         </div>
+        <div class="sm:hidden divide-y divide-[var(--v-hairline)]">
+          {% for e in pf_entries|slice:":5" %}
+          <div class="py-2 flex items-center justify-between gap-2">
+            <div class="min-w-0">
+              <div class="flex items-center gap-1.5">
+                <span class="font-bold text-xs text-base-content tabular-nums">{{ e.financial_year }}</span>
+                <span class="v-delta v-delta-neutral text-xs py-0 px-1.5">{{ e.account_name }}</span>
+                <span class="font-bold text-xs text-base-content tabular-nums">{{ e.closing_balance|inr }}</span>
+              </div>
+              <div class="text-xs text-base-content/55 mt-0.5 tabular-nums">
+                {% if e.contribution > 0 %}+{{ e.contribution|inr }} contrib{% endif %}{% if e.interest > 0 %} &middot; <span class="text-emerald-400">+{{ e.interest|inr }} int</span>{% endif %}
+              </div>
+            </div>
+            <button type="button" class="v-icon-btn shrink-0" aria-label="Edit {{ e.account_name }} {{ e.financial_year }}" data-edit-pf
+                    data-id="{{ e.id }}" data-account="{{ e.account_name }}" data-member="{{ e.account_name }}"
+                    data-fy="{{ e.fy_year }}" data-fylabel="{{ e.financial_year }}"
+                    data-contrib="{{ e.contribution }}" data-interest="{{ e.interest }}"
+                    data-remarks="{{ e.remarks }}" data-baby="{{ e.is_baby|yesno:'true,false' }}">
+              <span class="material-symbols-outlined text-base">edit</span>
+            </button>
+          </div>
+          {% endfor %}
+        </div>
         {% else %}
-        <div class="p-6 text-center text-xs text-base-content/50">No PF entries recorded. Add PPF accounts for Atul &amp; Kanika.</div>
+        <div class="p-6 text-center text-xs text-base-content/50">No PF entries recorded. Add PPF accounts for family members.</div>
         {% endif %}
       </div>
     </div>
   </div>
 
   {# NPS & Bonds Grid #}
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
     {# NPS Panel #}
-    <div class="v-panel">
+    <div class="v-panel v-panel-fill">
       <div class="v-panel-header">
         <div class="flex items-center gap-2">
           <h3 class="v-panel-title">National Pension System (NPS)</h3>
-          {% if nps_latest %}<span class="v-delta v-delta-pos text-xs font-semibold">{{ nps_latest.total_balance|inr }}</span>{% endif %}
+          {% if nps_latest %}<span class="v-delta v-delta-pos text-xs font-semibold tabular-nums">{{ nps_latest.total_balance|inr }}</span>{% endif %}
         </div>
-        <div class="flex items-center gap-2">
-          <a href="{% url 'nps_detail' %}" class="v-btn v-btn-ghost v-btn-xs">View Detail</a>
-          <button type="button" class="v-btn v-btn-secondary v-btn-xs" onclick="openNpsAddModal()">
+        <div class="flex items-center gap-1.5">
+          <a href="{% url 'nps_detail' %}" class="v-btn v-btn-ghost v-btn-xs text-primary">View Detail</a>
+          <button type="button" class="v-btn v-btn-secondary v-btn-sm" onclick="openNpsAddModal()">
             <span class="material-symbols-outlined text-sm">add</span>Add
           </button>
         </div>
       </div>
       <div class="v-panel-body p-0">
         {% if nps_entries %}
-        <div class="v-table-wrap max-h-56 overflow-y-auto">
+        <div class="v-panel-table max-h-56 overflow-y-auto">
           <table class="v-table">
             <thead>
               <tr>
                 <th>Date</th>
                 <th class="v-num">Total Balance</th>
                 <th class="v-num">Returns Earned</th>
-                <th class="text-center w-10"></th>
+                <th class="text-right w-12"></th>
               </tr>
             </thead>
             <tbody>
               {% for e in nps_entries|slice:":5" %}
               <tr>
-                <td class="text-xs text-base-content/60">{{ e.date|date:"d M Y" }}</td>
-                <td class="v-num font-bold text-xs">{{ e.total_balance|inr }}</td>
+                <td class="text-xs text-base-content/65 whitespace-nowrap tabular-nums">{{ e.date|date:"d M Y" }}</td>
+                <td class="v-num font-bold text-xs text-base-content">{{ e.total_balance|inr }}</td>
                 <td class="v-num text-xs text-emerald-400 font-semibold">+{{ e.interest_earned|inr }}</td>
-                <td class="text-center">
-                  <button type="button" class="v-btn v-btn-ghost v-btn-xs" data-edit-nps
+                <td class="text-right">
+                  <button type="button" class="v-icon-btn" aria-label="Edit NPS entry from {{ e.date|date:'d M Y' }}" data-edit-nps
                           data-id="{{ e.id }}" data-date="{{ e.date|date:'Y-m-d' }}"
                           data-contrib="{{ e.contribution }}" data-interest="{{ e.interest_earned }}"
                           data-balance="{{ e.total_balance }}" data-remarks="{{ e.remarks }}">
-                    <span class="material-symbols-outlined text-xs">edit</span>
+                    <span class="material-symbols-outlined text-sm">edit</span>
                   </button>
                 </td>
               </tr>
@@ -1088,40 +1220,40 @@
     </div>
 
     {# Bonds Panel #}
-    <div class="v-panel">
+    <div class="v-panel v-panel-fill">
       <div class="v-panel-header">
         <div class="flex items-center gap-2">
           <h3 class="v-panel-title">Sovereign &amp; Corporate Bonds</h3>
-          <span class="v-delta v-delta-neutral text-xs font-semibold">{{ bonds_total|inr }}</span>
+          <span class="v-delta v-delta-neutral text-xs font-semibold tabular-nums">{{ bonds_total|inr }}</span>
         </div>
-        <div class="flex items-center gap-2">
-          <a href="{% url 'bonds_detail' %}" class="v-btn v-btn-ghost v-btn-xs">View All</a>
-          <button type="button" class="v-btn v-btn-secondary v-btn-xs" onclick="openModal('addBondModal')">
+        <div class="flex items-center gap-1.5">
+          <a href="{% url 'bonds_detail' %}" class="v-btn v-btn-ghost v-btn-xs text-primary">View All</a>
+          <button type="button" class="v-btn v-btn-secondary v-btn-sm" onclick="openAddBondMasterModal()">
             <span class="material-symbols-outlined text-sm">add</span>Add Bond
           </button>
         </div>
       </div>
       <div class="v-panel-body p-0">
         {% if bonds %}
-        <div class="v-table-wrap max-h-56 overflow-y-auto">
+        <div class="v-panel-table max-h-56 overflow-y-auto">
           <table class="v-table">
             <thead>
               <tr>
                 <th>Account / Bond Series</th>
                 <th class="v-num">Principal Amount</th>
-                <th class="text-center w-10"></th>
+                <th class="text-right w-12"></th>
               </tr>
             </thead>
             <tbody>
               {% for b in bonds %}
               <tr>
                 <td class="font-bold text-xs text-base-content">{{ b.account_name }}</td>
-                <td class="v-num font-bold text-xs">{{ b.amount|inr }}</td>
-                <td class="text-center">
-                  <button type="button" class="v-btn v-btn-ghost v-btn-xs" data-edit-bond
+                <td class="v-num font-bold text-xs text-base-content">{{ b.amount|inr }}</td>
+                <td class="text-right">
+                  <button type="button" class="v-icon-btn" aria-label="Edit {{ b.account_name }}" data-edit-bond
                           data-id="{{ b.id }}" data-account="{{ b.account_name }}"
                           data-amount="{{ b.amount }}" data-remarks="{{ b.remarks }}">
-                    <span class="material-symbols-outlined text-xs">edit</span>
+                    <span class="material-symbols-outlined text-sm">edit</span>
                   </button>
                 </td>
               </tr>
@@ -1139,57 +1271,57 @@
 
 {% comment %} DOMAIN 4: LIQUIDITY & FIXED DEPOSITS (CASH & FDs) {% endcomment %}
 <div class="mb-8 scroll-mt-24" id="liquidity">
-  <div class="flex items-center justify-between mb-3">
+  <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
     <div class="flex items-center gap-2">
       <span class="material-symbols-outlined text-sky-400 text-xl">payments</span>
       <h2 class="v-title text-base lg:text-lg m-0">Cash Positions &amp; Fixed Deposits</h2>
     </div>
     <div class="flex items-center gap-2">
-      <span class="v-delta v-delta-neutral text-xs font-bold">{{ cash_total|add:fd_current|inr }}</span>
-      <a href="{% url 'fd_detail' %}" class="v-btn v-btn-secondary v-btn-xs sm:v-btn-sm">
+      <span class="v-delta v-delta-neutral text-xs font-bold tabular-nums">{{ cash_total|add:fd_current|inr }}</span>
+      <a href="{% url 'fd_detail' %}" class="v-btn v-btn-secondary v-btn-sm">
         <span class="material-symbols-outlined text-sm">account_balance_wallet</span>FD Ladder
       </a>
     </div>
   </div>
 
-  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
     {# Cash Positions Panel #}
-    <div class="v-panel">
+    <div class="v-panel v-panel-fill">
       <div class="v-panel-header">
         <div class="flex items-center gap-2">
           <h3 class="v-panel-title">Liquid Bank &amp; Cash Accounts</h3>
-          <span class="v-delta v-delta-pos text-xs font-semibold">{{ cash_total|inr }}</span>
+          <span class="v-delta v-delta-pos text-xs font-semibold tabular-nums">{{ cash_total|inr }}</span>
         </div>
-        <div class="flex items-center gap-2">
-          <a href="{% url 'cash_detail' %}" class="v-btn v-btn-ghost v-btn-xs">View All</a>
-          <button type="button" class="v-btn v-btn-secondary v-btn-xs" onclick="openModal('addCashModal')">
+        <div class="flex items-center gap-1.5">
+          <a href="{% url 'cash_detail' %}" class="v-btn v-btn-ghost v-btn-xs text-primary">View All</a>
+          <button type="button" class="v-btn v-btn-secondary v-btn-sm" onclick="openAddCashMasterModal()">
             <span class="material-symbols-outlined text-sm">add</span>Add Cash
           </button>
         </div>
       </div>
       <div class="v-panel-body p-0">
         {% if cash_positions %}
-        <div class="v-table-wrap max-h-56 overflow-y-auto">
+        <div class="v-panel-table max-h-56 overflow-y-auto">
           <table class="v-table">
             <thead>
               <tr>
                 <th>Bank / Account</th>
                 <th class="v-num">Balance</th>
-                <th>Remarks</th>
-                <th class="text-center w-10"></th>
+                <th class="hidden sm:table-cell">Remarks</th>
+                <th class="text-right w-12"></th>
               </tr>
             </thead>
             <tbody>
               {% for c in cash_positions %}
               <tr>
                 <td class="font-bold text-xs text-base-content">{{ c.name }}</td>
-                <td class="v-num font-bold text-xs">{{ c.amount|inr }}</td>
-                <td class="text-xs text-base-content/50 truncate max-w-[120px]">{{ c.remarks|default:"-" }}</td>
-                <td class="text-center">
-                  <button type="button" class="v-btn v-btn-ghost v-btn-xs" data-edit-cash
+                <td class="v-num font-bold text-xs text-base-content">{{ c.amount|inr }}</td>
+                <td class="hidden sm:table-cell text-xs text-base-content/55 truncate max-w-[120px]">{{ c.remarks|default:"—" }}</td>
+                <td class="text-right">
+                  <button type="button" class="v-icon-btn" aria-label="Edit {{ c.name }}" data-edit-cash
                           data-id="{{ c.id }}" data-name="{{ c.name }}"
                           data-amount="{{ c.amount }}" data-remarks="{{ c.remarks }}">
-                    <span class="material-symbols-outlined text-xs">edit</span>
+                    <span class="material-symbols-outlined text-sm">edit</span>
                   </button>
                 </td>
               </tr>
@@ -1204,22 +1336,22 @@
     </div>
 
     {# Fixed Deposits Panel #}
-    <div class="v-panel">
+    <div class="v-panel v-panel-fill">
       <div class="v-panel-header">
         <div class="flex items-center gap-2">
           <h3 class="v-panel-title">Active Fixed Deposits</h3>
-          <span class="v-delta v-delta-pos text-xs font-semibold">{{ fd_current|inr }}</span>
+          <span class="v-delta v-delta-pos text-xs font-semibold tabular-nums">{{ fd_current|inr }}</span>
         </div>
-        <div class="flex items-center gap-2">
-          <a href="{% url 'fd_detail' %}" class="v-btn v-btn-ghost v-btn-xs">Ladder View</a>
-          <button type="button" class="v-btn v-btn-secondary v-btn-xs" onclick="openModal('addFdModal')">
+        <div class="flex items-center gap-1.5">
+          <a href="{% url 'fd_detail' %}" class="v-btn v-btn-ghost v-btn-xs text-primary">Ladder View</a>
+          <button type="button" class="v-btn v-btn-secondary v-btn-sm" onclick="openAddFdMasterModal()">
             <span class="material-symbols-outlined text-sm">add</span>Add FD
           </button>
         </div>
       </div>
       <div class="v-panel-body p-0">
         {% if active_fds %}
-        <div class="v-table-wrap max-h-56 overflow-y-auto">
+        <div class="hidden sm:block v-panel-table max-h-56 overflow-y-auto">
           <table class="v-table">
             <thead>
               <tr>
@@ -1228,7 +1360,7 @@
                 <th class="v-num">Rate</th>
                 <th class="v-num">Current Value</th>
                 <th>Maturity</th>
-                <th class="text-center w-10"></th>
+                <th class="text-right w-12"></th>
               </tr>
             </thead>
             <tbody>
@@ -1236,29 +1368,52 @@
               <tr>
                 <td>
                   <div class="font-bold text-xs text-base-content">{{ fd.name }}</div>
-                  <div class="text-[10px] text-base-content/50">{{ fd.account_name }}</div>
+                  <div class="text-xs text-base-content/50">{{ fd.account_name }}</div>
                 </td>
-                <td class="v-num text-xs">{{ fd.principal|inr }}</td>
+                <td class="v-num text-xs text-base-content/75">{{ fd.principal|inr }}</td>
                 <td class="v-num text-xs font-semibold text-emerald-400">{{ fd.interest_rate }}%</td>
                 <td class="v-num font-bold text-xs text-base-content">{{ fd.current_value|inr }}</td>
-                <td class="text-xs text-base-content/60 whitespace-nowrap">
+                <td class="text-xs text-base-content/65 whitespace-nowrap tabular-nums">
                   {{ fd.maturity_date|date:"d M Y" }}
-                  {% if fd.days_remaining > 0 %}<span class="text-[10px] opacity-60">({{ fd.days_remaining }}d)</span>{% endif %}
+                  {% if fd.days_remaining > 0 %}<span class="text-xs opacity-60">({{ fd.days_remaining }}d)</span>{% endif %}
                 </td>
-                <td class="text-center">
-                  <button type="button" class="v-btn v-btn-ghost v-btn-xs" data-edit-fd
+                <td class="text-right">
+                  <button type="button" class="v-icon-btn" aria-label="Edit {{ fd.name }}" data-edit-fd
                           data-id="{{ fd.id }}" data-name="{{ fd.name }}" data-account="{{ fd.account_name }}"
                           data-principal="{{ fd.principal }}" data-rate="{{ fd.interest_rate }}"
                           data-compounding="{{ fd.compounding }}" data-start="{{ fd.start_date|date:'Y-m-d' }}"
                           data-maturity="{{ fd.maturity_date|date:'Y-m-d' }}" data-active="{{ fd.is_active|yesno:'true,false' }}"
                           data-remarks="{{ fd.remarks }}">
-                    <span class="material-symbols-outlined text-xs">edit</span>
+                    <span class="material-symbols-outlined text-sm">edit</span>
                   </button>
                 </td>
               </tr>
               {% endfor %}
             </tbody>
           </table>
+        </div>
+        <div class="sm:hidden divide-y divide-[var(--v-hairline)]">
+          {% for fd in active_fds|slice:":5" %}
+          <div class="v-mobile-row gap-2">
+            <div class="min-w-0 flex-1">
+              <div class="font-bold text-xs text-base-content truncate">{{ fd.name }}</div>
+              <div class="text-xs text-base-content/55 tabular-nums truncate">
+                {{ fd.account_name }} &middot; <span class="text-emerald-400 font-semibold">{{ fd.interest_rate }}%</span> &middot; {{ fd.maturity_date|date:"d M Y" }}
+              </div>
+            </div>
+            <div class="flex items-center gap-1 shrink-0">
+              <span class="font-bold text-xs text-base-content tabular-nums">{{ fd.current_value|inr }}</span>
+              <button type="button" class="v-icon-btn" aria-label="Edit {{ fd.name }}" data-edit-fd
+                      data-id="{{ fd.id }}" data-name="{{ fd.name }}" data-account="{{ fd.account_name }}"
+                      data-principal="{{ fd.principal }}" data-rate="{{ fd.interest_rate }}"
+                      data-compounding="{{ fd.compounding }}" data-start="{{ fd.start_date|date:'Y-m-d' }}"
+                      data-maturity="{{ fd.maturity_date|date:'Y-m-d' }}" data-active="{{ fd.is_active|yesno:'true,false' }}"
+                      data-remarks="{{ fd.remarks }}">
+                <span class="material-symbols-outlined text-base">edit</span>
+              </button>
+            </div>
+          </div>
+          {% endfor %}
         </div>
         {% else %}
         <div class="p-6 text-center text-xs text-base-content/50">No active fixed deposits.</div>
@@ -1280,67 +1435,67 @@
 {% include 'portfolio/_pf_form_modal.html' with form_obj=pf_form %}
 
 {# Goal Modal #}
-<dialog class="modal" id="addGoalModal">
-  <div class="modal-box w-full max-w-lg bg-base-100 p-6 flex flex-col justify-between">
-    <div>
-      <div class="flex items-center justify-between pb-3 border-b border-base-content/8">
-        <h3 class="font-bold text-base flex items-center gap-2" id="goalModalTitle">
-          <span class="material-symbols-outlined text-primary">add_circle</span>Plan Financial Year Target
-        </h3>
-        <button type="button" class="v-btn v-btn-ghost v-btn-xs" onclick="closeModal('addGoalModal')">
-          <span class="material-symbols-outlined text-lg">close</span>
-        </button>
-      </div>
+<dialog class="modal modal-bottom sm:modal-middle" id="addGoalModal">
+  <div class="modal-box max-w-lg max-h-[90dvh] overflow-y-auto overscroll-contain">
+    <div class="v-modal-header flex items-center justify-between gap-3 pb-3 mb-4 border-b border-[var(--v-hairline)]">
+      <h3 class="font-semibold text-base text-base-content flex items-center gap-2" id="goalModalTitle">
+        <span class="material-symbols-outlined text-primary text-xl">flag</span>Plan Financial Year Target
+      </h3>
+      <button type="button" class="v-icon-btn" onclick="closeModal('addGoalModal')" aria-label="Close">
+        <span class="material-symbols-outlined text-lg">close</span>
+      </button>
+    </div>
 
-      <form id="goalForm" method="post" action="{% url 'add_goal' %}" class="v-form-grid mt-4">
-        {% csrf_token %}
-        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    <form id="goalForm" method="post" action="{% url 'add_goal' %}">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
 
-        <div class="v-field">
-          <label class="v-label">Financial Year Cycle</label>
+      <div class="v-form-grid">
+        <label class="form-field v-field">
+          <span class="v-label">Financial Year Cycle</span>
           {{ goal_form.financial_year }}
-          <span class="text-[10px] text-base-content/40 mt-1">Select an Indian FY cycle (Apr 1 – Mar 31) to auto-fill target end date.</span>
-        </div>
+          <span class="text-xs text-base-content/45 mt-1 block">Select an Indian FY cycle (Apr 1 – Mar 31) to auto-fill target end date.</span>
+        </label>
 
         <div class="v-form-grid-2">
-          <div class="v-field">
-            <label class="v-label">Goal Label</label>
+          <label class="form-field v-field">
+            <span class="v-label">Goal Label</span>
             {{ goal_form.label }}
-          </div>
-          <div class="v-field">
-            <label class="v-label">Target Corpus (₹)</label>
+          </label>
+          <label class="form-field v-field">
+            <span class="v-label">Target Corpus (₹)</span>
             {{ goal_form.target_amount }}
-          </div>
+          </label>
         </div>
 
-        <div class="v-field">
-          <label class="v-label">Target Date</label>
+        <label class="form-field v-field">
+          <span class="v-label">Target Date</span>
           {{ goal_form.target_date }}
-        </div>
+        </label>
 
-        <div class="v-field">
-          <label class="v-label">Strategic Notes / Plan</label>
+        <label class="form-field v-field">
+          <span class="v-label">Strategic Notes / Plan <span class="text-base-content/40 font-normal normal-case tracking-normal">optional</span></span>
           {{ goal_form.notes }}
-        </div>
+        </label>
+      </div>
 
-        <div class="flex items-center justify-between pt-4 border-t border-base-content/8 mt-4">
-          <button type="button" id="goalDeleteBtn" class="v-btn v-btn-danger v-btn-sm" style="display:none" onclick="confirmDelete('deleteGoalForm')">
-            <span class="material-symbols-outlined text-sm">delete</span>Delete
-          </button>
-          <div class="flex items-center gap-2 ml-auto">
-            <button type="button" class="v-btn v-btn-ghost v-btn-sm" onclick="closeModal('addGoalModal')">Cancel</button>
-            <button type="submit" class="v-btn v-btn-primary v-btn-sm">Save Target</button>
-          </div>
-        </div>
-      </form>
+      <div class="v-modal-footer modal-action flex-wrap items-center gap-2 mt-6 pt-3 border-t border-[var(--v-hairline)]">
+        <button type="button" id="goalDeleteBtn" class="v-btn v-btn-danger mr-auto hidden" style="display:none" onclick="confirmDelete('deleteGoalForm')">
+          <span class="material-symbols-outlined text-base">delete</span>Delete
+        </button>
+        <button type="button" class="v-btn v-btn-ghost" onclick="closeModal('addGoalModal')">Cancel</button>
+        <button type="submit" class="v-btn v-btn-primary">
+          <span class="material-symbols-outlined text-base">save</span>Save Target
+        </button>
+      </div>
+    </form>
 
-      <form id="deleteGoalForm" method="post" action="" style="display:none">
-        {% csrf_token %}
-        <input type="hidden" name="next" value="{{ request.get_full_path }}">
-      </form>
-    </div>
+    <form id="deleteGoalForm" method="post" action="" class="hidden">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    </form>
   </div>
-  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+  <form method="dialog" class="modal-backdrop"><button aria-label="Close modal">close</button></form>
 </dialog>
 
 {# NPS Modal #}
@@ -1362,107 +1517,107 @@
 {% include 'portfolio/_commodity_form_modal.html' with modal_id="addCommodityModal" form_id="commodityForm" title_id="commodityModalTitle" delete_btn_id="commodityDeleteBtn" delete_form_id="deleteCommodityForm" form_obj=commodity_form is_baby=False %}
 
 {# US Stock Modal #}
-<dialog class="modal" id="addUSStockModal">
-  <div class="modal-box w-full max-w-lg bg-base-100 p-6 flex flex-col justify-between">
-    <div>
-      <div class="flex items-center justify-between pb-3 border-b border-base-content/8">
-        <h3 class="font-bold text-base flex items-center gap-2" id="usStockModalTitle">
-          <span class="material-symbols-outlined text-primary">add_circle</span>Add RSU Holding
-        </h3>
-        <button type="button" class="v-btn v-btn-ghost v-btn-xs" onclick="closeModal('addUSStockModal')">
-          <span class="material-symbols-outlined text-lg">close</span>
-        </button>
+<dialog class="modal modal-bottom sm:modal-middle" id="addUSStockModal">
+  <div class="modal-box max-w-lg max-h-[90dvh] overflow-y-auto overscroll-contain">
+    <div class="v-modal-header flex items-center justify-between gap-3 pb-3 mb-4 border-b border-[var(--v-hairline)]">
+      <h3 class="font-semibold text-base text-base-content flex items-center gap-2" id="usStockModalTitle">
+        <span class="material-symbols-outlined text-primary text-xl">language</span>Add RSU Holding
+      </h3>
+      <button type="button" class="v-icon-btn" onclick="closeModal('addUSStockModal')" aria-label="Close">
+        <span class="material-symbols-outlined text-lg">close</span>
+      </button>
+    </div>
+
+    <form id="usStockForm" method="post" action="{% url 'add_us_stock' %}">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+      <div class="v-form-grid">
+        <div class="v-form-grid-2">
+          <label class="form-field v-field">
+            <span class="v-label">Stock Ticker Symbol</span>
+            {{ us_stock_form.symbol }}
+          </label>
+          <label class="form-field v-field">
+            <span class="v-label">Company Name</span>
+            {{ us_stock_form.company_name }}
+          </label>
+        </div>
+
+        <div class="v-form-grid-2">
+          <label class="form-field v-field">
+            <span class="v-label">Quantity (Shares)</span>
+            {{ us_stock_form.quantity }}
+          </label>
+          <label class="form-field v-field">
+            <span class="v-label">Vest Date</span>
+            {{ us_stock_form.vest_date }}
+          </label>
+        </div>
+
+        <div class="v-form-grid-2">
+          <label class="form-field v-field">
+            <span class="v-label">Buy Price (USD) <span class="text-base-content/40 font-normal normal-case tracking-normal">auto if blank</span></span>
+            {{ us_stock_form.purchase_price_usd }}
+          </label>
+          <label class="form-field v-field">
+            <span class="v-label">USD/INR Rate <span class="text-base-content/40 font-normal normal-case tracking-normal">auto</span></span>
+            {{ us_stock_form.purchase_usd_inr }}
+          </label>
+        </div>
+
+        <label class="form-field v-field">
+          <span class="v-label">Remarks <span class="text-base-content/40 font-normal normal-case tracking-normal">optional</span></span>
+          {{ us_stock_form.remarks }}
+        </label>
       </div>
 
-      <form id="usStockForm" method="post" action="{% url 'add_us_stock' %}" class="v-form-grid mt-4">
-        {% csrf_token %}
-        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <div class="v-modal-footer modal-action flex-wrap items-center gap-2 mt-6 pt-3 border-t border-[var(--v-hairline)]">
+        <button type="button" id="usStockDeleteBtn" class="v-btn v-btn-danger mr-auto hidden" style="display:none" onclick="confirmDelete('deleteUSStockForm')">
+          <span class="material-symbols-outlined text-base">delete</span>Delete
+        </button>
+        <button type="button" class="v-btn v-btn-ghost" onclick="closeModal('addUSStockModal')">Cancel</button>
+        <button type="submit" class="v-btn v-btn-primary">
+          <span class="material-symbols-outlined text-base">save</span>Save Holding
+        </button>
+      </div>
+    </form>
 
-        <div class="v-form-grid-2">
-          <div class="v-field">
-            <label class="v-label">Stock Ticker Symbol</label>
-            {{ us_stock_form.symbol }}
-          </div>
-          <div class="v-field">
-            <label class="v-label">Company Name</label>
-            {{ us_stock_form.company_name }}
-          </div>
-        </div>
-
-        <div class="v-form-grid-2">
-          <div class="v-field">
-            <label class="v-label">Quantity (Shares)</label>
-            {{ us_stock_form.quantity }}
-          </div>
-          <div class="v-field">
-            <label class="v-label">Vest Date</label>
-            {{ us_stock_form.vest_date }}
-          </div>
-        </div>
-
-        <div class="v-form-grid-2">
-          <div class="v-field">
-            <label class="v-label">Buy Price (USD) <span class="opacity-40">auto if blank</span></label>
-            {{ us_stock_form.purchase_price_usd }}
-          </div>
-          <div class="v-field">
-            <label class="v-label">USD/INR Exchange Rate <span class="opacity-40">auto</span></label>
-            {{ us_stock_form.purchase_usd_inr }}
-          </div>
-        </div>
-
-        <div class="v-field">
-          <label class="v-label">Remarks <span class="opacity-40">optional</span></label>
-          {{ us_stock_form.remarks }}
-        </div>
-
-        <div class="flex items-center justify-between pt-4 border-t border-base-content/8 mt-4">
-          <button type="button" id="usStockDeleteBtn" class="v-btn v-btn-danger v-btn-sm" style="display:none" onclick="confirmDelete('deleteUSStockForm')">
-            <span class="material-symbols-outlined text-sm">delete</span>Delete
-          </button>
-          <div class="flex items-center gap-2 ml-auto">
-            <button type="button" class="v-btn v-btn-ghost v-btn-sm" onclick="closeModal('addUSStockModal')">Cancel</button>
-            <button type="submit" class="v-btn v-btn-primary v-btn-sm">Save Holding</button>
-          </div>
-        </div>
-      </form>
-
-      <form id="deleteUSStockForm" method="post" action="" style="display:none">
-        {% csrf_token %}
-        <input type="hidden" name="next" value="{{ request.get_full_path }}">
-      </form>
-    </div>
+    <form id="deleteUSStockForm" method="post" action="" class="hidden">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+    </form>
   </div>
-  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+  <form method="dialog" class="modal-backdrop"><button aria-label="Close modal">close</button></form>
 </dialog>
 
 {# Real Estate Modal #}
 {% include 'portfolio/_real_estate_form_modal.html' with form_obj=real_estate_form is_baby=False %}
 
 {# Biometric Setup Modal #}
-<dialog class="modal" id="biometricModal">
-  <div class="modal-box max-w-sm bg-base-100 p-6">
-    <div class="flex items-center justify-between pb-3 border-b border-base-content/8">
-      <h3 class="font-bold text-base flex items-center gap-2">
-        <span class="material-symbols-outlined text-primary">fingerprint</span>Passkey / Biometric Access
+<dialog class="modal modal-bottom sm:modal-middle" id="biometricModal">
+  <div class="modal-box max-w-sm max-h-[90dvh] overflow-y-auto overscroll-contain">
+    <div class="v-modal-header flex items-center justify-between gap-3 pb-3 mb-3 border-b border-[var(--v-hairline)]">
+      <h3 class="font-semibold text-base text-base-content flex items-center gap-2">
+        <span class="material-symbols-outlined text-primary text-xl">fingerprint</span>Passkey Access
       </h3>
-      <button type="button" class="v-btn v-btn-ghost v-btn-xs" onclick="closeModal('biometricModal')">
+      <button type="button" class="v-icon-btn" onclick="closeModal('biometricModal')" aria-label="Close">
         <span class="material-symbols-outlined text-lg">close</span>
       </button>
     </div>
-    <p class="text-xs text-base-content/60 mt-2">Use TouchID, FaceID, or hardware FIDO2 passkeys for instant passwordless vault authorization.</p>
+    <p class="text-xs text-base-content/65 leading-relaxed">Use Touch ID, Face ID, or hardware FIDO2 passkeys for instant passwordless vault authorization.</p>
 
     {% if webauthn_credentials %}
     <div class="mt-4 space-y-2">
-      <div class="text-[10px] font-bold uppercase tracking-wider text-base-content/50">Enrolled Devices</div>
+      <div class="text-xs font-semibold text-base-content/65">Enrolled Devices</div>
       {% for cred in webauthn_credentials %}
-      <div class="flex items-center justify-between p-2.5 bg-base-content/4 rounded-lg text-xs">
-        <div class="flex items-center gap-2">
-          <span class="material-symbols-outlined text-sm text-emerald-400">verified_user</span>
-          <span class="font-medium">{{ cred.device_name }}</span>
-          <span class="text-[10px] text-base-content/40">{{ cred.created_at|timesince }} ago</span>
+      <div class="flex items-center justify-between gap-2 p-2.5 bg-base-200/50 border border-[var(--v-hairline)] rounded-lg text-xs">
+        <div class="flex items-center gap-2 min-w-0">
+          <span class="material-symbols-outlined text-sm text-emerald-400 shrink-0">verified_user</span>
+          <span class="font-medium text-base-content truncate">{{ cred.device_name }}</span>
+          <span class="text-xs text-base-content/45 shrink-0">{{ cred.created_at|timesince }} ago</span>
         </div>
-        <button type="button" class="v-btn v-btn-ghost v-btn-xs text-rose-400" onclick="removeBiometric({{ cred.pk }})">
+        <button type="button" class="v-icon-btn text-rose-400 shrink-0" onclick="removeBiometric({{ cred.pk }})" aria-label="Remove {{ cred.device_name }}">
           <span class="material-symbols-outlined text-sm">delete</span>
         </button>
       </div>
@@ -1471,17 +1626,17 @@
     {% endif %}
 
     <div class="mt-4">
-      <button type="button" id="bioRegBtn" class="v-btn v-btn-primary w-full justify-center" onclick="registerBiometric()">
+      <button type="button" id="bioRegBtn" class="v-btn v-btn-primary w-full justify-center min-h-[44px]" onclick="registerBiometric()">
         <span class="material-symbols-outlined text-base">add</span>Register Current Device
       </button>
-      <p id="bioRegStatus" class="text-xs mt-2 text-base-content/50"></p>
+      <p id="bioRegStatus" class="text-xs mt-2 text-base-content/55"></p>
     </div>
 
-    <div class="flex justify-end pt-3 border-t border-base-content/8 mt-4">
-      <button type="button" class="v-btn v-btn-ghost v-btn-sm" onclick="closeModal('biometricModal')">Close</button>
+    <div class="v-modal-footer modal-action justify-end mt-4 pt-3 border-t border-[var(--v-hairline)]">
+      <button type="button" class="v-btn v-btn-ghost" onclick="closeModal('biometricModal')">Close</button>
     </div>
   </div>
-  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+  <form method="dialog" class="modal-backdrop"><button aria-label="Close modal">close</button></form>
 </dialog>
 
 {{ pf_chart_data|json_script:"pf-chart-data" }}
@@ -1544,11 +1699,51 @@
 <script src="{% static 'js/nps_modal.js' %}"></script>
 
 <script>
+function _resetAddModal(formId, addUrl, delBtnId, titleId, addTitle, modalId) {
+  var form = document.getElementById(formId);
+  if (!form) return;
+  form.action = addUrl;
+  form.reset();
+  var delBtn = document.getElementById(delBtnId);
+  if (delBtn) {
+    delBtn.classList.add('hidden');
+    delBtn.style.display = 'none';
+  }
+  var titleEl = document.getElementById(titleId);
+  if (titleEl) {
+    titleEl.innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span> ' + addTitle;
+  }
+  openModal(modalId);
+}
+
+function openAddUSStockModal() {
+  _resetAddModal('usStockForm', "{% url 'add_us_stock' %}", 'usStockDeleteBtn', 'usStockModalTitle', 'Add RSU Holding', 'addUSStockModal');
+}
+function openAddRealEstateMasterModal() {
+  _resetAddModal('realEstateForm', "{% url 'add_real_estate' %}", 'realEstateDeleteBtn', 'realEstateModalTitle', 'Add Real Estate Property', 'addRealEstateModal');
+}
+function openAddCryptoMasterModal() {
+  _resetAddModal('cryptoForm', "{% url 'add_crypto' %}", 'cryptoDeleteBtn', 'cryptoModalTitle', 'Add Crypto Asset', 'addCryptoModal');
+}
+function openAddEpfMasterModal() {
+  _resetAddModal('epfForm', "{% url 'add_epf_entry' %}", 'epfDeleteBtn', 'epfModalTitle', 'Add EPF Entry', 'addEpfModal');
+}
+function openAddBondMasterModal() {
+  _resetAddModal('bondForm', "{% url 'add_bond' %}", 'bondDeleteBtn', 'bondModalTitle', 'Add Bond Holding', 'addBondModal');
+}
+function openAddCashMasterModal() {
+  _resetAddModal('cashForm', "{% url 'add_cash' %}", 'cashDeleteBtn', 'cashModalTitle', 'Add Cash Position', 'addCashModal');
+}
+function openAddFdMasterModal() {
+  _resetAddModal('fdForm', "{% url 'add_fd' %}", 'fdDeleteBtn', 'fdModalTitle', 'Add Fixed Deposit', 'addFdModal');
+}
+
 function setPfMember(name) {
   var inp = document.getElementById('pfAccountName');
   if (inp) {
     inp.value = name;
     inp.focus();
+    checkMasterPfExistingEntry();
   }
 }
 
@@ -1645,7 +1840,11 @@ function openGoalModal(defaultFy) {
   var form = document.getElementById('goalForm');
   form.action = "{% url 'add_goal' %}";
   form.reset();
-  document.getElementById('goalDeleteBtn').style.display = 'none';
+  var delBtn = document.getElementById('goalDeleteBtn');
+  if (delBtn) {
+    delBtn.classList.add('hidden');
+    delBtn.style.display = 'none';
+  }
   document.getElementById('goalModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span> Plan Financial Year Target';
   var fySel = form.querySelector('[name=financial_year]');
   if (defaultFy && fySel) {
@@ -1700,9 +1899,13 @@ function openAddCommodityModal() {
   if (weightField) weightField.value = '';
   var purchaseField = form.querySelector('[name=purchase_price_per_gram]');
   if (purchaseField) purchaseField.value = window.GOLD_RATE || '';
-  
-  document.getElementById('commodityDeleteBtn').style.display = 'none';
-  document.getElementById('commodityModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span>Add Commodity';
+
+  var delBtn = document.getElementById('commodityDeleteBtn');
+  if (delBtn) {
+    delBtn.classList.add('hidden');
+    delBtn.style.display = 'none';
+  }
+  document.getElementById('commodityModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span> Add Commodity';
   openModal('addCommodityModal');
 }
 
@@ -1710,13 +1913,17 @@ function _editSetup(formId, delFormId, delBtnId, titleId, editUrlBase, delUrlBas
   var form = document.getElementById(formId);
   form.action = editUrlBase.replace('/0/', '/' + d.id + '/');
   document.getElementById(delFormId).action = delUrlBase.replace('/0/', '/' + d.id + '/');
-  document.getElementById(delBtnId).style.display = 'inline-flex';
+  var delBtn = document.getElementById(delBtnId);
+  if (delBtn) {
+    delBtn.classList.remove('hidden');
+    delBtn.style.display = 'inline-flex';
+  }
   document.getElementById(titleId).innerHTML = '<span class="material-symbols-outlined text-primary">edit</span> ' + editTitle;
   for (var name in fieldMap) {
     var el = form.querySelector('[name=' + name + ']');
     if (!el) continue;
     if (el.type === 'checkbox') el.checked = fieldMap[name] === 'true';
-    else el.value = fieldMap[name];
+    else el.value = fieldMap[name] || '';
   }
   openModal(modalId);
 }
@@ -1842,7 +2049,7 @@ document.addEventListener('click', function(e) {
     var member = btn.dataset.member || btn.dataset.account || 'Atul';
     var fy = btn.dataset.fy || '';
     var fyLabel = btn.dataset.fylabel || ('FY ' + fy);
-    document.getElementById('pfModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">edit</span> Edit PF Entry · ' + fyLabel;
+    document.getElementById('pfModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">edit</span> Edit PF Entry &middot; ' + fyLabel;
     document.getElementById('pfAccountName').value = member;
     var origMem = document.getElementById('pfOrigMember');
     if (origMem) origMem.value = member;
@@ -1892,7 +2099,12 @@ document.addEventListener('click', function(e) {
   } else if ((btn = e.target.closest('[data-edit-re]'))) {
     _editSetup('realEstateForm','deleteRealEstateForm','realEstateDeleteBtn','realEstateModalTitle',
       "{% url 'edit_real_estate' pk=0 %}","{% url 'delete_real_estate' pk=0 %}",'Edit Property','addRealEstateModal',btn.dataset,
-      {name:btn.dataset.name,property_type:btn.dataset.type,status:btn.dataset.status,area_value:btn.dataset.area,area_unit:btn.dataset.unit,locality:btn.dataset.locality,city:btn.dataset.city,state:btn.dataset.state,landmark:btn.dataset.landmark,pincode:btn.dataset.pincode,micro_market_tag:btn.dataset.micro,google_maps_url:btn.dataset.maps,khasra_khata_number:btn.dataset.khasra,purchase_date:btn.dataset.date,purchase_price:btn.dataset.price,stamp_duty_charges:btn.dataset.stamp,current_valuation:btn.dataset.valuation,last_valuation_date:btn.dataset.vdate,monthly_rental_income:btn.dataset.rent,remarks:btn.dataset.remarks});
+      {name:btn.dataset.name,property_type:btn.dataset.type,status:btn.dataset.status,acquisition_type:btn.dataset.acquisition||'PURCHASED',original_owner:btn.dataset.owner||'',inherited_year:btn.dataset.inherited||'',area_value:btn.dataset.area,area_unit:btn.dataset.unit,locality:btn.dataset.locality,city:btn.dataset.city,state:btn.dataset.state,landmark:btn.dataset.landmark,pincode:btn.dataset.pincode,micro_market_tag:btn.dataset.micro,google_maps_url:btn.dataset.maps,khasra_khata_number:btn.dataset.khasra,purchase_date:btn.dataset.date,purchase_price:btn.dataset.price,stamp_duty_charges:btn.dataset.stamp||'0',current_valuation:btn.dataset.valuation,last_valuation_date:btn.dataset.vdate,monthly_rental_income:btn.dataset.rent||'0',remarks:btn.dataset.remarks});
+    var reForm = document.getElementById('realEstateForm');
+    var disc = reForm ? reForm.querySelector('details.v-disclosure') : null;
+    if (disc) {
+      disc.open = Boolean((btn.dataset.acquisition && btn.dataset.acquisition !== 'PURCHASED') || btn.dataset.owner || btn.dataset.inherited);
+    }
   }
 });
 </script>

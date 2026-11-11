@@ -20,7 +20,7 @@
 
   <div class="v-toolbar">
     <button type="button" class="v-btn v-btn-secondary" onclick="openAddBabyCommodityModal()">
-      <span class="material-symbols-outlined text-sm">diamond</span>Add Gold/Silver
+      <span class="material-symbols-outlined text-sm">diamond</span>Add Bullion
     </button>
     <button type="button" class="v-btn v-btn-primary" onclick="openModal('selectHoldingsModal')">
       <span class="material-symbols-outlined text-sm">checklist</span>Select Holdings
@@ -37,7 +37,7 @@
   <div class="v-empty-icon text-primary">
     <span class="material-symbols-outlined text-3xl">child_care</span>
   </div>
-  <h2 class="v-empty-title">Child Portfolio is Empty</h2>
+  <h1 class="v-empty-title">Child Portfolio is Empty</h1>
   <p class="v-empty-desc">
     Tag specific stock or mutual fund holdings from your Zerodha accounts to ring-fence them into this child wealth repository, or allocate physical bullion.
   </p>
@@ -53,17 +53,18 @@
 
 {% else %}
 
+{% with bullion_total=gold_value|add:silver_value market_count=baby_stocks|length|add:baby_index_mf|length|add:baby_other_mf|length %}
 {# --- SIGNATURE LEDGER SUMMARY BAND --- #}
-<div class="v-ledger-band">
+<section class="v-ledger-band" aria-label="Child Portfolio Valuation Summary">
   <div class="v-lead-cell">
     <div>
       <div class="v-lead-label">
         <span>Child Portfolio Valuation</span>
-        <span class="v-delta v-delta-pos text-[10px] py-0 px-2 font-semibold">Ring-Fenced</span>
+        <span class="v-delta v-delta-pos text-xs py-0 px-2 font-semibold">Ring-Fenced</span>
       </div>
       <div class="v-lead-figure-row">
-        <span class="v-lead-figure">{{ total_value|inr }}</span>
-        <span class="v-delta {% if total_returns >= 0 %}v-delta-pos{% else %}v-delta-neg{% endif %} text-xs font-bold">
+        <span class="v-lead-figure tabular-nums">{{ total_value|inr }}</span>
+        <span class="v-delta {% if total_returns >= 0 %}v-delta-pos{% else %}v-delta-neg{% endif %} text-xs font-bold tabular-nums">
           <span class="material-symbols-outlined text-xs">{% if total_returns >= 0 %}trending_up{% else %}trending_down{% endif %}</span>
           {% if total_returns >= 0 %}+{% endif %}{{ total_returns|inr }} ({{ return_pct }}%)
         </span>
@@ -73,90 +74,233 @@
       </div>
     </div>
 
-    {# Proportional allocation doughnut #}
-    <div class="mt-4 pt-3 border-t border-base-content/8">
-      <div class="flex items-center justify-between mb-2">
-        <span class="text-xs font-semibold uppercase tracking-wider text-base-content/50">Child Asset Allocation</span>
-        <button type="button" class="v-btn v-btn-ghost v-btn-xs" onclick="openModal('selectHoldingsModal')">
-          <span class="material-symbols-outlined text-xs">edit</span>Manage
-        </button>
+    {% if total_value > 0 %}
+    {% with market_val=total_value|add:0 %}
+    <div class="v-horizon">
+      <div class="v-horizon-bar" role="img" aria-label="Child portfolio asset allocation">
+        {% if gold_value > 0 %}
+        <div class="v-horizon-seg" style="width: {% widthratio gold_value total_value 100 %}%; background: #eab308;" title="Gold: {{ gold_value|inr }}"></div>
+        {% endif %}
+        {% if silver_value > 0 %}
+        <div class="v-horizon-seg" style="width: {% widthratio silver_value total_value 100 %}%; background: #94a3b8;" title="Silver: {{ silver_value|inr }}"></div>
+        {% endif %}
+        {% if total_value > bullion_total %}
+        <div class="v-horizon-seg" style="flex: 1; background: #6366f1;" title="Equities & Mutual Funds"></div>
+        {% endif %}
       </div>
-      <div class="chart-wrap" style="height:140px"><canvas id="babyAllocationChart"></canvas></div>
+      <div class="v-horizon-legend">
+        {% if market_count > 0 %}
+        <span class="v-horizon-item">
+          <span class="v-horizon-dot" style="background: #6366f1;"></span>
+          Equities &amp; MF <strong>{{ market_count }} holdings</strong>
+        </span>
+        {% endif %}
+        {% if bullion_total > 0 %}
+        <span class="v-horizon-item">
+          <span class="v-horizon-dot" style="background: #eab308;"></span>
+          Bullion <strong>{{ bullion_total|inr_short }}</strong>
+        </span>
+        {% endif %}
+      </div>
     </div>
+    {% endwith %}
+    {% endif %}
   </div>
 
   <div class="v-stat-grid">
     <div class="v-stat-cell">
       <div class="v-stat-label">Total Invested</div>
-      <div class="v-stat-value">{{ total_invested|inr }}</div>
+      <div class="v-stat-value text-base-content tabular-nums">{{ total_invested|inr }}</div>
       <div class="v-stat-sub">Cost basis of earmarked holdings</div>
     </div>
     <div class="v-stat-cell">
       <div class="v-stat-label">Unrealized P&amp;L</div>
-      <div class="v-stat-value {% if total_returns >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+      <div class="v-stat-value tabular-nums {% if total_returns >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
         {% if total_returns >= 0 %}+{% endif %}{{ total_returns|inr }}
       </div>
-      <div class="v-stat-sub">{{ return_pct }}% capital appreciation</div>
+      <div class="v-stat-sub tabular-nums">{{ return_pct }}% capital appreciation</div>
     </div>
     <div class="v-stat-cell">
-      <div class="v-stat-label">Active Positions</div>
-      <div class="v-stat-value text-indigo-400">
-        {{ baby_stocks|length|add:baby_index_mf|length|add:baby_other_mf|length }}
-      </div>
+      <div class="v-stat-label">Market Positions</div>
+      <div class="v-stat-value text-base-content tabular-nums">{{ market_count }}</div>
       <div class="v-stat-sub">Stocks &amp; Mutual Funds</div>
     </div>
     <div class="v-stat-cell">
-      <div class="v-stat-label">Bullion Value</div>
-      <div class="v-stat-value text-amber-400">{{ gold_value|add:silver_value|inr }}</div>
-      <div class="v-stat-sub">Gold &amp; Silver bullion holdings</div>
+      <div class="v-stat-label">Bullion Reserve</div>
+      <div class="v-stat-value text-base-content tabular-nums">{{ bullion_total|inr }}</div>
+      <div class="v-stat-sub">Gold &amp; Silver bullion</div>
     </div>
   </div>
+</section>
+{% endwith %}
+
+{# --- ALLOCATION CHART & PHYSICAL BULLION WORKBENCH --- #}
+<div class="grid grid-cols-1 {% if gold_holdings or silver_holdings %}lg:grid-cols-12{% endif %} gap-4 mb-6 items-stretch">
+  <section class="{% if gold_holdings or silver_holdings %}lg:col-span-5{% endif %} v-panel v-panel-fill" aria-label="Child Asset Allocation Chart">
+    <div class="v-panel-header">
+      <h2 class="v-panel-title">
+        <span class="material-symbols-outlined text-base text-indigo-400">pie_chart</span>
+        Child Asset Allocation
+      </h2>
+      <button type="button" class="v-btn v-btn-ghost v-btn-sm" onclick="openModal('selectHoldingsModal')">
+        <span class="material-symbols-outlined text-sm">checklist</span>Manage
+      </button>
+    </div>
+    <div class="v-panel-body flex flex-col justify-center">
+      <div class="chart-wrap h-[190px] sm:h-[210px] w-full"><canvas id="babyAllocationChart"></canvas></div>
+    </div>
+  </section>
+
+  {% if gold_holdings or silver_holdings %}
+  <section class="lg:col-span-7 v-panel v-panel-fill" aria-label="Earmarked Physical Bullion">
+    <div class="v-panel-header">
+      <div class="flex items-center gap-2 min-w-0">
+        <h2 class="v-panel-title">
+          <span class="material-symbols-outlined text-base text-amber-400">diamond</span>
+          Earmarked Physical Bullion
+        </h2>
+        <span class="v-delta v-delta-neutral text-xs font-semibold tabular-nums">{{ gold_value|add:silver_value|inr }}</span>
+      </div>
+      <button type="button" class="v-btn v-btn-secondary v-btn-sm" onclick="openAddBabyCommodityModal()">
+        <span class="material-symbols-outlined text-sm">add</span>Add Bullion
+      </button>
+    </div>
+    <div class="v-panel-body p-0 flex-1">
+      <div class="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-[var(--v-hairline)] h-full">
+        {# Gold Pot (Flush Hairline Column — No Nested Box) #}
+        <div class="p-4 flex flex-col">
+          <div class="flex items-center justify-between gap-2 pb-2.5 border-b border-[var(--v-hairline)]">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="material-symbols-outlined text-lg text-amber-400 shrink-0">diamond</span>
+              <div class="min-w-0">
+                <div class="text-xs font-bold text-base-content">Gold Bullion</div>
+                <div class="text-xs text-base-content/50 tabular-nums">{{ gold_rate|inr }}/g</div>
+              </div>
+            </div>
+            <div class="text-sm font-bold text-base-content tabular-nums shrink-0">{{ gold_value|inr }}</div>
+          </div>
+          {% if gold_holdings %}
+          <div class="divide-y divide-[var(--v-hairline)] max-h-44 overflow-y-auto mt-1">
+            {% for h in gold_holdings %}
+            <div class="flex items-center justify-between gap-2 py-1.5 text-xs">
+              <div class="min-w-0">
+                <div class="text-base-content/85 font-medium truncate">{{ h.description }}</div>
+                <div class="text-xs text-base-content/50 tabular-nums">{{ h.weight_grams|floatformat:2 }}g &middot; {{ h.purity }}</div>
+              </div>
+              <div class="flex items-center gap-0.5 shrink-0">
+                <button type="button" class="v-icon-btn" data-edit-baby-commodity
+                        data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}"
+                        data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}"
+                        aria-label="Edit {{ h.description }}">
+                  <span class="material-symbols-outlined text-sm">edit</span>
+                </button>
+                <form method="post" action="{% url 'toggle_baby' 'commodityholding' h.id %}?next={% url 'baby_portfolio' %}" class="inline m-0">
+                  {% csrf_token %}
+                  <button type="submit" class="v-icon-btn text-amber-400" title="Return to Master Portfolio" aria-label="Return {{ h.description }} to Master Portfolio">
+                    <span class="material-symbols-outlined text-sm">assignment_return</span>
+                  </button>
+                </form>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="text-xs text-base-content/45 py-4 my-auto text-center">No gold items earmarked.</p>
+          {% endif %}
+        </div>
+
+        {# Silver Pot (Flush Hairline Column — No Nested Box) #}
+        <div class="p-4 flex flex-col">
+          <div class="flex items-center justify-between gap-2 pb-2.5 border-b border-[var(--v-hairline)]">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="material-symbols-outlined text-lg text-slate-400 shrink-0">toll</span>
+              <div class="min-w-0">
+                <div class="text-xs font-bold text-base-content">Silver Bullion</div>
+                <div class="text-xs text-base-content/50 tabular-nums">{{ silver_rate|inr }}/g</div>
+              </div>
+            </div>
+            <div class="text-sm font-bold text-base-content tabular-nums shrink-0">{{ silver_value|inr }}</div>
+          </div>
+          {% if silver_holdings %}
+          <div class="divide-y divide-[var(--v-hairline)] max-h-44 overflow-y-auto mt-1">
+            {% for h in silver_holdings %}
+            <div class="flex items-center justify-between gap-2 py-1.5 text-xs">
+              <div class="min-w-0">
+                <div class="text-base-content/85 font-medium truncate">{{ h.description }}</div>
+                <div class="text-xs text-base-content/50 tabular-nums">{{ h.weight_grams|floatformat:2 }}g &middot; {{ h.purity }}</div>
+              </div>
+              <div class="flex items-center gap-0.5 shrink-0">
+                <button type="button" class="v-icon-btn" data-edit-baby-commodity
+                        data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}"
+                        data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}"
+                        aria-label="Edit {{ h.description }}">
+                  <span class="material-symbols-outlined text-sm">edit</span>
+                </button>
+                <form method="post" action="{% url 'toggle_baby' 'commodityholding' h.id %}?next={% url 'baby_portfolio' %}" class="inline m-0">
+                  {% csrf_token %}
+                  <button type="submit" class="v-icon-btn text-amber-400" title="Return to Master Portfolio" aria-label="Return {{ h.description }} to Master Portfolio">
+                    <span class="material-symbols-outlined text-sm">assignment_return</span>
+                  </button>
+                </form>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="text-xs text-base-content/45 py-4 my-auto text-center">No silver items earmarked.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </section>
+  {% endif %}
 </div>
 
 {# --- INDIVIDUAL STOCKS --- #}
 {% if baby_stocks %}
-<div class="v-panel mb-4">
+<section class="v-panel mb-5" aria-label="Earmarked Individual Stocks">
   <div class="v-panel-header">
-    <div class="flex items-center gap-2">
-      <h3 class="v-panel-title">
-        <span class="material-symbols-outlined text-base text-primary">show_chart</span>
+    <div class="flex items-center gap-2 min-w-0">
+      <h2 class="v-panel-title">
+        <span class="material-symbols-outlined text-base text-indigo-400">show_chart</span>
         Earmarked Individual Stocks
-      </h3>
-      <span class="v-delta v-delta-neutral text-xs font-semibold">{{ baby_stocks|length }} Holdings</span>
+      </h2>
+      <span class="v-delta v-delta-neutral text-xs font-semibold tabular-nums">{{ baby_stocks|length }} Holdings</span>
     </div>
-    <button type="button" class="v-btn v-btn-ghost v-btn-xs" onclick="openModal('selectHoldingsModal')">
-      <span class="material-symbols-outlined text-xs">edit</span>Manage
+    <button type="button" class="v-btn v-btn-ghost v-btn-sm" onclick="openModal('selectHoldingsModal')">
+      <span class="material-symbols-outlined text-sm">edit</span>Manage
     </button>
   </div>
   <div class="v-panel-body p-0">
-    <div class="v-table-wrap">
+    {# Desktop Table #}
+    <div class="v-panel-table hidden md:block overflow-x-auto">
       <table class="v-table" id="babyStocksTable">
         <thead>
           <tr>
-            <th>Symbol</th>
+            <th class="sortable-th cursor-pointer select-none">Symbol <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
             <th>Account</th>
-            <th class="v-num">Qty</th>
-            <th class="v-num">Purchased</th>
-            <th class="v-num">Current Value</th>
-            <th class="v-num">Unrealized P&amp;L</th>
-            <th class="text-center w-14">Return</th>
+            <th class="sortable-th cursor-pointer select-none v-num">Qty <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Purchased <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Current Value <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Unrealized P&amp;L <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="text-right w-16">Return</th>
           </tr>
         </thead>
         <tbody>
           {% for s in baby_stocks %}
           <tr>
-            <td class="font-bold text-base-content">{{ s.symbol }}</td>
+            <td class="font-bold text-xs text-base-content" data-val="{{ s.symbol }}">{{ s.symbol }}</td>
             <td class="text-xs text-base-content/60">{{ s.account.name }}</td>
-            <td class="v-num font-semibold">{{ s.quantity }}</td>
-            <td class="v-num text-base-content/70">₹{{ s.purchase_value|floatformat:2|indian_number }}</td>
-            <td class="v-num font-bold text-base-content">₹{{ s.current_value|floatformat:2|indian_number }}</td>
-            <td class="v-num font-semibold {% if s.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+            <td class="v-num text-xs font-semibold" data-val="{{ s.quantity }}">{{ s.quantity }}</td>
+            <td class="v-num text-xs text-base-content/75" data-val="{{ s.purchase_value }}">₹{{ s.purchase_value|floatformat:2|indian_number }}</td>
+            <td class="v-num text-xs font-bold text-base-content" data-val="{{ s.current_value }}">₹{{ s.current_value|floatformat:2|indian_number }}</td>
+            <td class="v-num text-xs font-semibold {% if s.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}" data-val="{{ s.pnl }}">
               {% if s.pnl >= 0 %}+{% endif %}₹{{ s.pnl|floatformat:2|indian_number }}
             </td>
-            <td class="text-center">
-              <form method="post" action="{% url 'toggle_baby' 'stockholding' s.id %}" class="inline m-0">
+            <td class="text-right">
+              <form method="post" action="{% url 'toggle_baby' 'stockholding' s.id %}?next={% url 'baby_portfolio' %}" class="inline m-0">
                 {% csrf_token %}
-                <button type="submit" class="v-btn v-btn-ghost v-btn-xs text-amber-400" title="Return to Master Portfolio">
+                <button type="submit" class="v-icon-btn text-amber-400" title="Return to Master Portfolio" aria-label="Return {{ s.symbol }} to Master Portfolio">
                   <span class="material-symbols-outlined text-sm">assignment_return</span>
                 </button>
               </form>
@@ -166,54 +310,91 @@
         </tbody>
       </table>
     </div>
+
+    {# Mobile View #}
+    <div class="md:hidden divide-y divide-[var(--v-hairline)]">
+      {% for s in baby_stocks %}
+      <div class="v-mobile-row flex-col !items-stretch gap-2">
+        <div class="w-full flex items-center justify-between gap-2">
+          <div class="min-w-0">
+            <div class="font-bold text-sm text-base-content">{{ s.symbol }}</div>
+            <div class="text-xs text-base-content/55 tabular-nums">{{ s.account.name }} &middot; {{ s.quantity }} shares</div>
+          </div>
+          <form method="post" action="{% url 'toggle_baby' 'stockholding' s.id %}?next={% url 'baby_portfolio' %}" class="inline m-0 shrink-0">
+            {% csrf_token %}
+            <button type="submit" class="v-icon-btn text-amber-400" title="Return to Master Portfolio" aria-label="Return {{ s.symbol }} to Master Portfolio">
+              <span class="material-symbols-outlined text-base">assignment_return</span>
+            </button>
+          </form>
+        </div>
+        <div class="w-full grid grid-cols-3 gap-2 pt-2 border-t border-[var(--v-hairline)] text-xs tabular-nums">
+          <div>
+            <span class="text-xs text-base-content/45 block">Purchased</span>
+            <span class="font-semibold text-base-content/80 mt-0.5 block">{{ s.purchase_value|inr }}</span>
+          </div>
+          <div>
+            <span class="text-xs text-base-content/45 block">Current</span>
+            <span class="font-bold text-base-content mt-0.5 block">{{ s.current_value|inr }}</span>
+          </div>
+          <div class="text-right">
+            <span class="text-xs text-base-content/45 block">P&amp;L</span>
+            <span class="font-bold mt-0.5 block {% if s.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+              {% if s.pnl >= 0 %}+{% endif %}{{ s.pnl|inr }}
+            </span>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
   </div>
-</div>
+</section>
 {% endif %}
 
 {# --- INDEX MUTUAL FUNDS --- #}
 {% if baby_index_mf %}
-<div class="v-panel mb-4">
+<section class="v-panel mb-5" aria-label="Earmarked Index Mutual Funds">
   <div class="v-panel-header">
-    <div class="flex items-center gap-2">
-      <h3 class="v-panel-title">
-        <span class="material-symbols-outlined text-base text-primary">stacked_line_chart</span>
+    <div class="flex items-center gap-2 min-w-0">
+      <h2 class="v-panel-title">
+        <span class="material-symbols-outlined text-base text-teal-400">stacked_line_chart</span>
         Earmarked Index Mutual Funds
-      </h3>
-      <span class="v-delta v-delta-neutral text-xs font-semibold">{{ baby_index_mf|length }} Funds</span>
+      </h2>
+      <span class="v-delta v-delta-neutral text-xs font-semibold tabular-nums">{{ baby_index_mf|length }} Funds</span>
     </div>
-    <button type="button" class="v-btn v-btn-ghost v-btn-xs" onclick="openModal('selectHoldingsModal')">
-      <span class="material-symbols-outlined text-xs">edit</span>Manage
+    <button type="button" class="v-btn v-btn-ghost v-btn-sm" onclick="openModal('selectHoldingsModal')">
+      <span class="material-symbols-outlined text-sm">edit</span>Manage
     </button>
   </div>
   <div class="v-panel-body p-0">
-    <div class="v-table-wrap">
+    {# Desktop Table #}
+    <div class="v-panel-table hidden md:block overflow-x-auto">
       <table class="v-table" id="babyIndexTable">
         <thead>
           <tr>
-            <th>Fund Name</th>
+            <th class="sortable-th cursor-pointer select-none">Fund Name <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
             <th>Account</th>
-            <th class="v-num">Units</th>
-            <th class="v-num">Invested</th>
-            <th class="v-num">Current Value</th>
-            <th class="v-num">Unrealized P&amp;L</th>
-            <th class="text-center w-14">Return</th>
+            <th class="sortable-th cursor-pointer select-none v-num">Units <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Invested <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Current Value <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Unrealized P&amp;L <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="text-right w-16">Return</th>
           </tr>
         </thead>
         <tbody>
           {% for mf in baby_index_mf %}
           <tr>
-            <td class="font-bold text-base-content max-w-xs truncate" title="{{ mf.fund_name }}">{{ mf.fund_name }}</td>
+            <td class="font-bold text-xs text-base-content max-w-xs truncate" title="{{ mf.fund_name }}" data-val="{{ mf.fund_name }}">{{ mf.fund_name }}</td>
             <td class="text-xs text-base-content/60">{{ mf.account.name }}</td>
-            <td class="v-num text-xs">{{ mf.units|floatformat:2 }}</td>
-            <td class="v-num text-base-content/70">₹{{ mf.purchase_value|floatformat:2|indian_number }}</td>
-            <td class="v-num font-bold text-base-content">₹{{ mf.current_value|floatformat:2|indian_number }}</td>
-            <td class="v-num font-semibold {% if mf.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+            <td class="v-num text-xs" data-val="{{ mf.units }}">{{ mf.units|floatformat:2 }}</td>
+            <td class="v-num text-xs text-base-content/75" data-val="{{ mf.purchase_value }}">₹{{ mf.purchase_value|floatformat:2|indian_number }}</td>
+            <td class="v-num text-xs font-bold text-base-content" data-val="{{ mf.current_value }}">₹{{ mf.current_value|floatformat:2|indian_number }}</td>
+            <td class="v-num text-xs font-semibold {% if mf.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}" data-val="{{ mf.pnl }}">
               {% if mf.pnl >= 0 %}+{% endif %}₹{{ mf.pnl|floatformat:2|indian_number }}
             </td>
-            <td class="text-center">
-              <form method="post" action="{% url 'toggle_baby' 'mutualfundholding' mf.id %}" class="inline m-0">
+            <td class="text-right">
+              <form method="post" action="{% url 'toggle_baby' 'mutualfundholding' mf.id %}?next={% url 'baby_portfolio' %}" class="inline m-0">
                 {% csrf_token %}
-                <button type="submit" class="v-btn v-btn-ghost v-btn-xs text-amber-400" title="Return to Master Portfolio">
+                <button type="submit" class="v-icon-btn text-amber-400" title="Return to Master Portfolio" aria-label="Return {{ mf.fund_name }} to Master Portfolio">
                   <span class="material-symbols-outlined text-sm">assignment_return</span>
                 </button>
               </form>
@@ -223,54 +404,91 @@
         </tbody>
       </table>
     </div>
+
+    {# Mobile View #}
+    <div class="md:hidden divide-y divide-[var(--v-hairline)]">
+      {% for mf in baby_index_mf %}
+      <div class="v-mobile-row flex-col !items-stretch gap-2">
+        <div class="w-full flex items-start justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <div class="font-bold text-sm text-base-content leading-snug line-clamp-2">{{ mf.fund_name }}</div>
+            <div class="text-xs text-base-content/55 mt-0.5 tabular-nums">{{ mf.account.name }} &middot; {{ mf.units|floatformat:2 }} units</div>
+          </div>
+          <form method="post" action="{% url 'toggle_baby' 'mutualfundholding' mf.id %}?next={% url 'baby_portfolio' %}" class="inline m-0 shrink-0">
+            {% csrf_token %}
+            <button type="submit" class="v-icon-btn text-amber-400" title="Return to Master Portfolio" aria-label="Return {{ mf.fund_name }} to Master Portfolio">
+              <span class="material-symbols-outlined text-base">assignment_return</span>
+            </button>
+          </form>
+        </div>
+        <div class="w-full grid grid-cols-3 gap-2 pt-2 border-t border-[var(--v-hairline)] text-xs tabular-nums">
+          <div>
+            <span class="text-xs text-base-content/45 block">Invested</span>
+            <span class="font-semibold text-base-content/80 mt-0.5 block">{{ mf.purchase_value|inr }}</span>
+          </div>
+          <div>
+            <span class="text-xs text-base-content/45 block">Current</span>
+            <span class="font-bold text-base-content mt-0.5 block">{{ mf.current_value|inr }}</span>
+          </div>
+          <div class="text-right">
+            <span class="text-xs text-base-content/45 block">P&amp;L</span>
+            <span class="font-bold mt-0.5 block {% if mf.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+              {% if mf.pnl >= 0 %}+{% endif %}{{ mf.pnl|inr }}
+            </span>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
   </div>
-</div>
+</section>
 {% endif %}
 
 {# --- OTHER MUTUAL FUNDS --- #}
 {% if baby_other_mf %}
-<div class="v-panel mb-4">
+<section class="v-panel mb-5" aria-label="Earmarked Active and Other Mutual Funds">
   <div class="v-panel-header">
-    <div class="flex items-center gap-2">
-      <h3 class="v-panel-title">
-        <span class="material-symbols-outlined text-base text-primary">finance_mode</span>
+    <div class="flex items-center gap-2 min-w-0">
+      <h2 class="v-panel-title">
+        <span class="material-symbols-outlined text-base text-orange-400">finance_mode</span>
         Active / Other Mutual Funds
-      </h3>
-      <span class="v-delta v-delta-neutral text-xs font-semibold">{{ baby_other_mf|length }} Funds</span>
+      </h2>
+      <span class="v-delta v-delta-neutral text-xs font-semibold tabular-nums">{{ baby_other_mf|length }} Funds</span>
     </div>
-    <button type="button" class="v-btn v-btn-ghost v-btn-xs" onclick="openModal('selectHoldingsModal')">
-      <span class="material-symbols-outlined text-xs">edit</span>Manage
+    <button type="button" class="v-btn v-btn-ghost v-btn-sm" onclick="openModal('selectHoldingsModal')">
+      <span class="material-symbols-outlined text-sm">edit</span>Manage
     </button>
   </div>
   <div class="v-panel-body p-0">
-    <div class="v-table-wrap">
+    {# Desktop Table #}
+    <div class="v-panel-table hidden md:block overflow-x-auto">
       <table class="v-table" id="babyOtherTable">
         <thead>
           <tr>
-            <th>Fund Name</th>
+            <th class="sortable-th cursor-pointer select-none">Fund Name <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
             <th>Account</th>
-            <th class="v-num">Units</th>
-            <th class="v-num">Invested</th>
-            <th class="v-num">Current Value</th>
-            <th class="v-num">Unrealized P&amp;L</th>
-            <th class="text-center w-14">Return</th>
+            <th class="sortable-th cursor-pointer select-none v-num">Units <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Invested <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Current Value <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Unrealized P&amp;L <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="text-right w-16">Return</th>
           </tr>
         </thead>
         <tbody>
           {% for mf in baby_other_mf %}
           <tr>
-            <td class="font-bold text-base-content max-w-xs truncate" title="{{ mf.fund_name }}">{{ mf.fund_name }}</td>
+            <td class="font-bold text-xs text-base-content max-w-xs truncate" title="{{ mf.fund_name }}" data-val="{{ mf.fund_name }}">{{ mf.fund_name }}</td>
             <td class="text-xs text-base-content/60">{{ mf.account.name }}</td>
-            <td class="v-num text-xs">{{ mf.units|floatformat:2 }}</td>
-            <td class="v-num text-base-content/70">₹{{ mf.purchase_value|floatformat:2|indian_number }}</td>
-            <td class="v-num font-bold text-base-content">₹{{ mf.current_value|floatformat:2|indian_number }}</td>
-            <td class="v-num font-semibold {% if mf.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+            <td class="v-num text-xs" data-val="{{ mf.units }}">{{ mf.units|floatformat:2 }}</td>
+            <td class="v-num text-xs text-base-content/75" data-val="{{ mf.purchase_value }}">₹{{ mf.purchase_value|floatformat:2|indian_number }}</td>
+            <td class="v-num text-xs font-bold text-base-content" data-val="{{ mf.current_value }}">₹{{ mf.current_value|floatformat:2|indian_number }}</td>
+            <td class="v-num text-xs font-semibold {% if mf.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}" data-val="{{ mf.pnl }}">
               {% if mf.pnl >= 0 %}+{% endif %}₹{{ mf.pnl|floatformat:2|indian_number }}
             </td>
-            <td class="text-center">
-              <form method="post" action="{% url 'toggle_baby' 'mutualfundholding' mf.id %}" class="inline m-0">
+            <td class="text-right">
+              <form method="post" action="{% url 'toggle_baby' 'mutualfundholding' mf.id %}?next={% url 'baby_portfolio' %}" class="inline m-0">
                 {% csrf_token %}
-                <button type="submit" class="v-btn v-btn-ghost v-btn-xs text-amber-400" title="Return to Master Portfolio">
+                <button type="submit" class="v-icon-btn text-amber-400" title="Return to Master Portfolio" aria-label="Return {{ mf.fund_name }} to Master Portfolio">
                   <span class="material-symbols-outlined text-sm">assignment_return</span>
                 </button>
               </form>
@@ -280,217 +498,176 @@
         </tbody>
       </table>
     </div>
-  </div>
-</div>
-{% endif %}
 
-{# --- PHYSICAL BULLION (GOLD & SILVER) --- #}
-{% if gold_holdings or silver_holdings %}
-<div class="v-panel mb-4">
-  <div class="v-panel-header">
-    <div class="flex items-center gap-2">
-      <h3 class="v-panel-title">
-        <span class="material-symbols-outlined text-base text-amber-400">diamond</span>
-        Earmarked Physical Bullion
-      </h3>
-      <span class="v-delta v-delta-neutral text-xs font-semibold">{{ gold_value|add:silver_value|inr }}</span>
-    </div>
-    <button type="button" class="v-btn v-btn-secondary v-btn-xs" onclick="openAddBabyCommodityModal()">
-      <span class="material-symbols-outlined text-sm">add</span>Add Bullion
-    </button>
-  </div>
-  <div class="v-panel-body">
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      {# Gold Pot #}
-      <div class="p-3.5 rounded-xl bg-base-content/3 border border-base-content/6">
-        <div class="flex items-center justify-between mb-2">
-          <div class="flex items-center gap-2">
-            <span class="material-symbols-outlined text-xl text-amber-400">diamond</span>
-            <div>
-              <div class="text-xs font-bold text-base-content">Gold Bullion</div>
-              <div class="text-[10px] text-base-content/50">{{ gold_rate|inr }}/g</div>
-            </div>
+    {# Mobile View #}
+    <div class="md:hidden divide-y divide-[var(--v-hairline)]">
+      {% for mf in baby_other_mf %}
+      <div class="v-mobile-row flex-col !items-stretch gap-2">
+        <div class="w-full flex items-start justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <div class="font-bold text-sm text-base-content leading-snug line-clamp-2">{{ mf.fund_name }}</div>
+            <div class="text-xs text-base-content/55 mt-0.5 tabular-nums">{{ mf.account.name }} &middot; {{ mf.units|floatformat:2 }} units</div>
           </div>
-          <div class="text-sm font-bold text-amber-400 tabular-nums">{{ gold_value|inr }}</div>
+          <form method="post" action="{% url 'toggle_baby' 'mutualfundholding' mf.id %}?next={% url 'baby_portfolio' %}" class="inline m-0 shrink-0">
+            {% csrf_token %}
+            <button type="submit" class="v-icon-btn text-amber-400" title="Return to Master Portfolio" aria-label="Return {{ mf.fund_name }} to Master Portfolio">
+              <span class="material-symbols-outlined text-base">assignment_return</span>
+            </button>
+          </form>
         </div>
-        {% if gold_holdings %}
-        <div class="divide-y divide-base-content/6 max-h-36 overflow-y-auto">
-          {% for h in gold_holdings %}
-          <div class="flex items-center justify-between py-1.5 text-xs">
-            <span class="text-base-content/80 truncate max-w-[150px]">{{ h.description }}</span>
-            <div class="flex items-center gap-2">
-              <span class="text-base-content/50 tabular-nums">{{ h.weight_grams|floatformat:0 }}g</span>
-              <button type="button" class="v-btn v-btn-ghost v-btn-xs" data-edit-baby-commodity
-                      data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}"
-                      data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}">
-                <span class="material-symbols-outlined text-xs">edit</span>
-              </button>
-              <form method="post" action="{% url 'toggle_baby' 'commodityholding' h.id %}?next={% url 'portfolio_tracker' %}" class="inline m-0">
-                {% csrf_token %}
-                <button type="submit" class="v-btn v-btn-ghost v-btn-xs text-amber-400" title="Return to Master Portfolio">
-                  <span class="material-symbols-outlined text-xs">assignment_return</span>
-                </button>
-              </form>
-            </div>
+        <div class="w-full grid grid-cols-3 gap-2 pt-2 border-t border-[var(--v-hairline)] text-xs tabular-nums">
+          <div>
+            <span class="text-xs text-base-content/45 block">Invested</span>
+            <span class="font-semibold text-base-content/80 mt-0.5 block">{{ mf.purchase_value|inr }}</span>
           </div>
-          {% endfor %}
+          <div>
+            <span class="text-xs text-base-content/45 block">Current</span>
+            <span class="font-bold text-base-content mt-0.5 block">{{ mf.current_value|inr }}</span>
+          </div>
+          <div class="text-right">
+            <span class="text-xs text-base-content/45 block">P&amp;L</span>
+            <span class="font-bold mt-0.5 block {% if mf.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+              {% if mf.pnl >= 0 %}+{% endif %}{{ mf.pnl|inr }}
+            </span>
+          </div>
         </div>
-        {% endif %}
       </div>
-
-      {# Silver Pot #}
-      <div class="p-3.5 rounded-xl bg-base-content/3 border border-base-content/6">
-        <div class="flex items-center justify-between mb-2">
-          <div class="flex items-center gap-2">
-            <span class="material-symbols-outlined text-xl text-slate-400">toll</span>
-            <div>
-              <div class="text-xs font-bold text-base-content">Silver Bullion</div>
-              <div class="text-[10px] text-base-content/50">{{ silver_rate|inr }}/g</div>
-            </div>
-          </div>
-          <div class="text-sm font-bold text-slate-300 tabular-nums">{{ silver_value|inr }}</div>
-        </div>
-        {% if silver_holdings %}
-        <div class="divide-y divide-base-content/6 max-h-36 overflow-y-auto">
-          {% for h in silver_holdings %}
-          <div class="flex items-center justify-between py-1.5 text-xs">
-            <span class="text-base-content/80 truncate max-w-[150px]">{{ h.description }}</span>
-            <div class="flex items-center gap-2">
-              <span class="text-base-content/50 tabular-nums">{{ h.weight_grams|floatformat:0 }}g</span>
-              <button type="button" class="v-btn v-btn-ghost v-btn-xs" data-edit-baby-commodity
-                      data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}"
-                      data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}">
-                <span class="material-symbols-outlined text-xs">edit</span>
-              </button>
-              <form method="post" action="{% url 'toggle_baby' 'commodityholding' h.id %}?next={% url 'portfolio_tracker' %}" class="inline m-0">
-                {% csrf_token %}
-                <button type="submit" class="v-btn v-btn-ghost v-btn-xs text-amber-400" title="Return to Master Portfolio">
-                  <span class="material-symbols-outlined text-xs">assignment_return</span>
-                </button>
-              </form>
-            </div>
-          </div>
-          {% endfor %}
-        </div>
-        {% endif %}
-      </div>
+      {% endfor %}
     </div>
   </div>
-</div>
+</section>
 {% endif %}
 
 {% endif %}{# end if empty #}
 
 {# --- SELECT HOLDINGS MODAL --- #}
-<dialog class="modal" id="selectHoldingsModal">
-  <div class="modal-box w-full max-w-2xl bg-base-100 p-6 flex flex-col justify-between">
-    <div>
-      <div class="flex items-center justify-between pb-3 border-b border-base-content/8">
-        <h3 class="font-bold text-base flex items-center gap-2">
+<dialog class="modal modal-bottom sm:modal-middle" id="selectHoldingsModal">
+  <div class="modal-box max-w-2xl max-h-[90dvh] overflow-y-auto overscroll-contain">
+    <div class="v-modal-header flex items-center justify-between gap-3 pb-3 mb-3 border-b border-[var(--v-hairline)]">
+      <div>
+        <h3 class="font-semibold text-base text-base-content flex items-center gap-2">
           <span class="material-symbols-outlined text-primary">child_care</span>
           Select Holdings for Child Portfolio
         </h3>
-        <button type="button" class="v-btn v-btn-ghost v-btn-xs" onclick="closeModal('selectHoldingsModal')">
-          <span class="material-symbols-outlined text-lg">close</span>
-        </button>
+        <p class="text-xs text-base-content/55 mt-0.5">Tap any instrument action to earmark or return it to Master Portfolio</p>
       </div>
-      <p class="text-xs text-base-content/50 mt-1 mb-4">Click the icon on any instrument to earmark or return it to the Master Portfolio.</p>
+      <button type="button" class="v-icon-btn shrink-0" onclick="closeModal('selectHoldingsModal')" aria-label="Close">
+        <span class="material-symbols-outlined text-lg">close</span>
+      </button>
+    </div>
 
-      <div class="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
-        {# Individual Stocks #}
-        {% if all_stocks %}
-        <div>
-          <div class="text-[11px] font-bold uppercase tracking-wider text-base-content/50 mb-2">Individual Stocks</div>
-          <div class="space-y-1.5">
-            {% for s in all_stocks %}
-            <div class="flex items-center justify-between p-2.5 rounded-lg {% if s.is_baby %}bg-primary/8 border border-primary/20{% else %}bg-base-content/3 border border-base-content/6{% endif %}">
-              <div class="flex items-center gap-2.5 min-w-0">
-                <span class="material-symbols-outlined text-base {% if s.is_baby %}text-primary{% else %}text-base-content/20{% endif %}">
-                  {% if s.is_baby %}check_circle{% else %}radio_button_unchecked{% endif %}
-                </span>
-                <div class="min-w-0">
-                  <div class="font-bold text-xs text-base-content">{{ s.symbol }}</div>
-                  <div class="text-[10px] text-base-content/50">{{ s.account.name }} · {{ s.quantity }} qty · {{ s.current_value|inr }}</div>
-                </div>
-              </div>
-              <form method="post" action="{% url 'toggle_baby' 'stockholding' s.id %}?next={% url 'baby_portfolio' %}" class="inline m-0">
-                {% csrf_token %}
-                <button type="submit" class="v-btn v-btn-xs {% if s.is_baby %}v-btn-secondary text-amber-400{% else %}v-btn-ghost text-base-content/60{% endif %}"
-                        title="{% if s.is_baby %}Remove from Child Portfolio{% else %}Add to Child Portfolio{% endif %}">
-                  <span class="material-symbols-outlined text-sm">{% if s.is_baby %}assignment_return{% else %}child_care{% endif %}</span>
-                </button>
-              </form>
-            </div>
-            {% endfor %}
-          </div>
-        </div>
-        {% endif %}
+    <div class="relative mb-3">
+      <label for="selectHoldingsSearch" class="sr-only">Filter holdings</label>
+      <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-base-content/45">
+        <span class="material-symbols-outlined text-base">search</span>
+      </span>
+      <input type="search" id="selectHoldingsSearch" class="v-input w-full !pl-10 text-xs" placeholder="Search scrip symbol, fund name, or account...">
+    </div>
 
-        {# Index Funds #}
-        {% if all_index_mf %}
-        <div>
-          <div class="text-[11px] font-bold uppercase tracking-wider text-base-content/50 mb-2">Index Mutual Funds</div>
-          <div class="space-y-1.5">
-            {% for m in all_index_mf %}
-            <div class="flex items-center justify-between p-2.5 rounded-lg {% if m.is_baby %}bg-primary/8 border border-primary/20{% else %}bg-base-content/3 border border-base-content/6{% endif %}">
-              <div class="flex items-center gap-2.5 min-w-0">
-                <span class="material-symbols-outlined text-base {% if m.is_baby %}text-primary{% else %}text-base-content/20{% endif %}">
-                  {% if m.is_baby %}check_circle{% else %}radio_button_unchecked{% endif %}
-                </span>
-                <div class="min-w-0">
-                  <div class="font-bold text-xs text-base-content truncate max-w-xs" title="{{ m.fund_name }}">{{ m.fund_name }}</div>
-                  <div class="text-[10px] text-base-content/50">{{ m.account.name }} · {{ m.units|floatformat:2 }} units · {{ m.current_value|inr }}</div>
-                </div>
+    <div class="space-y-4 max-h-[55vh] overflow-y-auto pr-1" id="selectHoldingsList">
+      {# Individual Stocks #}
+      {% if all_stocks %}
+      <div data-holding-group>
+        <div class="text-xs font-semibold text-base-content/65 mb-2">Individual Stocks</div>
+        <div class="space-y-1.5">
+          {% for s in all_stocks %}
+          <div class="flex items-center justify-between gap-2 p-2.5 rounded-lg {% if s.is_baby %}bg-primary/8 border border-primary/25{% else %}bg-base-200/40 border border-[var(--v-hairline)]{% endif %}"
+               data-holding-item data-search="{{ s.symbol|lower }} {{ s.account.name|lower }}">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <span class="material-symbols-outlined text-base shrink-0 {% if s.is_baby %}text-primary{% else %}text-base-content/25{% endif %}">
+                {% if s.is_baby %}check_circle{% else %}radio_button_unchecked{% endif %}
+              </span>
+              <div class="min-w-0">
+                <div class="font-bold text-xs text-base-content truncate">{{ s.symbol }}</div>
+                <div class="text-xs text-base-content/55 tabular-nums truncate">{{ s.account.name }} &middot; {{ s.quantity }} qty &middot; {{ s.current_value|inr }}</div>
               </div>
-              <form method="post" action="{% url 'toggle_baby' 'mutualfundholding' m.id %}?next={% url 'baby_portfolio' %}" class="inline m-0">
-                {% csrf_token %}
-                <button type="submit" class="v-btn v-btn-xs {% if m.is_baby %}v-btn-secondary text-amber-400{% else %}v-btn-ghost text-base-content/60{% endif %}"
-                        title="{% if m.is_baby %}Remove from Child Portfolio{% else %}Add to Child Portfolio{% endif %}">
-                  <span class="material-symbols-outlined text-sm">{% if m.is_baby %}assignment_return{% else %}child_care{% endif %}</span>
-                </button>
-              </form>
             </div>
-            {% endfor %}
+            <form method="post" action="{% url 'toggle_baby' 'stockholding' s.id %}?next={% url 'baby_portfolio' %}" class="inline m-0 shrink-0">
+              {% csrf_token %}
+              <button type="submit" class="v-icon-btn {% if s.is_baby %}text-amber-400{% else %}text-primary{% endif %}"
+                      title="{% if s.is_baby %}Return to Master Portfolio{% else %}Add to Child Portfolio{% endif %}"
+                      aria-label="{% if s.is_baby %}Return {{ s.symbol }} to Master Portfolio{% else %}Add {{ s.symbol }} to Child Portfolio{% endif %}">
+                <span class="material-symbols-outlined text-base">{% if s.is_baby %}assignment_return{% else %}child_care{% endif %}</span>
+              </button>
+            </form>
           </div>
+          {% endfor %}
         </div>
-        {% endif %}
-
-        {# Other Mutual Funds #}
-        {% if all_other_mf %}
-        <div>
-          <div class="text-[11px] font-bold uppercase tracking-wider text-base-content/50 mb-2">Other Mutual Funds</div>
-          <div class="space-y-1.5">
-            {% for m in all_other_mf %}
-            <div class="flex items-center justify-between p-2.5 rounded-lg {% if m.is_baby %}bg-primary/8 border border-primary/20{% else %}bg-base-content/3 border border-base-content/6{% endif %}">
-              <div class="flex items-center gap-2.5 min-w-0">
-                <span class="material-symbols-outlined text-base {% if m.is_baby %}text-primary{% else %}text-base-content/20{% endif %}">
-                  {% if m.is_baby %}check_circle{% else %}radio_button_unchecked{% endif %}
-                </span>
-                <div class="min-w-0">
-                  <div class="font-bold text-xs text-base-content truncate max-w-xs" title="{{ m.fund_name }}">{{ m.fund_name }}</div>
-                  <div class="text-[10px] text-base-content/50">{{ m.account.name }} · {{ m.units|floatformat:2 }} units · {{ m.current_value|inr }}</div>
-                </div>
-              </div>
-              <form method="post" action="{% url 'toggle_baby' 'mutualfundholding' m.id %}?next={% url 'baby_portfolio' %}" class="inline m-0">
-                {% csrf_token %}
-                <button type="submit" class="v-btn v-btn-xs {% if m.is_baby %}v-btn-secondary text-amber-400{% else %}v-btn-ghost text-base-content/60{% endif %}"
-                        title="{% if m.is_baby %}Remove from Child Portfolio{% else %}Add to Child Portfolio{% endif %}">
-                  <span class="material-symbols-outlined text-sm">{% if m.is_baby %}assignment_return{% else %}child_care{% endif %}</span>
-                </button>
-              </form>
-            </div>
-            {% endfor %}
-          </div>
-        </div>
-        {% endif %}
       </div>
+      {% endif %}
 
-      <div class="flex justify-end pt-3 border-t border-base-content/8 mt-4">
-        <button type="button" class="v-btn v-btn-primary v-btn-sm" onclick="closeModal('selectHoldingsModal')">Done</button>
+      {# Index Funds #}
+      {% if all_index_mf %}
+      <div data-holding-group>
+        <div class="text-xs font-semibold text-base-content/65 mb-2">Index Mutual Funds</div>
+        <div class="space-y-1.5">
+          {% for m in all_index_mf %}
+          <div class="flex items-center justify-between gap-2 p-2.5 rounded-lg {% if m.is_baby %}bg-primary/8 border border-primary/25{% else %}bg-base-200/40 border border-[var(--v-hairline)]{% endif %}"
+               data-holding-item data-search="{{ m.fund_name|lower }} {{ m.account.name|lower }}">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <span class="material-symbols-outlined text-base shrink-0 {% if m.is_baby %}text-primary{% else %}text-base-content/25{% endif %}">
+                {% if m.is_baby %}check_circle{% else %}radio_button_unchecked{% endif %}
+              </span>
+              <div class="min-w-0">
+                <div class="font-bold text-xs text-base-content truncate" title="{{ m.fund_name }}">{{ m.fund_name }}</div>
+                <div class="text-xs text-base-content/55 tabular-nums truncate">{{ m.account.name }} &middot; {{ m.units|floatformat:2 }} units &middot; {{ m.current_value|inr }}</div>
+              </div>
+            </div>
+            <form method="post" action="{% url 'toggle_baby' 'mutualfundholding' m.id %}?next={% url 'baby_portfolio' %}" class="inline m-0 shrink-0">
+              {% csrf_token %}
+              <button type="submit" class="v-icon-btn {% if m.is_baby %}text-amber-400{% else %}text-primary{% endif %}"
+                      title="{% if m.is_baby %}Return to Master Portfolio{% else %}Add to Child Portfolio{% endif %}"
+                      aria-label="{% if m.is_baby %}Return {{ m.fund_name }} to Master Portfolio{% else %}Add {{ m.fund_name }} to Child Portfolio{% endif %}">
+                <span class="material-symbols-outlined text-base">{% if m.is_baby %}assignment_return{% else %}child_care{% endif %}</span>
+              </button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
       </div>
+      {% endif %}
+
+      {# Other Mutual Funds #}
+      {% if all_other_mf %}
+      <div data-holding-group>
+        <div class="text-xs font-semibold text-base-content/65 mb-2">Other Mutual Funds</div>
+        <div class="space-y-1.5">
+          {% for m in all_other_mf %}
+          <div class="flex items-center justify-between gap-2 p-2.5 rounded-lg {% if m.is_baby %}bg-primary/8 border border-primary/25{% else %}bg-base-200/40 border border-[var(--v-hairline)]{% endif %}"
+               data-holding-item data-search="{{ m.fund_name|lower }} {{ m.account.name|lower }}">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <span class="material-symbols-outlined text-base shrink-0 {% if m.is_baby %}text-primary{% else %}text-base-content/25{% endif %}">
+                {% if m.is_baby %}check_circle{% else %}radio_button_unchecked{% endif %}
+              </span>
+              <div class="min-w-0">
+                <div class="font-bold text-xs text-base-content truncate" title="{{ m.fund_name }}">{{ m.fund_name }}</div>
+                <div class="text-xs text-base-content/55 tabular-nums truncate">{{ m.account.name }} &middot; {{ m.units|floatformat:2 }} units &middot; {{ m.current_value|inr }}</div>
+              </div>
+            </div>
+            <form method="post" action="{% url 'toggle_baby' 'mutualfundholding' m.id %}?next={% url 'baby_portfolio' %}" class="inline m-0 shrink-0">
+              {% csrf_token %}
+              <button type="submit" class="v-icon-btn {% if m.is_baby %}text-amber-400{% else %}text-primary{% endif %}"
+                      title="{% if m.is_baby %}Return to Master Portfolio{% else %}Add to Child Portfolio{% endif %}"
+                      aria-label="{% if m.is_baby %}Return {{ m.fund_name }} to Master Portfolio{% else %}Add {{ m.fund_name }} to Child Portfolio{% endif %}">
+                <span class="material-symbols-outlined text-base">{% if m.is_baby %}assignment_return{% else %}child_care{% endif %}</span>
+              </button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if not all_stocks and not all_index_mf and not all_other_mf %}
+      <div class="p-6 text-center text-xs text-base-content/50">No synced Zerodha holdings available to earmark yet.</div>
+      {% endif %}
+    </div>
+
+    <div class="v-modal-footer modal-action justify-end mt-4 pt-3 border-t border-[var(--v-hairline)]">
+      <button type="button" class="v-btn v-btn-primary" onclick="closeModal('selectHoldingsModal')">Done</button>
     </div>
   </div>
-  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+  <form method="dialog" class="modal-backdrop"><button aria-label="Close modal">close</button></form>
 </dialog>
 
 {# Add/Edit Commodity Modal #}
@@ -505,6 +682,7 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'js/sortable.js' %}"></script>
 <script>
   window.GOLD_RATE = {{ gold_rate|default:0 }};
   window.SILVER_RATE = {{ silver_rate|default:0 }};
@@ -530,12 +708,15 @@ function openAddBabyCommodityModal() {
   if (weightField) weightField.value = '';
   var purchaseField = form.querySelector('[name=purchase_price_per_gram]');
   if (purchaseField) purchaseField.value = window.GOLD_RATE || '';
-  
+
   var delBtn = document.getElementById('babyCommodityDeleteBtn');
-  if (delBtn) delBtn.style.display = 'none';
+  if (delBtn) {
+    delBtn.classList.add('hidden');
+    delBtn.style.display = 'none';
+  }
   var titleEl = document.getElementById('babyCommodityModalTitle');
   if (titleEl) {
-    titleEl.innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span>Add Commodity';
+    titleEl.innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span> Add Commodity';
   }
   openModal('addBabyCommodityModal');
 }
@@ -544,6 +725,23 @@ document.addEventListener('DOMContentLoaded', function(){
   if (document.getElementById('babyStocksTable')) initPagination('babyStocksTable', 20);
   if (document.getElementById('babyIndexTable')) initPagination('babyIndexTable', 20);
   if (document.getElementById('babyOtherTable')) initPagination('babyOtherTable', 20);
+
+  // Live filter in Select Holdings modal
+  var searchInp = document.getElementById('selectHoldingsSearch');
+  if (searchInp) {
+    searchInp.addEventListener('input', function() {
+      var q = searchInp.value.trim().toLowerCase();
+      document.querySelectorAll('#selectHoldingsList [data-holding-group]').forEach(function(group) {
+        var visibleCount = 0;
+        group.querySelectorAll('[data-holding-item]').forEach(function(item) {
+          var match = !q || (item.getAttribute('data-search') || '').indexOf(q) !== -1;
+          item.style.display = match ? '' : 'none';
+          if (match) visibleCount++;
+        });
+        group.style.display = visibleCount > 0 ? '' : 'none';
+      });
+    });
+  }
 
   // Commodity edit handler (delegation)
   document.addEventListener('click', function(e) {
@@ -564,12 +762,15 @@ document.addEventListener('DOMContentLoaded', function(){
     cf.querySelector('[name=weight_grams]').value = btn.dataset.weight;
     cf.querySelector('[name=purchase_price_per_gram]').value = btn.dataset.purchase;
     var delBtn = document.getElementById('babyCommodityDeleteBtn');
-    if (delBtn) delBtn.style.display = 'inline-flex';
+    if (delBtn) {
+      delBtn.classList.remove('hidden');
+      delBtn.style.display = 'inline-flex';
+    }
     var delForm = document.getElementById('deleteBabyCommodityForm');
     if (delForm) delForm.action = "{% url 'delete_commodity' pk=0 %}".replace('/0/', '/' + btn.dataset.id + '/');
     var titleEl = document.getElementById('babyCommodityModalTitle');
     if (titleEl) {
-      titleEl.innerHTML = '<span class="material-symbols-outlined text-primary">edit</span>Edit Commodity';
+      titleEl.innerHTML = '<span class="material-symbols-outlined text-primary">edit</span> Edit Commodity';
     }
     openModal('addBabyCommodityModal');
   });
@@ -599,14 +800,14 @@ document.addEventListener('DOMContentLoaded', function(){
               cutout: '72%',
               plugins: {
                 legend: {
-                  position: 'right',
+                  position: 'bottom',
                   labels: {
-                    color: 'rgba(226, 232, 240, 0.75)',
+                    color: 'rgba(226, 232, 240, 0.78)',
                     usePointStyle: true,
                     pointStyle: 'circle',
                     boxWidth: 6,
-                    padding: 8,
-                    font: { size: 10 }
+                    padding: 10,
+                    font: { size: 11 }
                   }
                 }
               }

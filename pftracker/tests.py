@@ -95,6 +95,37 @@ class PftrackerUtilsTests(TestCase):
         resp = safe_redirect(req, 'dashboard')
         self.assertEqual(resp.url, '/')
 
+        # 6. HTTPS downgrade blocked when request is secure
+        req_downgrade = self.rf.post(
+            '/', {'next': 'http://testserver/tracker/'},
+            HTTP_HOST='testserver', secure=True,
+        )
+        resp = safe_redirect(req_downgrade, 'dashboard')
+        self.assertEqual(resp.url, '/')
+
+        # 7. CRLF / control character injection blocked
+        req_crlf = self.rf.post('/', {'next': '/tracker/\r\nSet-Cookie: evil=1'}, HTTP_HOST='testserver')
+        resp = safe_redirect(req_crlf, 'dashboard')
+        self.assertEqual(resp.url, '/')
+
+        # 8. Untrusted bare view name in ?next= must NOT raise NoReverseMatch 500
+        req_bare = self.rf.post('/', {'next': 'nonexistent_view_name_xyz'}, HTTP_HOST='testserver')
+        resp = safe_redirect(req_bare, 'dashboard')
+        self.assertEqual(resp.url, '/')
+
+    def test_oauth_discovery_enforces_s256_pkce_only(self):
+        resp = self.client.get('/.well-known/oauth-authorization-server')
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data.get('code_challenge_methods_supported'), ['S256'])
+        self.assertNotIn('plain', data.get('code_challenge_methods_supported', []))
+
+    def test_media_url_not_served_unauthenticated_in_debug(self):
+        from django.test import override_settings
+        with override_settings(DEBUG=True):
+            resp = self.client.get('/media/jewellery_photos/nonexistent.jpg')
+            self.assertEqual(resp.status_code, 404)
+
     def test_feature_enabled_helper(self):
         # User without group returns True
         standalone_user = User(username="solo")

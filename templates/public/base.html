@@ -1,5 +1,5 @@
 {% load static %}<!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" data-theme="night" class="dark pub-root">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -12,64 +12,105 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
 
+  <style>@layer properties, theme, base, daisyui, components, utilities;</style>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css">
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
   <style type="text/tailwindcss">
-    @theme {
-      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+    @theme inline {
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --color-base-100: var(--color-base-100);
+      --color-base-200: var(--color-base-200);
+      --color-base-300: var(--color-base-300);
+      --color-base-content: var(--color-base-content);
+      --color-primary: var(--color-primary);
+      --color-primary-content: var(--color-primary-content);
+      --color-secondary: var(--color-secondary);
+      --color-accent: var(--color-accent);
+      --color-info: var(--color-info);
+      --color-success: var(--color-success);
+      --color-warning: var(--color-warning);
+      --color-error: var(--color-error);
     }
   </style>
   <link rel="stylesheet" href="{% static 'css/style.css' %}">
   <link rel="stylesheet" href="{% static 'css/public.css' %}">
 </head>
-<body class="bg-[#0b0f17] text-[#f1f5f9] min-h-screen flex flex-col font-sans antialiased selection:bg-indigo-500/25 selection:text-white">
+<body class="pub-body selection:bg-indigo-500/25 selection:text-white">
+  <a href="#mainContent" class="v-skip-link">Skip to main content</a>
 
-  {# Sticky Glass Navigation Header #}
-  <header class="sticky top-0 z-50 backdrop-blur-md bg-[#0b0f17]/90 border-b border-white/10">
-    <div class="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-      <a href="{% url 'about' %}" class="brand flex items-center gap-2.5 text-white font-bold tracking-widest text-sm hover:opacity-90 transition-opacity">
-        <span class="w-8 h-8 rounded-lg bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
-          <span class="material-symbols-outlined text-lg">shield</span>
+  {# Shared SVG gradient definitions for Vault emblem #}
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="vg" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#818cf8"/>
+        <stop offset="100%" stop-color="#6366f1"/>
+      </linearGradient>
+      <linearGradient id="vg2" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#a78bfa"/>
+        <stop offset="100%" stop-color="#0ea5e9"/>
+      </linearGradient>
+    </defs>
+  </svg>
+
+  {# Sticky Private Bank Folio Header #}
+  <header class="pub-header">
+    <div class="pub-header-inner">
+      <a href="{% url 'about' %}" class="pub-brand">
+        <span class="pub-brand-mark">
+          {% include "includes/vault_icon.html" with size="22" %}
         </span>
-        <span>VAULT</span>
+        <span>Vault</span>
+        <span class="hidden sm:inline-block text-xs font-medium text-slate-400 border-l border-white/10 pl-2.5 ml-0.5 tracking-normal">
+          Household Ledger
+        </span>
       </a>
 
-      <nav class="nav-links flex items-center gap-1 sm:gap-2">
-        <a href="{% url 'about' %}" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors {% if page == 'about' %}text-white bg-white/10{% else %}text-slate-400 hover:text-white hover:bg-white/5{% endif %}">
-          About
+      <div class="flex items-center gap-2">
+        <nav class="pub-nav-desktop" aria-label="Public pages">
+          <a href="{% url 'about' %}" class="pub-nav-link" {% if page == 'about' %}aria-current="page"{% endif %}>About</a>
+          <a href="{% url 'privacy' %}" class="pub-nav-link" {% if page == 'privacy' %}aria-current="page"{% endif %}>Privacy</a>
+          <a href="{% url 'terms' %}" class="pub-nav-link" {% if page == 'terms' %}aria-current="page"{% endif %}>Terms</a>
+        </nav>
+
+        <a href="{% url 'login' %}" id="nav-signin" class="v-btn v-btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+            <polyline points="10 17 15 12 10 7"/>
+            <line x1="15" y1="12" x2="3" y2="12"/>
+          </svg>
+          <span>Sign in</span>
         </a>
-        <a href="{% url 'privacy' %}" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors {% if page == 'privacy' %}text-white bg-white/10{% else %}text-slate-400 hover:text-white hover:bg-white/5{% endif %}">
-          Privacy
-        </a>
-        <a href="{% url 'terms' %}" class="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium transition-colors {% if page == 'terms' %}text-white bg-white/10{% else %}text-slate-400 hover:text-white hover:bg-white/5{% endif %}">
-          Terms
-        </a>
-        <a href="{% url 'login' %}" id="nav-signin" class="ml-2 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs sm:text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-sm">
-          <span class="material-symbols-outlined text-sm">login</span>Sign in
-        </a>
-      </nav>
+      </div>
     </div>
+
+    {# Ergonomic >=44px mobile folio navigation strip (<640px) #}
+    <nav class="pub-nav-mobile" aria-label="Public pages mobile">
+      <a href="{% url 'about' %}" class="pub-nav-mobile-link" {% if page == 'about' %}aria-current="page"{% endif %}>About</a>
+      <a href="{% url 'privacy' %}" class="pub-nav-mobile-link" {% if page == 'privacy' %}aria-current="page"{% endif %}>Privacy</a>
+      <a href="{% url 'terms' %}" class="pub-nav-mobile-link" {% if page == 'terms' %}aria-current="page"{% endif %}>Terms</a>
+    </nav>
   </header>
 
-  {# Main Folio Content #}
-  <main class="flex-1 max-w-5xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-12">
+  {# Main Folio Stage #}
+  <main id="mainContent" tabindex="-1" class="pub-main outline-none">
     {% block content %}{% endblock %}
   </main>
 
   {# Fiduciary Footer #}
-  <footer class="border-t border-white/10 bg-[#070b10] py-8 text-center text-xs text-slate-400">
-    <div class="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-      <div class="flex items-center gap-4">
-        <a href="{% url 'about' %}" class="hover:text-white transition-colors">About</a>
-        <a href="{% url 'privacy' %}" class="hover:text-white transition-colors">Privacy Policy</a>
-        <a href="{% url 'terms' %}" class="hover:text-white transition-colors">Terms of Service</a>
-      </div>
-      <div>
-        <p>&copy; {% now "Y" %} Vault &middot; Private Household Deployment &middot; Contact: <a href="mailto:{{ contact_email }}" class="text-indigo-400 hover:underline">{{ contact_email }}</a></p>
-      </div>
+  <footer class="pub-footer">
+    <div class="pub-footer-inner">
+      <nav class="pub-footer-links" aria-label="Legal and governance links">
+        <a href="{% url 'about' %}">About Vault</a>
+        <a href="{% url 'privacy' %}">Privacy Policy</a>
+        <a href="{% url 'terms' %}">Terms of Service</a>
+      </nav>
+      <p class="tabular-nums flex flex-wrap items-center gap-x-1.5">
+        <span>&copy; {% now "Y" %} Vault &middot; Invite-only single-household deployment &middot;</span>
+        <a href="mailto:{{ contact_email }}" class="inline-flex items-center min-h-[44px] lg:min-h-[32px] text-indigo-400 hover:text-indigo-300 underline underline-offset-4">{{ contact_email }}</a>
+      </p>
     </div>
   </footer>
-
 </body>
 </html>

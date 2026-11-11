@@ -2,35 +2,36 @@
 {% load indian_format %}
 {% load static %}
 
-{% block title %}Physical Bullion & Commodities | Portfolio | Vault{% endblock %}
+{% block title %}Physical Bullion &amp; Commodities | Portfolio | Vault{% endblock %}
 
 {% block page_header %}
 <div class="v-page-header">
-  <div class="v-page-title-row">
-    <div>
-      <h1 class="v-page-title">Physical Bullion &amp; Commodities</h1>
-      <div class="v-page-sub">
-        <span class="inline-flex items-center gap-1 font-semibold text-warning">
-          <span class="material-symbols-outlined text-xs">diamond</span>Gold 24K <span class="tabular-nums">{{ gold_rate|inr }}</span>/g
-        </span>
-        <span class="text-base-content/30">&middot;</span>
-        <span class="inline-flex items-center gap-1 font-semibold text-base-content/80">
-          <span class="material-symbols-outlined text-xs">toll</span>Silver 999 <span class="tabular-nums">{{ silver_rate|inr }}</span>/g
-        </span>
-        {% if gold_price_obj %}
-        <span class="hidden sm:inline text-base-content/30">&middot;</span>
-        <span class="hidden sm:inline text-xs text-base-content/50">Updated {{ gold_price_obj.fetched_at|timesince }} ago</span>
-        {% endif %}
-      </div>
-    </div>
-    <div class="v-page-actions">
-      <button type="button" class="v-btn v-btn-primary" onclick="openAddModal()">
-        <span class="material-symbols-outlined text-sm">add</span> Add Holding
-      </button>
-      <a href="{% url 'portfolio_tracker' %}" class="v-btn v-btn-secondary">
-        <span class="material-symbols-outlined text-sm">arrow_back</span> Portfolio
-      </a>
-    </div>
+  <div>
+    <h1 class="v-title flex items-center gap-2">
+      <span class="material-symbols-outlined text-amber-400 text-2xl">diamond</span>
+      Physical Bullion &amp; Commodities
+    </h1>
+    <p class="v-subtitle flex flex-wrap items-center gap-x-2 gap-y-1">
+      <span class="inline-flex items-center gap-1 font-medium text-amber-400">
+        Gold 24K <span class="tabular-nums">{{ gold_rate|inr }}</span>/g
+      </span>
+      <span class="text-base-content/30">&middot;</span>
+      <span class="inline-flex items-center gap-1 font-medium text-base-content/75">
+        Silver 999 <span class="tabular-nums">{{ silver_rate|inr }}</span>/g
+      </span>
+      {% if gold_price_obj %}
+      <span class="hidden sm:inline text-base-content/30">&middot;</span>
+      <span class="hidden sm:inline text-xs text-base-content/45">Updated {{ gold_price_obj.fetched_at|timesince }} ago</span>
+      {% endif %}
+    </p>
+  </div>
+  <div class="v-toolbar">
+    <button type="button" class="v-btn v-btn-primary" onclick="openAddModal()">
+      <span class="material-symbols-outlined text-sm">add</span>Add Holding
+    </button>
+    <a href="{% url 'portfolio_tracker' %}#alternates" class="v-btn v-btn-secondary">
+      <span class="material-symbols-outlined text-sm">arrow_back</span>Portfolio
+    </a>
   </div>
 </div>
 {% endblock %}
@@ -38,380 +39,398 @@
 {% block content %}
 <div class="space-y-6">
 
-  {# --- Ledger Summary Band --- #}
+  {# --- SIGNATURE LEDGER SUMMARY BAND --- #}
   <section class="v-ledger-band" aria-label="Commodities Valuation Summary">
-    <div class="v-ledger-lead">
-      <div class="v-ledger-lead-label">Total Intrinsic Valuation</div>
-      <div class="v-ledger-lead-val">{{ total|inr }}</div>
-      <div class="flex items-center gap-2 mt-2">
-        {% if total_returns >= 0 %}
-        <span class="v-delta v-delta-pos">+{{ total_returns|inr }} (+{% if total_invested > 0 %}{{ total_returns|floatformat:1 }}{% else %}0.0{% endif %}%)</span>
-        {% else %}
-        <span class="v-delta v-delta-neg">{{ total_returns|inr }}</span>
-        {% endif %}
-        <span class="text-xs text-base-content/40">unrealized net gain</span>
+    <div class="v-lead-cell">
+      <div>
+        <div class="v-lead-label">
+          <span>Total Intrinsic Valuation</span>
+          <span class="v-delta v-delta-neutral text-xs py-0 px-2 font-semibold">Physical Reserve</span>
+        </div>
+        <div class="v-lead-figure-row">
+          <span class="v-lead-figure tabular-nums">{{ total|inr }}</span>
+          <span class="v-delta {% if total_returns >= 0 %}v-delta-pos{% else %}v-delta-neg{% endif %} text-xs font-bold tabular-nums">
+            <span class="material-symbols-outlined text-xs">{% if total_returns >= 0 %}trending_up{% else %}trending_down{% endif %}</span>
+            {% if total_returns >= 0 %}+{% endif %}{{ total_returns|inr }}{% if total_invested > 0 %} ({% if total_returns >= 0 %}+{% endif %}{% widthratio total_returns total_invested 100 %}%){% endif %}
+          </span>
+        </div>
+        <div class="v-lead-sub">
+          Gold: <strong class="text-base-content/85 tabular-nums">{{ gold_weight|floatformat:2 }}g</strong>
+          &middot;
+          Silver: <strong class="text-base-content/85 tabular-nums">{{ silver_weight|floatformat:2 }}g</strong>
+        </div>
       </div>
-      <div class="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-base-content/5 text-xs">
-        <span class="flex items-center gap-1 text-warning font-medium">
-          <span class="material-symbols-outlined text-xs">diamond</span> Gold: <strong class="tabular-nums">{{ gold_weight|floatformat:1 }}g</strong>
-        </span>
-        <span class="text-base-content/20">&bull;</span>
-        <span class="flex items-center gap-1 text-base-content/70 font-medium">
-          <span class="material-symbols-outlined text-xs">toll</span> Silver: <strong class="tabular-nums">{{ silver_weight|floatformat:1 }}g</strong>
-        </span>
+
+      {% if total > 0 %}
+      <div class="v-horizon">
+        <div class="v-horizon-bar" role="img" aria-label="Gold and silver valuation mix">
+          {% if gold_value > 0 %}
+          <div class="v-horizon-seg" style="width: {% widthratio gold_value total 100 %}%; background: #eab308;" title="Gold: {{ gold_value|inr }}"></div>
+          {% endif %}
+          {% if silver_value > 0 %}
+          <div class="v-horizon-seg" style="width: {% widthratio silver_value total 100 %}%; background: #94a3b8;" title="Silver: {{ silver_value|inr }}"></div>
+          {% endif %}
+        </div>
+        <div class="v-horizon-legend">
+          <span class="v-horizon-item">
+            <span class="v-horizon-dot" style="background: #eab308;"></span>
+            Gold <strong>{% widthratio gold_value total 100 %}%</strong>
+          </span>
+          <span class="v-horizon-item">
+            <span class="v-horizon-dot" style="background: #94a3b8;"></span>
+            Silver <strong>{% widthratio silver_value total 100 %}%</strong>
+          </span>
+        </div>
       </div>
+      {% endif %}
     </div>
 
-    <div class="v-ledger-stats">
+    <div class="v-stat-grid">
       <div class="v-stat-cell">
         <div class="v-stat-label">Total Invested</div>
-        <div class="v-stat-val">{{ total_invested|inr }}</div>
+        <div class="v-stat-value text-base-content tabular-nums">{{ total_invested|inr }}</div>
         <div class="v-stat-sub">Historical cost basis</div>
       </div>
       <div class="v-stat-cell">
-        <div class="v-stat-label">Unrealized Gain / P&amp;L</div>
-        <div class="v-stat-val {% if total_returns >= 0 %}text-success{% else %}text-error{% endif %}">
+        <div class="v-stat-label">Unrealized P&amp;L</div>
+        <div class="v-stat-value tabular-nums {% if total_returns >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
           {% if total_returns >= 0 %}+{% endif %}{{ total_returns|inr }}
         </div>
-        <div class="v-stat-sub">Market mark-to-model</div>
+        <div class="v-stat-sub">Spot mark-to-market</div>
       </div>
       <div class="v-stat-cell">
         <div class="v-stat-label">Gold Valuation</div>
-        <div class="v-stat-val text-warning">{{ gold_value|inr }}</div>
-        <div class="v-stat-sub">{{ gold_weight|floatformat:1 }}g @ {{ gold_rate|inr }}/g</div>
+        <div class="v-stat-value text-base-content tabular-nums">{{ gold_value|inr }}</div>
+        <div class="v-stat-sub tabular-nums">{{ gold_weight|floatformat:2 }}g @ {{ gold_rate|inr }}/g</div>
       </div>
       <div class="v-stat-cell">
         <div class="v-stat-label">Silver Valuation</div>
-        <div class="v-stat-val">{{ silver_value|inr }}</div>
-        <div class="v-stat-sub">{{ silver_weight|floatformat:1 }}g @ {{ silver_rate|inr }}/g</div>
+        <div class="v-stat-value text-base-content tabular-nums">{{ silver_value|inr }}</div>
+        <div class="v-stat-sub tabular-nums">{{ silver_weight|floatformat:2 }}g @ {{ silver_rate|inr }}/g</div>
       </div>
     </div>
   </section>
 
-  {# --- Gold Holdings --- #}
+  {# --- GOLD HOLDINGS --- #}
   <section class="v-panel" aria-label="Physical Gold Ledger">
     <div class="v-panel-header">
-      <div class="flex items-center gap-2.5">
-        <div class="w-8 h-8 rounded-lg bg-warning/10 text-warning flex items-center justify-center shrink-0">
-          <span class="material-symbols-outlined text-lg">diamond</span>
-        </div>
-        <div>
+      <div class="flex items-center gap-2.5 min-w-0">
+        <span class="material-symbols-outlined text-lg text-amber-400 shrink-0">diamond</span>
+        <div class="min-w-0">
           <h2 class="v-panel-title">Gold Holdings</h2>
-          <div class="text-xs text-base-content/50 mt-0.5">Physical sovereign bullion, coins &amp; jewelry reserve</div>
+          <p class="text-xs text-base-content/50 mt-0.5 truncate">Physical sovereign bullion, coins &amp; gold reserve</p>
         </div>
       </div>
-      <div class="flex flex-wrap items-center gap-2">
-        <span class="v-badge v-badge-neutral tabular-nums">{{ gold_weight|floatformat:2 }}g</span>
-        <span class="v-badge v-badge-accent tabular-nums">{{ gold_value|inr }}</span>
+      <div class="flex flex-wrap items-center gap-1.5 shrink-0">
+        <span class="v-delta v-delta-neutral text-xs font-semibold tabular-nums">{{ gold_weight|floatformat:2 }}g</span>
+        <span class="v-delta v-delta-neutral text-xs font-semibold tabular-nums">{{ gold_value|inr }}</span>
       </div>
     </div>
 
-    {% if gold_holdings %}
-    {# Desktop Table #}
-    <div class="hidden md:block overflow-x-auto">
-      <table class="v-table" id="goldTable">
-        <thead>
-          <tr>
-            <th class="sortable-th">Description <span class="material-symbols-outlined sort-icon text-sm opacity-50 align-middle">unfold_more</span></th>
-            <th>Purity</th>
-            <th class="sortable-th text-right">Weight <span class="material-symbols-outlined sort-icon text-sm opacity-50 align-middle">unfold_more</span></th>
-            <th class="text-right">Purchase Rate</th>
-            <th class="sortable-th text-right">Current Value <span class="material-symbols-outlined sort-icon text-sm opacity-50 align-middle">unfold_more</span></th>
-            <th class="sortable-th text-right">P&amp;L <span class="material-symbols-outlined sort-icon text-sm opacity-50 align-middle">unfold_more</span></th>
-            <th class="w-20 text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for h in gold_holdings %}
-          <tr class="v-table-row">
-            <td>
-              <div class="font-medium text-base-content flex items-center gap-2">
-                {{ h.description }}
-                {% if h.is_baby %}<span class="v-badge v-badge-warning text-[10px] py-0 px-1.5">Child</span>{% endif %}
+    <div class="v-panel-body p-0">
+      {% if gold_holdings %}
+      {# Desktop Table #}
+      <div class="v-panel-table hidden md:block overflow-x-auto">
+        <table class="v-table" id="goldTable">
+          <thead>
+            <tr>
+              <th class="sortable-th cursor-pointer select-none">Description <span class="material-symbols-outlined sort-icon text-xs opacity-40 align-middle">unfold_more</span></th>
+              <th>Purity</th>
+              <th class="sortable-th cursor-pointer select-none v-num">Weight <span class="material-symbols-outlined sort-icon text-xs opacity-40 align-middle">unfold_more</span></th>
+              <th class="v-num">Purchase Rate</th>
+              <th class="sortable-th cursor-pointer select-none v-num">Current Value <span class="material-symbols-outlined sort-icon text-xs opacity-40 align-middle">unfold_more</span></th>
+              <th class="sortable-th cursor-pointer select-none v-num">P&amp;L <span class="material-symbols-outlined sort-icon text-xs opacity-40 align-middle">unfold_more</span></th>
+              <th class="w-24 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for h in gold_holdings %}
+            <tr>
+              <td>
+                <div class="font-semibold text-xs text-base-content flex items-center gap-2">
+                  <span>{{ h.description }}</span>
+                  {% if h.is_baby %}<span class="v-delta v-delta-neutral text-xs py-0 px-1.5 text-amber-400">Child</span>{% endif %}
+                </div>
+              </td>
+              <td>
+                <span class="v-delta v-delta-neutral text-xs py-0 px-1.5 font-mono">{{ h.purity }}</span>
+              </td>
+              <td class="v-num text-xs font-medium text-base-content" data-val="{{ h.weight_grams }}">{{ h.weight_grams|floatformat:2 }}g</td>
+              <td class="v-num text-xs text-base-content/65 whitespace-nowrap" data-val="{{ h.purchase_price_per_gram }}">{{ h.purchase_price_per_gram|inr }}/g</td>
+              <td class="v-num text-xs font-bold text-base-content" data-val="{{ h.current_value }}">{{ h.current_value|inr }}</td>
+              <td class="v-num" data-val="{{ h.pnl }}">
+                <span class="v-delta {% if h.pnl >= 0 %}v-delta-pos{% else %}v-delta-neg{% endif %} text-xs font-semibold tabular-nums">
+                  {% if h.pnl >= 0 %}+{% endif %}{{ h.pnl|inr }}
+                </span>
+              </td>
+              <td class="text-right">
+                <div class="flex items-center justify-end gap-1">
+                  <button type="button" class="v-icon-btn" data-edit-commodity data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}" data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}" title="Edit holding" aria-label="Edit {{ h.description }}">
+                    <span class="material-symbols-outlined text-sm">edit</span>
+                  </button>
+                  <form method="post" action="{% url 'toggle_baby' 'commodityholding' h.id %}?next={{ request.get_full_path|urlencode }}" class="inline m-0">
+                    {% csrf_token %}
+                    {% if h.is_baby %}
+                    <button type="submit" class="v-icon-btn text-amber-400" title="Return to Master Portfolio" aria-label="Return {{ h.description }} to Master Portfolio">
+                      <span class="material-symbols-outlined text-sm">assignment_return</span>
+                    </button>
+                    {% else %}
+                    <button type="submit" class="v-icon-btn text-primary" title="Assign to Child Portfolio" aria-label="Assign {{ h.description }} to Child Portfolio">
+                      <span class="material-symbols-outlined text-sm">child_care</span>
+                    </button>
+                    {% endif %}
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+            <tr class="total-row border-t-2 border-[var(--v-hairline)] font-bold">
+              <td colspan="2" class="text-xs text-base-content">Total Gold Holding</td>
+              <td class="v-num text-xs text-base-content" data-val="{{ gold_weight }}">{{ gold_weight|floatformat:2 }}g</td>
+              <td></td>
+              <td class="v-num text-xs text-base-content" data-val="{{ gold_value }}">{{ gold_value|inr }}</td>
+              <td colspan="2"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {# Mobile View #}
+      <div class="md:hidden divide-y divide-[var(--v-hairline)]">
+        {% for h in gold_holdings %}
+        <div class="v-mobile-row flex-col !items-stretch gap-2">
+          <div class="w-full flex items-start justify-between gap-2">
+            <div class="min-w-0 flex-1">
+              <div class="font-semibold text-sm text-base-content flex items-center gap-1.5 flex-wrap">
+                <span class="truncate">{{ h.description }}</span>
+                {% if h.is_baby %}<span class="v-delta v-delta-neutral text-xs py-0 px-1.5 text-amber-400">Child</span>{% endif %}
               </div>
-            </td>
-            <td>
-              <span class="v-badge v-badge-neutral text-xs font-mono">{{ h.purity }}</span>
-            </td>
-            <td class="text-right v-num" data-val="{{ h.weight_grams }}">{{ h.weight_grams|floatformat:2 }}g</td>
-            <td class="text-right v-num text-xs text-base-content/70 whitespace-nowrap" data-val="{{ h.purchase_price_per_gram }}">{{ h.purchase_price_per_gram|inr }}/g</td>
-            <td class="text-right v-num font-semibold text-base-content" data-val="{{ h.current_value }}">{{ h.current_value|inr }}</td>
-            <td class="text-right v-num" data-val="{{ h.pnl }}">
-              {% if h.pnl >= 0 %}
-              <span class="v-delta v-delta-pos">+{{ h.pnl|inr }}</span>
-              {% else %}
-              <span class="v-delta v-delta-neg">{{ h.pnl|inr }}</span>
-              {% endif %}
-            </td>
-            <td class="text-right">
-              <div class="flex items-center justify-end gap-1">
-                <button type="button" class="v-btn v-btn-ghost v-btn-xs" data-edit-commodity data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}" data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}" title="Edit holding">
-                  <span class="material-symbols-outlined text-sm">edit</span>
+              <div class="flex items-center gap-2 mt-1 text-xs text-base-content/60">
+                <span class="v-delta v-delta-neutral text-xs py-0 px-1.5 font-mono">{{ h.purity }}</span>
+                <span>&middot;</span>
+                <span class="tabular-nums font-semibold text-base-content/80">{{ h.weight_grams|floatformat:2 }}g</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-0.5 shrink-0">
+              <button type="button" class="v-icon-btn" data-edit-commodity data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}" data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}" aria-label="Edit {{ h.description }}">
+                <span class="material-symbols-outlined text-base">edit</span>
+              </button>
+              <form method="post" action="{% url 'toggle_baby' 'commodityholding' h.id %}?next={{ request.get_full_path|urlencode }}" class="inline m-0">
+                {% csrf_token %}
+                {% if h.is_baby %}
+                <button type="submit" class="v-icon-btn text-amber-400" title="Return to Master Portfolio" aria-label="Return {{ h.description }} to Master Portfolio">
+                  <span class="material-symbols-outlined text-base">assignment_return</span>
                 </button>
-                <form method="post" action="{% url 'toggle_baby' 'commodityholding' h.id %}?next={{ request.get_full_path|urlencode }}" class="inline m-0">
-                  {% csrf_token %}
-                  {% if h.is_baby %}
-                  <button type="submit" class="v-btn v-btn-ghost v-btn-xs text-warning" title="Move to Master Portfolio">
-                    <span class="material-symbols-outlined text-sm">assignment_return</span>
-                  </button>
-                  {% else %}
-                  <button type="submit" class="v-btn v-btn-ghost v-btn-xs text-primary" title="Move to Child Portfolio">
-                    <span class="material-symbols-outlined text-sm">child_care</span>
-                  </button>
-                  {% endif %}
-                </form>
+                {% else %}
+                <button type="submit" class="v-icon-btn text-primary" title="Assign to Child Portfolio" aria-label="Assign {{ h.description }} to Child Portfolio">
+                  <span class="material-symbols-outlined text-base">child_care</span>
+                </button>
+                {% endif %}
+              </form>
+            </div>
+          </div>
+          <div class="w-full grid grid-cols-3 gap-2 pt-2 border-t border-[var(--v-hairline)] text-xs tabular-nums">
+            <div>
+              <div class="text-xs text-base-content/45">Buy Rate</div>
+              <div class="font-medium text-base-content/80 mt-0.5">{{ h.purchase_price_per_gram|inr }}/g</div>
+            </div>
+            <div>
+              <div class="text-xs text-base-content/45">Current</div>
+              <div class="font-bold text-base-content mt-0.5">{{ h.current_value|inr }}</div>
+            </div>
+            <div class="text-right">
+              <div class="text-xs text-base-content/45">P&amp;L</div>
+              <div class="font-bold mt-0.5 {% if h.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+                {% if h.pnl >= 0 %}+{% endif %}{{ h.pnl|inr }}
               </div>
-            </td>
-          </tr>
-          {% endfor %}
-          <tr class="v-table-total">
-            <td colspan="2" class="font-bold text-primary uppercase text-xs tracking-wider">Total Gold Holding</td>
-            <td class="text-right v-num font-bold" data-val="{{ gold_weight }}">{{ gold_weight|floatformat:2 }}g</td>
-            <td></td>
-            <td class="text-right v-num font-bold text-primary" data-val="{{ gold_value }}">{{ gold_value|inr }}</td>
-            <td colspan="2"></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    {# Mobile View #}
-    <div class="md:hidden divide-y divide-base-content/5">
-      {% for h in gold_holdings %}
-      <div class="v-mobile-row">
-        <div class="flex items-start justify-between gap-2">
-          <div class="flex-1 min-w-0">
-            <div class="font-medium text-sm text-base-content">
-              {{ h.description }}
-              {% if h.is_baby %}<span class="v-badge v-badge-warning text-[10px] ml-1">Child</span>{% endif %}
-            </div>
-            <div class="flex items-center gap-2 mt-1 text-xs text-base-content/60">
-              <span class="v-badge v-badge-neutral text-[10px]">{{ h.purity }}</span>
-              <span>&bull;</span>
-              <span class="tabular-nums font-semibold">{{ h.weight_grams|floatformat:2 }}g</span>
-            </div>
-          </div>
-          <div class="flex items-center gap-1 shrink-0">
-            <button type="button" class="v-btn v-btn-ghost v-btn-xs" data-edit-commodity data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}" data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}">
-              <span class="material-symbols-outlined text-sm">edit</span>
-            </button>
-            <form method="post" action="{% url 'toggle_baby' 'commodityholding' h.id %}?next={{ request.get_full_path|urlencode }}" class="inline m-0">
-              {% csrf_token %}
-              {% if h.is_baby %}
-              <button type="submit" class="v-btn v-btn-ghost v-btn-xs text-warning" title="Move to Master Portfolio">
-                <span class="material-symbols-outlined text-sm">assignment_return</span>
-              </button>
-              {% else %}
-              <button type="submit" class="v-btn v-btn-ghost v-btn-xs text-primary" title="Move to Child Portfolio">
-                <span class="material-symbols-outlined text-sm">child_care</span>
-              </button>
-              {% endif %}
-            </form>
-          </div>
-        </div>
-        <div class="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-base-content/5 text-xs">
-          <div>
-            <div class="text-[10px] uppercase text-base-content/40 tracking-wider">Purchase</div>
-            <div class="tabular-nums font-medium text-base-content mt-0.5">{{ h.purchase_price_per_gram|inr }}/g</div>
-          </div>
-          <div>
-            <div class="text-[10px] uppercase text-base-content/40 tracking-wider">Current Val</div>
-            <div class="tabular-nums font-semibold text-base-content mt-0.5">{{ h.current_value|inr }}</div>
-          </div>
-          <div>
-            <div class="text-[10px] uppercase text-base-content/40 tracking-wider">P&amp;L</div>
-            <div class="mt-0.5">
-              {% if h.pnl >= 0 %}
-              <span class="v-delta v-delta-pos text-[11px]">+{{ h.pnl|inr }}</span>
-              {% else %}
-              <span class="v-delta v-delta-neg text-[11px]">{{ h.pnl|inr }}</span>
-              {% endif %}
             </div>
           </div>
         </div>
+        {% endfor %}
+        <div class="flex items-center justify-between px-4 py-3 bg-base-200/40 text-xs font-semibold">
+          <span class="text-base-content/75">Total Gold</span>
+          <span class="tabular-nums font-bold text-base-content">{{ gold_weight|floatformat:2 }}g &middot; {{ gold_value|inr }}</span>
+        </div>
       </div>
-      {% endfor %}
-      <div class="flex items-center justify-between p-3 bg-base-200/50 text-xs font-semibold">
-        <span class="text-primary uppercase tracking-wider">Total Gold</span>
-        <span class="tabular-nums font-bold">{{ gold_weight|floatformat:2 }}g &middot; <span class="text-primary">{{ gold_value|inr }}</span></span>
+
+      {% if gold_price_obj %}
+      <div class="px-4 py-2 border-t border-[var(--v-hairline)] text-xs text-base-content/45 flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-xs">update</span> Spot rate updated {{ gold_price_obj.fetched_at|timesince }} ago
       </div>
-    </div>
+      {% endif %}
 
-    {% if gold_price_obj %}
-    <div class="px-4 py-2 border-t border-base-content/5 text-[11px] text-base-content/40 flex items-center gap-1.5">
-      <span class="material-symbols-outlined text-xs">update</span> Spot rate updated {{ gold_price_obj.fetched_at|timesince }} ago
+      {% else %}
+      <div class="v-empty py-10">
+        {% include 'includes/vault_icon.html' with name='gold' size=40 class='text-amber-400/70 mb-2' %}
+        <h3 class="v-empty-title">No Gold Holdings Recorded</h3>
+        <p class="v-empty-desc">Register 24K/22K physical sovereign bullion, coins, or bars for live spot valuation.</p>
+        <button type="button" class="v-btn v-btn-primary" onclick="openAddModal()">
+          <span class="material-symbols-outlined text-sm">add</span>Add Gold Holding
+        </button>
+      </div>
+      {% endif %}
     </div>
-    {% endif %}
-
-    {% else %}
-    <div class="p-8 text-center text-sm text-base-content/40">
-      <span class="material-symbols-outlined text-3xl mb-1 text-base-content/20 block">diamond</span>
-      No gold holdings recorded. Click "Add Holding" to register gold bullion or jewelry.
-    </div>
-    {% endif %}
   </section>
 
-  {# --- Silver Holdings --- #}
+  {# --- SILVER HOLDINGS --- #}
   <section class="v-panel" aria-label="Physical Silver Ledger">
     <div class="v-panel-header">
-      <div class="flex items-center gap-2.5">
-        <div class="w-8 h-8 rounded-lg bg-base-content/10 text-base-content/80 flex items-center justify-center shrink-0">
-          <span class="material-symbols-outlined text-lg">toll</span>
-        </div>
-        <div>
+      <div class="flex items-center gap-2.5 min-w-0">
+        <span class="material-symbols-outlined text-lg text-slate-400 shrink-0">toll</span>
+        <div class="min-w-0">
           <h2 class="v-panel-title">Silver Holdings</h2>
-          <div class="text-xs text-base-content/50 mt-0.5">Physical bullion bars, coins &amp; silverware reserve</div>
+          <p class="text-xs text-base-content/50 mt-0.5 truncate">Physical 999 bullion bars, coins &amp; silverware reserve</p>
         </div>
       </div>
-      <div class="flex flex-wrap items-center gap-2">
-        <span class="v-badge v-badge-neutral tabular-nums">{{ silver_weight|floatformat:2 }}g</span>
-        <span class="v-badge v-badge-accent tabular-nums">{{ silver_value|inr }}</span>
+      <div class="flex flex-wrap items-center gap-1.5 shrink-0">
+        <span class="v-delta v-delta-neutral text-xs font-semibold tabular-nums">{{ silver_weight|floatformat:2 }}g</span>
+        <span class="v-delta v-delta-neutral text-xs font-semibold tabular-nums">{{ silver_value|inr }}</span>
       </div>
     </div>
 
-    {% if silver_holdings %}
-    {# Desktop Table #}
-    <div class="hidden md:block overflow-x-auto">
-      <table class="v-table" id="silverTable">
-        <thead>
-          <tr>
-            <th class="sortable-th">Description <span class="material-symbols-outlined sort-icon text-sm opacity-50 align-middle">unfold_more</span></th>
-            <th>Purity</th>
-            <th class="sortable-th text-right">Weight <span class="material-symbols-outlined sort-icon text-sm opacity-50 align-middle">unfold_more</span></th>
-            <th class="text-right">Purchase Rate</th>
-            <th class="sortable-th text-right">Current Value <span class="material-symbols-outlined sort-icon text-sm opacity-50 align-middle">unfold_more</span></th>
-            <th class="sortable-th text-right">P&amp;L <span class="material-symbols-outlined sort-icon text-sm opacity-50 align-middle">unfold_more</span></th>
-            <th class="w-20 text-right">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for h in silver_holdings %}
-          <tr class="v-table-row">
-            <td>
-              <div class="font-medium text-base-content flex items-center gap-2">
-                {{ h.description }}
-                {% if h.is_baby %}<span class="v-badge v-badge-warning text-[10px] py-0 px-1.5">Child</span>{% endif %}
+    <div class="v-panel-body p-0">
+      {% if silver_holdings %}
+      {# Desktop Table #}
+      <div class="v-panel-table hidden md:block overflow-x-auto">
+        <table class="v-table" id="silverTable">
+          <thead>
+            <tr>
+              <th class="sortable-th cursor-pointer select-none">Description <span class="material-symbols-outlined sort-icon text-xs opacity-40 align-middle">unfold_more</span></th>
+              <th>Purity</th>
+              <th class="sortable-th cursor-pointer select-none v-num">Weight <span class="material-symbols-outlined sort-icon text-xs opacity-40 align-middle">unfold_more</span></th>
+              <th class="v-num">Purchase Rate</th>
+              <th class="sortable-th cursor-pointer select-none v-num">Current Value <span class="material-symbols-outlined sort-icon text-xs opacity-40 align-middle">unfold_more</span></th>
+              <th class="sortable-th cursor-pointer select-none v-num">P&amp;L <span class="material-symbols-outlined sort-icon text-xs opacity-40 align-middle">unfold_more</span></th>
+              <th class="w-24 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for h in silver_holdings %}
+            <tr>
+              <td>
+                <div class="font-semibold text-xs text-base-content flex items-center gap-2">
+                  <span>{{ h.description }}</span>
+                  {% if h.is_baby %}<span class="v-delta v-delta-neutral text-xs py-0 px-1.5 text-amber-400">Child</span>{% endif %}
+                </div>
+              </td>
+              <td>
+                <span class="v-delta v-delta-neutral text-xs py-0 px-1.5 font-mono">{{ h.purity }}</span>
+              </td>
+              <td class="v-num text-xs font-medium text-base-content" data-val="{{ h.weight_grams }}">{{ h.weight_grams|floatformat:2 }}g</td>
+              <td class="v-num text-xs text-base-content/65 whitespace-nowrap" data-val="{{ h.purchase_price_per_gram }}">{{ h.purchase_price_per_gram|inr }}/g</td>
+              <td class="v-num text-xs font-bold text-base-content" data-val="{{ h.current_value }}">{{ h.current_value|inr }}</td>
+              <td class="v-num" data-val="{{ h.pnl }}">
+                <span class="v-delta {% if h.pnl >= 0 %}v-delta-pos{% else %}v-delta-neg{% endif %} text-xs font-semibold tabular-nums">
+                  {% if h.pnl >= 0 %}+{% endif %}{{ h.pnl|inr }}
+                </span>
+              </td>
+              <td class="text-right">
+                <div class="flex items-center justify-end gap-1">
+                  <button type="button" class="v-icon-btn" data-edit-commodity data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}" data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}" title="Edit holding" aria-label="Edit {{ h.description }}">
+                    <span class="material-symbols-outlined text-sm">edit</span>
+                  </button>
+                  <form method="post" action="{% url 'toggle_baby' 'commodityholding' h.id %}?next={{ request.get_full_path|urlencode }}" class="inline m-0">
+                    {% csrf_token %}
+                    {% if h.is_baby %}
+                    <button type="submit" class="v-icon-btn text-amber-400" title="Return to Master Portfolio" aria-label="Return {{ h.description }} to Master Portfolio">
+                      <span class="material-symbols-outlined text-sm">assignment_return</span>
+                    </button>
+                    {% else %}
+                    <button type="submit" class="v-icon-btn text-primary" title="Assign to Child Portfolio" aria-label="Assign {{ h.description }} to Child Portfolio">
+                      <span class="material-symbols-outlined text-sm">child_care</span>
+                    </button>
+                    {% endif %}
+                  </form>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+            <tr class="total-row border-t-2 border-[var(--v-hairline)] font-bold">
+              <td colspan="2" class="text-xs text-base-content">Total Silver Holding</td>
+              <td class="v-num text-xs text-base-content" data-val="{{ silver_weight }}">{{ silver_weight|floatformat:2 }}g</td>
+              <td></td>
+              <td class="v-num text-xs text-base-content" data-val="{{ silver_value }}">{{ silver_value|inr }}</td>
+              <td colspan="2"></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      {# Mobile View #}
+      <div class="md:hidden divide-y divide-[var(--v-hairline)]">
+        {% for h in silver_holdings %}
+        <div class="v-mobile-row flex-col !items-stretch gap-2">
+          <div class="w-full flex items-start justify-between gap-2">
+            <div class="min-w-0 flex-1">
+              <div class="font-semibold text-sm text-base-content flex items-center gap-1.5 flex-wrap">
+                <span class="truncate">{{ h.description }}</span>
+                {% if h.is_baby %}<span class="v-delta v-delta-neutral text-xs py-0 px-1.5 text-amber-400">Child</span>{% endif %}
               </div>
-            </td>
-            <td>
-              <span class="v-badge v-badge-neutral text-xs font-mono">{{ h.purity }}</span>
-            </td>
-            <td class="text-right v-num" data-val="{{ h.weight_grams }}">{{ h.weight_grams|floatformat:2 }}g</td>
-            <td class="text-right v-num text-xs text-base-content/70 whitespace-nowrap" data-val="{{ h.purchase_price_per_gram }}">{{ h.purchase_price_per_gram|inr }}/g</td>
-            <td class="text-right v-num font-semibold text-base-content" data-val="{{ h.current_value }}">{{ h.current_value|inr }}</td>
-            <td class="text-right v-num" data-val="{{ h.pnl }}">
-              {% if h.pnl >= 0 %}
-              <span class="v-delta v-delta-pos">+{{ h.pnl|inr }}</span>
-              {% else %}
-              <span class="v-delta v-delta-neg">{{ h.pnl|inr }}</span>
-              {% endif %}
-            </td>
-            <td class="text-right">
-              <div class="flex items-center justify-end gap-1">
-                <button type="button" class="v-btn v-btn-ghost v-btn-xs" data-edit-commodity data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}" data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}" title="Edit holding">
-                  <span class="material-symbols-outlined text-sm">edit</span>
+              <div class="flex items-center gap-2 mt-1 text-xs text-base-content/60">
+                <span class="v-delta v-delta-neutral text-xs py-0 px-1.5 font-mono">{{ h.purity }}</span>
+                <span>&middot;</span>
+                <span class="tabular-nums font-semibold text-base-content/80">{{ h.weight_grams|floatformat:2 }}g</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-0.5 shrink-0">
+              <button type="button" class="v-icon-btn" data-edit-commodity data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}" data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}" aria-label="Edit {{ h.description }}">
+                <span class="material-symbols-outlined text-base">edit</span>
+              </button>
+              <form method="post" action="{% url 'toggle_baby' 'commodityholding' h.id %}?next={{ request.get_full_path|urlencode }}" class="inline m-0">
+                {% csrf_token %}
+                {% if h.is_baby %}
+                <button type="submit" class="v-icon-btn text-amber-400" title="Return to Master Portfolio" aria-label="Return {{ h.description }} to Master Portfolio">
+                  <span class="material-symbols-outlined text-base">assignment_return</span>
                 </button>
-                <form method="post" action="{% url 'toggle_baby' 'commodityholding' h.id %}?next={{ request.get_full_path|urlencode }}" class="inline m-0">
-                  {% csrf_token %}
-                  {% if h.is_baby %}
-                  <button type="submit" class="v-btn v-btn-ghost v-btn-xs text-warning" title="Move to Master Portfolio">
-                    <span class="material-symbols-outlined text-sm">assignment_return</span>
-                  </button>
-                  {% else %}
-                  <button type="submit" class="v-btn v-btn-ghost v-btn-xs text-primary" title="Move to Child Portfolio">
-                    <span class="material-symbols-outlined text-sm">child_care</span>
-                  </button>
-                  {% endif %}
-                </form>
+                {% else %}
+                <button type="submit" class="v-icon-btn text-primary" title="Assign to Child Portfolio" aria-label="Assign {{ h.description }} to Child Portfolio">
+                  <span class="material-symbols-outlined text-base">child_care</span>
+                </button>
+                {% endif %}
+              </form>
+            </div>
+          </div>
+          <div class="w-full grid grid-cols-3 gap-2 pt-2 border-t border-[var(--v-hairline)] text-xs tabular-nums">
+            <div>
+              <div class="text-xs text-base-content/45">Buy Rate</div>
+              <div class="font-medium text-base-content/80 mt-0.5">{{ h.purchase_price_per_gram|inr }}/g</div>
+            </div>
+            <div>
+              <div class="text-xs text-base-content/45">Current</div>
+              <div class="font-bold text-base-content mt-0.5">{{ h.current_value|inr }}</div>
+            </div>
+            <div class="text-right">
+              <div class="text-xs text-base-content/45">P&amp;L</div>
+              <div class="font-bold mt-0.5 {% if h.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+                {% if h.pnl >= 0 %}+{% endif %}{{ h.pnl|inr }}
               </div>
-            </td>
-          </tr>
-          {% endfor %}
-          <tr class="v-table-total">
-            <td colspan="2" class="font-bold text-primary uppercase text-xs tracking-wider">Total Silver Holding</td>
-            <td class="text-right v-num font-bold" data-val="{{ silver_weight }}">{{ silver_weight|floatformat:2 }}g</td>
-            <td></td>
-            <td class="text-right v-num font-bold text-primary" data-val="{{ silver_value }}">{{ silver_value|inr }}</td>
-            <td colspan="2"></td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
-    {# Mobile View #}
-    <div class="md:hidden divide-y divide-base-content/5">
-      {% for h in silver_holdings %}
-      <div class="v-mobile-row">
-        <div class="flex items-start justify-between gap-2">
-          <div class="flex-1 min-w-0">
-            <div class="font-medium text-sm text-base-content">
-              {{ h.description }}
-              {% if h.is_baby %}<span class="v-badge v-badge-warning text-[10px] ml-1">Child</span>{% endif %}
-            </div>
-            <div class="flex items-center gap-2 mt-1 text-xs text-base-content/60">
-              <span class="v-badge v-badge-neutral text-[10px]">{{ h.purity }}</span>
-              <span>&bull;</span>
-              <span class="tabular-nums font-semibold">{{ h.weight_grams|floatformat:2 }}g</span>
-            </div>
-          </div>
-          <div class="flex items-center gap-1 shrink-0">
-            <button type="button" class="v-btn v-btn-ghost v-btn-xs" data-edit-commodity data-id="{{ h.id }}" data-type="{{ h.commodity_type }}" data-desc="{{ h.description }}" data-purity="{{ h.purity }}" data-weight="{{ h.weight_grams }}" data-purchase="{{ h.purchase_price_per_gram }}">
-              <span class="material-symbols-outlined text-sm">edit</span>
-            </button>
-            <form method="post" action="{% url 'toggle_baby' 'commodityholding' h.id %}?next={{ request.get_full_path|urlencode }}" class="inline m-0">
-              {% csrf_token %}
-              {% if h.is_baby %}
-              <button type="submit" class="v-btn v-btn-ghost v-btn-xs text-warning" title="Move to Master Portfolio">
-                <span class="material-symbols-outlined text-sm">assignment_return</span>
-              </button>
-              {% else %}
-              <button type="submit" class="v-btn v-btn-ghost v-btn-xs text-primary" title="Move to Child Portfolio">
-                <span class="material-symbols-outlined text-sm">child_care</span>
-              </button>
-              {% endif %}
-            </form>
-          </div>
-        </div>
-        <div class="grid grid-cols-3 gap-2 mt-2 pt-2 border-t border-base-content/5 text-xs">
-          <div>
-            <div class="text-[10px] uppercase text-base-content/40 tracking-wider">Purchase</div>
-            <div class="tabular-nums font-medium text-base-content mt-0.5">{{ h.purchase_price_per_gram|inr }}/g</div>
-          </div>
-          <div>
-            <div class="text-[10px] uppercase text-base-content/40 tracking-wider">Current Val</div>
-            <div class="tabular-nums font-semibold text-base-content mt-0.5">{{ h.current_value|inr }}</div>
-          </div>
-          <div>
-            <div class="text-[10px] uppercase text-base-content/40 tracking-wider">P&amp;L</div>
-            <div class="mt-0.5">
-              {% if h.pnl >= 0 %}
-              <span class="v-delta v-delta-pos text-[11px]">+{{ h.pnl|inr }}</span>
-              {% else %}
-              <span class="v-delta v-delta-neg text-[11px]">{{ h.pnl|inr }}</span>
-              {% endif %}
             </div>
           </div>
         </div>
+        {% endfor %}
+        <div class="flex items-center justify-between px-4 py-3 bg-base-200/40 text-xs font-semibold">
+          <span class="text-base-content/75">Total Silver</span>
+          <span class="tabular-nums font-bold text-base-content">{{ silver_weight|floatformat:2 }}g &middot; {{ silver_value|inr }}</span>
+        </div>
       </div>
-      {% endfor %}
-      <div class="flex items-center justify-between p-3 bg-base-200/50 text-xs font-semibold">
-        <span class="text-primary uppercase tracking-wider">Total Silver</span>
-        <span class="tabular-nums font-bold">{{ silver_weight|floatformat:2 }}g &middot; <span class="text-primary">{{ silver_value|inr }}</span></span>
+
+      {% if silver_price_obj %}
+      <div class="px-4 py-2 border-t border-[var(--v-hairline)] text-xs text-base-content/45 flex items-center gap-1.5">
+        <span class="material-symbols-outlined text-xs">update</span> Spot rate updated {{ silver_price_obj.fetched_at|timesince }} ago
       </div>
-    </div>
+      {% endif %}
 
-    {% if silver_price_obj %}
-    <div class="px-4 py-2 border-t border-base-content/5 text-[11px] text-base-content/40 flex items-center gap-1.5">
-      <span class="material-symbols-outlined text-xs">update</span> Spot rate updated {{ silver_price_obj.fetched_at|timesince }} ago
+      {% else %}
+      <div class="v-empty py-10">
+        {% include 'includes/vault_icon.html' with name='vault' size=40 class='text-slate-400/70 mb-2' %}
+        <h3 class="v-empty-title">No Silver Holdings Recorded</h3>
+        <p class="v-empty-desc">Register 999 or 925 physical silver bars, coins, or bullion reserves.</p>
+        <button type="button" class="v-btn v-btn-primary" onclick="openAddModal()">
+          <span class="material-symbols-outlined text-sm">add</span>Add Silver Holding
+        </button>
+      </div>
+      {% endif %}
     </div>
-    {% endif %}
-
-    {% else %}
-    <div class="p-8 text-center text-sm text-base-content/40">
-      <span class="material-symbols-outlined text-3xl mb-1 text-base-content/20 block">toll</span>
-      No silver holdings recorded. Click "Add Holding" to register physical silver bullion.
-    </div>
-    {% endif %}
   </section>
 
 </div>
@@ -431,7 +450,11 @@ function _editSetup(formId, delFormId, delBtnId, titleId, editUrlBase, delUrlBas
   var form = document.getElementById(formId);
   form.action = editUrlBase.replace('/0/', '/' + d.id + '/');
   document.getElementById(delFormId).action = delUrlBase.replace('/0/', '/' + d.id + '/');
-  document.getElementById(delBtnId).style.display = 'inline-flex';
+  var delBtn = document.getElementById(delBtnId);
+  if (delBtn) {
+    delBtn.classList.remove('hidden');
+    delBtn.style.display = 'inline-flex';
+  }
   document.getElementById(titleId).innerHTML = '<span class="material-symbols-outlined text-primary">edit</span> ' + editTitle;
   for (var name in fieldMap) {
     var el = form.querySelector('[name=' + name + ']');
@@ -445,8 +468,12 @@ function openAddModal() {
   var form = document.getElementById('commodityForm');
   form.action = "{% url 'add_commodity' %}";
   form.reset();
-  document.getElementById('commodityDeleteBtn').style.display = 'none';
-  document.getElementById('commodityModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span>Add Commodity';
+  var delBtn = document.getElementById('commodityDeleteBtn');
+  if (delBtn) {
+    delBtn.classList.add('hidden');
+    delBtn.style.display = 'none';
+  }
+  document.getElementById('commodityModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span> Add Commodity';
   var typeEl = form.querySelector('[name=commodity_type]');
   var purityEl = form.querySelector('[name=purity]');
   window._updateCommodityPurity(typeEl, purityEl);

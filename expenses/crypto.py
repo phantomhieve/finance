@@ -12,13 +12,30 @@ from cryptography.fernet import Fernet, InvalidToken
 from django.conf import settings
 
 
-@functools.lru_cache(maxsize=1)
-def _fernet():
-    key = os.environ.get('EXPENSES_ENCRYPTION_KEY', '').strip()
+@functools.lru_cache(maxsize=8)
+def _fernet_for_key(env_key: str, secret_key: str, debug: bool) -> Fernet:
+    key = env_key
     if not key:
-        digest = hashlib.sha256(b'vault-expenses:' + settings.SECRET_KEY.encode()).digest()
+        if not debug and (
+            not secret_key
+            or len(secret_key) < 32
+            or secret_key.startswith('django-insecure-')
+        ):
+            raise RuntimeError(
+                "EXPENSES_ENCRYPTION_KEY or a strong (>=32-char) DJANGO_SECRET_KEY "
+                "must be configured when DEBUG=False."
+            )
+        digest = hashlib.sha256(b'vault-expenses:' + secret_key.encode()).digest()
         key = base64.urlsafe_b64encode(digest).decode()
     return Fernet(key.encode())
+
+
+def _fernet() -> Fernet:
+    return _fernet_for_key(
+        os.environ.get('EXPENSES_ENCRYPTION_KEY', '').strip(),
+        getattr(settings, 'SECRET_KEY', '') or '',
+        bool(getattr(settings, 'DEBUG', False)),
+    )
 
 
 def encrypt(plaintext):

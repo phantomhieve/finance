@@ -2,130 +2,260 @@
 {% block title %}Vault — Private Household Wealth Intelligence{% endblock %}
 {% block content %}
 
-{# --- HERO SECTION --- #}
-<section class="text-center py-12 sm:py-16 animate-up">
-  <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 mb-6">
-    <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
-    Private Family Office &amp; Wealth Operating System
+{# --- EDITORIAL PRIVATE BANK FOLIO HERO --- #}
+<section class="pub-hero-grid animate-up" aria-labelledby="aboutHeroTitle">
+  <div>
+    <h1 id="aboutHeroTitle" class="pub-display-title">
+      Your household&rsquo;s wealth and cashflow, governed in one private vault.
+    </h1>
+
+    <p class="pub-lead-copy">
+      Vault is an invite-only, self-hosted financial ledger engineered exclusively for a single family. It consolidates multi-asset Indian portfolios, physical jewellery custody, April&ndash;March fiscal savings goals, and automated credit card statement reconciliation without third-party aggregators.
+    </p>
+
+    <div class="flex flex-wrap items-center gap-3 mt-7">
+      <a href="{% url 'login' %}" id="hero-signin" class="v-btn v-btn-primary px-5 py-2.5 text-sm">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <path d="m9 12 2 2 4-4"/>
+        </svg>
+        <span>Sign in with Google</span>
+      </a>
+      <a href="{% url 'privacy' %}" id="hero-privacy" class="v-btn v-btn-secondary px-5 py-2.5 text-sm">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+          <line x1="16" y1="13" x2="8" y2="13"/>
+          <line x1="16" y1="17" x2="8" y2="17"/>
+        </svg>
+        <span>How we handle your data</span>
+      </a>
+    </div>
   </div>
 
-  <h1 class="text-3xl sm:text-5xl font-extrabold tracking-tight text-white max-w-3xl mx-auto leading-tight">
-    Your household's money,<br>
-    <span class="text-indigo-400">in one private vault.</span>
-  </h1>
-
-  <p class="mt-5 text-base sm:text-lg text-slate-400 max-w-2xl mx-auto leading-relaxed">
-    Vault is a private, self-hosted personal finance ledger engineered for a single family. It tracks multi-asset wealth, physical jewellery custody, rent and savings goals, and reconciles card spends directly from bank alerts.
-  </p>
-
-  <div class="flex flex-wrap items-center justify-center gap-3 mt-8">
-    <a href="{% url 'login' %}" id="hero-signin" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/25 transition-all">
-      <span class="material-symbols-outlined text-lg">login</span>Sign in with Google
-    </a>
-    <a href="{% url 'privacy' %}" id="hero-privacy" class="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10 transition-all">
-      <span class="material-symbols-outlined text-lg">policy</span>How we handle your data
-    </a>
-  </div>
+  {# Right Rail: Fiduciary Architecture Specification Sheet #}
+  <aside class="pub-spec-sheet" aria-label="Vault deployment architecture">
+    <div class="pub-spec-header">
+      <span class="text-sm font-semibold text-white">Fiduciary System Profile</span>
+      <span class="v-delta v-delta-pos">Invite-Only Ledger</span>
+    </div>
+    <div class="pub-spec-row">
+      <span class="pub-spec-key">Tenancy Model</span>
+      <span class="pub-spec-val">Single Household</span>
+    </div>
+    <div class="pub-spec-row">
+      <span class="pub-spec-key">Asset Coverage</span>
+      <span class="pub-spec-val">11 Indian &amp; Global Classes</span>
+    </div>
+    <div class="pub-spec-row">
+      <span class="pub-spec-key">Alert Ingestion</span>
+      <span class="pub-spec-val">30+ Banks (Gmail Read-Only)</span>
+    </div>
+    <div class="pub-spec-row">
+      <span class="pub-spec-key">Session Protection</span>
+      <span class="pub-spec-val">Fernet AES-128 + Passkeys</span>
+    </div>
+    <div class="px-5 py-4 bg-[#0e141f] border-t border-white/8">
+      <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+        <span>Unified Ledger Coverage</span>
+        <span class="tabular-nums text-slate-200 font-medium">4 Core Modules</span>
+      </div>
+      <div class="v-horizon-bar" aria-hidden="true">
+        <span class="v-horizon-seg" style="width: 36%; background: #6366f1;"></span>
+        <span class="v-horizon-seg" style="width: 24%; background: #10b981;"></span>
+        <span class="v-horizon-seg" style="width: 22%; background: #eab308;"></span>
+        <span class="v-horizon-seg" style="width: 18%; background: #0ea5e9;"></span>
+      </div>
+      <div class="v-horizon-legend mt-2.5">
+        <span class="v-horizon-item"><span class="v-horizon-dot" style="background:#6366f1"></span>Portfolio</span>
+        <span class="v-horizon-item"><span class="v-horizon-dot" style="background:#10b981"></span>Expenses</span>
+        <span class="v-horizon-item"><span class="v-horizon-dot" style="background:#eab308"></span>Bullion</span>
+        <span class="v-horizon-item"><span class="v-horizon-dot" style="background:#0ea5e9"></span>FY &amp; HRA</span>
+      </div>
+    </div>
+  </aside>
 </section>
 
-{# --- WHAT VAULT DOES --- #}
-<section class="mt-12 sm:mt-16 animate-up">
-  <div class="text-center mb-8">
-    <h2 class="text-xl sm:text-2xl font-bold text-white">What Vault does</h2>
-    <p class="text-sm text-slate-400 mt-1">Four core pillars of household financial intelligence</p>
+{# --- WHAT VAULT DOES: RULED CAPABILITY MATRIX --- #}
+<section class="mt-12 sm:mt-16 animate-up" aria-labelledby="capabilitiesTitle">
+  <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-2 mb-5">
+    <div>
+      <h2 id="capabilitiesTitle" class="text-xl sm:text-2xl font-bold tracking-tight text-white">What Vault governs</h2>
+      <p class="text-sm text-slate-400 mt-1">Four hairline-integrated ledgers replacing fragmented spreadsheets and public aggregators</p>
+    </div>
+    <span class="text-xs text-slate-400 tabular-nums">April&ndash;March Indian Fiscal Calendar</span>
   </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-    {# Card 1: Portfolio #}
-    <div class="v-panel p-5 bg-[#111722] border-white/10">
-      <div class="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center text-indigo-400 mb-4">
-        <span class="material-symbols-outlined text-2xl">trending_up</span>
+  <div class="pub-matrix pub-matrix-2">
+    {# Module 1: Multi-Asset Portfolio #}
+    <div class="pub-matrix-cell">
+      <div>
+        <div class="pub-cell-head">
+          <h3 class="pub-cell-title">Multi-Asset Portfolio &amp; Jewellery Vault</h3>
+          <span class="pub-cell-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/>
+              <polyline points="16 7 22 7 22 13"/>
+            </svg>
+          </span>
+        </div>
+        <p class="pub-cell-body">
+          Consolidated balance sheet spanning Zerodha demat equities, mutual funds, US RSUs, EPF, PPF, NPS, fixed deposits, sovereign bonds, real estate, and purity-adjusted family gold &amp; silver ornaments across bank lockers and home safes.
+        </p>
       </div>
-      <h3 class="text-base font-bold text-white">Multi-Asset Portfolio Tracking</h3>
-      <p class="text-sm text-slate-400 mt-2 leading-relaxed">
-        Consolidated ledger for Indian equities, Zerodha demat accounts, mutual funds, EPF/PPF, NPS, fixed deposits, physical bullion, and real estate with automated valuation and capital compounding metrics.
-      </p>
+      <div class="pub-cell-meta">
+        Separates fresh capital inflows from market compounding across every FY
+      </div>
     </div>
 
-    {# Card 2: Expense Ingestion #}
-    <div class="v-panel p-5 bg-[#111722] border-white/10">
-      <div class="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center text-emerald-400 mb-4">
-        <span class="material-symbols-outlined text-2xl">credit_card</span>
+    {# Module 2: Automated Expense Intelligence #}
+    <div class="pub-matrix-cell">
+      <div>
+        <div class="pub-cell-head">
+          <h3 class="pub-cell-title">Automated Bank Alert Spend Triage</h3>
+          <span class="pub-cell-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="5" width="20" height="14" rx="2"/>
+              <line x1="2" y1="10" x2="22" y2="10"/>
+              <line x1="6" y1="15" x2="10" y2="15"/>
+            </svg>
+          </span>
+        </div>
+        <p class="pub-cell-body">
+          Ingests transaction alerts from 30+ Indian banks and card issuers via optional read-only Gmail sync. Extracts merchant, card last-4 digits, and rupee amount to benchmark daily burn pace against prior months.
+        </p>
       </div>
-      <h3 class="text-base font-bold text-white">Automated Expense Intelligence</h3>
-      <p class="text-sm text-slate-400 mt-2 leading-relaxed">
-        Seamlessly ingests transaction alerts from 30+ Indian banks via read-only email sync. Automatically extracts merchants, amounts, and dates to audit daily burn pace against prior month trends.
-      </p>
+      <div class="pub-cell-meta">
+        Tracks refunds, inter-account transfers, and category burn shares
+      </div>
     </div>
 
-    {# Card 3: Card Statements #}
-    <div class="v-panel p-5 bg-[#111722] border-white/10">
-      <div class="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/25 flex items-center justify-center text-amber-400 mb-4">
-        <span class="material-symbols-outlined text-2xl">receipt_long</span>
+    {# Module 3: Card Statement Reconciliation #}
+    <div class="pub-matrix-cell">
+      <div>
+        <div class="pub-cell-head">
+          <h3 class="pub-cell-title">Credit Card PDF Statement Reconciliation</h3>
+          <span class="pub-cell-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16l3-2 3 2 3-2 3 2 3-2V8z"/>
+              <polyline points="14 2 14 8 20 8"/>
+              <path d="m9 14 2 2 4-4"/>
+            </svg>
+          </span>
+        </div>
+        <p class="pub-cell-body">
+          Decrypts password-protected monthly credit card statement PDFs locally to execute a 3-stage reconciliation: matching email alerts to statement lines, surfacing missed charges, and monitoring active EMI schedules.
+        </p>
       </div>
-      <h3 class="text-base font-bold text-white">Card Statement Reconciliation</h3>
-      <p class="text-sm text-slate-400 mt-2 leading-relaxed">
-        Unlocks password-protected credit card statement PDFs to execute a 3-stage audit: matching email alerts against statement lines, importing missed transactions, and tracking active EMI amortizations.
-      </p>
+      <div class="pub-cell-meta">
+        Statement unlock credentials stored encrypted at rest
+      </div>
     </div>
 
-    {# Card 4: Savings & HRA #}
-    <div class="v-panel p-5 bg-[#111722] border-white/10">
-      <div class="w-10 h-10 rounded-xl bg-cyan-500/15 border border-cyan-500/25 flex items-center justify-center text-cyan-400 mb-4">
-        <span class="material-symbols-outlined text-2xl">cottage</span>
+    {# Module 4: Indian FY Savings & HRA #}
+    <div class="pub-matrix-cell">
+      <div>
+        <div class="pub-cell-head">
+          <h3 class="pub-cell-title">Indian FY Savings &amp; HRA Rent Ledger</h3>
+          <span class="pub-cell-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 21h18"/>
+              <path d="M5 21V7l7-4 7 4v14"/>
+              <path d="M9 21v-6h6v6"/>
+            </svg>
+          </span>
+        </div>
+        <p class="pub-cell-body">
+          Paces monthly household savings, bonuses, and goal increments across the April&ndash;March Financial Year. Includes a role-scoped HRA ledger for verifying monthly rent transfers and landlord settlements.
+        </p>
       </div>
-      <h3 class="text-base font-bold text-white">Indian FY Savings &amp; HRA Ledger</h3>
-      <p class="text-sm text-slate-400 mt-2 leading-relaxed">
-        Paces monthly savings across the April–March Financial Year against annual targets. Dedicated HRA tracker verifies rent transfers and landlord settlements with complete fiscal receipts.
-      </p>
+      <div class="pub-cell-meta">
+        Role-isolated access for Primary, Account Holder, and Landlord members
+      </div>
     </div>
   </div>
 </section>
 
 {# --- HOW VAULT USES GOOGLE DATA --- #}
-<section class="mt-16 sm:mt-20 animate-up">
-  <div class="text-center mb-8">
-    <h2 class="text-xl sm:text-2xl font-bold text-white">How Vault uses Google data</h2>
-    <p class="text-sm text-slate-400 mt-1">Privacy-first principles engineered for Google OAuth Verification</p>
+<section class="mt-14 sm:mt-16 animate-up" aria-labelledby="googleGovernanceTitle">
+  <div class="flex flex-col sm:flex-row sm:items-end justify-between gap-2 mb-5">
+    <div>
+      <h2 id="googleGovernanceTitle" class="text-xl sm:text-2xl font-bold tracking-tight text-white">How Vault uses Google user data</h2>
+      <p class="text-sm text-slate-400 mt-1">Strict data minimization engineered in compliance with Google OAuth &amp; Limited Use requirements</p>
+    </div>
+    <a href="{% url 'privacy' %}#section-4" class="inline-flex items-center min-h-[44px] text-xs font-semibold text-indigo-400 hover:text-indigo-300 underline underline-offset-4">
+      Read Limited Use disclosure &rarr;
+    </a>
   </div>
 
-  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-    {# Trust 1: Sign-in #}
-    <div class="v-panel p-5 bg-[#111722] border-white/10">
-      <div class="w-10 h-10 rounded-xl bg-indigo-500/15 border border-indigo-500/25 flex items-center justify-center text-indigo-400 mb-4">
-        <span class="material-symbols-outlined text-2xl">vpn_key</span>
+  <div class="pub-matrix pub-matrix-3">
+    {# Trust 1: Google Sign-In #}
+    <div class="pub-matrix-cell">
+      <div>
+        <div class="pub-cell-head">
+          <h3 class="pub-cell-title">Google Sign-In</h3>
+          <span class="pub-cell-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="7.5" cy="15.5" r="5.5"/>
+              <path d="m21 2-9.6 9.6"/>
+              <path d="m15.5 7.5 3 3L22 7l-3-3"/>
+            </svg>
+          </span>
+        </div>
+        <p class="pub-cell-body">
+          Used exclusively to verify approved household member identity. Vault receives your verified name, email address, and profile avatar. External account passwords are never collected.
+        </p>
       </div>
-      <h3 class="text-base font-bold text-white">Google Sign-In</h3>
-      <p class="text-sm text-slate-400 mt-2 leading-relaxed">
-        Google Sign-In is used exclusively to authenticate household identity. Vault receives your verified name, email address, and profile picture. No external passwords are ever stored.
-      </p>
+      <div class="pub-cell-meta">Scope: <code>openid email profile</code></div>
     </div>
 
-    {# Trust 2: Gmail (read-only) #}
-    <div class="v-panel p-5 bg-[#111722] border-white/10">
-      <div class="w-10 h-10 rounded-xl bg-sky-500/15 border border-sky-500/25 flex items-center justify-center text-sky-400 mb-4">
-        <span class="material-symbols-outlined text-2xl">mail</span>
+    {# Trust 2: Gmail Read-Only #}
+    <div class="pub-matrix-cell">
+      <div>
+        <div class="pub-cell-head">
+          <h3 class="pub-cell-title">Gmail (Optional Read-Only)</h3>
+          <span class="pub-cell-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="2" y="4" width="20" height="16" rx="2"/>
+              <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>
+            </svg>
+          </span>
+        </div>
+        <p class="pub-cell-body">
+          When explicitly connected, Vault queries only automated bank alerts and card statement PDFs. Only structured transaction metadata is saved; raw email bodies are never stored on disk, modified, or sent.
+        </p>
       </div>
-      <h3 class="text-base font-bold text-white">Gmail (Read-Only, Optional)</h3>
-      <p class="text-sm text-slate-400 mt-2 leading-relaxed">
-        When connected, Vault queries your inbox strictly for bank alerts and credit card statements. Only parsed transaction metadata is saved; full email bodies are never stored on disk.
-      </p>
+      <div class="pub-cell-meta">Scope: <code>gmail.readonly</code></div>
     </div>
 
-    {# Trust 3: Never Shared #}
-    <div class="v-panel p-5 bg-[#111722] border-white/10">
-      <div class="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center text-emerald-400 mb-4">
-        <span class="material-symbols-outlined text-2xl">shield</span>
+    {# Trust 3: Zero Sharing #}
+    <div class="pub-matrix-cell">
+      <div>
+        <div class="pub-cell-head">
+          <h3 class="pub-cell-title">Never Shared or Monetized</h3>
+          <span class="pub-cell-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+          </span>
+        </div>
+        <p class="pub-cell-body">
+          All financial records stay on your private server. OAuth refresh tokens are encrypted at rest with Fernet symmetric keys, and Gmail access can be disconnected in one click at any time.
+        </p>
       </div>
-      <h3 class="text-base font-bold text-white">Never Shared or Sold</h3>
-      <p class="text-sm text-slate-400 mt-2 leading-relaxed">
-        All financial records stay on your private deployment. Access tokens are encrypted at rest with Fernet symmetric cryptography, and you can revoke integration access at any time.
-      </p>
+      <div class="pub-cell-meta">Zero advertising or third-party brokerage</div>
     </div>
   </div>
 
-  <div class="mt-6 p-4 rounded-xl bg-white/5 border border-white/10 text-center text-xs text-slate-400">
-    Vault is invite-only: deployment and access are restricted exclusively to members of a single household. Complete regulatory terms and data rights are detailed in our <a href="{% url 'privacy' %}" class="text-indigo-400 hover:underline">Privacy Policy</a>.
+  <div class="mt-5 pub-callout flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-300">
+    <p>
+      Vault is strictly private: registration is closed to the public and access is restricted to verified members of a single household.
+    </p>
+    <div class="flex flex-wrap items-center gap-4 shrink-0">
+      <a href="{% url 'privacy' %}" class="inline-flex items-center min-h-[44px] font-semibold text-indigo-400 hover:text-indigo-300 underline underline-offset-4">Privacy Policy</a>
+      <a href="{% url 'terms' %}" class="inline-flex items-center min-h-[44px] font-semibold text-indigo-400 hover:text-indigo-300 underline underline-offset-4">Terms of Service</a>
+    </div>
   </div>
 </section>
 

@@ -101,9 +101,22 @@ def log_delete(instance, tool_name):
 # Revert
 # ---------------------------------------------------------------------------
 
+REVERTABLE_MODELS = frozenset({
+    'tracker.Transaction', 'tracker.Note', 'tracker.HRAExpense',
+    'portfolio.EPFEntry', 'portfolio.PFEntry', 'portfolio.NPSEntry', 'portfolio.FixedDeposit',
+    'portfolio.CashPosition', 'portfolio.BondHolding',
+    'portfolio.CryptoHolding', 'portfolio.CommodityHolding',
+    'portfolio.FinancialGoal', 'portfolio.USStockHolding',
+    'portfolio.RealEstateHolding',
+    'jewellery.JewelleryItem',
+})
+
+
 def _entry_belongs_to_group(entry: MCPAuditLog, group) -> bool:
     if group is None:
-        return True
+        return False
+    if entry.model_name not in REVERTABLE_MODELS:
+        return False
     snap = entry.data_before or entry.data_after or {}
     if not isinstance(snap, dict):
         return False
@@ -111,8 +124,10 @@ def _entry_belongs_to_group(entry: MCPAuditLog, group) -> bool:
         return snap['group_id'] == group.pk
     if 'user_id' in snap:
         from tracker.models import User
+        if entry.model_name == 'tracker.Note':
+            return User.objects.filter(pk=snap['user_id'], group=group, user_type='PRIMARY').exists()
         return User.objects.filter(pk=snap['user_id'], group=group).exists()
-    return True
+    return False
 
 
 def revert_entry(entry: MCPAuditLog, group=None) -> str:
@@ -127,7 +142,9 @@ def revert_entry(entry: MCPAuditLog, group=None) -> str:
     """
     if entry.reverted:
         return f"Entry #{entry.pk} has already been reverted."
-    if group is not None and not _entry_belongs_to_group(entry, group):
+    if entry.model_name not in REVERTABLE_MODELS:
+        return f"Error: Revert not allowed for model '{entry.model_name}'."
+    if group is None or not _entry_belongs_to_group(entry, group):
         return f"Error: Entry #{entry.pk} not found."
 
     try:
@@ -135,13 +152,15 @@ def revert_entry(entry: MCPAuditLog, group=None) -> str:
     except (LookupError, ValueError) as exc:
         return f"Cannot resolve model '{entry.model_name}': {exc}"
 
-    scope = {}
-    if group is not None:
-        field_names = {f.name for f in Model._meta.get_fields()}
-        if 'group' in field_names:
-            scope = {'group': group}
-        elif 'user' in field_names:
-            scope = {'user__group': group}
+    field_names = {f.name for f in Model._meta.get_fields()}
+    if 'group' in field_names:
+        scope = {'group': group}
+    elif entry.model_name == 'tracker.Note':
+        scope = {'user__group': group, 'user__user_type': 'PRIMARY'}
+    elif 'user' in field_names:
+        scope = {'user__group': group}
+    else:
+        return f"Error: Entry #{entry.pk} has no household scope."
 
     if entry.action == 'CREATE':
         try:
@@ -161,15 +180,19 @@ def revert_entry(entry: MCPAuditLog, group=None) -> str:
             obj = Model.objects.get(pk=entry.object_id, **scope)
         except Model.DoesNotExist:
             return f"{entry.model_name}#{entry.object_id} no longer exists."
-        _apply_snapshot(obj, entry.data_before)
+        _apply_snapshot(obj, entry.data_before, skip_pk=True, skip_ownership=True)
         obj.save()
         msg = f"Restored {entry.model_name}#{entry.object_id} to pre-update state."
 
     elif entry.action == 'DELETE':
         if not entry.data_before:
             return f"No data_before snapshot for entry #{entry.pk}; cannot revert."
+        orig_pk = entry.data_before.get('id')
+        pk_taken = bool(orig_pk is not None and Model.objects.filter(pk=orig_pk).exists())
         obj = Model()
-        _apply_snapshot(obj, entry.data_before)
+        _apply_snapshot(obj, entry.data_before, skip_pk=pk_taken, skip_ownership=False)
+        if 'group' in field_names:
+            obj.group = group
         obj.save()
         msg = (
             f"Re-created {entry.model_name} (new pk={obj.pk}, "
@@ -186,17 +209,17 @@ def revert_entry(entry: MCPAuditLog, group=None) -> str:
     return msg
 
 
-def _apply_snapshot(instance, data: dict):
+def _apply_snapshot(instance, data: dict, skip_pk: bool = False, skip_ownership: bool = False):
     """Set field values on a model instance from a serialised snapshot dict."""
     field_map = {f.attname: f for f in instance._meta.concrete_fields}
     for key, value in data.items():
         field = field_map.get(key)
         if not field:
             continue
-        # Skip auto-fields that Django manages
-        if getattr(field, 'primary_key', False):
-            # For DELETE reverts we *do* want to keep the original PK if possible
-            pass
+        if getattr(field, 'primary_key', False) and skip_pk:
+            continue
+        if skip_ownership and key in ('group_id', 'user_id'):
+            continue
         if value is not None:
             # Convert string representations back to proper Python types
             internal_type = field.get_internal_type()

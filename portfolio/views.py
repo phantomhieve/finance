@@ -1,3 +1,4 @@
+import hmac
 import inspect
 import json
 import time
@@ -66,6 +67,22 @@ logger = logging.getLogger(__name__)
 _PORTFOLIO_UNLOCK_TTL = 1800  # 30 minutes
 
 
+def is_vault_session_valid(session, group, ttl=_PORTFOLIO_UNLOCK_TTL) -> bool:
+    """Validate unlocked-session TTL and bind real unlocks to the group's current password."""
+    unlocked_at = session.get('portfolio_unlocked_at')
+    if not unlocked_at or (time.time() - unlocked_at) > ttl:
+        session.pop('portfolio_unlocked_at', None)
+        session.pop('portfolio_pwd_sig', None)
+        return False
+    if 'portfolio_pwd_sig' in session and group is not None and group.portfolio_password:
+        expected_sig = group.get_portfolio_session_hash()
+        if not hmac.compare_digest(str(session.get('portfolio_pwd_sig') or ''), expected_sig):
+            session.pop('portfolio_unlocked_at', None)
+            session.pop('portfolio_pwd_sig', None)
+            return False
+    return True
+
+
 def _vault_gate(permission_attr, feature_name):
     """Role check + household feature toggle + unlocked-session TTL shared by portfolio and jewellery."""
     def decorator(view_func):
@@ -75,11 +92,9 @@ def _vault_gate(permission_attr, feature_name):
                 return HttpResponseForbidden('You do not have permission to view this page.')
             if request.user.group is None or not feature_enabled(request.user, feature_name):
                 raise Http404
-            unlocked_at = request.session.get('portfolio_unlocked_at')
-            if not unlocked_at or (time.time() - unlocked_at) > _PORTFOLIO_UNLOCK_TTL:
-                request.session.pop('portfolio_unlocked_at', None)
+            if not is_vault_session_valid(request.session, request.user.group):
                 return redirect('/portfolio/unlock/?next=' + quote(request.get_full_path()))
-            request.portfolio_expires_at = int(unlocked_at + _PORTFOLIO_UNLOCK_TTL)
+            request.portfolio_expires_at = int(request.session['portfolio_unlocked_at'] + _PORTFOLIO_UNLOCK_TTL)
             return view_func(request, *args, **kwargs)
         return _wrapped
     return decorator
@@ -92,26 +107,48 @@ _require_jewellery = _vault_gate('can_view_jewellery', 'jewellery')
 _UNLOCK_ATTEMPT_KEY = '_portfolio_unlock_attempts'
 _UNLOCK_LOCKOUT_KEY = '_portfolio_unlock_lockout'
 _MAX_UNLOCK_ATTEMPTS = 5
+_MAX_GROUP_UNLOCK_ATTEMPTS = 10
 _LOCKOUT_SECONDS = 300
 
 
 @login_required
 def portfolio_unlock(request):
     from django.core.cache import cache
+    if not (
+        getattr(request.user, 'can_view_portfolio', False)
+        or getattr(request.user, 'can_view_jewellery', False)
+        or getattr(request.user, 'can_view_expenses', False)
+    ):
+        return HttpResponseForbidden('You do not have permission to unlock the vault.')
+
     raw_next = request.POST.get('next') or request.GET.get('next', '/portfolio/')
-    if raw_next and raw_next.startswith('/') and not raw_next.startswith('//') and url_has_allowed_host_and_scheme(
-        raw_next, allowed_hosts=None, require_https=request.is_secure()
+    if (
+        raw_next
+        and raw_next.startswith('/')
+        and not raw_next.startswith('//')
+        and not any(c in raw_next for c in ('\r', '\n', '\x00', '\\'))
+        and url_has_allowed_host_and_scheme(
+            raw_next, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+        )
     ):
         next_url = raw_next
     else:
         next_url = '/portfolio/'
 
     group = request.user.group
-    cache_prefix = f"vault_unlock_{group.pk if group else request.user.pk}"
-    attempt_cache_key = f"{cache_prefix}_attempts"
-    lockout_cache_key = f"{cache_prefix}_lockout"
+    gid = group.pk if group else request.user.pk
+    user_cache_prefix = f"vault_unlock_{gid}_u_{request.user.pk}"
+    user_attempt_key = f"{user_cache_prefix}_attempts"
+    user_lockout_key = f"{user_cache_prefix}_lockout"
+    group_cache_prefix = f"vault_unlock_{gid}"
+    group_attempt_key = f"{group_cache_prefix}_attempts"
+    group_lockout_key = f"{group_cache_prefix}_lockout"
 
-    lockout_until = max(request.session.get(_UNLOCK_LOCKOUT_KEY, 0), cache.get(lockout_cache_key, 0))
+    lockout_until = max(
+        request.session.get(_UNLOCK_LOCKOUT_KEY, 0),
+        cache.get(user_lockout_key, 0),
+        cache.get(group_lockout_key, 0),
+    )
     if lockout_until and time.time() < lockout_until:
         remaining = int(lockout_until - time.time())
         messages.error(request, f'Too many failed attempts. Try again in {remaining // 60}m {remaining % 60}s.')
@@ -126,9 +163,13 @@ def portfolio_unlock(request):
         if group.check_portfolio_password(password):
             request.session.pop(_UNLOCK_ATTEMPT_KEY, None)
             request.session.pop(_UNLOCK_LOCKOUT_KEY, None)
-            cache.delete_many([attempt_cache_key, lockout_cache_key])
+            cache.delete_many([
+                user_attempt_key, user_lockout_key,
+                group_attempt_key, group_lockout_key,
+            ])
             request.session['portfolio_unlocked_at'] = time.time()
-            
+            request.session['portfolio_pwd_sig'] = group.get_portfolio_session_hash()
+
             # If they don't have Face ID and can register, ask them to register instead of redirecting immediately.
             has_webauthn = WebAuthnCredential.objects.filter(user=request.user).exists()
             can_register = getattr(request.user, 'can_view_jewellery', False)
@@ -140,24 +181,32 @@ def portfolio_unlock(request):
                     'can_register_webauthn': True,
                     'just_unlocked': True,
                 })
-                
+
             return redirect(next_url)
-        attempts = max(request.session.get(_UNLOCK_ATTEMPT_KEY, 0), cache.get(attempt_cache_key, 0)) + 1
-        request.session[_UNLOCK_ATTEMPT_KEY] = attempts
-        cache.set(attempt_cache_key, attempts, timeout=_LOCKOUT_SECONDS)
-        if attempts >= _MAX_UNLOCK_ATTEMPTS:
+
+        user_attempts = max(request.session.get(_UNLOCK_ATTEMPT_KEY, 0), cache.get(user_attempt_key, 0)) + 1
+        group_attempts = cache.get(group_attempt_key, 0) + 1
+        request.session[_UNLOCK_ATTEMPT_KEY] = user_attempts
+        cache.set(user_attempt_key, user_attempts, timeout=_LOCKOUT_SECONDS)
+        cache.set(group_attempt_key, group_attempts, timeout=_LOCKOUT_SECONDS)
+
+        if user_attempts >= _MAX_UNLOCK_ATTEMPTS or group_attempts >= _MAX_GROUP_UNLOCK_ATTEMPTS:
             lock_until = time.time() + _LOCKOUT_SECONDS
             request.session[_UNLOCK_LOCKOUT_KEY] = lock_until
             request.session[_UNLOCK_ATTEMPT_KEY] = 0
-            cache.set(lockout_cache_key, lock_until, timeout=_LOCKOUT_SECONDS)
-            cache.delete(attempt_cache_key)
+            if user_attempts >= _MAX_UNLOCK_ATTEMPTS:
+                cache.set(user_lockout_key, lock_until, timeout=_LOCKOUT_SECONDS)
+                cache.delete(user_attempt_key)
+            if group_attempts >= _MAX_GROUP_UNLOCK_ATTEMPTS:
+                cache.set(group_lockout_key, lock_until, timeout=_LOCKOUT_SECONDS)
+                cache.delete(group_attempt_key)
             messages.error(request, f'Too many failed attempts. Locked for {_LOCKOUT_SECONDS // 60} minutes.')
         else:
             messages.error(request, 'Incorrect portfolio password.')
     has_webauthn = WebAuthnCredential.objects.filter(user=request.user).exists()
     can_register = getattr(request.user, 'can_view_jewellery', False)
     # Show registration prompt if the user just unlocked (session was just set)
-    just_unlocked = bool(request.session.get('portfolio_unlocked_at'))
+    just_unlocked = is_vault_session_valid(request.session, group)
     return render(request, 'portfolio/unlock.html', {
         'next': next_url,
         'has_password': has_password,
@@ -208,7 +257,7 @@ def _holding_totals(items, purchase_attr='purchase_value',
 # Generic CRUD factory
 # ---------------------------------------------------------------------------
 
-def _make_crud_views(model_class, form_class, label):
+def _make_crud_views(model_class, form_class, label, feature_name=None):
     """
     Generate add / edit / delete views for a model + form pair.
     Returns (add_view, edit_view, delete_view) tuple.
@@ -225,6 +274,8 @@ def _make_crud_views(model_class, form_class, label):
     @_require_portfolio
     @require_POST
     def add_view(request):
+        if feature_name and not feature_enabled(request.user, feature_name):
+            raise Http404
         form = _build_form(request, request.POST)
         if form.is_valid():
             obj = form.save(commit=False)
@@ -241,6 +292,8 @@ def _make_crud_views(model_class, form_class, label):
     @_require_portfolio
     @require_POST
     def edit_view(request, pk):
+        if feature_name and not feature_enabled(request.user, feature_name):
+            raise Http404
         lookup = {'pk': pk}
         if hasattr(model_class, 'group'):
             lookup['group'] = _user_group(request)
@@ -258,6 +311,8 @@ def _make_crud_views(model_class, form_class, label):
     @_require_portfolio
     @require_POST
     def delete_view(request, pk):
+        if feature_name and not feature_enabled(request.user, feature_name):
+            raise Http404
         lookup = {'pk': pk}
         if hasattr(model_class, 'group'):
             lookup['group'] = _user_group(request)
@@ -300,13 +355,16 @@ add_goal, edit_goal, delete_goal = _make_crud_views(
     FinancialGoal, FinancialGoalForm, 'Financial goal')
 
 add_real_estate, edit_real_estate, delete_real_estate = _make_crud_views(
-    RealEstateHolding, RealEstateHoldingForm, 'Real estate property')
+    RealEstateHolding, RealEstateHoldingForm, 'Real estate property',
+    feature_name='real_estate')
 
 
 @login_required
 @_require_portfolio
 @require_POST
 def update_real_estate_valuation(request, pk):
+    if not feature_enabled(request.user, 'real_estate'):
+        raise Http404
     group = _user_group(request)
     holding = get_object_or_404(RealEstateHolding, pk=pk, group=group)
     form = RealEstateValuationForm(request.POST, instance=holding)
@@ -322,6 +380,8 @@ def update_real_estate_valuation(request, pk):
 @login_required
 @_require_portfolio
 def get_real_estate_llm_prompt_json(request, pk):
+    if not feature_enabled(request.user, 'real_estate'):
+        raise Http404
     group = _user_group(request)
     holding = get_object_or_404(RealEstateHolding, pk=pk, group=group)
     return JsonResponse({
@@ -745,23 +805,31 @@ def save_pf_fy_entry(request):
         return _safe_redirect(request, fallback='pf_detail')
 
     account_name = (request.POST.get('account_name') or 'Atul').strip()
-    if not account_name:
-        messages.error(request, "Account holder name is required.")
+    if not account_name or len(account_name) > 100:
+        messages.error(request, "Account holder name must be between 1 and 100 characters.")
         return _safe_redirect(request, fallback='pf_detail')
 
     action_type = (request.POST.get('action_type') or '').strip().lower()
-    orig_member = (request.POST.get('orig_member') or '').strip()
+    orig_member = (request.POST.get('orig_member') or '').strip()[:100]
     orig_fy_year_raw = (request.POST.get('orig_fy_year') or '').strip()
     is_edit = (action_type == 'edit') or bool(orig_member and orig_fy_year_raw)
 
-    try:
-        fy_year = int(request.POST.get('fy_year'))
-    except (TypeError, ValueError):
+    raw_fy_year = request.POST.get('fy_year')
+    if raw_fy_year is None or str(raw_fy_year).strip() == '':
         fy_year = fy_start_year()
+    else:
+        try:
+            fy_year = int(raw_fy_year)
+        except (TypeError, ValueError):
+            messages.error(request, "Invalid Financial Year.")
+            return _safe_redirect(request, fallback='pf_detail')
+    if not (1950 <= fy_year <= 2100):
+        messages.error(request, "Financial Year must be between 1950 and 2100.")
+        return _safe_redirect(request, fallback='pf_detail')
 
     contrib_val = _parse_inr(request.POST.get('contribution'))
     interest_val = _parse_inr(request.POST.get('interest'))
-    remarks = (request.POST.get('remarks') or '').strip()
+    remarks = (request.POST.get('remarks') or '').strip()[:255]
     is_baby = request.POST.get('is_baby') in ('true', 'True', '1', 'on')
 
     with transaction.atomic():
@@ -769,6 +837,8 @@ def save_pf_fy_entry(request):
             try:
                 orig_fy_year = int(orig_fy_year_raw)
             except (TypeError, ValueError):
+                orig_fy_year = fy_year
+            if not (1950 <= orig_fy_year <= 2100):
                 orig_fy_year = fy_year
 
             existing = PFEntry.objects.filter(
@@ -832,7 +902,8 @@ def save_pf_fy_entry(request):
                 existing.contribution = (existing.contribution or Decimal('0')) + contrib_val
                 existing.interest = (existing.interest or Decimal('0')) + interest_val
                 if remarks:
-                    existing.remarks = f"{existing.remarks} · {remarks}" if existing.remarks else remarks
+                    combined = f"{existing.remarks} · {remarks}" if existing.remarks else remarks
+                    existing.remarks = combined[:255]
                 existing.save()
                 messages.success(
                     request,
@@ -874,6 +945,9 @@ def delete_pf_fy_entry(request):
     try:
         fy_year = int(request.POST.get('fy_year'))
     except (TypeError, ValueError):
+        messages.error(request, "Invalid Financial Year.")
+        return _safe_redirect(request, fallback='pf_detail')
+    if not (1950 <= fy_year <= 2100):
         messages.error(request, "Invalid Financial Year.")
         return _safe_redirect(request, fallback='pf_detail')
 
@@ -996,6 +1070,8 @@ def commodities_detail(request):
 @login_required
 @_require_portfolio
 def real_estate_detail(request):
+    if not feature_enabled(request.user, 'real_estate'):
+        raise Http404
     group = _user_group(request)
     holdings = list(RealEstateHolding.objects.filter(group=group, is_baby=False))
     total_invested = sum((h.total_cost_basis for h in holdings), _ZERO)
@@ -1123,6 +1199,8 @@ def take_snapshot_view(request):
 @_require_portfolio
 @require_POST
 def generate_insights(request):
+    if not feature_enabled(request.user, 'ai_insights'):
+        raise Http404
     group = _user_group(request)
     from django.utils import timezone as _tz
     last, can = _insight_can_generate(group)
@@ -1183,8 +1261,7 @@ def webauthn_register_begin(request):
     Accessible to PRIMARY and ACCOUNT_HOLDER (jewellery access)."""
     if not getattr(request.user, 'can_view_jewellery', False):
         return JsonResponse({'error': 'Forbidden.'}, status=403)
-    unlocked_at = request.session.get('portfolio_unlocked_at')
-    if not unlocked_at or (time.time() - unlocked_at) > _PORTFOLIO_UNLOCK_TTL:
+    if not is_vault_session_valid(request.session, request.user.group):
         return JsonResponse({'error': 'Vault must be unlocked first.'}, status=403)
 
     from webauthn import generate_registration_options, options_to_json
@@ -1230,8 +1307,7 @@ def webauthn_register_complete(request):
     """Complete biometric registration and store the credential."""
     if not getattr(request.user, 'can_view_jewellery', False):
         return JsonResponse({'error': 'Forbidden.'}, status=403)
-    unlocked_at = request.session.get('portfolio_unlocked_at')
-    if not unlocked_at or (time.time() - unlocked_at) > _PORTFOLIO_UNLOCK_TTL:
+    if not is_vault_session_valid(request.session, request.user.group):
         return JsonResponse({'error': 'Vault must be unlocked first.'}, status=403)
     challenge = _pop_challenge(request, 'webauthn_reg_challenge')
     if not challenge:
@@ -1241,6 +1317,8 @@ def webauthn_register_complete(request):
 
     try:
         body = json.loads(request.body)
+        if not isinstance(body, dict):
+            return JsonResponse({'error': 'Invalid request.'}, status=400)
         verification = verify_registration_response(
             credential=body,
             expected_challenge=challenge,
@@ -1309,6 +1387,8 @@ def webauthn_auth_complete(request):
 
     try:
         body = json.loads(request.body)
+        if not isinstance(body, dict):
+            return JsonResponse({'error': 'Authentication failed.'}, status=400)
         raw_id = base64url_to_bytes(body['rawId'])
         cred = WebAuthnCredential.objects.get(credential_id=raw_id, user=request.user)
     except (WebAuthnCredential.DoesNotExist, KeyError, TypeError, ValueError):
@@ -1333,11 +1413,18 @@ def webauthn_auth_complete(request):
 
     from django.core.cache import cache
     group = request.user.group
-    cache_prefix = f"vault_unlock_{group.pk if group else request.user.pk}"
-    cache.delete_many([f"{cache_prefix}_attempts", f"{cache_prefix}_lockout"])
+    gid = group.pk if group else request.user.pk
+    user_cache_prefix = f"vault_unlock_{gid}_u_{request.user.pk}"
+    group_cache_prefix = f"vault_unlock_{gid}"
+    cache.delete_many([
+        f"{user_cache_prefix}_attempts", f"{user_cache_prefix}_lockout",
+        f"{group_cache_prefix}_attempts", f"{group_cache_prefix}_lockout",
+    ])
     request.session.pop(_UNLOCK_ATTEMPT_KEY, None)
     request.session.pop(_UNLOCK_LOCKOUT_KEY, None)
     request.session['portfolio_unlocked_at'] = time.time()
+    if group:
+        request.session['portfolio_pwd_sig'] = group.get_portfolio_session_hash()
     return JsonResponse({'ok': True})
 
 
@@ -1347,12 +1434,14 @@ def webauthn_remove(request):
     """Remove a registered biometric credential."""
     if not getattr(request.user, 'can_view_jewellery', False):
         return JsonResponse({'error': 'Forbidden.'}, status=403)
-    unlocked_at = request.session.get('portfolio_unlocked_at')
-    if not unlocked_at or (time.time() - unlocked_at) > _PORTFOLIO_UNLOCK_TTL:
+    if not is_vault_session_valid(request.session, request.user.group):
         return JsonResponse({'error': 'Portfolio must be unlocked.'}, status=403)
 
     try:
-        pk = int(json.loads(request.body).get('id', 0))
+        body = json.loads(request.body)
+        if not isinstance(body, dict):
+            return JsonResponse({'error': 'Invalid request.'}, status=400)
+        pk = int(body.get('id', 0))
         WebAuthnCredential.objects.filter(pk=pk, user=request.user).delete()
     except (ValueError, TypeError):
         return JsonResponse({'error': 'Invalid request.'}, status=400)
@@ -1431,6 +1520,8 @@ def toggle_baby(request, model_name, pk):
     model_class = model_map.get(model_name.lower())
     if not model_class:
         return HttpResponseBadRequest("Invalid model name")
+    if model_name.lower() == 'realestateholding' and not feature_enabled(request.user, 'real_estate'):
+        raise Http404
     
     group = _user_group(request)
     if model_name.lower() in ('stockholding', 'mutualfundholding'):

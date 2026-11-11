@@ -5,43 +5,29 @@
 
 {% block page_header %}
 <header class="v-page-header">
-  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
-    <div class="flex items-start justify-between gap-3">
-      <div>
-        <h1 class="v-title">{{ summary.label }}</h1>
-        <p class="v-subtitle">{{ summary.start|date:"d M Y" }} → {{ summary.end|date:"d M Y" }}</p>
-      </div>
-      <div class="flex items-center gap-1 sm:hidden shrink-0">
-        <a href="{% url 'expenses_home' %}" class="v-btn v-btn-ghost text-xs px-2.5 py-1" title="Back to monthly view">
-          <span class="material-symbols-outlined text-sm">arrow_back</span>Month
-        </a>
-        <a href="{% url 'expenses_statements' %}" class="v-btn v-btn-ghost p-1.5" aria-label="Card statements" title="Card statements">
-          <span class="material-symbols-outlined text-base">request_quote</span>
-        </a>
-        <a href="{% url 'expenses_settings' %}" class="v-btn v-btn-ghost p-1.5" aria-label="Expense settings" title="Gmail, cards &amp; categories">
-          <span class="material-symbols-outlined text-base">tune</span>
-        </a>
-      </div>
-    </div>
+  <div>
+    <h1 class="v-title">{{ summary.label }}</h1>
+    <p class="v-subtitle tabular-nums">{{ summary.start|date:"d M Y" }} → {{ summary.end|date:"d M Y" }}</p>
+  </div>
 
-    <div class="v-toolbar">
-      <div class="fy-tabs" id="fySwitcher">
-        {% for fy in fy_options %}
-        <a href="?fy={{ fy }}" class="fy-tab {% if fy == fy_start %}fy-tab-active fy-visible{% endif %}">{{ fy }}-{{ fy|add:1 }}</a>
-        {% endfor %}
-      </div>
-      <div class="hidden sm:flex items-center gap-1.5">
-        <a href="{% url 'expenses_home' %}" class="v-btn v-btn-ghost text-xs">
-          <span class="material-symbols-outlined text-sm">arrow_back</span>Monthly view
-        </a>
-        <a href="{% url 'expenses_statements' %}" class="v-btn v-btn-ghost p-1.5" aria-label="Card statements" title="Card statements">
-          <span class="material-symbols-outlined text-base">request_quote</span>
-        </a>
-        <a href="{% url 'expenses_settings' %}" class="v-btn v-btn-ghost p-1.5" aria-label="Expense settings" title="Gmail, cards &amp; categories">
-          <span class="material-symbols-outlined text-base">tune</span>
-        </a>
-      </div>
+  <div class="v-toolbar">
+    <div class="fy-tabs" id="fySwitcher">
+      {% for fy in fy_options %}
+      <a href="?fy={{ fy }}" class="fy-tab !min-h-11 lg:!min-h-8 inline-flex items-center {% if fy == fy_start %}fy-tab-active fy-visible{% endif %} tabular-nums">{{ fy }}-{{ fy|add:1 }}</a>
+      {% endfor %}
     </div>
+    <a href="{% url 'expenses_home' %}" class="v-btn v-btn-secondary !min-h-11 lg:!min-h-9" title="Back to monthly view">
+      <span class="material-symbols-outlined text-[18px]">arrow_back</span>
+      <span>Monthly</span>
+    </a>
+    <a href="{% url 'expenses_statements' %}" class="v-btn v-btn-secondary !min-h-11 !min-w-11 lg:!min-h-9 lg:!min-w-0" aria-label="Card statements" title="Card statements">
+      <span class="material-symbols-outlined text-[18px]">request_quote</span>
+      <span class="hidden sm:inline">Statements</span>
+    </a>
+    <a href="{% url 'expenses_settings' %}" class="v-btn v-btn-secondary !min-h-11 !min-w-11 lg:!min-h-9 lg:!min-w-0" aria-label="Expense settings" title="Gmail, cards &amp; categories">
+      <span class="material-symbols-outlined text-[18px]">tune</span>
+      <span class="hidden sm:inline">Settings</span>
+    </a>
   </div>
 </header>
 {% endblock %}
@@ -49,60 +35,55 @@
 {% block content %}
 
 {# --- SIGNATURE LEDGER BAND --- #}
-<section class="v-ledger-band mb-5" aria-label="Annual financial position">
+<section class="v-ledger-band mb-5 animate-up" aria-label="Annual financial position">
   <div class="v-lead-cell">
-    <div class="flex items-center justify-between gap-2 flex-wrap mb-1">
-      <span class="text-[10px] font-bold tracking-wider uppercase opacity-60">
-        {% if summary.in_progress %}Spent so far · {{ summary.label }}{% else %}Total spend · {{ summary.label }}{% endif %}
-      </span>
+    <div class="v-lead-label">
+      <span>{% if summary.in_progress %}Spent So Far · {{ summary.label }}{% else %}Total Annual Spend · {{ summary.label }}{% endif %}</span>
       {% if summary.in_progress %}
-      <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
+      <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20 tabular-nums">
         <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
         <span>Month {{ summary.started_months_count }} of 12</span>
       </span>
       {% else %}
-      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-base-content/10 opacity-70">
+      <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-base-content/10 opacity-75">
         <span class="material-symbols-outlined text-xs">check_circle</span>
         <span>Full FY</span>
       </span>
       {% endif %}
     </div>
 
-    <div class="v-lead-figure">{{ summary.total|inr }}</div>
-
-    <div class="flex items-center flex-wrap gap-2 mt-2">
+    <div class="v-lead-figure-row">
+      <span class="v-lead-figure tabular-nums">{{ summary.total|inr }}</span>
       {% if summary.prev_delta_pct is not None %}
-      <span class="v-delta {% if summary.prev_delta_pct > 0 %}v-delta-neg{% else %}v-delta-pos{% endif %}">
+      <span class="v-delta {% if summary.prev_delta_pct > 0 %}v-delta-neg{% else %}v-delta-pos{% endif %} tabular-nums">
         <span class="material-symbols-outlined text-xs">{% if summary.prev_delta_pct > 0 %}trending_up{% else %}trending_down{% endif %}</span>
         <span>{% if summary.prev_delta_pct > 0 %}+{% endif %}{{ summary.prev_delta_pct }}% YoY</span>
       </span>
-      <span class="text-xs opacity-55">
-        {% if summary.prev_gap %}({{ summary.prev_gap|inr_short }} {% if summary.prev_delta > 0 %}more{% else %}less{% endif %}){% endif %}
-        vs {{ summary.prev_label }}{% if summary.in_progress %} to date{% endif %} ({{ summary.prev_total|inr_short }})
-      </span>
-      {% else %}
-      <span class="text-xs opacity-50">{{ summary.count }} transactions across {{ summary.active_months_count }} active month{{ summary.active_months_count|pluralize }}</span>
       {% endif %}
     </div>
 
-    {# Top Category Horizon Distribution Bar with Protective Padding #}
+    <div class="v-lead-sub tabular-nums">
+      {% if summary.prev_delta_pct is not None %}
+        {% if summary.prev_gap %}{{ summary.prev_gap|inr_short }} {% if summary.prev_delta > 0 %}higher{% else %}lower{% endif %} {% endif %}vs {{ summary.prev_label }}{% if summary.in_progress %} to date{% endif %} ({{ summary.prev_total|inr_short }})
+      {% else %}
+        {{ summary.count }} transactions across {{ summary.active_months_count }} active month{{ summary.active_months_count|pluralize }}
+      {% endif %}
+    </div>
+
+    {# Top Category Horizon Distribution Bar #}
     {% if summary.categories %}
-    <div class="mt-4 pt-3 border-t border-base-content/10">
-      <div class="flex items-center justify-between text-[11px] mb-1.5 px-0.5">
-        <span class="opacity-55 font-medium">Category distribution</span>
-        <span class="opacity-80 font-bold tabular-nums">Top: {{ summary.categories.0.name }} ({{ summary.categories.0.pct }}%)</span>
-      </div>
-      <div class="v-horizon" style="height: 6px;">
+    <div class="v-horizon">
+      <div class="v-horizon-bar">
         {% for c in summary.categories|slice:":5" %}
-        <div class="v-horizon-seg" style="width: {{ c.pct }}%; background-color: hsl({{ c.hue }}, 75%, 55%);" title="{{ c.name }}: {{ c.total|inr }} ({{ c.pct }}%)"></div>
+        <span class="v-horizon-seg" style="width: {{ c.pct }}%; background-color: hsl({{ c.hue }} 75% 55%);" title="{{ c.name }}: {{ c.total|inr }} ({{ c.pct }}%)"></span>
         {% endfor %}
       </div>
-      <div class="v-horizon-legend mt-2.5 px-1 flex flex-wrap gap-x-4 gap-y-1.5">
+      <div class="v-horizon-legend">
         {% for c in summary.categories|slice:":4" %}
-        <span class="v-horizon-item inline-flex items-center gap-1.5 text-[11px] opacity-80">
-          <span class="v-horizon-dot" style="background-color: hsl({{ c.hue }}, 75%, 55%);"></span>
-          <span class="whitespace-nowrap">{{ c.name }}</span>
-          <strong class="v-horizon-pct font-semibold text-base-content">{{ c.pct }}%</strong>
+        <span class="v-horizon-item">
+          <span class="v-horizon-dot" style="background-color: hsl({{ c.hue }} 75% 55%);"></span>
+          <span class="truncate max-w-[96px]">{{ c.name }}</span>
+          <strong class="v-horizon-pct tabular-nums">{{ c.pct }}%</strong>
         </span>
         {% endfor %}
       </div>
@@ -111,25 +92,25 @@
   </div>
 
   {# 4 Semantic KPI Stat Cells #}
-  <div class="v-stat-grid grid-cols-2 lg:grid-cols-2">
+  <div class="v-stat-grid">
     <div class="v-stat-cell">
-      <div class="text-[10px] font-bold tracking-wider uppercase opacity-55">Monthly Average</div>
-      <div class="text-lg sm:text-xl font-extrabold tabular-nums text-primary mt-0.5">{{ summary.avg_month|inr }}</div>
-      <div class="text-[11px] opacity-50 mt-0.5 truncate">
+      <div class="v-stat-label">Monthly Average</div>
+      <div class="v-stat-value text-base-content tabular-nums">{{ summary.avg_month|inr }}</div>
+      <div class="v-stat-sub tabular-nums">
         {% if summary.complete_months_count %}{{ summary.complete_months_count }} completed mo{% else %}Current FY pace{% endif %}
       </div>
     </div>
 
     {% if summary.top_month %}
-    <a href="{% url 'expenses_home' %}?m={{ summary.top_month.param }}" class="v-stat-cell no-underline text-inherit group hover:border-amber-400/40 transition-colors cursor-pointer">
+    <a href="{% url 'expenses_home' %}?m={{ summary.top_month.param }}" class="v-stat-cell no-underline text-inherit group hover:bg-[var(--v-hover)] transition-colors cursor-pointer">
     {% else %}
     <div class="v-stat-cell">
     {% endif %}
-      <div class="text-[10px] font-bold tracking-wider uppercase opacity-55">Highest Month</div>
-      <div class="text-lg sm:text-xl font-extrabold tabular-nums text-amber-400 mt-0.5 truncate">
+      <div class="v-stat-label">Highest Month</div>
+      <div class="v-stat-value text-amber-400 tabular-nums truncate">
         {% if summary.top_month %}{{ summary.top_month.label }} · {{ summary.top_month.total|inr_short }}{% else %}—{% endif %}
       </div>
-      <div class="text-[11px] opacity-50 mt-0.5 truncate">
+      <div class="v-stat-sub tabular-nums truncate">
         {% if summary.low_month and summary.low_month.param != summary.top_month.param %}
           Low: {{ summary.low_month.label }} ({{ summary.low_month.total|inr_short }})
         {% elif summary.top_month %}
@@ -140,12 +121,12 @@
       </div>
     {% if summary.top_month %}</a>{% else %}</div>{% endif %}
 
-    <button type="button" onclick="jumpToYearSection('subs')" class="v-stat-cell text-left group hover:border-violet-400/40 transition-colors cursor-pointer">
-      <div class="text-[10px] font-bold tracking-wider uppercase opacity-55">Subscriptions</div>
-      <div class="text-lg sm:text-xl font-extrabold tabular-nums text-violet-400 mt-0.5">
+    <button type="button" onclick="jumpToYearSection('subs')" class="v-stat-cell text-left group hover:bg-[var(--v-hover)] transition-colors cursor-pointer">
+      <div class="v-stat-label">Subscriptions</div>
+      <div class="v-stat-value text-violet-400 tabular-nums">
         {% if summary.subscriptions.total %}{{ summary.subscriptions.total|inr_short }}{% else %}₹0{% endif %}
       </div>
-      <div class="text-[11px] opacity-50 mt-0.5 truncate">
+      <div class="v-stat-sub tabular-nums truncate">
         {% if summary.subscriptions.services_count %}
           {{ summary.subscriptions.services_count }} service{{ summary.subscriptions.services_count|pluralize }} · {{ summary.subscriptions.avg_month|inr_short }}/mo
         {% else %}
@@ -155,95 +136,95 @@
     </button>
 
     <div class="v-stat-cell">
-      <div class="text-[10px] font-bold tracking-wider uppercase opacity-55">Flexible Burn</div>
-      <div class="text-lg sm:text-xl font-extrabold tabular-nums text-emerald-400 mt-0.5">
+      <div class="v-stat-label">Flexible Burn</div>
+      <div class="v-stat-value text-emerald-400 tabular-nums">
         {{ summary.per_day|inr_short }}<span class="text-xs font-normal opacity-60">/day</span>
       </div>
-      <div class="text-[11px] opacity-50 mt-0.5 truncate">Excl. rent &amp; EMIs</div>
+      <div class="v-stat-sub truncate">Excl. rent &amp; EMIs</div>
     </div>
   </div>
 </section>
 
 {% if summary.total %}
 
-{# --- ANNUAL HIGHLIGHT INSIGHTS (4-Cell Bento Strip) --- #}
-<div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 mb-5">
+{# --- ANNUAL HIGHLIGHT INSIGHTS (Ruled 4-Cell Strip) --- #}
+<div class="v-stat-strip mb-5 animate-up">
   <div class="v-stat-cell flex items-center gap-3" title="Daily flexible spend average across the FY, excluding rent, EMIs, and insurance">
     <div class="w-9 h-9 rounded-xl bg-amber-400/10 text-amber-400 flex items-center justify-center shrink-0">
       <span class="material-symbols-outlined text-lg">speed</span>
     </div>
     <div class="min-w-0 flex-1">
-      <div class="text-[10px] font-bold uppercase tracking-wider opacity-50 truncate">Daily Pace</div>
+      <div class="v-stat-label truncate">Daily Pace</div>
       <div class="text-sm sm:text-base font-bold tabular-nums text-base-content mt-0.5 truncate">{{ summary.per_day|inr }}<span class="text-[10px] font-normal opacity-60">/day</span></div>
     </div>
   </div>
 
   {% if summary.biggest %}
   <a href="{% url 'expenses_home' %}?m={{ summary.biggest_month_param }}&q={{ summary.biggest.merchant|urlencode }}"
-     class="v-stat-cell flex items-center gap-3 no-underline text-inherit hover:border-rose-400/40 transition-colors cursor-pointer"
+     class="v-stat-cell flex items-center gap-3 no-underline text-inherit hover:bg-[var(--v-hover)] transition-colors cursor-pointer"
      title="{{ summary.biggest.merchant }} · {{ summary.biggest.amount|inr }} on {{ summary.biggest.txn_date|date:'j M Y' }}">
     <div class="w-9 h-9 rounded-xl bg-rose-400/10 text-rose-400 flex items-center justify-center shrink-0">
       <span class="material-symbols-outlined text-lg">vertical_align_top</span>
     </div>
     <div class="min-w-0 flex-1">
-      <div class="text-[10px] font-bold uppercase tracking-wider opacity-50 truncate">Biggest Expense</div>
-      <div class="text-sm sm:text-base font-bold tabular-nums text-base-content mt-0.5 truncate">{{ summary.biggest.amount|inr_short }} <span class="text-[10px] font-normal opacity-60 truncate">· {{ summary.biggest.merchant|default:"Expense"|truncatechars:12 }}</span></div>
+      <div class="v-stat-label truncate">Biggest Expense</div>
+      <div class="text-sm sm:text-base font-bold tabular-nums text-base-content mt-0.5 truncate">{{ summary.biggest.amount|inr_short }} <span class="text-[10px] font-normal opacity-60 truncate">· {{ summary.biggest.merchant|default:"Expense"|truncatechars:14 }}</span></div>
     </div>
   </a>
   {% endif %}
 
   {% if summary.frequent %}{% with m=summary.frequent %}
   <a href="{% url 'expenses_home' %}?m={{ m.month_param }}&q={{ m.merchant|urlencode }}"
-     class="v-stat-cell flex items-center gap-3 no-underline text-inherit hover:border-sky-400/40 transition-colors cursor-pointer"
+     class="v-stat-cell flex items-center gap-3 no-underline text-inherit hover:bg-[var(--v-hover)] transition-colors cursor-pointer"
      title="{{ m.merchant }} · {{ m.count }} visits totaling {{ m.total|inr }}">
     <div class="w-9 h-9 rounded-xl bg-sky-400/10 text-sky-400 flex items-center justify-center shrink-0">
       <span class="material-symbols-outlined text-lg">storefront</span>
     </div>
     <div class="min-w-0 flex-1">
-      <div class="text-[10px] font-bold uppercase tracking-wider opacity-50 truncate">Most Visited</div>
-      <div class="text-sm sm:text-base font-bold tabular-nums text-base-content mt-0.5 truncate">{{ m.count }}× <span class="text-[10px] font-normal opacity-60 truncate">· {{ m.merchant|truncatechars:12 }}</span></div>
+      <div class="v-stat-label truncate">Most Visited</div>
+      <div class="text-sm sm:text-base font-bold tabular-nums text-base-content mt-0.5 truncate">{{ m.count }}× <span class="text-[10px] font-normal opacity-60 truncate">· {{ m.merchant|truncatechars:14 }}</span></div>
     </div>
   </a>
   {% endwith %}{% endif %}
 
   {% if summary.riser %}
   <a href="{% url 'expenses_home' %}?m={{ summary.latest_month_param }}&cat={{ summary.riser.id|default:'none' }}"
-     class="v-stat-cell flex items-center gap-3 no-underline text-inherit hover:border-amber-400/40 transition-colors cursor-pointer"
+     class="v-stat-cell flex items-center gap-3 no-underline text-inherit hover:bg-[var(--v-hover)] transition-colors cursor-pointer"
      title="{{ summary.riser.name }} rose by {{ summary.riser.delta|inr }} vs {{ summary.prev_label }}">
     <div class="w-9 h-9 rounded-xl bg-amber-400/10 text-amber-400 flex items-center justify-center shrink-0">
       <span class="material-symbols-outlined text-lg">trending_up</span>
     </div>
     <div class="min-w-0 flex-1">
-      <div class="text-[10px] font-bold uppercase tracking-wider opacity-50 truncate">Biggest YoY Rise</div>
-      <div class="text-sm sm:text-base font-bold tabular-nums text-amber-400 mt-0.5 truncate">+{{ summary.riser.delta|inr_short }} <span class="text-[10px] font-normal opacity-60 truncate">· {{ summary.riser.name|truncatechars:12 }}</span></div>
+      <div class="v-stat-label truncate">Biggest YoY Rise</div>
+      <div class="text-sm sm:text-base font-bold tabular-nums text-amber-400 mt-0.5 truncate">+{{ summary.riser.delta|inr_short }} <span class="text-[10px] font-normal opacity-60 truncate">· {{ summary.riser.name|truncatechars:14 }}</span></div>
     </div>
   </a>
   {% elif summary.categories %}
   <a href="{% url 'expenses_home' %}?m={{ summary.latest_month_param }}&cat={{ summary.categories.0.id|default:'none' }}"
-     class="v-stat-cell flex items-center gap-3 no-underline text-inherit hover:border-amber-400/40 transition-colors cursor-pointer">
+     class="v-stat-cell flex items-center gap-3 no-underline text-inherit hover:bg-[var(--v-hover)] transition-colors cursor-pointer">
     <div class="w-9 h-9 rounded-xl bg-amber-400/10 text-amber-400 flex items-center justify-center shrink-0">
       <span class="material-symbols-outlined text-lg">donut_small</span>
     </div>
     <div class="min-w-0 flex-1">
-      <div class="text-[10px] font-bold uppercase tracking-wider opacity-50 truncate">Top Category</div>
-      <div class="text-sm sm:text-base font-bold tabular-nums text-base-content mt-0.5 truncate">{{ summary.categories.0.pct }}% <span class="text-[10px] font-normal opacity-60 truncate">· {{ summary.categories.0.name|truncatechars:12 }}</span></div>
+      <div class="v-stat-label truncate">Top Category</div>
+      <div class="text-sm sm:text-base font-bold tabular-nums text-base-content mt-0.5 truncate">{{ summary.categories.0.pct }}% <span class="text-[10px] font-normal opacity-60 truncate">· {{ summary.categories.0.name|truncatechars:14 }}</span></div>
     </div>
   </a>
   {% endif %}
 </div>
 
 {# --- MOBILE SEGMENTED SWITCHER (< lg) --- #}
-<div class="flex lg:hidden bg-base-300/40 p-1 rounded-xl mb-4 text-xs font-semibold overflow-x-auto scrollbar-hide border border-base-content/10" role="tablist" aria-label="Annual view sections">
-  <button type="button" class="flex-1 py-1.5 px-3 rounded-lg text-center transition-all bg-primary/20 text-primary border border-primary/30 font-bold cursor-pointer whitespace-nowrap flex items-center justify-center gap-1.5" id="yrTabOverviewBtn" onclick="switchYearMobileTab('overview')">
+<div class="flex lg:hidden bg-base-300/60 p-1 rounded-xl mb-4 text-xs font-semibold overflow-x-auto scrollbar-hide border border-base-content/10 gap-1" role="tablist" aria-label="Annual view sections">
+  <button type="button" role="tab" aria-selected="true" class="v-segmented-item flex-1 !min-h-11 px-2.5 rounded-lg text-center transition-all bg-base-100 text-primary shadow-xs font-bold cursor-pointer whitespace-nowrap inline-flex items-center justify-center gap-1" id="yrTabOverviewBtn" onclick="switchYearMobileTab('overview')">
     <span class="material-symbols-outlined text-sm">bar_chart</span>Overview
   </button>
-  <button type="button" class="flex-1 py-1.5 px-3 rounded-lg text-center transition-all opacity-60 hover:opacity-100 cursor-pointer whitespace-nowrap flex items-center justify-center gap-1.5" id="yrTabCategoriesBtn" onclick="switchYearMobileTab('categories')">
+  <button type="button" role="tab" aria-selected="false" class="v-segmented-item flex-1 !min-h-11 px-2.5 rounded-lg text-center transition-all opacity-65 hover:opacity-100 cursor-pointer whitespace-nowrap inline-flex items-center justify-center gap-1" id="yrTabCategoriesBtn" onclick="switchYearMobileTab('categories')">
     <span class="material-symbols-outlined text-sm">donut_small</span>Categories
   </button>
-  <button type="button" class="flex-1 py-1.5 px-3 rounded-lg text-center transition-all opacity-60 hover:opacity-100 cursor-pointer whitespace-nowrap flex items-center justify-center gap-1.5" id="yrTabMerchantsBtn" onclick="switchYearMobileTab('merchants')">
+  <button type="button" role="tab" aria-selected="false" class="v-segmented-item flex-1 !min-h-11 px-2.5 rounded-lg text-center transition-all opacity-65 hover:opacity-100 cursor-pointer whitespace-nowrap inline-flex items-center justify-center gap-1" id="yrTabMerchantsBtn" onclick="switchYearMobileTab('merchants')">
     <span class="material-symbols-outlined text-sm">storefront</span>Merchants
   </button>
-  <button type="button" class="flex-1 py-1.5 px-3 rounded-lg text-center transition-all opacity-60 hover:opacity-100 cursor-pointer whitespace-nowrap flex items-center justify-center gap-1.5" id="yrTabSubsBtn" onclick="switchYearMobileTab('subs')">
+  <button type="button" role="tab" aria-selected="false" class="v-segmented-item flex-1 !min-h-11 px-2.5 rounded-lg text-center transition-all opacity-65 hover:opacity-100 cursor-pointer whitespace-nowrap inline-flex items-center justify-center gap-1" id="yrTabSubsBtn" onclick="switchYearMobileTab('subs')">
     <span class="material-symbols-outlined text-sm">subscriptions</span>Subs
   </button>
 </div>
@@ -256,47 +237,46 @@
         <span class="material-symbols-outlined text-base text-amber-400">stacked_bar_chart</span>
         <h2 class="v-panel-title">Monthly Spend Trajectory</h2>
       </div>
-      <p class="text-[11px] opacity-45 mt-0.5">
+      <p class="text-[11px] opacity-55 mt-0.5 tabular-nums">
         Benchmark dashed line: monthly average ({{ summary.avg_month|inr_short }}){% if summary.in_progress %} of completed months{% endif %} · Select any bar to inspect month
       </p>
     </div>
-    <div class="inline-flex items-center gap-1 bg-base-300/60 p-1 rounded-lg border border-base-content/10 self-start sm:self-auto shrink-0">
-      <button type="button" id="yearChartBtnStacked" class="px-2.5 py-1 rounded-md text-xs font-semibold bg-primary text-primary-content cursor-pointer transition-colors" onclick="Expenses.setYearChartMode('stacked')">
+    <div class="inline-flex items-center gap-1 bg-base-300/60 p-1 rounded-xl border border-base-content/10 self-start sm:self-auto shrink-0">
+      <button type="button" id="yearChartBtnStacked" class="v-segmented-item !min-h-11 lg:!min-h-8 px-3 rounded-lg text-xs font-semibold bg-primary text-primary-content cursor-pointer transition-colors" onclick="Expenses.setYearChartMode('stacked')">
         By Category
       </button>
-      <button type="button" id="yearChartBtnTotal" class="px-2.5 py-1 rounded-md text-xs font-semibold opacity-60 hover:opacity-100 cursor-pointer transition-colors" onclick="Expenses.setYearChartMode('total')">
+      <button type="button" id="yearChartBtnTotal" class="v-segmented-item !min-h-11 lg:!min-h-8 px-3 rounded-lg text-xs font-semibold opacity-65 hover:opacity-100 cursor-pointer transition-colors" onclick="Expenses.setYearChartMode('total')">
         Monthly Totals
       </button>
     </div>
   </div>
   <div class="v-panel-body pt-2 pb-4 px-3 sm:px-5">
-    <div class="w-full relative" style="height:280px; min-height:280px">
+    <div class="w-full relative h-[240px] sm:h-[280px]">
       <canvas id="yearChart" data-month-url="{% url 'expenses_home' %}" aria-label="Monthly spend by category"></canvas>
     </div>
   </div>
 </section>
 
 {# --- ROW 1: CATEGORY BREAKDOWN (7 cols) + MONTH-BY-MONTH CADENCE (5 cols) --- #}
-{# Perfectly balanced ~500px height pairing that eliminates vertical dead space #}
 <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start mb-5">
 
   {# --- LEFT: By Category Panel (7 cols) --- #}
-  <div id="yrSectionCategories" class="lg:col-span-7 hidden lg:block">
+  <div id="yrSectionCategories" class="lg:col-span-7 hidden lg:block min-w-0">
     <section class="v-panel">
       <div class="v-panel-header flex items-center justify-between gap-2">
         <div class="flex items-center gap-2">
           <span class="material-symbols-outlined text-base opacity-60">pie_chart</span>
           <h2 class="v-panel-title">By Category</h2>
-          <span class="text-[11px] px-2 py-0.5 rounded-full bg-base-300/70 border border-base-content/10 opacity-70 font-semibold tabular-nums">{{ summary.categories|length }}</span>
+          <span class="text-[11px] px-2 py-0.5 rounded-full bg-base-300/70 border border-base-content/10 opacity-75 font-semibold tabular-nums">{{ summary.categories|length }}</span>
         </div>
-        <span class="text-[11px] opacity-45 font-medium">Apr → Mar seasonality &amp; share</span>
+        <span class="text-[11px] opacity-50 font-medium">Apr → Mar seasonality</span>
       </div>
 
-      <div class="v-panel-body">
-        <div class="flex flex-col gap-1.5">
+      <div class="v-panel-body !p-0">
+        <div class="divide-y divide-[var(--v-hairline-subtle)]">
           {% for c in summary.categories %}
           <a href="{% url 'expenses_home' %}?m={{ summary.latest_month_param }}&cat={% if c.id %}{{ c.id }}{% else %}none{% endif %}"
-             class="exp-cat-row p-2.5 rounded-xl border border-transparent hover:border-base-content/10 hover:bg-base-200/50 transition-all {% if forloop.counter > 8 %}exp-ycat-more hidden{% endif %}">
+             class="exp-cat-row px-4 py-3 min-h-14 hover:bg-[var(--v-hover)] transition-colors flex items-center gap-3 {% if forloop.counter > 6 %}exp-ycat-more hidden{% endif %}">
             <span class="jw-type-avatar shrink-0" style="--h:{{ c.hue }};width:2.35rem;height:2.35rem;border-radius:.75rem">
               <span class="icon-filled material-symbols-outlined text-lg">{{ c.icon }}</span>
             </span>
@@ -304,11 +284,11 @@
               <div class="flex items-baseline justify-between gap-2">
                 <div class="flex items-center gap-1.5 min-w-0">
                   <span class="text-sm font-semibold truncate">{{ c.name }}</span>
-                  <span class="text-[10px] opacity-40 tabular-nums shrink-0">({{ c.count }})</span>
+                  <span class="text-xs opacity-45 tabular-nums shrink-0">({{ c.count }})</span>
                 </div>
                 <div class="flex items-baseline gap-2 shrink-0">
                   {% if summary.prev_total > 0 and c.gap >= 500 %}
-                  <span class="text-[10px] font-semibold tabular-nums hidden sm:inline {% if c.delta > 0 %}text-rose-400{% else %}text-emerald-400{% endif %}">
+                  <span class="text-xs font-semibold tabular-nums hidden sm:inline {% if c.delta > 0 %}text-rose-400{% else %}text-emerald-400{% endif %}">
                     {% if c.delta > 0 %}▲{% else %}▼{% endif %} {{ c.gap|inr_short }}
                   </span>
                   {% endif %}
@@ -319,7 +299,7 @@
               {# Share bar + monthly average + percentage #}
               <div class="flex items-center gap-2.5 mt-1.5">
                 <div class="exp-bar flex-1" style="--h:{{ c.hue }}"><span style="width:{{ c.pct }}%"></span></div>
-                <span class="text-[10px] opacity-55 tabular-nums shrink-0">{{ c.avg_month|inr_short }}/mo · <strong class="font-semibold text-base-content/85">{{ c.pct }}%</strong></span>
+                <span class="text-xs opacity-60 tabular-nums shrink-0">{{ c.avg_month|inr_short }}/mo · <strong class="font-semibold text-base-content/85">{{ c.pct }}%</strong></span>
               </div>
 
               {# 12-Month Apr -> Mar Seasonality Sparkline #}
@@ -331,19 +311,19 @@
                         title="{{ sm.label }}: {{ sm.amount|inr }}"></span>
                   {% endfor %}
                 </div>
-                <span class="text-[9px] opacity-40 tabular-nums shrink-0 w-16 text-right">{{ c.active_months }}/12 mo</span>
+                <span class="text-xs opacity-45 tabular-nums shrink-0 w-16 text-right">{{ c.active_months }}/12 mo</span>
               </div>
             </div>
           </a>
           {% endfor %}
         </div>
 
-        {% if summary.categories|length > 8 %}
-        <div class="flex justify-center mt-3 pt-2 border-t border-base-content/10">
+        {% if summary.categories|length > 6 %}
+        <div class="flex justify-center py-2.5 px-4 border-t border-[var(--v-hairline)]">
           <button type="button" id="expYearCatBtn"
-                  class="v-btn v-btn-ghost text-xs font-semibold gap-1 text-primary cursor-pointer"
+                  class="v-btn v-btn-ghost !min-h-11 lg:!min-h-8 text-xs font-semibold gap-1 text-primary cursor-pointer"
                   onclick="toggleYearCategories()">
-            <span id="expYearCatTxt" data-collapsed="Show all {{ summary.categories|length }} categories" data-expanded="Show top 8 only">Show all {{ summary.categories|length }} categories</span>
+            <span id="expYearCatTxt" data-collapsed="Show all {{ summary.categories|length }} categories" data-expanded="Show top 6 only">Show all {{ summary.categories|length }} categories</span>
             <span id="expYearCatIcon" class="material-symbols-outlined text-base">expand_more</span>
           </button>
         </div>
@@ -352,34 +332,34 @@
     </section>
   </div>
 
-  {# --- RIGHT: Month-by-Month Interactive Navigation (5 cols) --- #}
-  <div id="yrSectionMonths" class="lg:col-span-5 hidden lg:block">
+  {# --- RIGHT: Month-by-Month Interactive Navigation (5 cols, visible in Overview on mobile too) --- #}
+  <div id="yrSectionMonths" class="lg:col-span-5 block min-w-0">
     <section class="v-panel">
       <div class="v-panel-header flex items-center justify-between">
         <div class="flex items-center gap-2">
           <span class="material-symbols-outlined text-base opacity-60">calendar_month</span>
           <h2 class="v-panel-title">Months</h2>
         </div>
-        <span class="text-[11px] opacity-45">Select to open ledger</span>
+        <span class="text-[11px] opacity-50">Select to open ledger</span>
       </div>
 
-      <div class="v-panel-body">
-        <div class="flex flex-col gap-1">
+      <div class="v-panel-body !p-0">
+        <div class="divide-y divide-[var(--v-hairline-subtle)]">
           {% for m in summary.months %}
           {% if m.started %}
           <a href="{% url 'expenses_home' %}?m={{ m.param }}"
-             class="flex items-center gap-3 py-2 px-2.5 rounded-xl hover:bg-base-200/60 border border-transparent hover:border-base-content/10 transition-all cursor-pointer">
+             class="flex items-center gap-3 py-3 px-4 min-h-12 hover:bg-[var(--v-hover)] transition-colors cursor-pointer">
             <div class="w-16 shrink-0">
-              <div class="flex items-center gap-1">
+              <div class="flex items-center gap-1 tabular-nums">
                 <span class="text-sm font-bold">{{ m.label }}</span>
-                <span class="text-[10px] opacity-40 font-normal">'{{ m.year|stringformat:"d"|slice:"2:" }}</span>
+                <span class="text-xs opacity-45 font-normal">'{{ m.year|stringformat:"d"|slice:"2:" }}</span>
               </div>
               {% if m.partial %}
-              <span class="inline-block text-[9px] font-bold uppercase text-amber-400">In progress</span>
+              <span class="inline-block text-xs font-semibold text-amber-400">Active</span>
               {% elif m.is_peak %}
-              <span class="inline-block text-[9px] font-bold uppercase text-rose-400">Peak</span>
+              <span class="inline-block text-xs font-semibold text-rose-400">Peak</span>
               {% elif m.count %}
-              <span class="inline-block text-[10px] opacity-40 tabular-nums">{{ m.count }} txn{{ m.count|pluralize }}</span>
+              <span class="inline-block text-xs opacity-45 tabular-nums">{{ m.count }} txn{{ m.count|pluralize }}</span>
               {% endif %}
             </div>
 
@@ -388,7 +368,7 @@
                 <span style="width:{{ m.bar }}%"></span>
               </div>
               {% if m.top_cat %}
-              <div class="flex items-center justify-between text-[10px] opacity-50 mt-1 gap-2">
+              <div class="flex items-center justify-between text-xs opacity-55 mt-1 gap-2">
                 <span class="truncate">Top: {{ m.top_cat }}</span>
                 {% if m.vs_avg_pct is not None and not m.partial %}
                 <span class="tabular-nums shrink-0 {% if m.vs_avg_pct > 10 %}text-rose-400{% elif m.vs_avg_pct < -10 %}text-emerald-400{% endif %}">
@@ -400,21 +380,21 @@
             </div>
 
             <div class="text-right shrink-0 w-24">
-              <span class="text-sm font-bold tabular-nums">{% if m.total %}{{ m.total|inr }}{% else %}<span class="opacity-30">—</span>{% endif %}</span>
+              <span class="text-sm font-bold tabular-nums">{% if m.total %}{{ m.total|inr }}{% else %}<span class="opacity-35">—</span>{% endif %}</span>
             </div>
-            <span class="material-symbols-outlined text-sm opacity-30">chevron_right</span>
+            <span class="material-symbols-outlined text-sm opacity-35">chevron_right</span>
           </a>
           {% endif %}
           {% endfor %}
         </div>
 
         {% if summary.started_months_count < 12 %}
-        <div class="mt-3 pt-3 border-t border-base-content/10 flex items-center justify-between gap-2 flex-wrap">
-          <span class="text-[10px] uppercase tracking-wider opacity-40 font-bold">Upcoming in {{ summary.label }}</span>
-          <div class="flex flex-wrap gap-1">
+        <div class="px-4 py-3 border-t border-[var(--v-hairline)] flex items-center justify-between gap-2 flex-wrap bg-[var(--v-elevated)]/40">
+          <span class="text-xs opacity-55 font-semibold">Upcoming in {{ summary.label }}</span>
+          <div class="flex flex-wrap gap-1.5">
             {% for m in summary.months %}
               {% if not m.started %}
-              <span class="px-2 py-0.5 rounded-md bg-base-300/40 border border-dashed border-base-content/15 text-[10px] opacity-40">{{ m.label }}</span>
+              <span class="px-2 py-0.5 rounded bg-base-200/60 text-xs opacity-50">{{ m.label }}</span>
               {% endif %}
             {% endfor %}
           </div>
@@ -427,97 +407,128 @@
 </div>
 
 {# --- ROW 2: TOP MERCHANTS (6 cols) + PAYMENT INSTRUMENTS & HOUSEHOLD (6 cols) --- #}
-{# Perfectly balanced ~400px height pairing that eliminates vertical dead space #}
 {% if summary.merchants or summary.sources %}
 <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start mb-5">
 
   {# --- LEFT: Top Merchants Panel (6 cols) --- #}
   {% if summary.merchants %}
-  <div id="yrSectionMerchants" class="{% if summary.sources %}lg:col-span-6{% else %}lg:col-span-12{% endif %} hidden lg:block">
-    <section class="v-panel">
+  <div id="yrSectionMerchants" class="{% if summary.sources %}lg:col-span-6{% else %}lg:col-span-12{% endif %} hidden lg:block min-w-0">
+    <section class="v-panel !mb-0">
       <div class="v-panel-header flex items-center justify-between">
         <div class="flex items-center gap-2">
           <span class="material-symbols-outlined text-base opacity-60">storefront</span>
           <h2 class="v-panel-title">Top Merchants</h2>
+          <span class="text-xs px-2 py-0.5 rounded-full bg-base-200/80 border border-[var(--v-hairline)] opacity-75 font-semibold tabular-nums">{{ summary.merchants|length }}</span>
         </div>
-        <span class="text-[11px] opacity-45">By annual spend</span>
+        <span class="text-xs opacity-50">By annual spend</span>
       </div>
 
-      <div class="v-panel-body">
-        <div class="flex flex-col gap-1.5">
+      <div class="v-panel-body !p-0">
+        <div class="divide-y divide-[var(--v-hairline-subtle)]">
           {% for m in summary.merchants %}
           <a href="{% url 'expenses_home' %}?m={{ m.month_param }}&q={{ m.merchant|urlencode }}"
-             class="p-2 -mx-1 rounded-xl hover:bg-base-200/60 transition-all flex items-center gap-2.5 cursor-pointer">
-            <span class="w-6 h-6 rounded-lg bg-base-300/80 border border-base-content/10 text-[11px] font-bold tabular-nums flex items-center justify-center opacity-60 shrink-0">
+             class="px-4 py-2.5 min-h-12 hover:bg-[var(--v-hover)] transition-colors flex items-center gap-3 cursor-pointer {% if forloop.counter > 6 %}exp-ymerch-more hidden{% endif %}">
+            <span class="w-6 h-6 rounded-md bg-[var(--v-elevated)] text-xs font-bold tabular-nums flex items-center justify-center text-base-content/65 shrink-0">
               {{ forloop.counter }}
             </span>
             <div class="flex-1 min-w-0">
               <div class="flex items-baseline justify-between gap-2">
-                <span class="text-xs sm:text-sm font-semibold truncate">{{ m.merchant }}</span>
-                <span class="text-xs sm:text-sm font-bold tabular-nums shrink-0">{{ m.total|inr }}</span>
+                <span class="text-xs sm:text-sm font-semibold truncate text-base-content">{{ m.merchant }}</span>
+                <span class="text-xs sm:text-sm font-bold tabular-nums shrink-0 text-base-content">{{ m.total|inr }}</span>
               </div>
               <div class="flex items-center gap-2 mt-1">
                 <div class="exp-bar flex-1" style="--h:200"><span style="width:{{ m.bar }}%"></span></div>
-                <span class="text-[10px] opacity-45 tabular-nums shrink-0">× {{ m.count }} · avg {{ m.avg|inr_short }}</span>
+                <span class="text-xs text-base-content/55 tabular-nums shrink-0">× {{ m.count }} · avg {{ m.avg|inr_short }}</span>
               </div>
             </div>
           </a>
           {% endfor %}
         </div>
+
+        {% if summary.merchants|length > 6 %}
+        <div class="flex justify-center py-2 px-4 border-t border-[var(--v-hairline)]">
+          <button type="button" id="expYearMerchBtn"
+                  class="v-btn v-btn-ghost !min-h-11 lg:!min-h-8 text-xs font-semibold gap-1 text-primary cursor-pointer"
+                  onclick="toggleYearMerchants()">
+            <span id="expYearMerchTxt" data-collapsed="Show all {{ summary.merchants|length }} merchants" data-expanded="Show top 6 only">Show all {{ summary.merchants|length }} merchants</span>
+            <span id="expYearMerchIcon" class="material-symbols-outlined text-base">expand_more</span>
+          </button>
+        </div>
+        {% endif %}
       </div>
     </section>
   </div>
   {% endif %}
 
-  {# --- RIGHT: Payment Sources & Household Split (6 cols) --- #}
+  {# --- RIGHT: Payment Sources + Standalone Household Member Split (6 cols, balanced stack) --- #}
   {% if summary.sources %}
-  <div id="yrSectionSources" class="{% if summary.merchants %}lg:col-span-6{% else %}lg:col-span-12{% endif %} hidden lg:block">
-    <section class="v-panel">
+  <div id="yrSectionSources" class="{% if summary.merchants %}lg:col-span-6{% else %}lg:col-span-12{% endif %} hidden lg:flex flex-col gap-5 space-y-4 lg:space-y-0 min-w-0">
+    <section class="v-panel !self-stretch !w-full max-w-full min-w-0 !mb-0">
       <div class="v-panel-header flex items-center justify-between">
         <div class="flex items-center gap-2">
           <span class="material-symbols-outlined text-base opacity-60">credit_card</span>
           <h2 class="v-panel-title">Cards &amp; Payment Instruments</h2>
         </div>
-        <span class="text-[11px] opacity-45 tabular-nums">{{ summary.sources|length }} source{{ summary.sources|length|pluralize }}</span>
+        <span class="text-xs opacity-50 tabular-nums">{{ summary.sources|length }} source{{ summary.sources|length|pluralize }}</span>
       </div>
 
-      <div class="v-panel-body">
-        <div class="flex flex-col gap-2">
+      <div class="v-panel-body !p-0">
+        <div class="divide-y divide-[var(--v-hairline-subtle)]">
           {% for s in summary.sources %}
-          <div class="p-2.5 rounded-xl bg-base-300/30 border border-base-content/10 flex items-center gap-3">
+          <div class="px-4 py-3 flex items-center gap-3">
             <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
               <span class="material-symbols-outlined text-base">{{ s.icon }}</span>
             </div>
             <div class="flex-1 min-w-0">
               <div class="flex items-baseline justify-between gap-2">
-                <span class="text-xs sm:text-sm font-semibold truncate">{{ s.name }}</span>
-                <span class="text-xs sm:text-sm font-bold tabular-nums shrink-0">{{ s.total|inr }}</span>
+                <span class="text-xs sm:text-sm font-semibold truncate text-base-content">{{ s.name }}</span>
+                <span class="text-xs sm:text-sm font-bold tabular-nums shrink-0 text-base-content">{{ s.total|inr }}</span>
               </div>
               <div class="flex items-center gap-2 mt-1">
                 <div class="exp-bar flex-1" style="--h:220"><span style="width:{{ s.bar }}%"></span></div>
-                <span class="text-[10px] opacity-50 tabular-nums shrink-0">{{ s.count }} txn{{ s.count|pluralize }} · {{ s.pct }}%</span>
+                <span class="text-xs text-base-content/55 tabular-nums shrink-0">{{ s.count }} txn{{ s.count|pluralize }} · {{ s.pct }}%</span>
               </div>
             </div>
           </div>
           {% endfor %}
         </div>
+      </div>
+    </section>
 
-        {% if summary.members|length > 1 %}
-        <div class="mt-4 pt-4 border-t border-base-content/10">
-          <div class="text-[10px] font-bold uppercase tracking-wider opacity-50 mb-2.5">Household Member Split</div>
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+    {% if summary.members|length > 1 %}
+    <section class="v-panel !self-stretch !w-full max-w-full min-w-0 !mb-0" aria-label="Household Member Split">
+      <div class="v-panel-header flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-base opacity-60">group</span>
+          <h2 class="v-panel-title">Household Member Split</h2>
+        </div>
+        <span class="text-xs opacity-50 tabular-nums">{{ summary.members|length }} profiles</span>
+      </div>
+
+      <div class="px-4 py-3 border-b border-[var(--v-hairline)]">
+        <div class="v-horizon !mt-0">
+          <div class="v-horizon-bar">
             {% for mem in summary.members %}
-            <div class="p-2.5 rounded-xl bg-base-300/30 border border-base-content/10">
-              <div class="text-[11px] opacity-60 truncate">{{ mem.name }}</div>
-              <div class="text-sm font-bold tabular-nums mt-0.5">{{ mem.total|inr_short }}</div>
-              <div class="text-[10px] opacity-45 tabular-nums">{{ mem.pct }}% · {{ mem.count }} txns</div>
-            </div>
+            <span class="v-horizon-seg" style="width:{{ mem.pct }}%;background:{% cycle '#6366f1' '#10b981' '#38bdf8' '#f59e0b' %};" title="{{ mem.name }}: {{ mem.total|inr }} ({{ mem.pct }}%)"></span>
             {% endfor %}
           </div>
         </div>
-        {% endif %}
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-px bg-[var(--v-hairline)]">
+        {% for mem in summary.members %}
+        <div class="bg-[var(--v-sheet)] p-3.5 min-w-0">
+          <div class="flex items-center gap-1.5">
+            <span class="w-2 h-2 rounded-full shrink-0" style="background:{% cycle '#6366f1' '#10b981' '#38bdf8' '#f59e0b' %};"></span>
+            <span class="text-xs text-base-content/70 font-medium truncate">{{ mem.name }}</span>
+          </div>
+          <div class="text-base font-extrabold text-base-content tabular-nums mt-1">{{ mem.total|inr_short }}</div>
+          <div class="text-xs text-base-content/50 tabular-nums mt-0.5">{{ mem.pct }}% · {{ mem.count }} txn{{ mem.count|pluralize }}</div>
+        </div>
+        {% endfor %}
       </div>
     </section>
+    {% endif %}
   </div>
   {% endif %}
 
@@ -528,38 +539,36 @@
 <section id="yrSectionSubscriptions" class="v-panel mb-5 hidden lg:block border-violet-500/20">
   <div class="v-panel-header flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4">
     <div class="flex items-center gap-3">
-      <span class="jw-type-avatar" style="--h:280;width:2.5rem;height:2.5rem;border-radius:.75rem">
+      <span class="jw-type-avatar shrink-0" style="--h:280;width:2.5rem;height:2.5rem;border-radius:.75rem">
         <span class="icon-filled material-symbols-outlined text-xl">subscriptions</span>
       </span>
       <div>
         <div class="flex items-center flex-wrap gap-2">
           <h2 class="v-panel-title">Recurring Subscriptions</h2>
           {% if summary.subscriptions.services_count %}
-          <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20">{{ summary.subscriptions.services_count }} service{{ summary.subscriptions.services_count|pluralize }}</span>
+          <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20 tabular-nums">{{ summary.subscriptions.services_count }} service{{ summary.subscriptions.services_count|pluralize }}</span>
           {% endif %}
           {% if summary.subscriptions.share_pct %}
-          <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-base-300/70 border border-base-content/10 opacity-70">{{ summary.subscriptions.share_pct }}% of FY spend</span>
+          <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-base-300/70 border border-base-content/10 opacity-75 tabular-nums">{{ summary.subscriptions.share_pct }}% of FY spend</span>
           {% endif %}
         </div>
-        <p class="text-[11px] opacity-50 mt-0.5">Month-wise cadence across Indian FY (April → March)</p>
+        <p class="text-[11px] opacity-55 mt-0.5">Month-wise cadence across Indian FY (April → March)</p>
       </div>
     </div>
 
-    <div class="flex items-center gap-3 sm:gap-4 bg-base-300/40 px-3.5 py-2 rounded-xl border border-base-content/10 self-start sm:self-auto">
-      <div>
-        <div class="text-[10px] font-bold uppercase tracking-wider opacity-45">Annual Spend</div>
+    <div class="flex items-center divide-x divide-[var(--v-hairline)] self-start sm:self-auto">
+      <div class="pr-3.5">
+        <div class="v-stat-label">Annual Spend</div>
         <div class="text-base lg:text-lg font-extrabold tabular-nums text-violet-400">{% if summary.subscriptions.total %}{{ summary.subscriptions.total|inr }}{% else %}₹0{% endif %}</div>
       </div>
-      <div class="w-px h-8 bg-base-content/10"></div>
-      <div>
-        <div class="text-[10px] font-bold uppercase tracking-wider opacity-45">Monthly Avg</div>
-        <div class="text-sm lg:text-base font-bold tabular-nums opacity-90">{% if summary.subscriptions.avg_month %}{{ summary.subscriptions.avg_month|inr }}/mo{% else %}₹0/mo{% endif %}</div>
+      <div class="px-3.5">
+        <div class="v-stat-label">Monthly Avg</div>
+        <div class="text-sm lg:text-base font-bold tabular-nums text-base-content">{% if summary.subscriptions.avg_month %}{{ summary.subscriptions.avg_month|inr }}/mo{% else %}₹0/mo{% endif %}</div>
       </div>
       {% if summary.subscriptions.count %}
-      <div class="w-px h-8 bg-base-content/10 hidden sm:block"></div>
-      <div class="hidden sm:block">
-        <div class="text-[10px] font-bold uppercase tracking-wider opacity-45">Charges</div>
-        <div class="text-sm lg:text-base font-bold tabular-nums opacity-90">{{ summary.subscriptions.count }}</div>
+      <div class="pl-3.5 hidden sm:block">
+        <div class="v-stat-label">Charges</div>
+        <div class="text-sm lg:text-base font-bold tabular-nums text-base-content">{{ summary.subscriptions.count }}</div>
       </div>
       {% endif %}
     </div>
@@ -570,61 +579,61 @@
 
     {# Sub-navigation toggle for Subscriptions #}
     <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-      <div class="inline-flex items-center gap-1 bg-base-300/60 p-1 rounded-lg border border-base-content/10">
-        <button type="button" id="subViewBtnAll" class="px-2.5 py-1 rounded-md text-xs font-semibold bg-violet-600 text-white cursor-pointer transition-colors" onclick="switchSubView('all')">
+      <div class="inline-flex items-center gap-1 bg-base-300/60 p-1 rounded-xl border border-base-content/10">
+        <button type="button" id="subViewBtnAll" class="v-segmented-item !min-h-11 lg:!min-h-8 px-3 rounded-lg text-xs font-semibold bg-violet-600 text-white cursor-pointer transition-colors" onclick="switchSubView('all')">
           All Views
         </button>
-        <button type="button" id="subViewBtnMatrix" class="px-2.5 py-1 rounded-md text-xs font-semibold opacity-65 hover:opacity-100 cursor-pointer transition-colors" onclick="switchSubView('matrix')">
+        <button type="button" id="subViewBtnMatrix" class="v-segmented-item !min-h-11 lg:!min-h-8 px-3 rounded-lg text-xs font-semibold opacity-65 hover:opacity-100 cursor-pointer transition-colors" onclick="switchSubView('matrix')">
           Service Matrix
         </button>
-        <button type="button" id="subViewBtnMonths" class="px-2.5 py-1 rounded-md text-xs font-semibold opacity-65 hover:opacity-100 cursor-pointer transition-colors" onclick="switchSubView('months')">
+        <button type="button" id="subViewBtnMonths" class="v-segmented-item !min-h-11 lg:!min-h-8 px-3 rounded-lg text-xs font-semibold opacity-65 hover:opacity-100 cursor-pointer transition-colors" onclick="switchSubView('months')">
           Monthly Calendar
         </button>
       </div>
-      <span class="text-[11px] opacity-45 font-medium">12 months (Apr {{ fy_start }} – Mar {{ fy_start|add:1 }})</span>
+      <span class="text-[11px] opacity-50 font-medium tabular-nums">12 months (Apr {{ fy_start }} – Mar {{ fy_start|add:1 }})</span>
     </div>
 
     {# 1. Service Cadence & FY Spend Matrix #}
     {% if summary.subscriptions.services %}
     <div id="subMatrixContainer">
-      <div class="flex items-center justify-between mb-3">
+      <div class="flex items-center justify-between mb-3 gap-2">
         <div>
-          <h3 class="text-xs font-bold uppercase tracking-wider opacity-60">Service Cadence &amp; FY Spend Matrix</h3>
-          <p class="text-[11px] opacity-45">Billing continuity and monthly rates across the fiscal calendar</p>
+          <h3 class="text-sm font-bold text-base-content">Service Cadence &amp; FY Spend Matrix</h3>
+          <p class="text-[11px] opacity-55">Billing continuity and monthly rates across the fiscal calendar</p>
         </div>
-        <span class="text-[10px] opacity-60 font-medium px-2 py-0.5 rounded-full bg-base-300/60 border border-base-content/10 hidden sm:inline-flex">12 months (Apr - Mar)</span>
+        <span class="text-[10px] opacity-65 font-medium px-2 py-0.5 rounded-full bg-base-300/60 border border-base-content/10 hidden sm:inline-flex">12 months (Apr - Mar)</span>
       </div>
 
-      {# Mobile-First Service Cadence Cards (< md) #}
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 md:hidden mb-4">
+      {# Mobile & Tablet Service Cadence Grid (< lg: hairline-ruled, zero nested cards) #}
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-px bg-[var(--v-hairline)] border border-[var(--v-hairline)] rounded-xl overflow-hidden lg:hidden mb-4">
         {% for s in summary.subscriptions.services %}
-        <div class="p-3 rounded-xl bg-base-300/40 border border-base-content/10 flex flex-col gap-2.5">
+        <div class="p-3.5 bg-[var(--v-sheet)] flex flex-col gap-2.5">
           <div class="flex items-center justify-between gap-2">
-            <div class="flex items-center gap-2 min-w-0">
-              <div class="w-7 h-7 rounded-lg bg-violet-500/15 flex items-center justify-center shrink-0">
-                <span class="material-symbols-outlined text-sm text-violet-400">{{ s.icon }}</span>
+            <div class="flex items-center gap-2.5 min-w-0">
+              <div class="w-8 h-8 rounded-lg bg-violet-500/15 flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-base text-violet-400">{{ s.icon }}</span>
               </div>
               <div class="min-w-0">
-                <div class="font-bold text-xs truncate">{{ s.name }}</div>
-                <div class="text-[10px] opacity-55 tabular-nums">{{ s.latest_amount|inr_short }}{% if s.months_active > 1 %}/mo{% endif %} · {{ s.months_active }}/12 mo</div>
+                <div class="font-bold text-xs sm:text-sm truncate text-base-content">{{ s.name }}</div>
+                <div class="text-xs opacity-60 tabular-nums">{{ s.latest_amount|inr_short }}{% if s.months_active > 1 %}/mo{% endif %} · {{ s.months_active }}/12 mo</div>
               </div>
             </div>
             <div class="text-right shrink-0">
               <div class="text-sm font-extrabold tabular-nums text-violet-400">{{ s.total|inr }}</div>
-              <span class="text-[10px] font-medium px-1.5 py-0.5 rounded {% if s.months_active == 12 %}bg-emerald-500/15 text-emerald-400{% else %}bg-base-content/10 opacity-70{% endif %}">
+              <span class="text-xs font-medium px-1.5 py-0.5 rounded tabular-nums {% if s.months_active == 12 %}bg-emerald-500/15 text-emerald-400{% else %}bg-base-content/10 opacity-75{% endif %}">
                 {{ s.months_active }}/12 mo
               </span>
             </div>
           </div>
 
-          {# 12-Month Apr -> Mar Visual Pill Strip #}
-          <div class="grid grid-cols-12 gap-1 pt-1.5 border-t border-base-content/10">
+          {# 12-Month Apr -> Mar Touch-Ergonomic 6x2 Pill Grid (>=44px height & width) #}
+          <div class="grid grid-cols-6 gap-1.5 pt-2 border-t border-[var(--v-hairline)]">
             {% for mv in s.months_data %}
             <a href="{% url 'expenses_home' %}?m={{ mv.param }}"
-               class="flex flex-col items-center py-1 rounded-md text-[9px] font-bold transition-all {% if mv.paid %}bg-violet-500/20 text-violet-300 border border-violet-500/30{% elif mv.started %}bg-base-100/40 opacity-35{% else %}opacity-20{% endif %}"
+               class="flex flex-col items-center justify-center !min-h-11 rounded-lg text-xs font-bold transition-all tabular-nums {% if mv.paid %}bg-violet-500/20 text-violet-300 border border-violet-500/30{% elif mv.started %}bg-[var(--v-elevated)] opacity-55{% else %}opacity-30{% endif %}"
                title="{{ mv.label }}: {% if mv.paid %}{{ mv.amount|inr }}{% elif mv.started %}No charge{% else %}Upcoming{% endif %}">
-              <span>{{ mv.label|slice:":1" }}</span>
-              <span class="text-[8px] mt-0.5">{% if mv.paid %}✓{% else %}·{% endif %}</span>
+              <span>{{ mv.label }}</span>
+              <span class="text-xs leading-none mt-0.5">{% if mv.paid %}✓{% else %}·{% endif %}</span>
             </a>
             {% endfor %}
           </div>
@@ -632,14 +641,14 @@
         {% endfor %}
       </div>
 
-      {# Desktop Full Matrix Table #}
-      <div class="v-table-wrap hidden md:block overflow-x-auto rounded-xl border border-base-content/10 bg-base-300/20">
-        <table class="v-table w-full text-xs">
+      {# Desktop Full Matrix Table (lg+) #}
+      <div class="v-table-wrap hidden lg:block overflow-x-auto rounded-xl border border-[var(--v-hairline)] bg-base-300/20">
+        <table class="v-table v-table-sticky w-full text-xs">
           <thead>
-            <tr class="text-[10px] opacity-55 border-b border-base-content/10 bg-base-300/40">
+            <tr class="text-xs opacity-60 border-b border-[var(--v-hairline)] bg-base-300/40">
               <th class="py-2.5 pl-3 sticky left-0 bg-base-300 z-10 text-left">Service</th>
-              <th class="py-2.5 text-right">Latest / Rate</th>
-              <th class="py-2.5 text-right">FY Total</th>
+              <th class="py-2.5 text-right v-num">Latest / Rate</th>
+              <th class="py-2.5 text-right v-num">FY Total</th>
               <th class="py-2.5 text-center">Cadence</th>
               {% for m in summary.subscriptions.months %}
               <th class="py-2.5 text-center w-9 px-0.5">{{ m.label }}</th>
@@ -648,7 +657,7 @@
           </thead>
           <tbody>
             {% for s in summary.subscriptions.services %}
-            <tr class="hover:bg-base-content/5 border-b border-base-content/5">
+            <tr class="hover:bg-[var(--v-hover)] border-b border-[var(--v-hairline-subtle)]">
               <td class="py-2.5 pl-3 sticky left-0 bg-base-200/95 backdrop-blur-sm z-10">
                 <div class="flex items-center gap-2">
                   <div class="w-6 h-6 rounded-lg bg-violet-500/15 flex items-center justify-center shrink-0">
@@ -657,21 +666,21 @@
                   <span class="font-semibold text-xs truncate max-w-[160px]">{{ s.name }}</span>
                 </div>
               </td>
-              <td class="py-2.5 text-right tabular-nums text-xs font-medium opacity-75">
+              <td class="py-2.5 text-right v-num tabular-nums text-xs font-medium opacity-80">
                 {{ s.latest_amount|inr_short }}{% if s.months_active > 1 %}/mo{% endif %}
               </td>
-              <td class="py-2.5 text-right tabular-nums text-xs font-bold text-violet-400">
+              <td class="py-2.5 text-right v-num tabular-nums text-xs font-bold text-violet-400">
                 {{ s.total|inr }}
               </td>
               <td class="py-2.5 text-center">
-                <span class="text-[10px] font-medium px-1.5 py-0.5 rounded {% if s.months_active == 12 %}bg-emerald-500/15 text-emerald-400{% else %}bg-base-content/10 opacity-70{% endif %}">
+                <span class="text-[10px] font-medium px-1.5 py-0.5 rounded tabular-nums {% if s.months_active == 12 %}bg-emerald-500/15 text-emerald-400{% else %}bg-base-content/10 opacity-75{% endif %}">
                   {{ s.months_active }}/12 mo
                 </span>
               </td>
               {% for mv in s.months_data %}
               <td class="py-2.5 text-center px-0.5">
                 {% if mv.paid %}
-                <a href="{% url 'expenses_home' %}?m={{ mv.param }}" class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-violet-500/20 text-violet-300 hover:bg-violet-600 hover:text-white transition-colors text-[10px] font-bold" title="{{ mv.label }}: {{ mv.amount|inr }}">✓</a>
+                <a href="{% url 'expenses_home' %}?m={{ mv.param }}" class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-violet-500/20 text-violet-300 hover:bg-violet-600 hover:text-white transition-colors text-[10px] font-bold" title="{{ mv.label }}: {{ mv.amount|inr }}">✓</a>
                 {% elif mv.started %}
                 <span class="inline-block w-1.5 h-1.5 rounded-full bg-base-content/15" title="{{ mv.label }}: No charge"></span>
                 {% else %}
@@ -688,49 +697,49 @@
     {% endif %}
 
     {# 2. Month-by-Month Subscription Calendar Grid #}
-    <div id="subMonthsContainer" class="mt-5 pt-4 border-t border-base-content/10">
+    <div id="subMonthsContainer" class="mt-5 pt-4 border-t border-[var(--v-hairline)]">
       <div class="flex items-center justify-between mb-3">
-        <span class="text-xs font-bold uppercase tracking-wider opacity-60">Month-by-month breakdown</span>
-        <span class="text-[11px] opacity-40">Select month to view charges</span>
+        <h3 class="text-sm font-bold text-base-content">Month-by-month breakdown</h3>
+        <span class="text-[11px] opacity-50">Select month to view charges</span>
       </div>
 
-      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-px bg-[var(--v-hairline)] border border-[var(--v-hairline)] rounded-xl overflow-hidden">
         {% for m in summary.subscriptions.months %}
-        <div class="rounded-xl border {% if m.total %}border-violet-500/25 bg-violet-500/5 hover:border-violet-500/40{% elif m.started %}border-base-content/10 bg-base-300/30{% else %}border-dashed border-base-content/10 opacity-40{% endif %} p-2.5 flex flex-col justify-between transition-all">
-          <div class="flex items-center justify-between gap-1 mb-1.5">
-            <a href="{% url 'expenses_home' %}?m={{ m.param }}" class="text-xs font-bold hover:underline flex items-center gap-0.5">
+        <div class="bg-[var(--v-sheet)] {% if m.total %}bg-violet-500/5{% elif not m.started %}opacity-50{% endif %} p-3 flex flex-col justify-between transition-colors">
+          <a href="{% url 'expenses_home' %}?m={{ m.param }}" class="flex items-center justify-between gap-1 !min-h-11 lg:!min-h-7 mb-1 px-1 -mx-1 rounded-lg hover:bg-[var(--v-hover)]">
+            <span class="text-xs font-bold flex items-center gap-0.5 tabular-nums">
               <span>{{ m.label }}</span>
-              <span class="text-[9px] opacity-40 font-normal">'{{ m.year|stringformat:"d"|slice:"2:" }}</span>
-            </a>
+              <span class="text-xs opacity-45 font-normal">'{{ m.year|stringformat:"d"|slice:"2:" }}</span>
+            </span>
             {% if m.count %}
-            <span class="text-[10px] font-bold px-1.5 py-0.2 rounded bg-violet-500/20 text-violet-300">{{ m.count }}</span>
+            <span class="text-xs font-bold px-1.5 py-0.5 rounded bg-violet-500/20 text-violet-300 tabular-nums">{{ m.count }}</span>
             {% elif m.started %}
-            <span class="text-[9px] opacity-30">—</span>
+            <span class="text-xs opacity-35">—</span>
             {% else %}
-            <span class="text-[9px] opacity-40 uppercase">Soon</span>
+            <span class="text-xs opacity-45">Soon</span>
             {% endif %}
-          </div>
+          </a>
 
           <div class="mb-2">
-            <div class="text-sm font-extrabold tabular-nums {% if m.total %}text-violet-400{% else %}opacity-30{% endif %}">
+            <div class="text-sm font-extrabold tabular-nums {% if m.total %}text-violet-400{% else %}opacity-35{% endif %}">
               {% if m.total %}{{ m.total|inr }}{% else %}₹0{% endif %}
             </div>
           </div>
 
-          <div class="flex flex-col gap-1 min-h-[2.5rem]">
+          <div class="divide-y divide-[var(--v-hairline-subtle)] min-h-[2.5rem] flex flex-col">
             {% for item in m.items %}
-            <div class="flex items-center justify-between text-[11px] bg-base-100/60 rounded-md px-1.5 py-1 gap-1 border border-base-content/5" title="{{ item.service }} · ₹{{ item.amount }} on {{ item.day_label }}">
+            <div class="flex items-center justify-between text-xs py-1 gap-1" title="{{ item.service }} · ₹{{ item.amount }} on {{ item.day_label }}">
               <div class="flex items-center gap-1 min-w-0">
-                <span class="material-symbols-outlined text-[13px] opacity-70 shrink-0">{{ item.icon }}</span>
+                <span class="material-symbols-outlined text-xs opacity-70 shrink-0">{{ item.icon }}</span>
                 <span class="truncate font-medium">{{ item.service }}</span>
               </div>
               <span class="tabular-nums font-semibold shrink-0">{{ item.amount|inr_short }}</span>
             </div>
             {% empty %}
             {% if m.started %}
-            <span class="text-[10px] opacity-30 italic self-center my-auto">No charges</span>
+            <span class="text-xs opacity-35 italic self-center my-auto">No charges</span>
             {% else %}
-            <span class="text-[10px] opacity-25 italic self-center my-auto">Upcoming</span>
+            <span class="text-xs opacity-30 italic self-center my-auto">Upcoming</span>
             {% endif %}
             {% endfor %}
           </div>
@@ -740,24 +749,24 @@
     </div>
 
     {% else %}
-    <div class="flex flex-col items-center justify-center py-10 text-center gap-2">
+    <div class="v-empty flex flex-col items-center justify-center py-10 text-center gap-2">
       <div class="w-12 h-12 rounded-xl bg-violet-500/10 flex items-center justify-center">
-        <span class="material-symbols-outlined text-2xl text-violet-400 opacity-60">subscriptions</span>
+        <span class="material-symbols-outlined text-2xl text-violet-400 opacity-70">subscriptions</span>
       </div>
-      <p class="text-xs font-semibold opacity-60">No recurring subscriptions recorded for {{ summary.label }} yet</p>
-      <p class="text-[11px] opacity-40 max-w-sm">Expenses under Subscriptions or recurring digital merchants like Netflix, Spotify, and YouTube will appear here month-by-month.</p>
+      <p class="text-xs font-semibold opacity-75">No recurring subscriptions recorded for {{ summary.label }} yet</p>
+      <p class="text-[11px] opacity-50 max-w-sm">Expenses under Subscriptions or recurring digital merchants like Netflix, Spotify, and YouTube will appear here month-by-month.</p>
     </div>
     {% endif %}
   </div>
 </section>
 
 {% else %}
-<div class="v-panel flex flex-col items-center justify-center py-16 gap-3 text-center my-8">
+<div class="v-panel v-empty flex flex-col items-center justify-center py-16 gap-3 text-center my-8">
   <div class="w-16 h-16 rounded-2xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center">
     <span class="icon-filled material-symbols-outlined text-3xl text-amber-400">calendar_month</span>
   </div>
-  <p class="font-bold opacity-75">No spend recorded in {{ summary.label }} yet</p>
-  <a href="{% url 'expenses_home' %}" class="v-btn v-btn-primary text-xs gap-1.5 mt-2">
+  <p class="font-bold opacity-80">No spend recorded in {{ summary.label }} yet</p>
+  <a href="{% url 'expenses_home' %}" class="v-btn v-btn-primary !min-h-11 lg:!min-h-9 text-xs gap-1.5 mt-2">
     <span class="material-symbols-outlined text-sm">arrow_back</span>Go to monthly expenses
   </a>
 </div>
@@ -770,6 +779,17 @@ function toggleYearCategories() {
   var rows = document.querySelectorAll('.exp-ycat-more');
   var btnTxt = document.getElementById('expYearCatTxt');
   var btnIcon = document.getElementById('expYearCatIcon');
+  if (!rows.length || !btnTxt || !btnIcon) return;
+  var expanding = rows[0].classList.contains('hidden');
+  rows.forEach(function (el) { el.classList.toggle('hidden', !expanding); });
+  btnTxt.textContent = expanding ? btnTxt.dataset.expanded : btnTxt.dataset.collapsed;
+  btnIcon.textContent = expanding ? 'expand_less' : 'expand_more';
+}
+
+function toggleYearMerchants() {
+  var rows = document.querySelectorAll('.exp-ymerch-more');
+  var btnTxt = document.getElementById('expYearMerchTxt');
+  var btnIcon = document.getElementById('expYearMerchIcon');
   if (!rows.length || !btnTxt || !btnIcon) return;
   var expanding = rows[0].classList.contains('hidden');
   rows.forEach(function (el) { el.classList.toggle('hidden', !expanding); });
@@ -836,12 +856,12 @@ function switchYearMobileTab(tab) {
     var btn = buttons[k];
     if (!btn) return;
     var active = k === tab;
-    btn.classList.toggle('bg-primary/20', active);
+    btn.setAttribute('aria-selected', active ? 'true' : 'false');
+    btn.classList.toggle('bg-base-100', active);
     btn.classList.toggle('text-primary', active);
-    btn.classList.toggle('border-primary/30', active);
-    btn.classList.toggle('border', active);
+    btn.classList.toggle('shadow-xs', active);
     btn.classList.toggle('font-bold', active);
-    btn.classList.toggle('opacity-60', !active);
+    btn.classList.toggle('opacity-65', !active);
   });
   if (tab === 'overview') {
     setTimeout(function () { window.dispatchEvent(new Event('resize')); }, 50);

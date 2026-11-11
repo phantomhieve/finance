@@ -1,62 +1,12 @@
 {% extends "admin/base.html" %}
-{% load static %}
+{% load i18n static %}
 
-{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | {{ site_title|default:_('Django site admin') }}{% endblock %}
+{% block title %}{% if subtitle %}{{ subtitle }} | {% endif %}{{ title }} | {{ site_title|default:_('Vault Admin') }}{% endblock %}
 
 {% block branding %}
-<div id="site-name" style="background:#0b0f17;padding:8px 16px;">
-  <a href="{% url 'admin:index' %}" style="display:inline-flex;align-items:center;gap:8px;text-decoration:none;color:#f1f5f9;background:#0b0f17;">
-    <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:#182030;border:1px solid rgba(99,102,241,0.35);color:#818cf8;font-weight:800;font-size:14px;">V</span>
-    <span style="font-weight:700;letter-spacing:-0.02em;color:#f1f5f9;">{{ site_header|default:_('Django administration') }}</span>
-    <span style="font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;padding:2px 8px;border-radius:999px;background:#182030;color:#cbd5e1;border:1px solid rgba(255,255,255,0.1);">Console</span>
-  </a>
-</div>
+    {% include "unfold/helpers/site_branding.html" %}
 {% endblock %}
 
 {% block dark-mode-vars %}{% endblock %}
-
-{% block extrastyle %}
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="{% static 'css/admin_theme.css' %}">
-<style>
-  :root {
-    --primary: #6366f1 !important;
-    --primary-fg: #ffffff !important;
-    --body-bg: #0b0f17 !important;
-    --darkened-bg: #111722 !important;
-    --header-bg: #0b0f17 !important;
-    --breadcrumbs-bg: #111722 !important;
-  }
-  #header {
-    background: #0b0f17 !important;
-    border-bottom: 1px solid rgba(255,255,255,0.08) !important;
-  }
-  div.breadcrumbs {
-    background: #111722 !important;
-    border-bottom: 1px solid rgba(255,255,255,0.06) !important;
-  }
-  .module, fieldset, #changelist .results table {
-    background: #111722 !important;
-    border: 1px solid rgba(255,255,255,0.08) !important;
-  }
-  .module h2, .module caption, .module thead th, fieldset h2 {
-    background: #182030 !important;
-    color: #f1f5f9 !important;
-  }
-  .user-tools-welcome, #user-tools a {
-    color: #94a3b8 !important;
-  }
-  #user-tools a:hover {
-    color: #f1f5f9 !important;
-  }
-</style>
-{% endblock %}
-
-{% block userlinks %}
-<a href="/" style="font-weight:600;color:#818cf8 !important;text-decoration:none;background:#0b0f17;">&larr; Return to Vault</a> /
-{{ block.super }}
-{% endblock %}
 
 {% block nav-global %}{% endblock %}

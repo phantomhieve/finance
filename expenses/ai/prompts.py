@@ -91,12 +91,12 @@ def build_categorise_prompt(
     allowed_categories: set[str] | list[str],
     examples: list[tuple[str, str]],
 ) -> str:
-    """Build structured prompt for batch transaction categorisation."""
+    """Build compact structured prompt for batch transaction categorisation."""
     allowed_sorted = sorted(set(allowed_categories))
     return (
-        f"Allowed categories: {json.dumps(allowed_sorted)}\n\n"
-        f"Household examples (merchant → category): {json.dumps(examples[:40])}\n\n"
-        f"Transactions:\n{json.dumps(items, default=str)}"
+        f"Allowed categories: {json.dumps(allowed_sorted, separators=(',', ':'), ensure_ascii=False)}\n\n"
+        f"Household examples (merchant → category): {json.dumps(examples[:40], separators=(',', ':'), ensure_ascii=False)}\n\n"
+        f"Transactions:\n{json.dumps(items, default=str, separators=(',', ':'), ensure_ascii=False)}"
     )
 
 
@@ -134,18 +134,20 @@ def chunk_statement_text(text: str, size: int = STATEMENT_CHUNK, max_chunks: int
 
 def build_match_prompt(items: list[dict[str, Any]]) -> str:
     """Serialise statement lines with their candidate expenses for AI matching."""
-    return mask_sensitive(f"Statement lines with candidates:\n{json.dumps(items, default=str)}")
+    return mask_sensitive(
+        f"Statement lines with candidates:\n{json.dumps(items, default=str, separators=(',', ':'), ensure_ascii=False)}"
+    )
 
 
 def build_monthly_note_prompt(summary_payload: dict[str, Any]) -> str:
     """Serialize summary metrics to JSON for monthly commentary."""
-    return json.dumps(summary_payload, default=str)
+    return json.dumps(summary_payload, default=str, separators=(",", ":"), ensure_ascii=False)
 
 
 def build_anomaly_prompt(items: list[dict[str, Any]], context: dict[str, Any]) -> str:
     """Construct prompt for AI anomaly detection with household spending context."""
     return (
-        f"Household spending context:\n{json.dumps(context, default=str)}\n\n"
-        f"Transactions to audit:\n{json.dumps(items, default=str)}"
+        f"Household spending context:\n{json.dumps(context, default=str, separators=(',', ':'), ensure_ascii=False)}\n\n"
+        f"Transactions to audit:\n{json.dumps(items, default=str, separators=(',', ':'), ensure_ascii=False)}"
     )
 

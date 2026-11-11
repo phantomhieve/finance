@@ -21,12 +21,31 @@ ROUND2: Decimal = Decimal('0.01')
 
 def safe_redirect(request: HttpRequest, fallback: str = 'dashboard') -> HttpResponseRedirect:
     """Redirect to the `next` POST/GET param only if it's a safe, same-host URL."""
-    target = request.POST.get('next') or request.GET.get('next', '')
+    target = (request.POST.get('next') or request.GET.get('next', '') or '').strip()
     allowed_hosts = {request.get_host()}
-    if target and url_has_allowed_host_and_scheme(target, allowed_hosts=allowed_hosts):
-        return redirect(target)
-    if fallback and isinstance(fallback, str) and url_has_allowed_host_and_scheme(fallback, allowed_hosts=allowed_hosts):
-        return redirect(fallback)
+    require_https = request.is_secure()
+    if (
+        target
+        and not any(ch in target for ch in ('\r', '\n', '\x00', '\\'))
+        and (
+            (target.startswith('/') and not target.startswith('//'))
+            or target.startswith(('http://', 'https://'))
+        )
+        and url_has_allowed_host_and_scheme(
+            target, allowed_hosts=allowed_hosts, require_https=require_https
+        )
+    ):
+        return HttpResponseRedirect(target)
+    if (
+        fallback
+        and isinstance(fallback, str)
+        and fallback.startswith(('http://', 'https://', '/'))
+        and not fallback.startswith('//')
+        and url_has_allowed_host_and_scheme(
+            fallback, allowed_hosts=allowed_hosts, require_https=require_https
+        )
+    ):
+        return HttpResponseRedirect(fallback)
     if fallback and isinstance(fallback, str) and not fallback.startswith(('/', 'http://', 'https://', '//', '\\')):
         try:
             return redirect(fallback)

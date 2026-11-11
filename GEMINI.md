@@ -1,70 +1,27 @@
-# Antigravity Rules — Vault Personal Finance
+# GEMINI.md — Antigravity Quick Reference
 
-These rules guide Google Antigravity agents when operating within this repository.
-
----
-
-## 1. Code Intelligence & Navigation with CodeGraph
-
-- **CodeGraph is Installed**: The CodeGraph knowledge graph index is initialized in `.codegraph/` (2,200+ nodes, 5,000+ edges) and configured as an MCP server.
-- **Query CodeGraph Before Grepping**:
-  - To locate symbols, classes, or routes: use `codegraph query <symbol>` or the `codegraph_query` MCP tool.
-  - To explore feature subsystems: use `codegraph explore "<topic>"` or `codegraph_explore`.
-  - To trace call paths: use `codegraph callers <symbol>` / `codegraph callees <symbol>` or their MCP equivalents.
-  - Before modifying function signatures: run `codegraph impact <symbol>` to verify the blast radius.
-- **Index Sync**: Run `codegraph sync` after making significant structural code changes.
+Concise operational index for Google Antigravity agents in **Vault**. For full architecture and module contracts, read [`AGENTS.md`](AGENTS.md) and [`.agents/skills/vault-architecture/SKILL.md`](.agents/skills/vault-architecture/SKILL.md).
 
 ---
 
-## 2. Secrets & Credential Protection
+## Core Invariants
 
-- **STRICT PROHIBITION**: Never read, dump, print, or commit secrets:
-  - Secret files: `.env`, `scripts/DEPLOY.env`, `.deploy-keys/`, `credentials/`, `*.pem`, `*.key`, `portfolio/investor_profile.md`, `**/google-service-account.json`.
-  - Never dump environment variables in terminals or outputs (`printenv`, `env`, `echo $SECRET_KEY`).
-  - Never print password hashes, encrypted OAuth tokens, or WebAuthn credentials from the database.
-- Reference `.env.example` or `pftracker/settings.py` when discussing configuration settings.
-
----
-
-## 3. Financial Calculation Standards
-
-- **Decimal Types Only**: Always use Python `Decimal` for currency, interest rates, weights, and holdings. Never use floating-point types for monetary values.
-- **Quantization**: Currency and returns must be quantized to 2 decimal places (`.quantize(Decimal('0.01'))`) or integer rupees (`.quantize(Decimal('0'))`).
-- **Fiscal Calendar**: Vault uses the Indian Financial Year (April 1 to March 31). Use helpers `fy_start_year()` and `fy_label()` from `pftracker.utils`.
-
----
-
-## 4. Multi-Tenancy, Roles & Security
-
-- **Multi-Tenancy**: All data is scoped to an `AccountGroup` with toggles configured in `HouseholdConfig`.
-- **User Roles**:
-  - `PRIMARY`: Full access across all modules, including investments, real estate, and MCP tools.
-  - `ACCOUNT_HOLDER`: Access to Savings, Expenses, Jewellery, HRA, and Notes; investments and investment-tagged expenses are masked.
-  - `LANDLORD`: View-only access strictly restricted to HRA rent records.
-- **Security Gate**: Portfolio and Jewellery are gated behind `_vault_gate`, requiring portfolio password or WebAuthn biometric unlock (30-min TTL).
-
----
-
-## 5. UI & Design System
-
-- **Design Aesthetic**: Dark-first glassmorphism (`night` theme, `#1a1b26`), Inter font, Material Symbols Outlined icons, DaisyUI 5, and Tailwind CSS.
-- **Responsive Layout**: Collapsible sidebar on desktop (`aside#desktopSidebar`), fixed bottom dock navigation on mobile (`nav.dock`).
-- **Interactive Feedback**: Always provide CSRF tokens on forms, use modal confirmations (`#confirmDeleteModal`) for destructive deletions, and adapt Chart.js charts dynamically to theme changes.
-
----
-
-## 6. MCP Architecture & Mutations
-
-- Changes made via MCP must record before/after JSON audit records in `MCPAuditLog` (`mcp_server.audit`) to preserve one-click revert capabilities.
-- Starlette ASGI router (`pftracker.asgi`) serves `/mcp` endpoints alongside Django at `/`.
-
----
-
-## 7. Git Commit & Pre-Push Verification Standards
-
-- **Pre-Push Local Verification (MANDATORY)**: Never commit or push unverified code. Before committing and pushing:
-  - Run lint verification locally: `./venv/bin/ruff check --select F,E9 .` (must pass with 0 errors).
-  - Run test suite locally: `./venv/bin/python manage.py test --keepdb` (must pass 100%).
-  - Synchronize CodeGraph index: `codegraph sync`.
-- **Conventional Commits**: Every commit must follow `<type>(<scope>): <summary>` format (`feat`, `fix`, `refactor`, `perf`, `test`, `chore`, `docs`).
-- **Comprehensive Body**: Commit messages must never be vague or single-line summaries. Always include a paragraph detailing motivation and a bulleted list of specific changes, additions, and removals.
+1. **CodeGraph First ([`.agents/rules/codegraph-navigation.md`](.agents/rules/codegraph-navigation.md))**:
+   - Use `codegraph_query`, `codegraph_node`, `codegraph_explore`, `codegraph_callers`, `codegraph_callees`, and `codegraph_impact` (index in `.codegraph/`) before grepping. Run `codegraph sync` after structural changes.
+2. **Zero Secret Exposure ([`.agents/rules/no-secrets.md`](.agents/rules/no-secrets.md))**:
+   - Never read, print, grep, or commit `.env`, `scripts/DEPLOY.env`, `.deploy-keys/`, `credentials/`, `*.pem`, `*.key`, `portfolio/investor_profile.md`, or service-account JSONs; never dump env vars (`env`, `printenv`). Reference `.env.example`, `portfolio/investor_profile.md.example`, and `pftracker/settings.py`.
+3. **Financial Precision & Indian FY ([`.agents/rules/financial-precision-and-security.md`](.agents/rules/financial-precision-and-security.md))**:
+   - Use Python `Decimal` exclusively for money, weights, and rates (`pftracker.utils.pct`, `pnl_pct`).
+   - Indian Financial Year runs April 1 – March 31 (`fy_start_year`, `fy_label` in `pftracker.utils`).
+   - Format INR with `{% load indian_format %}` (`|inr`, `|inr_short`, `|indian_number` from `portfolio/templatetags/indian_format.py`) and enforce `tabular-nums`.
+4. **Multi-Tenancy & Role Gates ([`AGENTS.md`](AGENTS.md))**:
+   - Scope every query to `AccountGroup` (`_gf(group)` fail-closed). Enforce `PRIMARY`, `ACCOUNT_HOLDER` (`_hides_investments` masks `Investments` expenses; no portfolio/MCP access), and `LANDLORD` (`/hra/` read-only).
+   - Keep Portfolio & Jewellery behind `_vault_gate` (`30m` TTL) and WebAuthn/password rate limits; enforce `@require_POST` + CSRF on all mutations.
+5. **Private Bank Folio UI ([`DESIGN.md`](DESIGN.md), [`.agents/rules/ui-and-design-system.md`](.agents/rules/ui-and-design-system.md))**:
+   - Dark-first Private Bank Consolidated Statement aesthetic (`night` `#0b0f17` ground / `#111722` sheet; `winter` `#f8fafc` ground / `#ffffff` sheet) built on Tailwind CSS v4 (`@tailwindcss/browser@4`), DaisyUI 5, Inter, Material Symbols Outlined, and `static/css/style.css`.
+   - Use `.v-ledger-band`, `.v-horizon`, `.v-workbench`, and `.v-panel` (zero nested cards, zero eyebrow kickers, `>=44px` touch targets on `<1024px`, desktop `aside#desktopSidebar` + `header.v-topbar`, mobile `nav.v-mobile-dock` + `#mobileNavDrawer`).
+6. **AI Gateway, Carbon Tiering & MCP ([`docs/ux/0001-ai-calling-and-dag-strategy.md`](docs/ux/0001-ai-calling-and-dag-strategy.md))**:
+   - Route all AI calls through `pftracker/ai_gateway/`: `gemini-4-carbon` (`ThinkingLevel.HIGH` in prod) for portfolio strategy/synthesis & land appraisal; `gemini-3.8-flash` (`thinking_budget=0` in prod) for Stage 1 specialist lenses and expense operations.
+   - Pre-compute `Decimal` metrics in Python before prompting, use `DjangoSafeThreadPoolExecutor` for thread concurrency, and log every MCP write via `MCPAuditLog` (`mcp_server/audit.py`).
+7. **Verification & Git ([`.agents/rules/git-commits.md`](.agents/rules/git-commits.md))**:
+   - Run `./venv/bin/ruff check --select F,E9 .`, `./venv/bin/python manage.py check --fail-level WARNING`, `./venv/bin/python manage.py test --keepdb`, and `codegraph sync` before committing with descriptive Conventional Commits.

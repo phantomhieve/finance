@@ -49,3 +49,9 @@ media/
 
 # CodeGraph local index
 .codegraph/
+
+# Impeccable local runtime state (keep .impeccable/design.json tracked)
+.impeccable/mocks/
+.impeccable/questions/
+.impeccable/review/
+.impeccable/surfaces/

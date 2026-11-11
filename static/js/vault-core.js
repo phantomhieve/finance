@@ -1,7 +1,20 @@
 var Vault = (function(){
   var el = document.getElementById('pageOverlay');
-  function hide() { if (el) el.style.display = 'none'; }
-  function show() { if (el) el.style.display = 'flex'; }
+  function hide() {
+    if (el) {
+      el.style.display = 'none';
+      el.setAttribute('aria-hidden', 'true');
+    }
+    document.querySelectorAll('form[data-vault-submitting]').forEach(function(f) {
+      delete f.dataset.vaultSubmitting;
+    });
+  }
+  function show() {
+    if (el) {
+      el.style.display = 'flex';
+      el.setAttribute('aria-hidden', 'false');
+    }
+  }
   function afterPaint(fn) { requestAnimationFrame(function(){ requestAnimationFrame(fn); }); }
 
   hide();
@@ -49,13 +62,19 @@ var Vault = (function(){
 
   document.addEventListener('click', function(e) {
     var a = e.target.closest('a[href]');
-    if (!a || e.metaKey || e.ctrlKey || e.shiftKey) return;
+    if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
     var h = a.getAttribute('href') || '';
-    if (!h || skip.test(h) || a.getAttribute('target') === '_blank') return;
+    if (!h || skip.test(h) || a.getAttribute('target') === '_blank' || a.hasAttribute('download')) return;
     if (a.closest('.dropdown-content')) return;
     var dest;
-    try { dest = new URL(h, cur); if (dest.href === cur) return; } catch(x) {}
+    try { dest = new URL(h, cur); if (dest.href === cur) {
+      var openDrawer = a.closest('dialog[open]');
+      if (openDrawer) openDrawer.close();
+      return;
+    } } catch(x) {}
     e.preventDefault();
+    var parentDialog = a.closest('dialog[open]');
+    if (parentDialog) parentDialog.close();
     // Action links (refresh, sync…) redirect back here; plain navigation lands elsewhere and is ignored.
     if (!dest || !dest.hash) rememberScroll();
     show();
@@ -64,12 +83,17 @@ var Vault = (function(){
   });
 
   document.addEventListener('submit', function(e) {
-    if (e.target.method === 'dialog') return;
-    e.preventDefault();
-    var dialog = e.target.closest('dialog');
-    if (dialog) dialog.close();
-    show();
     var form = e.target;
+    if (form.method === 'dialog') return;
+    if (form.dataset.vaultSubmitting === '1') {
+      e.preventDefault();
+      return;
+    }
+    e.preventDefault();
+    form.dataset.vaultSubmitting = '1';
+    var dialog = form.closest('dialog');
+    if (dialog && dialog.open) dialog.close();
+    show();
     afterPaint(function(){ form.submit(); });
   });
 
@@ -120,5 +144,12 @@ var Vault = (function(){
     navigator.serviceWorker.register('/sw.js').catch(function(){});
   }
 
-  return { showLoader: show, hideLoader: hide, afterPaint: afterPaint };
+  return {
+    showLoader: show,
+    hideLoader: hide,
+    afterPaint: afterPaint,
+    toast: function(msg, lvl) {
+      if (typeof showVaultToast === 'function') showVaultToast(msg, lvl);
+    }
+  };
 })();

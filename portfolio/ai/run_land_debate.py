@@ -5,16 +5,16 @@ load_dotenv()
 from google import genai
 
 client = genai.Client(api_key=os.environ['GEMINI_API_KEY'])
-MODEL = 'gemini-3.1-pro-preview'
+MODEL = 'gemini-4-carbon'
 
-print("=== INITIATING LIVE TO-AND-FRO DEBATE: ARGON vs DEEPSEEK ===", flush=True)
+print("=== INITIATING LIVE TO-AND-FRO DEBATE: CARBON vs DEEPSEEK ===", flush=True)
 print(f"Engine: {MODEL} | Task: FY-End Land Appraisal Prompt Architecture\n", flush=True)
 
 # ---------------------------------------------------------------------------
-# Turn 1: Argon Proposes the Master Methodology & Prompts
+# Turn 1: Carbon Proposes the Master Methodology & Prompts
 # ---------------------------------------------------------------------------
-print(">>> TURN 1: ARGON PROPOSES INITIAL LAND VALUATION PROMPTS", flush=True)
-argon_turn1_input = """You are Argon, Chief Quantitative Real Estate Architect for Vault Family Wealth.
+print(">>> TURN 1: CARBON PROPOSES INITIAL LAND VALUATION PROMPTS", flush=True)
+carbon_turn1_input = """You are Carbon, Chief Quantitative Real Estate Architect for Vault Family Wealth.
 We are replacing our old hardcoded +6% annual land markup (April 1) with an AI-driven valuation engine.
 Asset context:
 - Property: Yamuna Expressway Sector 22D Residential Plot (250 Gaj / Sq. Yard).
@@ -27,20 +27,20 @@ Propose:
 3. Draft the exact prompt text for Stage 1 (Market Comps) and Stage 3 (Appreciation Determination).
 """
 
-r1 = client.models.generate_content(model=MODEL, contents=argon_turn1_input)
-argon_draft = r1.text
-print(argon_draft[:800] + "...\n[Argon Turn 1 complete]\n", flush=True)
+r1 = client.models.generate_content(model=MODEL, contents=carbon_turn1_input)
+carbon_draft = r1.text
+print(carbon_draft[:800] + "...\n[Carbon Turn 1 complete]\n", flush=True)
 
 # ---------------------------------------------------------------------------
 # Turn 2: DeepSeek Cross-Examines and Attacks Optimism
 # ---------------------------------------------------------------------------
-print(">>> TURN 2: DEEPSEEK SKEPTICAL AUDITOR CROSS-EXAMINES ARGON", flush=True)
+print(">>> TURN 2: DEEPSEEK SKEPTICAL AUDITOR CROSS-EXAMINES CARBON", flush=True)
 deepseek_turn2_input = f"""You are DeepSeek-R1, acting as the Senior Fiduciary Auditor and Adversarial Risk Officer.
-Argon has just proposed the following valuation framework for the Yamuna Expressway plot:
+Carbon has just proposed the following valuation framework for the Yamuna Expressway plot:
 
---- ARGON PROPOSAL ---
-{argon_draft}
-----------------------
+--- CARBON PROPOSAL ---
+{carbon_draft}
+-----------------------
 
 Interrogate this aggressively from a fiduciary and macro perspective:
 1. Listing vs Registry Reality: Real estate portals (99acres, MagicBricks) quote speculative broker ask prices. How do we prevent these asking premiums from inflating book value?
@@ -55,10 +55,10 @@ deepseek_critique = r2.text
 print(deepseek_critique[:800] + "...\n[DeepSeek Turn 2 complete]\n", flush=True)
 
 # ---------------------------------------------------------------------------
-# Turn 3: Argon Reconciles and Synthesizes Final Multi-Stage Prompts
+# Turn 3: Carbon Reconciles and Synthesizes Final Multi-Stage Prompts
 # ---------------------------------------------------------------------------
-print(">>> TURN 3: ARGON SYNTHESIZES FINAL GROUNDED PROMPTS", flush=True)
-argon_turn3_input = f"""You are Argon. DeepSeek-R1 has provided this intense fiduciary critique:
+print(">>> TURN 3: CARBON SYNTHESIZES FINAL GROUNDED PROMPTS", flush=True)
+carbon_turn3_input = f"""You are Carbon. DeepSeek-R1 has provided this intense fiduciary critique:
 
 --- DEEPSEEK CRITIQUE ---
 {deepseek_critique}
@@ -72,20 +72,20 @@ Reconcile DeepSeek's risk mandates. Provide the finalized, hardened production p
 Output the clean, ready-to-use prompt templates with Python format variables (e.g. {{holding_name}}, {{locality}}, {{circle_rate}}, etc.).
 """
 
-r3 = client.models.generate_content(model=MODEL, contents=argon_turn3_input)
+r3 = client.models.generate_content(model=MODEL, contents=carbon_turn3_input)
 final_prompts = r3.text
-print(final_prompts[:800] + "...\n[Argon Turn 3 complete]\n", flush=True)
+print(final_prompts[:800] + "...\n[Carbon Turn 3 complete]\n", flush=True)
 
 # ---------------------------------------------------------------------------
 # Save full debate record to markdown
 # ---------------------------------------------------------------------------
 output_path = "portfolio/ai/generated_land_prompts.md"
 with open(output_path, "w") as f:
-    f.write("# Live Multi-Turn Debate: Argon & DeepSeek Land Appraisal Prompts\n\n")
+    f.write("# Live Multi-Turn Debate: Carbon & DeepSeek Land Appraisal Prompts\n\n")
     f.write(f"**Engine**: `{MODEL}`  \n")
     f.write("**Date**: 2026-11-03  \n\n")
-    f.write("## Turn 1: Argon Proposed Valuation Architecture\n\n")
-    f.write(argon_draft + "\n\n")
+    f.write("## Turn 1: Carbon Proposed Valuation Architecture\n\n")
+    f.write(carbon_draft + "\n\n")
     f.write("## Turn 2: DeepSeek Fiduciary Cross-Examination & Haircuts\n\n")
     f.write(deepseek_critique + "\n\n")
     f.write("## Turn 3: Synthesized Production Prompts for Multi-Stage DAG\n\n")

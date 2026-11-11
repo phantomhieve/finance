@@ -58,6 +58,10 @@ if [[ -f "${APP_DIR}/portfolio/investor_profile.md" ]]; then
   chown "${APP_OWNER}:${APP_OWNER}" "${APP_DIR}/portfolio/investor_profile.md"
   chmod 600 "${APP_DIR}/portfolio/investor_profile.md"
 fi
+if [[ -d "${APP_DIR}/media" ]]; then
+  chown -R "${APP_OWNER}:${APP_OWNER}" "${APP_DIR}/media"
+  chmod -R u=rwX,go= "${APP_DIR}/media"
+fi
 chmod g+s "$APP_DIR" 2>/dev/null || true
 
 echo "==> Activate script: ${ACTIVATE_SCRIPT}"
@@ -86,12 +90,17 @@ if [[ -n "\$STATIC_DIR" ]]; then
   rsync -a --delete "\$APP/staticfiles/" "\$STATIC_DIR/"
 fi
 
+mkdir -p "\$APP/media/jewellery_photos/cache"
+chown -R "\$APP_OWNER:\$APP_OWNER" "\$APP/media"
+chmod -R u=rwX,go= "\$APP/media"
+
 mkdir -p "\$(dirname "\$CRON_LOG")"
 touch "\$CRON_LOG"
 chown "\$APP_OWNER:\$APP_OWNER" "\$CRON_LOG" 2>/dev/null || true
+chmod 640 "\$CRON_LOG" 2>/dev/null || true
 
 sed -e "s|__APP_DIR__|\$APP|g" -e "s|__APP_OWNER__|\$APP_OWNER|g" -e "s|__CRON_LOG__|\$CRON_LOG|g" -e "s|__CRON_NAME__|\$CRON_NAME|g" "\$APP/deploy/cron" > "/etc/cron.d/\${CRON_NAME}.tmp"
-if ! awk -v owner="\$APP_OWNER" '!/^[[:space:]]*(#|\$|[A-Za-z_][A-Za-z0-9_]*=)/ && \$6 != owner { exit 1 }' "/etc/cron.d/\${CRON_NAME}.tmp"; then
+if ! awk -v owner="\$APP_OWNER" '!/^[[:space:]]*(#|\$|[A-Za-z_][A-Za-z0-9_]*=)/ { user = (\$1 ~ /^@/) ? \$2 : \$6; if (user != owner) exit 1 }' "/etc/cron.d/\${CRON_NAME}.tmp"; then
   rm -f "/etc/cron.d/\${CRON_NAME}.tmp"
   echo "ERROR: cron file contains unauthorized user entry (must be \$APP_OWNER)" >&2
   exit 1

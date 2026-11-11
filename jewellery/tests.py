@@ -399,3 +399,58 @@ class JewelleryEdgeCasesAndValuationTests(TestCase):
         self.assertIn('Necklace', results[0]['label'])
         self.assertEqual(results[0]['location'], 'Bank Locker')
 
+    def test_security_negative_weight_and_decompression_bomb_rejected(self):
+        from io import BytesIO
+        from unittest import mock
+        from PIL import Image
+        from jewellery.forms import JewelleryItemForm
+
+        # 1. Negative weight_grams rejected
+        neg_form = JewelleryItemForm(data={
+            'category': 'RING',
+            'location': 'BANK_LOCKER',
+            'metal_type': 'GOLD',
+            'purity': '22k',
+            'weight_grams': '-5.00',
+        })
+        self.assertFalse(neg_form.is_valid())
+        self.assertIn('weight_grams', neg_form.errors)
+
+        # 2. Image exceeding MAX_PHOTO_PIXELS rejected cleanly
+        im = Image.new('RGB', (100, 100), color='gold')
+        buf = BytesIO()
+        im.save(buf, format='JPEG')
+        buf.seek(0)
+        photo = SimpleUploadedFile('huge.jpg', buf.read(), content_type='image/jpeg')
+
+        with mock.patch('jewellery.forms.MAX_PHOTO_PIXELS', 1000):
+            bomb_form = JewelleryItemForm(
+                data={
+                    'category': 'RING',
+                    'location': 'BANK_LOCKER',
+                    'metal_type': 'GOLD',
+                    'purity': '22k',
+                    'weight_grams': '5.00',
+                },
+                files={'photo': photo},
+            )
+            self.assertFalse(bomb_form.is_valid())
+            self.assertIn('photo', bomb_form.errors)
+
+    def test_cross_household_edit_and_delete_return_404(self):
+        other_group = AccountGroup.objects.create(name="OtherJewelleryGroup")
+        other_item = JewelleryItem.objects.create(
+            group=other_group, category='RING', metal_type='GOLD',
+            purity='22k', weight_grams=Decimal('8.00'), location='HOME_SAFE',
+        )
+        self.assertEqual(
+            self.client.post(reverse('edit_jewellery', kwargs={'pk': other_item.pk}), {}).status_code,
+            404,
+        )
+        self.assertEqual(
+            self.client.post(reverse('delete_jewellery', kwargs={'pk': other_item.pk})).status_code,
+            404,
+        )
+        self.assertTrue(JewelleryItem.objects.filter(pk=other_item.pk).exists())
+
+

@@ -27,12 +27,19 @@ T = TypeVar("T", bound=BaseModel)
 
 
 def _normalize_model_name(model: str | None) -> str:
-    """Normalize user-friendly aliases like 'argon' to 'gemini-4-argon' and 'flash' to 'gemini-3.8-flash'."""
+    """Normalize user-friendly aliases like 'carbon' to 'gemini-4-carbon' and 'flash' to 'gemini-3.8-flash'.
+
+    Preserves backward-compatible recognition when callers explicitly pass 'argon' aliases.
+    """
     if not model:
-        return "gemini-4-argon"
+        return "gemini-4-carbon"
     m = model.strip()
+    if not m:
+        return "gemini-4-carbon"
     m_lower = m.lower()
-    if m_lower in ("argon", "gemini-argon", "gemini_argon"):
+    if m_lower in ("carbon", "gemini-carbon", "gemini_carbon", "gemini-4-carbon", "gemini_4_carbon"):
+        return "gemini-4-carbon"
+    if m_lower in ("argon", "gemini-argon", "gemini_argon", "gemini-4-argon", "gemini_4_argon"):
         return "gemini-4-argon"
     if m_lower in (
         "flash-lite",
@@ -82,10 +89,10 @@ def _build_gemini_thinking_config(
     """Resolve optimized ThinkingConfig for Gemini models based on dev vs prod and task tier.
 
     Optimization Matrix:
-    - Portfolio (TaskType.REASONING):
-      - PROD with Argon: ThinkingLevel.HIGH for exhaustive multi-pillar analysis.
-      - DEV with Argon/Flash: ThinkingLevel.LOW for fast, iterative developer feedback.
-    - Expenses (TaskType.FAST / EXTRACTION):
+    - Portfolio & Land Appraisal (TaskType.REASONING / RESEARCH):
+      - PROD with Carbon (or legacy Argon): ThinkingLevel.HIGH for exhaustive multi-pillar analysis.
+      - DEV with Carbon/Flash: ThinkingLevel.LOW for fast, iterative developer feedback.
+    - Expenses & Specialist Fast Lenses (TaskType.FAST / EXTRACTION):
       - Both DEV and PROD: thinking_budget=0 (thinking disabled) for instantaneous
         extraction, matching, and categorisation without wasting latency or tokens.
     """
@@ -132,7 +139,7 @@ def _build_gemini_thinking_config(
 
     # 3. Environment-aware automatic optimization
     target = _normalize_model_name(model).lower()
-    is_reasoning_model = "argon" in target or "thinking" in target or "r1" in target
+    is_reasoning_model = any(tok in target for tok in ("carbon", "argon", "thinking", "r1"))
     is_debug = getattr(settings, "DEBUG", True)
     task_str = str(task.value if hasattr(task, "value") else (task or "")).lower()
 
@@ -266,6 +273,10 @@ class GeminiAdapter(BaseAIAdapter):
         if max_tokens:
             config_kwargs["max_output_tokens"] = max_tokens
 
+        enable_search = bool(kwargs.get("enable_search_grounding", False))
+        if enable_search:
+            config_kwargs["tools"] = [genai.types.Tool(google_search=genai.types.GoogleSearch())]
+
         thinking_cfg = _build_gemini_thinking_config(
             model=target_model,
             task=task or kwargs.get("task"),
@@ -292,7 +303,19 @@ class GeminiAdapter(BaseAIAdapter):
             )
         except Exception as exc:
             exc_str = str(exc).lower()
-            if "thinking" in exc_str and ("not supported" in exc_str or "invalid" in exc_str):
+            if enable_search and ("tool" in exc_str or "google_search" in exc_str or "search" in exc_str or "mime" in exc_str):
+                logger.warning(
+                    "Gemini combined search grounding + response_schema rejected for %s (%s); retrying structured without tools...",
+                    target_model,
+                    exc,
+                )
+                config_kwargs.pop("tools", None)
+                resp = client.models.generate_content(
+                    model=target_model,
+                    contents=prompt,
+                    config=genai.types.GenerateContentConfig(**config_kwargs),
+                )
+            elif "thinking" in exc_str and ("not supported" in exc_str or "invalid" in exc_str):
                 logger.warning("Gemini thinking_config not supported for model %s; retrying without it...", target_model)
                 config_kwargs.pop("thinking_config", None)
                 resp = client.models.generate_content(

@@ -61,6 +61,10 @@
         var on = b.getAttribute('data-loc') === loc;
         b.classList.toggle('btn-primary', on);
         b.classList.toggle('btn-ghost', !on);
+        b.classList.toggle('v-btn-primary', on);
+        b.classList.toggle('v-btn-secondary', !on);
+        b.classList.toggle('is-active', on);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
       });
     }
 
@@ -77,8 +81,6 @@
   }
 
   // ── Photo preview ────────────────────────────────────────────────
-  // Shows a brief "processing" spinner, then reveals the selected image —
-  // mimicking the feel of the server receiving the upload.
   function handlePhotoSelect(input, previewContainerId, previewImgId, uploadBoxId) {
     var file = input && input.files ? input.files[0] : null;
     var container = document.getElementById(previewContainerId);
@@ -119,7 +121,7 @@
       ) && /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=\s]+$/.test(result);
 
       if (isSafeDataUrl) {
-        var wait = Math.max(0, 550 - (Date.now() - started));
+        var wait = Math.max(0, 400 - (Date.now() - started));
         setTimeout(function () {
           if (loader) loader.classList.add('hidden');
           if (img) {
@@ -155,8 +157,9 @@
     var totalPages = Math.ceil(items.length / itemsPerPage);
     var currentPage = 1;
 
-    var nav = document.createElement('div');
-    nav.className = 'flex items-center justify-between mt-4 px-1';
+    var nav = document.createElement('nav');
+    nav.setAttribute('aria-label', 'Collection pagination');
+    nav.className = 'v-pagination-bar flex flex-wrap items-center justify-between gap-2 mt-4 px-1 py-2';
     grid.parentNode.insertBefore(nav, grid.nextSibling);
 
     function render() {
@@ -167,16 +170,23 @@
       });
 
       var info = document.createElement('span');
-      info.className = 'text-[10px] uppercase tracking-wider opacity-40 font-bold';
-      info.textContent = 'Showing ' + (start + 1) + ' – ' + Math.min(end, items.length) + ' of ' + items.length;
+      info.className = 'pagination-info tabular-nums';
+      info.textContent = 'Showing ' + (start + 1) + '–' + Math.min(end, items.length) + ' of ' + items.length;
 
-      var pageBtn = function (page, disabled, active, iconName) {
+      var pageBtn = function (page, disabled, active, iconName, ariaLabel) {
         var b = document.createElement('button');
-        b.className = 'join-item btn btn-xs ' + (active ? 'btn-primary' : 'btn-ghost') + (disabled ? ' btn-disabled' : '');
+        b.type = 'button';
+        b.className = 'v-page-btn join-item btn btn-xs ' +
+          (active ? 'btn-primary v-btn-primary is-active' : 'btn-ghost v-btn-ghost') +
+          (disabled ? ' btn-disabled' : '');
+        b.disabled = !!disabled;
         b.setAttribute('data-page', String(page));
+        if (ariaLabel) b.setAttribute('aria-label', ariaLabel);
+        if (active) b.setAttribute('aria-current', 'page');
         if (iconName) {
           var ic = document.createElement('span');
-          ic.className = 'material-symbols-outlined text-sm';
+          ic.className = 'material-symbols-outlined text-base';
+          ic.setAttribute('aria-hidden', 'true');
           ic.textContent = iconName;
           b.appendChild(ic);
         } else {
@@ -186,27 +196,28 @@
       };
 
       var join = document.createElement('div');
-      join.className = 'join';
-      join.appendChild(pageBtn('prev', currentPage === 1, false, 'chevron_left'));
+      join.className = 'join v-page-join';
+      join.appendChild(pageBtn('prev', currentPage === 1, false, 'chevron_left', 'Previous page'));
       var sp = Math.max(1, currentPage - 2);
       var ep = Math.min(totalPages, sp + 4);
       if (ep - sp < 4) sp = Math.max(1, ep - 4);
       for (var p = sp; p <= ep; p++) {
-        join.appendChild(pageBtn(p, false, p === currentPage));
+        join.appendChild(pageBtn(p, false, p === currentPage, null, 'Page ' + p));
       }
-      join.appendChild(pageBtn('next', currentPage === totalPages, false, 'chevron_right'));
+      join.appendChild(pageBtn('next', currentPage === totalPages, false, 'chevron_right', 'Next page'));
       nav.replaceChildren(info, join);
     }
 
     nav.addEventListener('click', function (e) {
       var btn = e.target.closest('[data-page]');
-      if (!btn || btn.classList.contains('btn-disabled')) return;
+      if (!btn || btn.disabled || btn.classList.contains('btn-disabled')) return;
       var p = btn.getAttribute('data-page');
       if (p === 'prev') currentPage = Math.max(1, currentPage - 1);
       else if (p === 'next') currentPage = Math.min(totalPages, currentPage + 1);
       else currentPage = parseInt(p, 10);
       render();
-      window.scrollTo({ top: grid.offsetTop - 100, behavior: 'smooth' });
+      var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.scrollTo({ top: Math.max(0, grid.offsetTop - 100), behavior: reduced ? 'auto' : 'smooth' });
     });
 
     render();

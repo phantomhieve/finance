@@ -9,6 +9,7 @@
   <link rel="icon" type="image/svg+xml" href="{% static 'favicon.svg' %}">
   <link rel="manifest" href="{% static 'manifest.json' %}">
   <meta name="theme-color" id="metaThemeColor" content="#0b0f17">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Vault">
@@ -16,20 +17,38 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet">
+  <style>@layer properties, theme, base, daisyui, components, utilities;</style>
   <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css" />
   <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css" />
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
   <style type="text/tailwindcss">
-    @theme {
-      --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+    @theme inline {
+      --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --color-base-100: var(--color-base-100);
+      --color-base-200: var(--color-base-200);
+      --color-base-300: var(--color-base-300);
+      --color-base-content: var(--color-base-content);
+      --color-primary: var(--color-primary);
+      --color-primary-content: var(--color-primary-content);
+      --color-secondary: var(--color-secondary);
+      --color-secondary-content: var(--color-secondary-content);
+      --color-accent: var(--color-accent);
+      --color-accent-content: var(--color-accent-content);
+      --color-neutral: var(--v-elevated);
+      --color-neutral-content: var(--color-base-content);
+      --color-info: var(--color-info);
+      --color-success: var(--color-success);
+      --color-warning: var(--color-warning);
+      --color-error: var(--color-error);
     }
   </style>
   <link rel="stylesheet" href="{% static 'css/style.css' %}">
   <script>
     (function(){
-      var t = localStorage.getItem('vault-theme') || 'night';
+      var t = 'night';
+      try { t = localStorage.getItem('vault-theme') || 'night'; } catch (e) {}
       document.documentElement.setAttribute('data-theme', t);
       var tc = t === 'night' ? '#0b0f17' : '#f8fafc';
       var m = document.querySelector('#metaThemeColor');
@@ -51,7 +70,9 @@
   {% block extra_head %}{% endblock %}
 </head>
 <body class="font-sans antialiased text-base-content bg-base-100 min-h-screen selection:bg-primary/25 selection:text-base-content">
-<div id="pageOverlay" class="page-overlay" style="display: none;" aria-hidden="true">
+<a href="#mainStage" class="v-skip-link">Skip to main content</a>
+
+<div id="pageOverlay" class="page-overlay" style="display: none;" aria-hidden="true" role="status" aria-label="Loading">
   <div class="page-spinner"></div>
 </div>
 
@@ -66,28 +87,31 @@
 </defs></svg>
 
 {% if user.is_authenticated %}
+{% with route_name=request.resolver_match.url_name|default:'' %}
 
-{# Desktop Navigation Rail (collapsible fixed left sidebar) #}
-<aside id="desktopSidebar" class="sidebar-desktop hidden lg:flex flex-col fixed inset-y-0 left-0 z-40" aria-label="Main Navigation">
-  {# Header: Logo and collapse toggle #}
-  <div class="sidebar-header flex items-center gap-2.5 px-4 h-14 border-b border-base-content/8">
-    <a href="/" class="flex items-center gap-2.5 no-underline text-inherit group">
-      {% include 'includes/vault_icon.html' with size=24 class='flex-shrink-0 transition-transform group-hover:scale-105' %}
-      <span class="sidebar-label font-extrabold tracking-[0.16em] text-sm uppercase brand-text">Vault</span>
+{# Desktop Navigation Rail (collapsible fixed left sidebar, >=1024px) #}
+<aside id="desktopSidebar" class="sidebar-desktop hidden lg:flex flex-col fixed inset-y-0 left-0 z-40" aria-label="Primary Navigation">
+  {# Header: Logo and collapse toggle (strictly 56px tall to align with .v-topbar) #}
+  <div class="sidebar-header">
+    <a href="/" class="sidebar-brand-link flex items-center gap-2.5 no-underline text-inherit group min-h-[40px] focus-visible:rounded-lg">
+      {% include 'includes/vault_icon.html' with size=22 class='flex-shrink-0 transition-transform group-hover:scale-105' %}
+      <span class="sidebar-label font-extrabold tracking-[0.16em] text-xs uppercase brand-text">Vault</span>
     </a>
-    <button onclick="toggleSidebar()" class="sidebar-toggle-btn ml-auto p-1.5 rounded-lg hover:bg-base-content/6 transition-colors" aria-label="Toggle sidebar width" title="Toggle sidebar">
-      <span class="material-symbols-outlined text-lg sidebar-collapse-icon text-base-content/60">keyboard_double_arrow_left</span>
+    <button type="button" onclick="toggleSidebar()" class="sidebar-toggle-btn" aria-label="Toggle sidebar width" aria-expanded="true" title="Toggle sidebar">
+      <span class="material-symbols-outlined text-[19px] sidebar-collapse-icon" aria-hidden="true">left_panel_close</span>
     </button>
   </div>
 
   {# Navigation Links #}
-  <nav class="flex-1 px-3 pt-3.5 pb-2 space-y-1 overflow-y-auto overflow-x-hidden">
-    <div class="sidebar-section-title sidebar-label px-2.5 pb-1 text-[10px] font-bold uppercase tracking-[0.08em] text-base-content/40">Wealth &amp; Portfolio</div>
-    
+  <nav class="sidebar-nav flex-1 px-2.5 py-3 space-y-0.5 overflow-y-auto overflow-x-hidden">
+    {% if user.can_view_portfolio and household_config.feature_portfolio or user.can_view_savings and household_config.feature_savings or user.can_view_jewellery and household_config.feature_jewellery %}
+    <div class="sidebar-section-title sidebar-label">Wealth &amp; Portfolio</div>
+    {% endif %}
+
     {% if user.can_view_portfolio and household_config.feature_portfolio %}
     <div class="tooltip tooltip-right sidebar-tip" data-tip="Master Portfolio">
-      <a href="{% url 'portfolio_tracker' %}" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all {% if request.resolver_match.url_name == 'portfolio_tracker' or 'portfolio' in request.resolver_match.url_name %}sidebar-active bg-primary/12 text-primary font-semibold{% else %}text-base-content/75 hover:text-base-content hover:bg-base-content/5{% endif %}">
-        <span class="material-symbols-outlined text-[19px] text-indigo-400 flex-shrink-0">cases</span>
+      <a href="{% url 'portfolio_tracker' %}" {% if route_name == 'portfolio_tracker' or 'portfolio' in route_name %}aria-current="page"{% endif %} class="sidebar-link {% if route_name == 'portfolio_tracker' or 'portfolio' in route_name %}sidebar-active{% endif %}">
+        <span class="material-symbols-outlined sidebar-nav-icon {% if route_name == 'portfolio_tracker' or 'portfolio' in route_name %}icon-filled{% endif %}" aria-hidden="true">cases</span>
         <span class="sidebar-label truncate">Master Portfolio</span>
       </a>
     </div>
@@ -95,8 +119,8 @@
 
     {% if user.can_view_savings and household_config.feature_savings %}
     <div class="tooltip tooltip-right sidebar-tip" data-tip="Monthly Savings">
-      <a href="{% url 'dashboard' %}" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all {% if request.resolver_match.url_name == 'dashboard' %}sidebar-active bg-primary/12 text-primary font-semibold{% else %}text-base-content/75 hover:text-base-content hover:bg-base-content/5{% endif %}">
-        <span class="material-symbols-outlined text-[19px] text-emerald-400 flex-shrink-0">monitoring</span>
+      <a href="{% url 'dashboard' %}" {% if route_name == 'dashboard' %}aria-current="page"{% endif %} class="sidebar-link {% if route_name == 'dashboard' %}sidebar-active{% endif %}">
+        <span class="material-symbols-outlined sidebar-nav-icon {% if route_name == 'dashboard' %}icon-filled{% endif %}" aria-hidden="true">monitoring</span>
         <span class="sidebar-label truncate">Monthly Savings</span>
       </a>
     </div>
@@ -104,19 +128,22 @@
 
     {% if user.can_view_jewellery and household_config.feature_jewellery %}
     <div class="tooltip tooltip-right sidebar-tip" data-tip="Jewellery Vault">
-      <a href="{% url 'jewellery_dashboard' %}" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all {% if 'jewellery' in request.resolver_match.url_name %}sidebar-active bg-primary/12 text-primary font-semibold{% else %}text-base-content/75 hover:text-base-content hover:bg-base-content/5{% endif %}">
-        <span class="material-symbols-outlined text-[19px] text-amber-400 flex-shrink-0">diamond</span>
+      <a href="{% url 'jewellery_dashboard' %}" {% if 'jewellery' in route_name %}aria-current="page"{% endif %} class="sidebar-link {% if 'jewellery' in route_name %}sidebar-active{% endif %}">
+        <span class="material-symbols-outlined sidebar-nav-icon {% if 'jewellery' in route_name %}icon-filled{% endif %}" aria-hidden="true">diamond</span>
         <span class="sidebar-label truncate">Jewellery Vault</span>
       </a>
     </div>
     {% endif %}
 
-    <div class="sidebar-section-title sidebar-label px-2.5 pt-3 pb-1 text-[10px] font-bold uppercase tracking-[0.08em] text-base-content/40">Cashflow &amp; Tax</div>
+    {% if user.can_view_expenses and household_config.feature_expenses or household_config.feature_hra %}
+    <div class="sidebar-group-sep" aria-hidden="true"></div>
+    <div class="sidebar-section-title sidebar-label pt-2">Cashflow &amp; Tax</div>
+    {% endif %}
 
     {% if user.can_view_expenses and household_config.feature_expenses %}
-    <div class="tooltip tooltip-right sidebar-tip" data-tip="Expenses">
-      <a href="{% url 'expenses_home' %}" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all {% if 'expense' in request.resolver_match.url_name %}sidebar-active bg-primary/12 text-primary font-semibold{% else %}text-base-content/75 hover:text-base-content hover:bg-base-content/5{% endif %}">
-        <span class="material-symbols-outlined text-[19px] text-orange-400 flex-shrink-0">receipt_long</span>
+    <div class="tooltip tooltip-right sidebar-tip" data-tip="Expenses &amp; Cards">
+      <a href="{% url 'expenses_home' %}" {% if 'expense' in route_name %}aria-current="page"{% endif %} class="sidebar-link {% if 'expense' in route_name %}sidebar-active{% endif %}">
+        <span class="material-symbols-outlined sidebar-nav-icon {% if 'expense' in route_name %}icon-filled{% endif %}" aria-hidden="true">receipt_long</span>
         <span class="sidebar-label truncate">Expenses &amp; Cards</span>
       </a>
     </div>
@@ -124,29 +151,30 @@
 
     {% if household_config.feature_hra %}
     <div class="tooltip tooltip-right sidebar-tip" data-tip="HRA &amp; Rent">
-      <a href="{% url 'hra_tracker' %}" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all {% if request.resolver_match.url_name == 'hra_tracker' %}sidebar-active bg-primary/12 text-primary font-semibold{% else %}text-base-content/75 hover:text-base-content hover:bg-base-content/5{% endif %}">
-        <span class="material-symbols-outlined text-[19px] text-cyan-400 flex-shrink-0">home_work</span>
+      <a href="{% url 'hra_tracker' %}" {% if route_name == 'hra_tracker' %}aria-current="page"{% endif %} class="sidebar-link {% if route_name == 'hra_tracker' %}sidebar-active{% endif %}">
+        <span class="material-symbols-outlined sidebar-nav-icon {% if route_name == 'hra_tracker' %}icon-filled{% endif %}" aria-hidden="true">home_work</span>
         <span class="sidebar-label truncate">HRA &amp; Rent</span>
       </a>
     </div>
     {% endif %}
 
-    <div class="sidebar-section-title sidebar-label px-2.5 pt-3 pb-1 text-[10px] font-bold uppercase tracking-[0.08em] text-base-content/40">Workspace</div>
-
-    {% if household_config.feature_notes %}
+    {% if user.can_view_savings and household_config.feature_notes %}
+    <div class="sidebar-group-sep" aria-hidden="true"></div>
+    <div class="sidebar-section-title sidebar-label pt-2">Workspace</div>
     <div class="tooltip tooltip-right sidebar-tip" data-tip="Financial Notes">
-      <a href="{% url 'notes_list' %}" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium transition-all {% if request.resolver_match.url_name == 'notes_list' %}sidebar-active bg-primary/12 text-primary font-semibold{% else %}text-base-content/75 hover:text-base-content hover:bg-base-content/5{% endif %}">
-        <span class="material-symbols-outlined text-[19px] text-violet-400 flex-shrink-0">sticky_note_2</span>
+      <a href="{% url 'notes_list' %}" {% if route_name == 'notes_list' %}aria-current="page"{% endif %} class="sidebar-link {% if route_name == 'notes_list' %}sidebar-active{% endif %}">
+        <span class="material-symbols-outlined sidebar-nav-icon {% if route_name == 'notes_list' %}icon-filled{% endif %}" aria-hidden="true">sticky_note_2</span>
         <span class="sidebar-label truncate">Financial Notes</span>
       </a>
     </div>
     {% endif %}
 
     {% if user.is_superuser %}
-    <div class="sidebar-section-title sidebar-label px-2.5 pt-3 pb-1 text-[10px] font-bold uppercase tracking-[0.08em] text-base-content/40">Administration</div>
+    <div class="sidebar-group-sep" aria-hidden="true"></div>
+    <div class="sidebar-section-title sidebar-label pt-2">Administration</div>
     <div class="tooltip tooltip-right sidebar-tip" data-tip="Django Admin">
-      <a href="{% url 'admin:index' %}" class="sidebar-link flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] font-medium text-base-content/75 hover:text-base-content hover:bg-base-content/5 transition-all">
-        <span class="material-symbols-outlined text-[19px] text-fuchsia-400 flex-shrink-0">admin_panel_settings</span>
+      <a href="{% url 'admin:index' %}" class="sidebar-link">
+        <span class="material-symbols-outlined sidebar-nav-icon" aria-hidden="true">admin_panel_settings</span>
         <span class="sidebar-label truncate">Django Admin</span>
       </a>
     </div>
@@ -154,82 +182,98 @@
   </nav>
 
   {# Sidebar User / Role Footer #}
-  <div class="sidebar-footer p-3 border-t border-base-content/8 flex items-center gap-2.5 bg-base-200/50">
+  <div class="sidebar-footer">
     <div class="avatar avatar-placeholder flex-shrink-0">
-      <div class="bg-primary/20 text-primary border border-primary/30 w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs">
+      <div class="bg-primary/15 text-primary border border-primary/30 w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs">
         <span>{{ user.username|slice:":1"|upper }}</span>
       </div>
     </div>
     <div class="sidebar-label min-w-0 flex-1">
-      <div class="text-xs font-semibold truncate text-base-content">{{ user.username }}</div>
-      <div class="text-[10px] text-base-content/50 truncate font-mono uppercase">{{ user.get_user_type_display }}</div>
+      <div class="text-xs font-semibold truncate text-base-content">{{ user.get_full_name|default:user.username }}</div>
+      <div class="text-xs text-base-content/65 truncate font-mono uppercase">{{ user.get_user_type_display }}</div>
     </div>
   </div>
 </aside>
 
 {# Main Content Stage #}
 <div id="mainContent" class="main-content flex flex-col min-h-screen">
-  {# Sticky Glass Topbar #}
-  <header class="navbar navbar-glass sticky top-0 z-30 h-14 min-h-0 px-4 lg:px-8 flex items-center justify-between border-b border-base-content/8 bg-base-100/90 backdrop-blur-md">
-    <div class="navbar-start flex items-center gap-3">
-      {# Mobile Logo #}
-      <a href="/" class="flex items-center gap-2 lg:hidden" aria-label="Vault Home">
-        {% include 'includes/vault_icon.html' with size=22 %}
-        <span class="font-extrabold tracking-[0.16em] text-xs uppercase brand-text">Vault</span>
+  {# Sticky Utility Topbar #}
+  <header class="navbar navbar-glass v-topbar sticky top-0 z-30 px-3 sm:px-4 lg:px-8 flex items-center justify-between gap-2">
+    <div class="navbar-start flex items-center gap-1.5 sm:gap-2.5 min-w-0 flex-1">
+      {# Mobile Drawer Button (44x44px hit box) #}
+      <button type="button" onclick="openModal('mobileNavDrawer')" class="v-icon-btn lg:hidden -ml-1 flex-shrink-0" aria-label="Open navigation drawer" aria-haspopup="dialog">
+        <span class="material-symbols-outlined text-xl" aria-hidden="true">menu</span>
+      </button>
+
+      {# Mobile Logo + Active Section Label #}
+      <a href="/" class="flex items-center gap-2 min-h-[44px] min-w-0 lg:hidden no-underline text-inherit" aria-label="Vault Home">
+        {% include 'includes/vault_icon.html' with size=21 class='flex-shrink-0' %}
+        <span class="font-extrabold tracking-[0.15em] text-xs uppercase brand-text flex-shrink-0">Vault</span>
+        <span class="text-base-content/25 text-xs flex-shrink-0" aria-hidden="true">/</span>
+        <span class="text-xs font-semibold text-base-content/80 truncate">
+          {% if 'portfolio' in route_name %}Portfolio
+          {% elif 'expense' in route_name %}Spends
+          {% elif 'jewellery' in route_name %}Jewellery
+          {% elif 'hra' in route_name %}HRA &amp; Rent
+          {% elif 'notes' in route_name %}Notes
+          {% else %}Savings{% endif %}
+        </span>
       </a>
-      {# Desktop Breadcrumb / Route Context #}
-      <div class="hidden lg:flex items-center gap-2 text-xs text-base-content/50 font-medium">
-        <span class="text-base-content/30 uppercase tracking-widest text-[10px]">Folio</span>
-        <span class="text-base-content/20">/</span>
-        <span class="text-base-content/80 font-semibold">
-          {% if 'portfolio' in request.resolver_match.url_name %}Portfolio Intelligence
-          {% elif 'expense' in request.resolver_match.url_name %}Cashflow &amp; Spends
-          {% elif 'jewellery' in request.resolver_match.url_name %}Precious Metals &amp; Custody
-          {% elif 'hra' in request.resolver_match.url_name %}HRA &amp; Rent
-          {% elif 'notes' in request.resolver_match.url_name %}Financial Workspace
-          {% else %}Household Dashboard{% endif %}
+
+      {# Desktop Route Context #}
+      <div class="hidden lg:flex items-center gap-2 text-xs text-base-content/60 font-medium">
+        <span class="text-base-content/45 font-semibold">Vault</span>
+        <span class="text-base-content/25" aria-hidden="true">/</span>
+        <span class="text-base-content font-semibold">
+          {% if 'portfolio' in route_name %}Portfolio Intelligence
+          {% elif 'expense' in route_name %}Cashflow &amp; Spends
+          {% elif 'jewellery' in route_name %}Precious Metals &amp; Custody
+          {% elif 'hra' in route_name %}HRA &amp; Rent
+          {% elif 'notes' in route_name %}Financial Workspace
+          {% else %}Monthly Savings{% endif %}
         </span>
       </div>
     </div>
 
-    <div class="navbar-end flex items-center gap-2.5">
+    <div class="navbar-end flex items-center gap-1 sm:gap-2 flex-shrink-0 w-auto">
       {# Portfolio Unlock Status indicator if unlocked #}
       {% if request.portfolio_expires_at %}
-      <div class="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 tabular-nums" title="Vault session active">
-        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-        <span>Vault Unlocked</span>
+      <div class="inline-flex items-center gap-1.5 px-2 sm:px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/12 text-emerald-400 border border-emerald-500/25 tabular-nums" title="Vault session unlocked">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" aria-hidden="true"></span>
+        <span class="hidden sm:inline">Vault Unlocked</span>
+        <span class="sr-only sm:hidden">Vault session unlocked</span>
       </div>
       {% endif %}
 
-      {# Theme Toggle Button #}
-      <button onclick="toggleVaultTheme()" id="themeToggleBtn" class="theme-toggle-btn w-8 h-8 rounded-lg hover:bg-base-content/8 flex items-center justify-center transition-colors text-base-content/70 hover:text-base-content" aria-label="Toggle visual theme" title="Toggle theme">
-        <span class="theme-icon theme-icon-light material-symbols-outlined text-amber-400 text-lg">light_mode</span>
-        <span class="theme-icon theme-icon-dark material-symbols-outlined text-indigo-300 text-lg">dark_mode</span>
+      {# Theme Toggle Button (44x44px touch target) #}
+      <button type="button" onclick="toggleVaultTheme()" id="themeToggleBtn" data-theme-toggle class="theme-toggle-btn v-icon-btn" aria-label="Toggle visual theme" title="Toggle theme">
+        <span class="theme-icon theme-icon-light material-symbols-outlined text-amber-400 text-xl" aria-hidden="true">light_mode</span>
+        <span class="theme-icon theme-icon-dark material-symbols-outlined text-indigo-300 text-xl" aria-hidden="true">dark_mode</span>
       </button>
 
-      {# User Menu Dropdown #}
+      {# User Menu Dropdown (44x44px touch target) #}
       <div class="dropdown dropdown-end">
-        <div tabindex="0" role="button" class="avatar avatar-placeholder cursor-pointer focus:outline-none" aria-label="User account menu">
-          <div class="bg-primary/20 text-primary border border-primary/30 w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs hover:border-primary/50 transition-all">
-            <span>{{ user.username|slice:":1"|upper }}</span>
-          </div>
-        </div>
-        <ul tabindex="0" class="dropdown-content menu bg-base-200/95 backdrop-blur-md rounded-xl z-50 w-56 p-2 shadow-2xl border border-base-content/10 mt-2">
-          <li class="menu-title px-3 pt-2 pb-2 border-b border-base-content/8 mb-1">
+        <button type="button" tabindex="0" class="v-avatar-btn" aria-label="User account menu" aria-haspopup="menu">
+          <span class="v-avatar-badge">
+            {{ user.username|slice:":1"|upper }}
+          </span>
+        </button>
+        <ul tabindex="0" class="dropdown-content menu bg-base-200/98 backdrop-blur-md rounded-xl z-50 w-56 p-2 shadow-2xl border border-base-content/12 mt-1.5">
+          <li class="menu-title px-3 pt-2 pb-2.5 border-b border-base-content/8 mb-1">
             <div class="text-xs font-semibold truncate text-base-content">{{ user.get_full_name|default:user.username }}</div>
-            <div class="text-[10px] text-base-content/50 font-mono">{{ user.get_user_type_display }}</div>
+            <div class="text-xs text-base-content/65 font-mono uppercase mt-0.5">{{ user.get_user_type_display }}</div>
           </li>
           {% if user.is_staff %}
           <li class="lg:hidden">
-            <a href="/vault-manage/" class="flex items-center gap-2 py-1.5 text-xs rounded-lg hover:bg-base-content/8">
-              <span class="material-symbols-outlined text-sm text-rose-400">admin_panel_settings</span>Admin Panel
+            <a href="{% url 'admin:index' %}" class="flex items-center gap-2.5 min-h-[44px] px-3 text-xs font-medium rounded-lg hover:bg-base-content/8">
+              <span class="material-symbols-outlined text-base text-fuchsia-400" aria-hidden="true">admin_panel_settings</span>Django Admin
             </a>
           </li>
           {% endif %}
           <li>
-            <form method="post" action="{% url 'logout' %}" class="m-0">{% csrf_token %}
-              <button type="submit" class="flex items-center gap-2 py-1.5 text-xs text-error w-full text-left rounded-lg hover:bg-error/10">
-                <span class="material-symbols-outlined text-sm">logout</span>Sign Out
+            <form method="post" action="{% url 'logout' %}" class="m-0 p-0 block">{% csrf_token %}
+              <button type="submit" class="flex items-center gap-2.5 min-h-[44px] px-3 text-xs font-semibold text-rose-400 w-full text-left rounded-lg hover:bg-rose-500/12 transition-colors">
+                <span class="material-symbols-outlined text-base" aria-hidden="true">logout</span>Sign Out
               </button>
             </form>
           </li>
@@ -238,17 +282,22 @@
     </div>
   </header>
 
-  {# Flash Alert Messages #}
-  {% if messages %}
-  <div class="px-4 lg:px-8 pt-3 flex flex-col gap-2 max-w-[1440px] mx-auto w-full" role="region" aria-label="Notifications">
-    {% for message in messages %}
-    <div role="alert" class="alert {% if 'error' in message.tags %}alert-error{% else %}alert-success{% endif %} text-xs rounded-lg py-2.5 px-3.5 flex items-center gap-2.5 shadow-sm border border-base-content/10">
-      <span class="material-symbols-outlined text-base flex-shrink-0">{% if 'error' in message.tags %}error{% else %}check_circle{% endif %}</span>
-      <span class="flex-1 font-medium">{{ message }}</span>
-    </div>
-    {% endfor %}
+  {# Flash Alert / Notification Stack #}
+  <div id="vaultToastRegion" class="v-toast-stack px-4 lg:px-8 {% if messages %}pt-3{% endif %} flex flex-col gap-2 max-w-[1440px] mx-auto w-full" role="region" aria-label="Notifications" aria-live="polite">
+    {% if messages %}
+      {% for message in messages %}
+      <div role="{% if 'error' in message.tags %}alert{% else %}status{% endif %}" class="v-toast {% if 'error' in message.tags %}v-toast-error{% elif 'warning' in message.tags %}v-toast-warning{% elif 'info' in message.tags %}v-toast-info{% else %}v-toast-success{% endif %}">
+        <span class="material-symbols-outlined text-base flex-shrink-0" aria-hidden="true">
+          {% if 'error' in message.tags %}error{% elif 'warning' in message.tags %}warning{% elif 'info' in message.tags %}info{% else %}check_circle{% endif %}
+        </span>
+        <span class="flex-1 font-medium">{{ message }}</span>
+        <button type="button" class="v-toast-close" aria-label="Dismiss notification" onclick="this.closest('.v-toast').remove()">
+          <span class="material-symbols-outlined text-base" aria-hidden="true">close</span>
+        </button>
+      </div>
+      {% endfor %}
+    {% endif %}
   </div>
-  {% endif %}
 
   {# Page Header (title and contextual toolbar) #}
   <div class="px-4 lg:px-8 pt-4 lg:pt-6 pb-1 relative z-20 max-w-[1440px] mx-auto w-full">
@@ -256,77 +305,164 @@
   </div>
 
   {# Main Page Content #}
-  <main class="flex-1 px-4 lg:px-8 pb-24 lg:pb-8 pt-1 max-w-[1440px] mx-auto w-full">
+  <main id="mainStage" tabindex="-1" class="v-main-stage flex-1 px-4 lg:px-8 pt-1 max-w-[1440px] mx-auto w-full focus:outline-none">
     {% block content %}{% endblock %}
   </main>
 </div>
 
-{# Mobile Bottom Dock #}
-<nav class="dock dock-sm fixed bottom-0 left-0 right-0 lg:hidden z-50 border-t border-base-content/10 bg-base-100/95 backdrop-blur-md" aria-label="Mobile Navigation">
+{# Mobile Bottom Dock (<1024px): Max 5 ergonomic thumb-zone slots + Drawer trigger #}
+<nav class="dock v-mobile-dock fixed bottom-0 left-0 right-0 lg:hidden z-50" aria-label="Mobile Primary Navigation">
   {% if user.can_view_portfolio and household_config.feature_portfolio %}
-  <a href="{% url 'portfolio_tracker' %}" class="{% if 'portfolio' in request.resolver_match.url_name or request.resolver_match.url_name == 'portfolio_tracker' %}dock-active text-primary font-semibold{% endif %}">
-    <span class="material-symbols-outlined text-xl">cases</span>
+  <a href="{% url 'portfolio_tracker' %}" {% if 'portfolio' in route_name or route_name == 'portfolio_tracker' %}aria-current="page"{% endif %} class="v-dock-item {% if 'portfolio' in route_name or route_name == 'portfolio_tracker' %}dock-active{% endif %}">
+    <span class="material-symbols-outlined text-xl {% if 'portfolio' in route_name or route_name == 'portfolio_tracker' %}icon-filled{% endif %}" aria-hidden="true">cases</span>
     <span class="dock-label">Portfolio</span>
   </a>
   {% endif %}
+
   {% if user.can_view_savings and household_config.feature_savings %}
-  <a href="{% url 'dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}dock-active text-primary font-semibold{% endif %}">
-    <span class="material-symbols-outlined text-xl">monitoring</span>
+  <a href="{% url 'dashboard' %}" {% if route_name == 'dashboard' %}aria-current="page"{% endif %} class="v-dock-item {% if route_name == 'dashboard' %}dock-active{% endif %}">
+    <span class="material-symbols-outlined text-xl {% if route_name == 'dashboard' %}icon-filled{% endif %}" aria-hidden="true">monitoring</span>
     <span class="dock-label">Savings</span>
   </a>
   {% endif %}
+
   {% if user.can_view_expenses and household_config.feature_expenses %}
-  <a href="{% url 'expenses_home' %}" class="{% if 'expense' in request.resolver_match.url_name %}dock-active text-primary font-semibold{% endif %}">
-    <span class="material-symbols-outlined text-xl">receipt_long</span>
+  <a href="{% url 'expenses_home' %}" {% if 'expense' in route_name %}aria-current="page"{% endif %} class="v-dock-item {% if 'expense' in route_name %}dock-active{% endif %}">
+    <span class="material-symbols-outlined text-xl {% if 'expense' in route_name %}icon-filled{% endif %}" aria-hidden="true">receipt_long</span>
     <span class="dock-label">Spends</span>
   </a>
   {% endif %}
+
   {% if user.can_view_jewellery and household_config.feature_jewellery %}
-  <a href="{% url 'jewellery_dashboard' %}" class="{% if 'jewellery' in request.resolver_match.url_name %}dock-active text-primary font-semibold{% endif %}">
-    <span class="material-symbols-outlined text-xl">diamond</span>
+  <a href="{% url 'jewellery_dashboard' %}" {% if 'jewellery' in route_name %}aria-current="page"{% endif %} class="v-dock-item {% if 'jewellery' in route_name %}dock-active{% endif %}">
+    <span class="material-symbols-outlined text-xl {% if 'jewellery' in route_name %}icon-filled{% endif %}" aria-hidden="true">diamond</span>
     <span class="dock-label">Jewellery</span>
   </a>
-  {% endif %}
-  {% if household_config.feature_hra %}
-  <a href="{% url 'hra_tracker' %}" class="{% if request.resolver_match.url_name == 'hra_tracker' %}dock-active text-primary font-semibold{% endif %}">
-    <span class="material-symbols-outlined text-xl">home_work</span>
+  {% elif household_config.feature_hra %}
+  <a href="{% url 'hra_tracker' %}" {% if route_name == 'hra_tracker' %}aria-current="page"{% endif %} class="v-dock-item {% if route_name == 'hra_tracker' %}dock-active{% endif %}">
+    <span class="material-symbols-outlined text-xl {% if route_name == 'hra_tracker' %}icon-filled{% endif %}" aria-hidden="true">home_work</span>
     <span class="dock-label">HRA</span>
   </a>
   {% endif %}
-  {% if household_config.feature_notes %}
-  <a href="{% url 'notes_list' %}" class="{% if request.resolver_match.url_name == 'notes_list' %}dock-active text-primary font-semibold{% endif %}">
-    <span class="material-symbols-outlined text-xl">sticky_note_2</span>
-    <span class="dock-label">Notes</span>
-  </a>
-  {% endif %}
-  <a href="javascript:void(0)" onclick="Vault.showLoader();Vault.afterPaint(function(){history.back()})" aria-label="Go back">
-    <span class="material-symbols-outlined text-xl">arrow_back</span>
-    <span class="dock-label">Back</span>
-  </a>
+
+  <button type="button" onclick="openModal('mobileNavDrawer')" class="v-dock-item {% if route_name == 'notes_list' or route_name == 'hra_tracker' and user.can_view_jewellery and household_config.feature_jewellery %}dock-active{% endif %}" aria-label="More destinations and workspace menu" aria-haspopup="dialog">
+    <span class="material-symbols-outlined text-xl" aria-hidden="true">apps</span>
+    <span class="dock-label">More</span>
+  </button>
 </nav>
 
+{# Mobile Navigation Bottom-Sheet Drawer (<1024px) #}
+<dialog id="mobileNavDrawer" class="modal v-mobile-drawer lg:hidden" aria-labelledby="mobileNavTitle">
+  <div class="modal-box v-mobile-drawer-box">
+    <div class="flex items-center justify-between pb-3 border-b border-base-content/10">
+      <div class="flex items-center gap-2.5 min-w-0">
+        {% include 'includes/vault_icon.html' with size=22 class='flex-shrink-0' %}
+        <div class="min-w-0">
+          <h2 id="mobileNavTitle" class="text-sm font-bold text-base-content leading-tight truncate">Vault Navigation</h2>
+          <p class="text-xs text-base-content/65 truncate">{{ user.get_full_name|default:user.username }} &middot; {{ user.get_user_type_display }}</p>
+        </div>
+      </div>
+      <button type="button" class="v-icon-btn -mr-1" onclick="closeModal('mobileNavDrawer')" aria-label="Close navigation drawer">
+        <span class="material-symbols-outlined text-xl" aria-hidden="true">close</span>
+      </button>
+    </div>
+
+    <nav class="py-3 space-y-1" aria-label="All Vault Destinations">
+      {% if user.can_view_portfolio and household_config.feature_portfolio %}
+      <a href="{% url 'portfolio_tracker' %}" {% if 'portfolio' in route_name or route_name == 'portfolio_tracker' %}aria-current="page"{% endif %} class="v-drawer-nav-link {% if 'portfolio' in route_name or route_name == 'portfolio_tracker' %}is-active{% endif %}">
+        <span class="material-symbols-outlined sidebar-nav-icon {% if 'portfolio' in route_name or route_name == 'portfolio_tracker' %}icon-filled{% endif %}" aria-hidden="true">cases</span>
+        <span class="flex-1">Master Portfolio</span>
+        <span class="material-symbols-outlined text-base opacity-40" aria-hidden="true">chevron_right</span>
+      </a>
+      {% endif %}
+
+      {% if user.can_view_savings and household_config.feature_savings %}
+      <a href="{% url 'dashboard' %}" {% if route_name == 'dashboard' %}aria-current="page"{% endif %} class="v-drawer-nav-link {% if route_name == 'dashboard' %}is-active{% endif %}">
+        <span class="material-symbols-outlined sidebar-nav-icon {% if route_name == 'dashboard' %}icon-filled{% endif %}" aria-hidden="true">monitoring</span>
+        <span class="flex-1">Monthly Savings</span>
+        <span class="material-symbols-outlined text-base opacity-40" aria-hidden="true">chevron_right</span>
+      </a>
+      {% endif %}
+
+      {% if user.can_view_expenses and household_config.feature_expenses %}
+      <a href="{% url 'expenses_home' %}" {% if 'expense' in route_name %}aria-current="page"{% endif %} class="v-drawer-nav-link {% if 'expense' in route_name %}is-active{% endif %}">
+        <span class="material-symbols-outlined sidebar-nav-icon {% if 'expense' in route_name %}icon-filled{% endif %}" aria-hidden="true">receipt_long</span>
+        <span class="flex-1">Expenses &amp; Card Statements</span>
+        <span class="material-symbols-outlined text-base opacity-40" aria-hidden="true">chevron_right</span>
+      </a>
+      {% endif %}
+
+      {% if user.can_view_jewellery and household_config.feature_jewellery %}
+      <a href="{% url 'jewellery_dashboard' %}" {% if 'jewellery' in route_name %}aria-current="page"{% endif %} class="v-drawer-nav-link {% if 'jewellery' in route_name %}is-active{% endif %}">
+        <span class="material-symbols-outlined sidebar-nav-icon {% if 'jewellery' in route_name %}icon-filled{% endif %}" aria-hidden="true">diamond</span>
+        <span class="flex-1">Jewellery Vault</span>
+        <span class="material-symbols-outlined text-base opacity-40" aria-hidden="true">chevron_right</span>
+      </a>
+      {% endif %}
+
+      {% if household_config.feature_hra %}
+      <a href="{% url 'hra_tracker' %}" {% if route_name == 'hra_tracker' %}aria-current="page"{% endif %} class="v-drawer-nav-link {% if route_name == 'hra_tracker' %}is-active{% endif %}">
+        <span class="material-symbols-outlined sidebar-nav-icon {% if route_name == 'hra_tracker' %}icon-filled{% endif %}" aria-hidden="true">home_work</span>
+        <span class="flex-1">HRA &amp; Rent Ledger</span>
+        <span class="material-symbols-outlined text-base opacity-40" aria-hidden="true">chevron_right</span>
+      </a>
+      {% endif %}
+
+      {% if user.can_view_savings and household_config.feature_notes %}
+      <a href="{% url 'notes_list' %}" {% if route_name == 'notes_list' %}aria-current="page"{% endif %} class="v-drawer-nav-link {% if route_name == 'notes_list' %}is-active{% endif %}">
+        <span class="material-symbols-outlined sidebar-nav-icon {% if route_name == 'notes_list' %}icon-filled{% endif %}" aria-hidden="true">sticky_note_2</span>
+        <span class="flex-1">Financial Notes</span>
+        <span class="material-symbols-outlined text-base opacity-40" aria-hidden="true">chevron_right</span>
+      </a>
+      {% endif %}
+
+      {% if user.is_staff or user.is_superuser %}
+      <a href="{% url 'admin:index' %}" class="v-drawer-nav-link">
+        <span class="material-symbols-outlined sidebar-nav-icon" aria-hidden="true">admin_panel_settings</span>
+        <span class="flex-1">Django Admin Console</span>
+        <span class="material-symbols-outlined text-base opacity-40" aria-hidden="true">chevron_right</span>
+      </a>
+      {% endif %}
+    </nav>
+
+    <div class="pt-3 border-t border-base-content/10 flex items-center justify-between gap-2">
+      <button type="button" onclick="toggleVaultTheme()" data-theme-toggle class="v-btn v-btn-secondary flex-1 justify-center">
+        <span class="material-symbols-outlined text-base text-amber-400" aria-hidden="true">contrast</span>
+        <span id="mobileThemeLabel">Switch Theme</span>
+      </button>
+      <form method="post" action="{% url 'logout' %}" class="m-0 flex-1">{% csrf_token %}
+        <button type="submit" class="v-btn v-btn-secondary w-full justify-center text-rose-400 border-rose-500/25 hover:bg-rose-500/12">
+          <span class="material-symbols-outlined text-base" aria-hidden="true">logout</span>
+          <span>Sign Out</span>
+        </button>
+      </form>
+    </div>
+  </div>
+  <form method="dialog" class="modal-backdrop bg-black/65 backdrop-blur-xs"><button aria-label="Close">close</button></form>
+</dialog>
+
+{% endwith %}
 {% else %}
-<main class="min-h-screen">{% block login_content %}{% endblock %}</main>
+<main id="mainStage" class="min-h-screen">{% block login_content %}{% endblock %}</main>
 {% endif %}
 
 {# Confirm Delete Dialog Modal #}
-<dialog id="confirmDeleteModal" class="modal" aria-labelledby="confirmDeleteTitle" aria-describedby="confirmDeleteMsg">
-  <div class="modal-box max-w-sm rounded-xl bg-base-100 border border-base-content/12 p-5 shadow-2xl">
-    <h3 id="confirmDeleteTitle" class="font-bold text-sm flex items-center gap-2 text-base-content">
-      <span class="material-symbols-outlined text-error text-lg">warning</span>Confirm Delete
+<dialog id="confirmDeleteModal" class="modal v-modal-center" aria-labelledby="confirmDeleteTitle" aria-describedby="confirmDeleteMsg">
+  <div class="modal-box max-w-sm rounded-2xl bg-base-100 border border-base-content/14 p-5 shadow-2xl">
+    <h3 id="confirmDeleteTitle" class="font-bold text-base flex items-center gap-2 text-base-content">
+      <span class="material-symbols-outlined text-error text-xl" aria-hidden="true">warning</span>Confirm Delete
     </h3>
-    <p id="confirmDeleteMsg" class="py-3 text-xs text-base-content/70 leading-relaxed">Are you sure you want to delete this entry? This action cannot be undone.</p>
-    <div class="modal-action flex items-center justify-end gap-2 mt-3">
-      <button type="button" class="btn btn-ghost btn-xs rounded-lg" onclick="document.getElementById('confirmDeleteModal').close()">Cancel</button>
-      <button type="button" class="btn btn-error btn-xs rounded-lg text-white font-medium flex items-center gap-1" id="confirmDeleteBtn" onclick="confirmDeleteProceed()">
-        <span class="material-symbols-outlined text-sm">delete</span>Delete
+    <p id="confirmDeleteMsg" class="py-3 text-sm text-base-content/75 leading-relaxed">Are you sure you want to delete this entry? This action cannot be undone.</p>
+    <div class="modal-action flex items-center justify-end gap-2.5 mt-3">
+      <button type="button" class="v-btn v-btn-secondary" onclick="document.getElementById('confirmDeleteModal').close()">Cancel</button>
+      <button type="button" class="v-btn v-btn-danger" id="confirmDeleteBtn" onclick="confirmDeleteProceed()">
+        <span class="material-symbols-outlined text-base" aria-hidden="true">delete</span>Delete
       </button>
     </div>
   </div>
-  <form method="dialog" class="modal-backdrop bg-black/60 backdrop-blur-xs"><button>close</button></form>
+  <form method="dialog" class="modal-backdrop bg-black/65 backdrop-blur-xs"><button aria-label="Close">close</button></form>
 </dialog>
 
-{% load static %}
 <script src="{% static 'js/vault-core.js' %}"></script>
 <script src="{% static 'js/vault-utils.js' %}"></script>
 {% block chart_js %}{% endblock %}

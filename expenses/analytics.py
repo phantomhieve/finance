@@ -92,8 +92,16 @@ def _daily(qs: QuerySet[Expense], days: int) -> list[Decimal]:
     return [by_day.get(d, ZERO) for d in range(1, days + 1)]
 
 
-def _spend(group: AccountGroup, start: datetime.date, end: datetime.date, mail_only: bool) -> QuerySet[Expense]:
+def _spend(
+    group: AccountGroup,
+    start: datetime.date,
+    end: datetime.date,
+    mail_only: bool,
+    hide_investments: bool = False,
+) -> QuerySet[Expense]:
     qs = live(group).filter(txn_date__gte=start, txn_date__lte=end, currency='INR').filter(spend_q())
+    if hide_investments:
+        qs = qs.exclude(category__name=INVESTMENT_CATEGORY)
     return qs.exclude(source='MANUAL') if mail_only else qs
 
 
@@ -129,7 +137,7 @@ def month_summary(
 
     py, pm = shift_month(year, month, -1)
     p_start, p_end = month_bounds(py, pm)
-    prev_qs = _spend(group, p_start, p_end, mail_only)
+    prev_qs = _spend(group, p_start, p_end, mail_only, hide_investments=hide_investments)
     prev_total = _sum(prev_qs)
     prev_daily = _daily(prev_qs, (p_end - p_start).days + 1)
 
@@ -247,9 +255,14 @@ def month_summary(
         rec['total'] += e.amount
         rec['items'].append(e)
 
-    known_tenures = dict(
+    known_tenures_qs = (
         Expense.objects.filter(group=group, is_emi=True, emi_total_installments__isnull=False)
         .exclude(emi_reference='')
+    )
+    if hide_investments:
+        known_tenures_qs = known_tenures_qs.exclude(category__name=INVESTMENT_CATEGORY)
+    known_tenures = dict(
+        known_tenures_qs
         .order_by('updated_at')
         .values_list('emi_reference', 'emi_total_installments')
     )
@@ -320,6 +333,7 @@ def monthly_trend(
     n: int = 6,
     mail_only: bool = False,
     today: datetime.date | None = None,
+    hide_investments: bool = False,
 ) -> dict[str, Any]:
     """Spend for the n months ending at (year, month), oldest first."""
     today = today or timezone.localdate()
@@ -327,7 +341,7 @@ def monthly_trend(
     _, end = month_bounds(year, month)
     totals = {
         (row['mo'].year, row['mo'].month): row['t']
-        for row in _spend(group, datetime.date(sy, sm, 1), end, mail_only)
+        for row in _spend(group, datetime.date(sy, sm, 1), end, mail_only, hide_investments=hide_investments)
         .annotate(mo=TruncMonth('txn_date')).values('mo').annotate(t=Sum('amount'))
     }
     out = []
@@ -798,9 +812,12 @@ def fy_summary(
     }
 
 
-def available_fys(group: AccountGroup) -> list[int]:
+def available_fys(group: AccountGroup, hide_investments: bool = False) -> list[int]:
     """Return sorted list of available Indian FY start years for this household."""
-    years = {d.year if d.month >= 4 else d.year - 1 for d in live(group).dates('txn_date', 'month')}
+    qs = live(group)
+    if hide_investments:
+        qs = qs.exclude(category__name=INVESTMENT_CATEGORY)
+    years = {d.year if d.month >= 4 else d.year - 1 for d in qs.dates('txn_date', 'month')}
     today = timezone.localdate()
     years.add(today.year if today.month >= 4 else today.year - 1)
     return sorted(years)

@@ -25,6 +25,7 @@ THUMBNAIL_SIZES = {
     'thumb': (480, 480),
     'full': (1600, 1600),
 }
+MAX_PHOTO_PIXELS = 40_000_000
 
 _SAFE_PHOTO_CONTENT_TYPES = {
     '.jpg': 'image/jpeg',
@@ -67,6 +68,8 @@ def get_or_create_thumbnail(original_path, size_variant='thumb', fallback_conten
 
         # Generate thumbnail
         with Image.open(original_path) as img:
+            if img.width <= 0 or img.height <= 0 or (img.width * img.height) > MAX_PHOTO_PIXELS:
+                raise ValueError("Image dimensions exceed safety limit")
             # Respect smartphone EXIF orientation before resizing
             img = ImageOps.exif_transpose(img)
 

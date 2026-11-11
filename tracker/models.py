@@ -4,6 +4,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.contrib.auth.models import AbstractUser
 from django.contrib.auth.hashers import check_password, make_password
+from django.utils.crypto import salted_hmac
 
 
 class AccountGroup(models.Model):
@@ -27,6 +28,12 @@ class AccountGroup(models.Model):
         if not self.portfolio_password:
             return False
         return check_password(raw_password, self.portfolio_password)
+
+    def get_portfolio_session_hash(self) -> str:
+        """Session-binding HMAC derived from the current hashed vault password."""
+        if not self.portfolio_password:
+            return ''
+        return salted_hmac('vault.portfolio_password', self.portfolio_password).hexdigest()
 
 
 class User(AbstractUser):

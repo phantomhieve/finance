@@ -207,7 +207,9 @@ class RealEstateMcpServerTests(TestCase):
             user_type="PRIMARY",
             group=self.group,
         )
-        # Point MCP server context to test group
+        # Point MCP server context to test group and restore on cleanup
+        orig_get_group = mcp_srv._get_group
+        self.addCleanup(setattr, mcp_srv, "_get_group", orig_get_group)
         mcp_srv._get_group = lambda: self.group
 
     def test_mcp_real_estate_flow(self):
@@ -344,6 +346,74 @@ class FinancialGoalRoadmapTests(TestCase):
         form = FinancialGoalForm(data={'financial_year': 'FY26', 'label': 'x', 'target_amount': '1'})
         self.assertFalse(form.is_valid())
         self.assertIn('financial_year', form.errors)
+
+    def test_closed_year_without_snapshot_is_unrecorded_and_never_clamps_to_zero(self):
+        """Regression: closed FY with no March snapshot must never claim Achieved or clamp Target to 0 under exclude_re."""
+        from portfolio.services import build_goal_roadmap
+        self.FinancialGoal.objects.create(
+            group=self.group,
+            label="FY26 Unrecorded",
+            target_amount=Decimal("30000000"),  # 3.00 Cr
+            financial_year="FY 2025-26",
+            achieved_at=datetime.date(2026, 1, 15),
+        )
+        rm = build_goal_roadmap(
+            self.group,
+            Decimal("16260958"),
+            today=self.today,
+            exclude_real_estate=True,
+            real_estate_value=Decimal("35750000"),  # 3.575 Cr live RE > 3.00 Cr historical goal
+        )
+        closed_goal = rm['closed'][0]['goals'][0]
+        self.assertIsNone(closed_goal['closing_value'])
+        self.assertFalse(closed_goal['achieved'])
+        self.assertEqual(closed_goal['status'], 'unrecorded')
+        self.assertEqual(closed_goal['target'], 30000000.0)
+        self.assertFalse(closed_goal['is_re_deducted'])
+        self.assertEqual(rm['closed'][0]['verdict'], 'unrecorded')
+        self.assertEqual(rm['track_record']['hit'], 0)
+        self.assertEqual(rm['track_record']['total'], 0)
+        self.assertEqual(rm['track_record']['unrecorded'], 1)
+
+    def test_closed_year_with_locked_closing_value_uses_march_snapshot_re_breakdown(self):
+        """Even when g.closing_value is already stored, exclude_real_estate uses historical March RE, not today's RE."""
+        from portfolio.services import build_goal_roadmap
+        MonthlySnapshot.objects.create(
+            group=self.group,
+            month=datetime.date(2026, 3, 1),
+            total_current_value=Decimal("6000000"),
+            data={'real_estate': {'current': 2000000.0}},
+        )
+        self.FinancialGoal.objects.create(
+            group=self.group,
+            label="FY26 Hit ExRE",
+            target_amount=Decimal("5500000"),  # 55L full -> 35L ex-RE vs 40L ex-RE close -> achieved
+            financial_year="FY 2025-26",
+            closing_value=Decimal("6000000"),
+        )
+        self.FinancialGoal.objects.create(
+            group=self.group,
+            label="FY26 Missed ExRE",
+            target_amount=Decimal("6500000"),  # 65L full -> 45L ex-RE vs 40L ex-RE close -> missed
+            financial_year="FY 2025-26",
+            closing_value=Decimal("6000000"),
+        )
+        rm = build_goal_roadmap(
+            self.group,
+            Decimal("6000000"),
+            today=self.today,
+            exclude_real_estate=True,
+            real_estate_value=Decimal("9000000"),  # today's RE (90L) is ignored in favour of March close RE (20L)
+        )
+        by_label = {g['label']: g for g in rm['closed'][0]['goals']}
+        self.assertEqual(by_label['FY26 Hit ExRE']['target'], 3500000.0)
+        self.assertEqual(by_label['FY26 Hit ExRE']['closing_value'], 4000000.0)
+        self.assertEqual(by_label['FY26 Hit ExRE']['status'], 'achieved')
+        self.assertEqual(by_label['FY26 Missed ExRE']['target'], 4500000.0)
+        self.assertEqual(by_label['FY26 Missed ExRE']['closing_value'], 4000000.0)
+        self.assertEqual(by_label['FY26 Missed ExRE']['status'], 'missed')
+        self.assertEqual(rm['track_record']['hit'], 1)
+        self.assertEqual(rm['track_record']['total'], 2)
 
 
 class EmailRenderingTests(TestCase):
@@ -980,6 +1050,167 @@ class PortfolioInsightsDAGTests(TestCase):
             self.assertEqual(ai_res.model, "vault-dag:multi-stage-async")
             self.assertIn("_dag_metadata", ai_res.insights_dict)
 
+    def test_quant_precompute_decimal_accuracy_and_full_universe_losers(self):
+        from portfolio.dag import QualityLensResult, compute_portfolio_quant_metrics
+        from pftracker.ai_gateway.adapters.gemini import _clean_schema_for_gemini
+
+        # Create 25 stocks so index #24 is beyond the old [:20] slice truncation
+        stocks = [
+            {
+                "symbol": f"STOCK{i}",
+                "total_invested": 100000.0,
+                "total_current": 110000.0,
+                "total_pnl": 10000.0,
+                "total_pnl_pct": 10.0,
+                "pct_of_portfolio": 2.2,
+            }
+            for i in range(24)
+        ]
+        stocks.append(
+            {
+                "symbol": "TAILCRASH",
+                "total_invested": 50000.0,
+                "total_current": 30000.0,
+                "total_pnl": -20000.0,
+                "total_pnl_pct": -40.0,
+                "pct_of_portfolio": 0.6,
+            }
+        )
+
+        payload = {
+            "summary": {"total_value": 5000000, "total_invested": 4000000, "total_returns": 1000000, "return_pct": 25.0},
+            "consolidated": [
+                {"name": "Equity", "value": 3000000, "pct": 60.0},
+                {"name": "Debt & EPF", "value": 2000000, "pct": 40.0},
+            ],
+            "stocks_consolidated": stocks,
+            "cash": {
+                "total": 400000,
+                "positions": [
+                    {"name": "HDFC Savings", "amount": 150000, "remarks": ""},
+                    {"name": "Friend Loan", "amount": 250000, "remarks": "Money lent to cousin"},
+                ],
+            },
+            "equity": {"total": 2670000},
+            "us_stocks_total": {"current_inr": 330000},
+            "fixed_deposits": [
+                {"name": "Low Rate FD", "rate": 6.8, "current_value": 200000},
+            ],
+            "mutual_funds_legacy": [
+                {"name": "Old Regular Fund", "current": 45000, "pnl": 5000},
+            ],
+        }
+        quant = compute_portfolio_quant_metrics(payload, "Monthly household expenses: ₹80,000")
+
+        # 1. Full-universe tail loser (#25) must NOT be truncated
+        flagged_syms = [s["symbol"] for s in quant.loss_aversion_flags]
+        self.assertIn("TAILCRASH", flagged_syms)
+        # 2. Illiquid 'lent' cash must be excluded from liquid_cash_inr & tier1_liquid_inr
+        self.assertEqual(quant.liquid_cash_inr, 150000.0)
+        self.assertEqual(quant.illiquid_receivables_inr, 250000.0)
+        self.assertEqual(quant.monthly_expense_estimate_inr, 80000.0)
+        self.assertEqual(quant.six_month_emergency_floor_inr, 480000.0)
+        # 3. Exact -35% equity crash and -30% RSU shock math
+        self.assertEqual(quant.total_equity_exposure_inr, 3000000.0)
+        self.assertEqual(quant.equity_crash_35pct_loss_inr, 1050000.0)
+        self.assertEqual(quant.rsu_shock_30pct_loss_inr, 99000.0)
+        # 4. FD post-tax (6.8 * 0.688 = 4.68%) < 8.15% EPF hurdle
+        self.assertEqual(len(quant.fds_below_epf_hurdle), 1)
+        # 5. Section 112A harvestable LTCG capped at 1,25,000
+        self.assertEqual(quant.sec_112a_harvestable_ltcg_inr, 125000.0)
+        # 6. Asset HHI: 0.6^2 + 0.4^2 = 0.52 -> 5200
+        self.assertEqual(quant.asset_hhi, 5200.0)
+
+        # 7. Typed LegacyFundAuditItem schema has explicit properties for Gemini
+        cleaned_schema = _clean_schema_for_gemini(QualityLensResult.model_json_schema())
+        self.assertTrue(bool(cleaned_schema.get("$defs") or cleaned_schema.get("properties")))
+        q_obj = QualityLensResult(
+            sub_score=77,
+            legacy_fund_audits=[{"fund_name": "Old Regular Fund", "action": "merge", "target": "UTI Nifty 50"}],
+        )
+        self.assertEqual(q_obj.legacy_fund_audits[0].target_fund, "UTI Nifty 50")
+        self.assertEqual(q_obj.legacy_fund_audits[0]["target"], "UTI Nifty 50")
+        self.assertEqual(q_obj.legacy_fund_audits[0].get("fund_name"), "Old Regular Fund")
+
+    def test_dag_stage_timeout_checkpoint_cache_and_critic_backfill(self):
+        import time as _time
+        from django.core.cache import cache
+        from unittest.mock import patch
+        from portfolio.dag import (
+            AllocationLensResult,
+            MacroStressLensResult,
+            PortfolioInsightsDAG,
+            QualityLensResult,
+            StrategyLensResult,
+        )
+        from portfolio.ai import Insight, PortfolioInsightsResponse
+
+        cache.clear()
+        calls = {"count": 0}
+
+        def slow_alloc_and_mock(schema, *args, **kwargs):
+            calls["count"] += 1
+            if schema == AllocationLensResult:
+                _time.sleep(0.25)  # Exceeds 0.05s stage_timeout on 1st run
+                return AllocationLensResult(sub_score=85)
+            if schema == QualityLensResult:
+                return QualityLensResult(
+                    sub_score=80,
+                    candidate_insights=[
+                        Insight(category="consolidation", severity="critical", title="Critical Legacy Exit", detail="Exit regular fund", action="Switch now"),
+                    ],
+                )
+            if schema == MacroStressLensResult:
+                return MacroStressLensResult(
+                    sub_score=75,
+                    candidate_insights=[
+                        Insight(category="macro", severity="info", title="Macro Fair Value", detail="Nifty at 21x", action="Stay invested"),
+                    ],
+                )
+            if schema == StrategyLensResult:
+                return StrategyLensResult(
+                    sub_score=82,
+                    candidate_insights=[
+                        Insight(category="tax", severity="positive", title="Harvest LTCG", detail="Use 1.25L", action="Sell & rebuy"),
+                    ],
+                )
+            if schema == PortfolioInsightsResponse:
+                # Deliberately omit the critical insight to verify Critic/Reducer backfills it
+                return PortfolioInsightsResponse(
+                    summary="Executive synthesis.",
+                    score=10,
+                    insights=[
+                        Insight(category="rebalancing", severity="info", title="Keep Glide Path", detail="Balanced", action="Hold"),
+                    ],
+                )
+            raise ValueError(schema)
+
+        payload = {
+            "summary": {"total_value": 2000000},
+            "cash": {"total": 50000},
+            "equity": {"total": 50000},
+        }
+        with patch("portfolio.dag.gateway.generate_structured", side_effect=slow_alloc_and_mock):
+            dag_timeout = PortfolioInsightsDAG(use_concurrent=True, stage_timeout=0.05, enable_stage_cache=True)
+            t0 = _time.monotonic()
+            res, meta = dag_timeout.execute(payload)
+            elapsed = _time.monotonic() - t0
+
+            # Non-blocking shutdown returns promptly without waiting full 0.25s hang + degrades Stage1A
+            self.assertLess(elapsed, 0.22)
+            self.assertIn("Stage1A:Allocation", meta.degraded_nodes)
+            self.assertTrue(meta.fallback_used)
+            # Critic/Reducer must rescue dropped critical insight + backfill distinct categories
+            titles = [i.title for i in res.insights]
+            self.assertIn("Critical Legacy Exit", titles)
+            self.assertGreaterEqual(len({i.category.value for i in res.insights}), 4)
+
+            # Second run with generous timeout hits stage cache for Stage1B and Stage1C
+            dag_cached = PortfolioInsightsDAG(use_concurrent=False, stage_timeout=2.0, enable_stage_cache=True)
+            _, meta2 = dag_cached.execute(payload)
+            self.assertIn("Stage1B:Quality", meta2.stage_cache_hits)
+            self.assertIn("Stage1C:Macro", meta2.stage_cache_hits)
+
 
 class PortfolioQueryOptimizationsTests(TestCase):
     def setUp(self):
@@ -1340,13 +1571,13 @@ class LandAppraisalTests(TestCase):
             key_drivers=["Airport progress"],
             risk_haircuts_applied=["Speculative broker markup discount"],
             confidence_score=0.9,
-            model_chain_used="gemini-grounding -> deepseek-auditor -> gemini-4-argon",
+            model_chain_used="gemini-grounding -> carbon-auditor -> gemini-4-carbon",
         )
 
         appraisal = run_land_appraisal_dag(self.plot, closing_fy="FY 2025-26", today=self.apr1, is_debug=False)
         self.assertEqual(appraisal.recommended_appreciation_pct, 5.5)
         self.assertEqual(appraisal.new_valuation_inr, 12660000.0)
-        self.assertIn("gemini-4-argon", appraisal.model_chain_used)
+        self.assertIn("gemini-4-carbon", appraisal.model_chain_used)
 
     @mock.patch('portfolio.land_appraisal.run_land_appraisal_dag')
     def test_apply_annual_land_appreciation_with_ai(self, mock_dag):
@@ -1367,7 +1598,7 @@ class LandAppraisalTests(TestCase):
             key_drivers=["Corridor expansion"],
             risk_haircuts_applied=["Illiquidity discount"],
             confidence_score=0.88,
-            model_chain_used="gemini-grounding -> deepseek-auditor -> gemini-4-argon",
+            model_chain_used="gemini-grounding -> carbon-auditor -> gemini-4-carbon",
         )
 
         fy, results = apply_annual_land_appreciation(today=self.apr1, use_ai=True)
@@ -1383,17 +1614,35 @@ class LandAppraisalTests(TestCase):
 
     def test_land_appraisal_dag_fallbacks(self):
         from portfolio.land_appraisal import (
+            GroundedMarketComps,
             _fallback_market_comps,
             _fallback_auditor_review,
             _fallback_synthesis,
+            compute_fiduciary_haircuts,
         )
         comps = _fallback_market_comps(self.plot)
         self.assertEqual(comps.observed_market_growth_pct, 7.5)
-        auditor = _fallback_auditor_review(comps)
+        auditor = _fallback_auditor_review(comps, holding=self.plot)
         self.assertEqual(auditor.conservative_appreciation_ceiling_pct, 6.0)
         synth = _fallback_synthesis(self.plot, "FY 2025-26", comps, auditor)
         self.assertEqual(synth.recommended_appreciation_pct, 6.0)
         self.assertEqual(synth.new_valuation_inr, 12720000.0)
+
+        # Live fiduciary quant anchor allows >6.0% up to min(15.0%, macro_cap_pct) while offline fallback caps at 6.0%
+        high_growth_comps = GroundedMarketComps(
+            locality="Sector 22D",
+            city="Greater Noida",
+            median_portal_ask_per_sq_yd=80000.0,
+            circle_rate_floor_per_sq_yd=40000.0,
+            observed_market_growth_pct=11.0,
+            rbi_repo_rate_pct=6.5,
+            cpi_inflation_pct=5.2,
+        )
+        quant = compute_fiduciary_haircuts(self.plot, high_growth_comps)
+        self.assertEqual(quant.suggested_conservative_ceiling_pct, 9.5)  # 11.0 - 1.5, below 14.7% macro cap
+        self.assertGreater(quant.net_realizable_per_sq_yd_inr, 0.0)
+        offline_aud = _fallback_auditor_review(high_growth_comps, holding=self.plot)
+        self.assertEqual(offline_aud.conservative_appreciation_ceiling_pct, 6.0)
 
     @mock.patch('portfolio.management.commands.appreciate_land.apply_annual_land_appreciation')
     def test_appreciate_land_command_options(self, mock_apply):
@@ -1448,7 +1697,7 @@ class LandAppraisalTests(TestCase):
             key_drivers=["Jewar Airport Phase 1 progress"],
             risk_haircuts_applied=["Speculative broker markup discount"],
             confidence_score=0.9,
-            model_chain_used="gemini-grounding -> argon-auditor -> gemini-4-argon",
+            model_chain_used="gemini-grounding -> carbon-auditor -> gemini-4-carbon",
         )
         results = [{
             'holding': self.plot,
@@ -1519,7 +1768,7 @@ class LandAppraisalTests(TestCase):
         mock_email.assert_called_once()
 
     @mock.patch('portfolio.land_appraisal.gateway.generate_structured')
-    def test_dag_stages_use_argon_in_production(self, mock_gen):
+    def test_dag_stages_use_carbon_in_production(self, mock_gen):
         from portfolio.land_appraisal import (
             GroundedMarketComps,
             DeepSeekAuditorReview,
@@ -1538,8 +1787,9 @@ class LandAppraisalTests(TestCase):
         )
         comps = discover_land_market_comps(self.plot, is_debug=False)
         _, kwargs1 = mock_gen.call_args
-        self.assertEqual(kwargs1.get('model'), 'gemini-4-argon')
+        self.assertEqual(kwargs1.get('model'), 'gemini-4-carbon')
         self.assertEqual(kwargs1.get('thinking_level'), 'HIGH')
+        self.assertTrue(kwargs1.get('enable_search_grounding'))
 
         # Stage 2 in prod
         mock_gen.reset_mock()
@@ -1550,26 +1800,48 @@ class LandAppraisalTests(TestCase):
         )
         auditor = run_deepseek_auditor_review(self.plot, comps, is_debug=False)
         _, kwargs2 = mock_gen.call_args
-        self.assertEqual(kwargs2.get('model'), 'gemini-4-argon')
+        self.assertEqual(kwargs2.get('model'), 'gemini-4-carbon')
         self.assertEqual(kwargs2.get('thinking_level'), 'HIGH')
 
-        # Stage 3 in prod
+        # Stage 3 in prod (also verify hard clamping to auditor ceiling + Acre-to-Gaj unit conversion)
         mock_gen.reset_mock()
         mock_gen.return_value = LandAppraisalSynthesis(
             holding_id=self.plot.id,
             holding_name=self.plot.name,
             closing_fy="FY 2025-26",
             current_valuation_inr=12000000.0,
-            recommended_appreciation_pct=5.5,
-            new_valuation_inr=12660000.0,
-            net_value_increase_inr=660000.0,
-            methodology_summary="Prod Argon DAG synthesis",
+            recommended_appreciation_pct=9.0,  # Exceeds 5.5% auditor ceiling -> must clamp to 5.5%
+            new_valuation_inr=13080000.0,
+            net_value_increase_inr=1080000.0,
+            methodology_summary="Prod Carbon DAG synthesis",
         )
         synth = synthesize_land_appreciation(self.plot, comps, auditor, "FY 2025-26", is_debug=False)
         _, kwargs3 = mock_gen.call_args
-        self.assertEqual(kwargs3.get('model'), 'gemini-4-argon')
+        self.assertEqual(kwargs3.get('model'), 'gemini-4-carbon')
         self.assertEqual(kwargs3.get('thinking_level'), 'HIGH')
-        self.assertIn("gemini-4-argon", synth.model_chain_used)
+        self.assertEqual(synth.recommended_appreciation_pct, 5.5)
+        self.assertEqual(synth.new_valuation_inr, 12660000.0)
+        self.assertEqual(synth.net_value_increase_inr, 660000.0)
+        self.assertIn("gemini-4-carbon", synth.model_chain_used)
+
+        # Verify non-GAJ unit (1 ACRE = 4840 Gaj) divides by area_in_gaj rather than raw area_value=1
+        acre_plot = RealEstateHolding.objects.create(
+            group=self.group,
+            name="Agri Acre Parcel",
+            property_type="AGRICULTURAL",
+            area_value=Decimal("1"),
+            area_unit="ACRE",
+            locality="Jewar Belt",
+            city="Gautam Buddha Nagar",
+            state="Uttar Pradesh",
+            purchase_date=datetime.date(2022, 1, 1),
+            purchase_price=Decimal("4000000"),
+            current_valuation=Decimal("4840000"),
+        )
+        from portfolio.land_appraisal import _fallback_synthesis
+        acre_synth = _fallback_synthesis(acre_plot, "FY 2025-26", comps, auditor)
+        # 4,840,000 * 1.055 = 5,106,200 / 4,840 Gaj = 1,055.00 INR/Sq.Yd (NOT 5,106,200!)
+        self.assertEqual(acre_synth.implied_rate_per_sq_yd_inr, 1055.0)
 
 
 class PortfolioDAGResilienceAndBabyTests(TestCase):
@@ -1615,6 +1887,17 @@ class PortfolioDAGResilienceAndBabyTests(TestCase):
         self.assertEqual(response.score, 78)
         self.assertIn("Portfolio diagnostic complete", response.summary)
         self.assertTrue(len(response.insights) > 0)
+
+    def test_dag_stage_cache_key_isolates_tenant_groups(self):
+        from portfolio.dag import PortfolioInsightsDAG
+
+        dag = PortfolioInsightsDAG(use_concurrent=False, enable_stage_cache=True)
+        payload = {"summary": {"total_current_value": 5000000}}
+        key_a = dag._stage_cache_key("Stage1A:Allocation", payload, "profile", group_id=self.group.id)
+        key_b = dag._stage_cache_key("Stage1A:Allocation", payload, "profile", group_id=self.other_group.id)
+        key_none = dag._stage_cache_key("Stage1A:Allocation", payload, "profile", group_id=None)
+        self.assertNotEqual(key_a, key_b)
+        self.assertNotEqual(key_a, key_none)
 
     def test_toggle_baby_holdings_and_tenant_isolation(self):
         from portfolio.models import ZerodhaAccount, StockHolding, FixedDeposit

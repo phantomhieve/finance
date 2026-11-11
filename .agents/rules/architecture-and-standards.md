@@ -1,66 +1,57 @@
 # Architecture, Contracts & Code Standards
 
-Guidelines for Antigravity agents modifying or extending the Vault Personal Finance codebase.
+Guidelines for agents modifying or extending the Vault codebase.
 
 ---
 
 ## 1. Python, Typing & Django Conventions
 
-- **Target Runtime**: Python 3.14 + Django 6.0 compatibility.
+- **Target Runtime**: Python 3.12+ and Django 6.0.
 - **Strict Typing**:
-  - All new or refactored functions, service methods, and helpers MUST include complete type hints.
-  - Use Python 3.10+ union syntax (`T | None` instead of `Optional[T]`, `list[str]` instead of `List[str]`).
-  - Money amounts MUST be typed as `Decimal`, never `float`.
+  - Include complete type hints (`T | None`, `list[str]`, `Decimal`) on all new or refactored functions, methods, and classes.
+  - Type monetary figures, weights, and rates exclusively as `Decimal`, never `float`.
 - **Docstring Standards**:
-  - Every module, class, public service function, and complex utility MUST have a clear docstring.
-  - Describe parameters, return types, exceptions raised, and multi-tenancy scoping.
-- **Clean Separation of Concerns**:
-  - **Models** in `<app>/models.py`: define schema, field validations, clean representation (`__str__`), and model-level properties.
-  - **Business Logic & External APIs** in `<app>/services.py`: aggregations, synchronization, third-party integrations, and complex math.
-  - **Forms** in `<app>/forms.py`: data validation, sanitization, and UI form specifications.
-  - **Views** in `<app>/views.py`: request parsing, security/role gating, context assembly, and response formatting. Keep views thin.
-  - **Background Commands** in `<app>/management/commands/`.
+  - Document parameters, return types, exceptions raised, and `AccountGroup` tenant scoping on public service functions and classes.
+- **Separation of Concerns**:
+  - **Models** (`<app>/models.py`): Schema, field validators, `__str__`, and pure model properties.
+  - **Services & Domain Modules** (`<app>/services.py`, `dag.py`, `land_appraisal.py`, `analytics.py`, `ingestion.py`, `statements.py`): Business logic, external APIs, synchronization, and `Decimal` calculations.
+  - **Forms** (`<app>/forms.py`): Validation and sanitization.
+  - **Views** (`<app>/views.py`): Request parsing, role/vault gating, context assembly, and response rendering.
+  - **Management Commands** (`<app>/management/commands/`): Scheduled and operational CLI entrypoints.
 
 ---
 
 ## 2. App Boundaries & Module Contracts
 
-| App | Contract / Scope | Invariants |
+| App | Responsibility | Key Invariants |
 | :--- | :--- | :--- |
-| **`tracker`** | Custom auth (`User`, `AccountGroup`), FY savings vs goal pacing, HRA tracking, personal notes. | User-scoped via `group_user_filter(user)`. Role permissions (`PRIMARY`, `ACCOUNT_HOLDER`, `LANDLORD`) strictly checked. Feature gates (`notes`, `hra`) enforced. |
-| **`portfolio`** | Multi-asset wealth management, Zerodha sync, live price services, multi-stage AI insights DAG. | Gated behind `_vault_gate` with session unlock TTL. Group-scoped via `_user_group(request)`. Master vs Child portfolio separation via `is_baby`. |
-| **`expenses`** | Bank statement parsing, transaction reconciliation, Gmail sync, EMI tracking, AI anomaly detection. | Group-scoped. Investment category (`INVESTMENT_CATEGORY`) masked from non-primary holders via `_hides_investments`. Reconciled dual-leg transfers collapsed. |
-| **`jewellery`** | Physical precious metal inventory, locker vs safe location tracking, live fineness valuation. | Gated behind `_vault_gate`. Live rates attached via `JewelleryItem.attach_rates` to prevent per-item N+1 queries. WebP thumbnail caching. |
-| **`pftracker`** | Core settings, ASGI dual router (`/mcp` + Django HTTP), AI gateway router, connection pooling & concurrency. | Concurrency must use `DjangoSafeThreadPoolExecutor` or `safe_async_to_thread` to prevent database connection leaks. |
-| **`mcp_server`** | FastMCP SSE tools & resources for external AI clients. | Requires OAuth 2.0 PKCE tokens. Write mutations require `write` scope and PRIMARY user. Every mutation MUST write an immutable before/after snapshot to `MCPAuditLog`. |
+| **`pftracker`** | Settings, dual ASGI router (`/mcp` + Django HTTP), Unified AI Gateway (`ai_gateway/`), DB pooling & safe concurrency (`concurrency.py`, `db_optimizations.py`). | Thread/async workers must use `DjangoSafeThreadPoolExecutor` or `safe_async_to_thread` to prevent DB connection leaks. |
+| **`tracker`** | Custom auth (`User`, `AccountGroup`, `HouseholdConfig`), FY savings vs. goal pacing, HRA ledger, personal notes, WebAuthn credentials. | User-scoped via resolved household owner or `group_user_filter(user)`. Role gates (`PRIMARY`, `ACCOUNT_HOLDER`, `LANDLORD`) and feature flags enforced. |
+| **`portfolio`** | 11-asset-class wealth engine, Google Sheets sync, live bullion/FX rates, `indian_format` filters, Portfolio & Land AI DAGs. | Gated behind `_vault_gate` (`30m` TTL). Group-scoped via `_gf(group)` fail-closed filter. Master vs. Child split via `is_baby`. |
+| **`expenses`** | Gmail OAuth sync, statement PDF unlocking & 3-stage reconciliation, dual-leg transfer settlement, EMI tracking, 4-tier categorization, AI audit. | Group-scoped. `INVESTMENT_CATEGORY` masked from non-primary members via `_hides_investments`. Optional `EXPENSES_UNLOCK_TTL` session lock. |
+| **`jewellery`** | Precious metal & ornament custody ledger (`BANK_LOCKER` vs. `HOME_SAFE`), fineness valuation, UUID photo storage, WebP thumbnails. | Gated behind `_vault_gate`. Live rates attached via `JewelleryItem.attach_rates` (zero per-item N+1 queries). |
+| **`mcp_server`** | FastMCP SSE tools & resources for external AI clients. | OAuth 2.0 PKCE (`RFC 9700`) required; `PRIMARY` role enforced; write tools require `write` scope and log reversible snapshots in `MCPAuditLog`. |
 
 ---
 
 ## 3. Anti-N+1 Query & Database Performance Rules
 
-1. **Mandatory Query Optimization**:
-   - Always apply `.select_related()` for single-valued relationships (`ForeignKey`, `OneToOneField`) accessed in templates, loops, or serializers.
-   - Always apply `.prefetch_related()` for multi-valued relationships (`ManyToManyField`, reverse `ForeignKey`).
-   - When fetching records by ID list, use `.in_bulk()` or `__in` queries instead of querying one-by-one.
-2. **Bulk Operations**:
-   - Use `bulk_create` and `bulk_update` with `batch_size` for multi-row inserts/updates.
-   - Specify `update_fields` when saving existing model instances to avoid full-row overwrites and race conditions.
-3. **Database Concurrency & Locking Prevention**:
-   - SQLite operates in WAL mode with a 15-second busy timeout (`pftracker/db_optimizations.py`).
-   - Long-running async or background operations MUST NOT hold transactions open.
-4. **Caching Invariants**:
-   - Cache expensive aggregations or lockout trackers using Django's cache framework (`from django.core.cache import cache`).
-   - Prefix cache keys with tenant identifiers (e.g. `vault_unlock_{group_id}`).
+1. **Relationship Prefetching**:
+   - Use `.select_related()` for `ForeignKey` / `OneToOneField` relations and `.prefetch_related()` for `ManyToManyField` / reverse `ForeignKey` relations accessed in loops, templates, or serializers.
+   - Use `.in_bulk()` or `__in` filters rather than per-ID queries inside loops.
+2. **Bulk & Scoped Writes**:
+   - Use `bulk_create` and `bulk_update` with `batch_size` for multi-row mutations.
+   - Pass `update_fields=[...]` when saving existing model instances to avoid clobbering concurrent column updates.
+3. **Concurrency & Cache Keys**:
+   - Never hold database transactions open across external HTTP or LLM network calls.
+   - Prefix cache keys (`django.core.cache`) with tenant identifiers (`group.id`) to guarantee multi-tenant isolation.
 
 ---
 
 ## 4. Error Recovery & Fault Tolerance
 
-1. **Multi-Stage DAG Resilience**:
-   - AI analytical pipelines (such as `PortfolioInsightsDAG` and `run_land_appraisal_dag`) MUST implement deterministic fallbacks for EVERY stage (Stages 1A/B/C, 2, and 3).
-   - Under network outages, rate limits, or model provider timeouts, the pipeline must degrade gracefully and return grounded deterministic assessments rather than crashing.
-2. **Graceful Degradation on Third-Party APIs**:
-   - Google Sheets sync, Gmail sync, commodity rate scrapers, and currency exchange APIs must catch connection/timeout errors, log structured warnings, and use cached rates/data.
-3. **Exception Specificity**:
-   - Never use bare `except:`. Always catch specific exception types (`(ValueError, KeyError, ObjectDoesNotExist, RequestException)`).
-   - Log exceptions with contextual metadata (tenant group ID, entity PK).
+1. **Quant-Grounded AI DAG Resilience**:
+   - Pre-compute deterministic `Decimal` metrics in Python before invoking LLM nodes, and provide data-grounded Python fallbacks for every stage (`PortfolioInsightsDAG`, `run_land_appraisal_dag`).
+   - Provider rate limits (`HTTP 429`), errors (`HTTP 5xx`), or timeouts must degrade gracefully without failing requests or cron runs.
+2. **Third-Party API Safety**:
+   - Catch specific exceptions (`ObjectDoesNotExist`, `ValueError`, `KeyError`, `RequestException`) on Google Sheets, Gmail, FX, and bullion scrapers; never use bare `except:`.

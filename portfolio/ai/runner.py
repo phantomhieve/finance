@@ -110,17 +110,13 @@ def call_gemini_direct(prompt_data: dict, group=None) -> AIResult:
         raise ValueError('GEMINI_API_KEY environment variable is not set')
 
     from pftracker.ai_gateway import AINode
-    from pftracker.ai_gateway.adapters.gemini import GeminiAdapter
+    from pftracker.ai_gateway.adapters.gemini import GeminiAdapter, _normalize_model_name
 
-    model = (
+    model = _normalize_model_name(
         getattr(settings, "GEMINI_MODEL", "")
         or os.environ.get("GEMINI_MODEL", "")
-        or ("gemini-3.8-flash" if getattr(settings, "DEBUG", True) else "gemini-4-argon")
+        or ("gemini-3.8-flash" if getattr(settings, "DEBUG", True) else "gemini-4-carbon")
     )
-    if model.strip().lower() in ("argon", "gemini-argon", "gemini_argon"):
-        model = "gemini-4-argon"
-    elif model.strip().lower() in ("flash", "gemini-flash", "3.8-flash", "gemini-3.8-flash"):
-        model = "gemini-3.8-flash"
     logger.info("Calling Gemini model: %s", model)
 
     node = AINode(

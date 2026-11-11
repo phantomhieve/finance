@@ -79,9 +79,7 @@ class NPSEntryForm(forms.ModelForm):
 
         if date:
             group = self._group or getattr(self.instance, 'group', None)
-            qs = NPSEntry.objects.all()
-            if group:
-                qs = qs.filter(group=group)
+            qs = NPSEntry.objects.filter(group=group) if group else NPSEntry.objects.none()
             if self.instance.pk:
                 qs = qs.exclude(pk=self.instance.pk)
             prev = qs.filter(date__lte=date).order_by('-date', '-created_at').first()
@@ -312,6 +310,16 @@ class RealEstateHoldingForm(forms.ModelForm):
         if val is None or val <= 0:
             raise forms.ValidationError("Area value must be greater than zero.")
         return val
+
+    def clean_google_maps_url(self):
+        from urllib.parse import urlparse
+        url = (self.cleaned_data.get('google_maps_url') or '').strip()
+        if not url:
+            return ''
+        parsed = urlparse(url)
+        if parsed.scheme.lower() not in ('http', 'https') or not parsed.netloc:
+            raise forms.ValidationError("Google Maps URL must use http:// or https://.")
+        return url
 
 
 class RealEstateValuationForm(forms.ModelForm):

@@ -302,3 +302,92 @@ class GoalAndCarryForwardTests(TestCase):
         self.assertEqual(adjusted_goals['August'], 115000.0)
         self.assertEqual(adjusted_goals['September'], 110000.0)
 
+
+class TrackerSecurityHardeningTests(TestCase):
+    def setUp(self):
+        from tracker.models import HRAExpense, Note, Transaction
+        self.group = AccountGroup.objects.create(name="SecHome")
+        self.other_group = AccountGroup.objects.create(name="OtherHome")
+        self.owner = User.objects.create_user(
+            username="sec_owner", password="pw", user_type="PRIMARY", group=self.group
+        )
+        self.spouse = User.objects.create_user(
+            username="sec_spouse", password="pw", user_type="ACCOUNT_HOLDER", group=self.group
+        )
+        self.outsider = User.objects.create_user(
+            username="sec_outsider", password="pw", user_type="PRIMARY", group=self.other_group
+        )
+        self.txn = Transaction.objects.create(
+            user=self.owner, date=datetime.date(2026, 5, 10),
+            amount=Decimal('1000'), remarks="Home Txn", type="SAVINGS",
+        )
+        self.other_txn = Transaction.objects.create(
+            user=self.outsider, date=datetime.date(2026, 5, 10),
+            amount=Decimal('2000'), remarks="Other Txn", type="SAVINGS",
+        )
+        self.hra = HRAExpense.objects.create(
+            user=self.owner, date=datetime.date(2026, 5, 10),
+            amount=Decimal('15000'), expense_type="Rent", hra_type="EXPENSE", mode_of_payment="UPI",
+        )
+        self.other_hra = HRAExpense.objects.create(
+            user=self.outsider, date=datetime.date(2026, 5, 10),
+            amount=Decimal('15000'), expense_type="Rent", hra_type="EXPENSE", mode_of_payment="UPI",
+        )
+        self.spouse_note = Note.objects.create(
+            user=self.spouse, title="Private Spouse Note", body="Secret",
+            date=datetime.date(2026, 5, 10), financial_year=2026,
+        )
+
+    def test_disabled_savings_feature_blocks_all_mutations(self):
+        self.group.config.feature_savings = False
+        self.group.config.save()
+        self.client.force_login(self.owner)
+
+        endpoints = [
+            ('POST', '/add/', {'date': '2026-05-10', 'amount': '500', 'type': 'SAVINGS', 'remarks': 'x'}),
+            ('POST', f'/edit/{self.txn.pk}/', {'date': '2026-05-10', 'amount': '600', 'type': 'SAVINGS'}),
+            ('POST', f'/delete/{self.txn.pk}/', {}),
+            ('POST', '/goal/increment/', {'effective_month': '2026-06-01', 'increment_amount': '5000'}),
+            ('POST', '/goal/annual/2026/', {'annual_goal': '1200000'}),
+            ('POST', '/goal/adjustment/', {'month': '2026-06-01', 'adjustment_amount': '2000'}),
+            ('POST', '/month-comment/', {'month': '2026-06-01', 'comment': 'test'}),
+        ]
+        for _, url, data in endpoints:
+            resp = self.client.post(url, data)
+            self.assertEqual(resp.status_code, 404, url)
+
+    def test_disabled_hra_feature_blocks_hra_mutations(self):
+        self.group.config.feature_hra = False
+        self.group.config.save()
+        self.client.force_login(self.owner)
+
+        self.assertEqual(self.client.post('/hra/add/', {
+            'date': '2026-05-10', 'amount': '5000', 'hra_type': 'EXPENSE', 'mode_of_payment': 'UPI'
+        }).status_code, 404)
+        self.assertEqual(self.client.post(f'/hra/edit/{self.hra.pk}/', {}).status_code, 404)
+        self.assertEqual(self.client.post(f'/hra/delete/{self.hra.pk}/').status_code, 404)
+
+    def test_cross_household_idor_and_private_note_isolation(self):
+        self.client.force_login(self.owner)
+        # Cross-household transaction & HRA IDOR -> 404
+        self.assertEqual(self.client.post(f'/edit/{self.other_txn.pk}/', {}).status_code, 404)
+        self.assertEqual(self.client.post(f'/delete/{self.other_txn.pk}/').status_code, 404)
+        self.assertEqual(self.client.post(f'/hra/edit/{self.other_hra.pk}/', {}).status_code, 404)
+        self.assertEqual(self.client.post(f'/hra/delete/{self.other_hra.pk}/').status_code, 404)
+        # Spouse private note cannot be edited or deleted even by PRIMARY in same household
+        self.assertEqual(self.client.post(f'/notes/edit/{self.spouse_note.pk}/', {
+            'title': 'Hijack', 'body': 'x', 'date': '2026-05-10'
+        }).status_code, 404)
+        self.assertEqual(self.client.post(f'/notes/delete/{self.spouse_note.pk}/').status_code, 404)
+
+    def test_month_comment_rejects_overlong_input_without_500(self):
+        from tracker.models import MonthlySavingsComment
+        self.client.force_login(self.owner)
+        resp = self.client.post('/month-comment/', {
+            'month': '2026-06-15',
+            'comment': 'x' * 600,
+        })
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(MonthlySavingsComment.objects.filter(user=self.owner).exists())
+
+

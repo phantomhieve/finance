@@ -25,25 +25,26 @@ def _add_months(d: datetime.date, months: int) -> datetime.date:
     return datetime.date(year, month, min(d.day, calendar.monthrange(year, month)[1]))
 
 
-def _loans(group):
+def _loans(group, hide_investments: bool = False):
     """Group real (non-deleted) EMI instalment rows by loan reference."""
     rows = (
         Expense.objects.filter(group=group, is_emi=True, is_deleted=False, direction='DEBIT')
         .exclude(emi_reference='').exclude(emi_component='PURCHASE')
-        .select_related('payment_source', 'category')
-        .order_by('txn_date', 'id')
     )
+    if hide_investments:
+        rows = rows.exclude(category__name='Investments')
+    rows = rows.select_related('payment_source', 'category').order_by('txn_date', 'id')
     by_ref = defaultdict(list)
     for e in rows:
         by_ref[e.emi_reference].append(e)
     return by_ref
 
 
-def emi_schedules(group, today=None):
+def emi_schedules(group, today=None, hide_investments: bool = False):
     """Return one dict per active (or just-finished) EMI loan with its derived schedule."""
     today = today or datetime.date.today()
     schedules = []
-    for ref, rows in _loans(group).items():
+    for ref, rows in _loans(group, hide_investments=hide_investments).items():
         total = max((e.emi_total_installments or 0 for e in rows), default=0)
         if not total:
             continue  # tenure unknown — nothing to project until the user sets it
@@ -100,14 +101,14 @@ def emi_schedules(group, today=None):
     return schedules
 
 
-def emi_projection(group, start, end, today=None, ongoing=None):
+def emi_projection(group, start, end, today=None, ongoing=None, hide_investments: bool = False):
     """Projected (not yet debited) instalments falling inside [start, end], plus unified loan cards.
 
     A projection is dropped when a real instalment for the same loan with an equal or higher
     number already exists in the window, so it never double-counts a posted debit.
     """
     today = today or datetime.date.today()
-    schedules = emi_schedules(group, today=today)
+    schedules = emi_schedules(group, today=today, hide_investments=hide_investments)
     items = []
     projected_by_ref = {}
     for s in schedules:
@@ -132,8 +133,10 @@ def emi_projection(group, start, end, today=None, ongoing=None):
                 txn_date__gte=start, txn_date__lte=end
             )
             .exclude(emi_reference='').exclude(emi_component='PURCHASE')
-            .select_related('payment_source')
         )
+        if hide_investments:
+            month_debits = month_debits.exclude(category__name='Investments')
+        month_debits = month_debits.select_related('payment_source')
         ongoing_by_loan = defaultdict(lambda: {
             'ref': '', 'num': None, 'total_installments': None,
             'principal': ZERO, 'interest': ZERO, 'total': ZERO,

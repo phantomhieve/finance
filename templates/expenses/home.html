@@ -5,47 +5,47 @@
 
 {% block page_header %}
 <div class="v-page-header">
-  <div class="flex flex-col sm:flex-row sm:items-center gap-3">
+  <div class="flex flex-wrap items-center gap-2.5 sm:gap-3 min-w-0">
     <h1 class="v-title">Expenses</h1>
     {# Integrated Month Switcher Pill #}
-    <div class="exp-month-switch inline-flex items-center gap-1.5 px-2 py-1 rounded-xl bg-base-200/80 border border-base-content/10 shadow-xs self-start">
-      <a href="?m={{ prev_month }}" class="btn btn-ghost btn-xs btn-square rounded-lg h-7 w-7 min-h-0 text-base-content/70 hover:text-base-content" aria-label="Previous month" title="Previous month">
-        <span class="material-symbols-outlined text-base">chevron_left</span>
+    <div class="exp-month-switch inline-flex items-center gap-1 px-1.5 py-1 rounded-xl bg-base-200/80 border border-base-content/10 shadow-xs">
+      <a href="?m={{ prev_month }}" class="v-icon-btn btn btn-ghost btn-xs btn-square rounded-lg !min-h-11 !min-w-11 lg:!min-h-8 lg:!min-w-8 text-base-content/75 hover:text-base-content" aria-label="Previous month" title="Previous month">
+        <span class="material-symbols-outlined text-lg">chevron_left</span>
       </a>
-      <span class="exp-month-label text-xs font-bold px-1 tabular-nums">{{ summary.label }}</span>
+      <span class="exp-month-label text-xs sm:text-sm font-bold px-1.5 tabular-nums whitespace-nowrap">{{ summary.label }}</span>
       {% if next_month %}
-      <a href="?m={{ next_month }}" class="btn btn-ghost btn-xs btn-square rounded-lg h-7 w-7 min-h-0 text-base-content/70 hover:text-base-content" aria-label="Next month" title="Next month">
-        <span class="material-symbols-outlined text-base">chevron_right</span>
+      <a href="?m={{ next_month }}" class="v-icon-btn btn btn-ghost btn-xs btn-square rounded-lg !min-h-11 !min-w-11 lg:!min-h-8 lg:!min-w-8 text-base-content/75 hover:text-base-content" aria-label="Next month" title="Next month">
+        <span class="material-symbols-outlined text-lg">chevron_right</span>
       </a>
       {% else %}
-      <span class="btn btn-ghost btn-xs btn-square rounded-lg h-7 w-7 min-h-0 btn-disabled opacity-20" aria-hidden="true">
-        <span class="material-symbols-outlined text-base">chevron_right</span>
+      <span class="btn btn-ghost btn-xs btn-square rounded-lg !min-h-11 !min-w-11 lg:!min-h-8 lg:!min-w-8 btn-disabled opacity-20" aria-hidden="true">
+        <span class="material-symbols-outlined text-lg">chevron_right</span>
       </span>
       {% endif %}
       {% if not is_current_month %}
-      <div class="w-px h-3.5 bg-base-content/15 mx-0.5"></div>
-      <a href="{% url 'expenses_home' %}" class="btn btn-ghost btn-xs px-2 h-7 min-h-0 text-[11px] font-semibold gap-1 text-primary hover:bg-primary/10">
-        <span class="material-symbols-outlined text-xs">today</span>Today
+      <div class="w-px h-4 bg-base-content/15 mx-0.5"></div>
+      <a href="{% url 'expenses_home' %}" class="btn btn-ghost btn-xs px-2.5 !min-h-11 lg:!min-h-8 text-xs font-semibold gap-1 text-primary hover:bg-primary/10 rounded-lg">
+        <span class="material-symbols-outlined text-sm">today</span>Today
       </a>
       {% endif %}
     </div>
   </div>
 
   <div class="v-toolbar">
-    <a href="{% url 'expenses_year' %}?fy={{ fy_start }}" class="v-btn v-btn-secondary" title="Annual Financial Year View">
-      <span class="material-symbols-outlined text-[17px]">calendar_month</span>
+    <a href="{% url 'expenses_year' %}?fy={{ fy_start }}" class="v-btn v-btn-secondary !min-h-11 !min-w-11 lg:!min-h-9 lg:!min-w-0" aria-label="Annual Financial Year View" title="Annual Financial Year View">
+      <span class="material-symbols-outlined text-lg">calendar_month</span>
       <span class="hidden sm:inline">Year View</span>
     </a>
-    <a href="{% url 'expenses_statements' %}" class="v-btn v-btn-secondary" title="Credit Card Statements &amp; Reconciliation">
-      <span class="material-symbols-outlined text-[17px]">request_quote</span>
+    <a href="{% url 'expenses_statements' %}" class="v-btn v-btn-secondary !min-h-11 !min-w-11 lg:!min-h-9 lg:!min-w-0" aria-label="Credit Card Statements and Reconciliation" title="Credit Card Statements &amp; Reconciliation">
+      <span class="material-symbols-outlined text-lg">request_quote</span>
       <span class="hidden sm:inline">Statements</span>
     </a>
-    <a href="{% url 'expenses_settings' %}" class="v-btn v-btn-secondary" title="Gmail Ingestion, Cards &amp; Categories">
-      <span class="material-symbols-outlined text-[17px]">tune</span>
+    <a href="{% url 'expenses_settings' %}" class="v-btn v-btn-secondary !min-h-11 !min-w-11 lg:!min-h-9 lg:!min-w-0" aria-label="Expense Settings" title="Gmail Ingestion, Cards &amp; Categories">
+      <span class="material-symbols-outlined text-lg">tune</span>
       <span class="hidden sm:inline">Settings</span>
     </a>
-    <button type="button" class="v-btn v-btn-primary gap-1.5" onclick="Expenses.open()">
-      <span class="material-symbols-outlined text-[17px]">add</span>
+    <button type="button" class="v-btn v-btn-primary !min-h-11 lg:!min-h-9 gap-1.5" onclick="Expenses.open()">
+      <span class="material-symbols-outlined text-lg">add</span>
       <span>Add Expense</span>
     </button>
   </div>
@@ -57,20 +57,20 @@
 {# --- 1. SIGNATURE LEDGER SUMMARY BAND --- #}
 {% with pace=summary.pace %}
 <div class="v-ledger-band mb-5 animate-up">
-  
-  {# Left Lead Cell (approx 5 cols): Net Spend Big Number + Horizon Bar #}
+
+  {# Left Lead Cell: Net Spend Big Number + Horizon Bar #}
   <div class="v-lead-cell">
     <div class="v-lead-label">
       <span>Net Monthly Spend · {{ summary.label }}</span>
       {% if pace %}
-      <span class="text-[10px] font-semibold text-base-content/50 tabular-nums px-2 py-0.5 rounded-full bg-base-content/5 border border-base-content/8">
+      <span class="text-xs font-semibold text-base-content/60 tabular-nums px-2 py-0.5 rounded-full bg-base-content/5 border border-base-content/10">
         Day {{ pace.day }} of {{ pace.days }}
       </span>
       {% endif %}
     </div>
 
     <div class="v-lead-figure-row">
-      <span class="v-lead-figure text-primary">{{ summary.total|inr }}</span>
+      <span class="v-lead-figure tabular-nums">{{ summary.total|inr }}</span>
       {% if summary.refunded_total > 0 %}
       <span class="v-delta v-delta-pos" title="Gross {{ summary.gross_total|inr }}">
         <span class="material-symbols-outlined text-xs">replay</span>
@@ -89,7 +89,7 @@
       {% endif %}
     </div>
 
-    <div class="v-lead-sub">
+    <div class="v-lead-sub tabular-nums text-base-content/60">
       {% if pace and pace.projected %}
         On pace for ~{{ pace.projected|inr_short }} · {{ summary.prev_label }} closed at {{ summary.prev_total|inr_short }}
       {% elif summary.prev_total %}
@@ -113,9 +113,9 @@
         {% for c in summary.categories|slice:":4" %}
         <div class="v-horizon-item">
           <span class="v-horizon-dot" style="background:hsl({{ c.hue }} 75% 58%)"></span>
-          <span class="truncate max-w-[90px]">{{ c.name }}:</span>
-          <span class="v-horizon-amount">{{ c.total|inr_short }}</span>
-          <span class="v-horizon-pct">({{ c.pct }}%)</span>
+          <span class="truncate max-w-[96px] text-base-content/80">{{ c.name }}:</span>
+          <span class="v-horizon-amount tabular-nums text-base-content">{{ c.total|inr_short }}</span>
+          <span class="v-horizon-pct tabular-nums text-base-content/60">({{ c.pct }}%)</span>
         </div>
         {% endfor %}
       </div>
@@ -125,31 +125,31 @@
 
   {# Right Hairline Grid: Cumulative Pace Contour + 3 Ruled Stat Cells #}
   <div class="v-stat-grid">
-    <div class="v-stat-cell col-span-2 sm:col-span-1">
+    <div class="v-stat-cell">
       <div class="v-stat-label">Transactions</div>
-      <div class="v-stat-value text-base-content">{{ summary.count }} <span class="text-xs font-normal opacity-50">txns</span></div>
-      <div class="v-stat-sub">Across {{ summary.start|date:"M Y" }}</div>
+      <div class="v-stat-value text-base-content tabular-nums">{{ summary.count }} <span class="text-xs font-normal text-base-content/60">txns</span></div>
+      <div class="v-stat-sub text-base-content/60">Across {{ summary.start|date:"M Y" }}</div>
     </div>
 
-    <div class="v-stat-cell col-span-2 sm:col-span-1">
+    <div class="v-stat-cell">
       {% if summary.emi_summary.count %}
       <div class="v-stat-label">Active EMIs</div>
-      <div class="v-stat-value text-purple-400">{{ summary.emi_summary.monthly_commitment|inr_short }}<span class="text-xs font-normal opacity-50">/mo</span></div>
-      <div class="v-stat-sub">{{ summary.emi_summary.count }} loan installment{{ summary.emi_summary.count|pluralize }}</div>
+      <div class="v-stat-value text-purple-400 tabular-nums">{{ summary.emi_summary.monthly_commitment|inr_short }}<span class="text-xs font-normal text-base-content/60">/mo</span></div>
+      <div class="v-stat-sub tabular-nums text-base-content/60">{{ summary.emi_summary.count }} loan installment{{ summary.emi_summary.count|pluralize }}</div>
       {% else %}
       <div class="v-stat-label">Transfers / Saved</div>
-      <div class="v-stat-value text-indigo-400">{{ summary.transfers|inr_short }}</div>
-      <div class="v-stat-sub">Internal movements</div>
+      <div class="v-stat-value text-sky-400 tabular-nums">{{ summary.transfers|inr_short }}</div>
+      <div class="v-stat-sub text-base-content/60">Internal movements</div>
       {% endif %}
     </div>
 
-    <div class="v-stat-cell col-span-2 sm:col-span-2">
-      <div class="v-stat-label flex items-center justify-between">
+    <div class="v-stat-cell col-span-2">
+      <div class="v-stat-label flex items-center justify-between gap-2">
         <span>Upcoming Statement Bills</span>
-        {% if dues %}<span class="text-[10px] text-secondary font-semibold">{{ dues|length }} card{{ dues|length|pluralize }}</span>{% endif %}
+        {% if dues %}<span class="text-xs text-secondary font-semibold tabular-nums">{{ dues|length }} card{{ dues|length|pluralize }}</span>{% endif %}
       </div>
-      <div class="v-stat-value text-secondary">{{ total_dues_amount|inr }}</div>
-      <div class="v-stat-sub truncate">
+      <div class="v-stat-value text-secondary tabular-nums">{{ total_dues_amount|inr }}</div>
+      <div class="v-stat-sub truncate tabular-nums text-base-content/60">
         {% if dues %}
           Due this cycle · {{ dues.0.payment_source.short_name }}{% if dues.0.days_left is not None %} ({{ dues.0.days_left }}d left){% endif %}
         {% else %}
@@ -158,20 +158,21 @@
       </div>
     </div>
 
-    {# Mini Cumulative Pace Chart Span #}
+    {# Monthly Spend Velocity & Cumulative Pace Chart Span #}
     {% if summary.total or summary.prev_total %}
-    <div class="col-span-2 sm:col-span-2 p-3.5 bg-base-300/20 border-t border-base-content/8">
-      <div class="flex items-center justify-between text-[11px] font-semibold text-base-content/60 mb-1.5">
-        <span class="flex items-center gap-1.5">
-          <span class="material-symbols-outlined text-sm text-primary">show_chart</span>
-          <span>Cumulative Spend Trajectory</span>
+    <div class="col-span-full p-3 sm:p-3.5 bg-[var(--v-sheet)] flex flex-col gap-2">
+      <div class="flex items-center justify-between gap-2 text-xs font-semibold text-base-content/80">
+        <span class="flex items-center gap-1.5 truncate">
+          <span class="material-symbols-outlined text-sm text-orange-400">speed</span>
+          <span class="truncate tabular-nums">Spend Velocity · {{ summary.per_day|inr }}/d</span>
         </span>
-        <div class="flex items-center gap-3 text-[10px] opacity-70">
-          <span class="flex items-center gap-1"><span class="inline-block w-2.5 h-[3px] rounded bg-primary"></span>{{ summary.start|date:"M" }}</span>
+        <div class="flex items-center gap-3 text-xs text-base-content/60 shrink-0">
+          <span class="flex items-center gap-1"><span class="inline-block w-2.5 h-[3px] rounded bg-orange-400"></span>{{ summary.start|date:"M" }}</span>
           <span class="flex items-center gap-1"><span class="inline-block w-2.5 border-t border-dashed border-base-content/50"></span>{{ summary.prev_label|slice:":3" }}</span>
         </div>
       </div>
-      <div class="w-full" style="height:85px">
+
+      <div class="w-full" style="height:84px">
         <canvas id="paceChart" aria-label="Cumulative spend this month compared with last month"></canvas>
       </div>
     </div>
@@ -182,12 +183,16 @@
 {% endwith %}
 
 {# --- MOBILE SEGMENTED WORKBENCH SWITCHER --- #}
-<div class="flex lg:hidden tabs tabs-boxed bg-base-300/60 p-1 rounded-xl mb-4 text-xs font-semibold">
-  <button type="button" class="tab tab-sm flex-1 rounded-lg transition-all tab-active font-bold text-primary cursor-pointer" id="expTabFeedBtn" onclick="switchExpMobileTab('feed')">
-    <span class="material-symbols-outlined text-base mr-1.5">receipt_long</span>Ledger Feed
+<div class="flex lg:hidden bg-base-300/60 p-1 rounded-xl mb-4 text-xs font-semibold border border-base-content/10 gap-1" role="tablist" aria-label="Monthly expenses sections">
+  <button type="button" role="tab" aria-selected="true" class="v-segmented-item flex-1 !min-h-11 px-3 rounded-lg transition-all bg-base-100 shadow-xs font-bold text-primary cursor-pointer inline-flex items-center justify-center gap-1.5" id="expTabFeedBtn" onclick="switchExpMobileTab('feed')">
+    <span class="material-symbols-outlined text-base">receipt_long</span>
+    <span>Ledger Feed</span>
+    <span class="text-xs text-base-content/60 tabular-nums">({{ row_count }})</span>
   </button>
-  <button type="button" class="tab tab-sm flex-1 rounded-lg transition-all opacity-70 cursor-pointer" id="expTabInsightsBtn" onclick="switchExpMobileTab('insights')">
-    <span class="material-symbols-outlined text-base mr-1.5">analytics</span>Categories &amp; Dues
+  <button type="button" role="tab" aria-selected="false" class="v-segmented-item flex-1 !min-h-11 px-3 rounded-lg transition-all opacity-70 hover:opacity-100 cursor-pointer inline-flex items-center justify-center gap-1.5" id="expTabInsightsBtn" onclick="switchExpMobileTab('insights')">
+    <span class="material-symbols-outlined text-base">analytics</span>
+    <span>Categories &amp; Dues</span>
+    {% if dues %}<span class="w-2 h-2 rounded-full bg-secondary"></span>{% endif %}
   </button>
 </div>
 
@@ -199,49 +204,49 @@
 
     {# Needs Attention / Triage Panel #}
     {% if not accounts or attention_count %}
-    <div class="v-panel border-amber-500/25 bg-amber-500/5 animate-up">
+    <div class="v-panel !self-stretch !w-full max-w-full min-w-0 border-amber-500/25 bg-amber-500/5 animate-up">
       <div class="v-panel-header !py-2.5 border-amber-500/15">
-        <h2 class="v-panel-title text-amber-300 text-xs font-bold uppercase tracking-wider">
+        <h2 class="v-panel-title text-amber-300">
           <span class="material-symbols-outlined text-amber-400 text-base">notification_important</span>
           Action Required
         </h2>
-        <span class="badge badge-xs badge-warning font-semibold">{{ attention_count|default:"1" }}</span>
+        <span class="badge badge-xs badge-warning font-semibold tabular-nums">{{ attention_count|default:"1" }}</span>
       </div>
-      <div class="divide-y divide-base-content/8">
+      <div class="divide-y divide-[var(--v-hairline)]">
         {% if not accounts %}
-        <a href="{% url 'expenses_settings' %}" class="flex items-center gap-3 p-3 hover:bg-base-content/5 transition-all text-xs">
+        <a href="{% url 'expenses_settings' %}" class="flex items-center gap-3 p-3.5 min-h-12 hover:bg-base-content/5 transition-all text-xs">
           <span class="w-8 h-8 rounded-lg bg-primary/15 text-primary flex items-center justify-center shrink-0">
             <span class="material-symbols-outlined text-base">mail</span>
           </span>
           <div class="flex-1 min-w-0">
             <span class="font-bold text-base-content block">Connect Gmail Inbox</span>
-            <span class="text-[11px] opacity-60 block truncate">Auto-sync bank &amp; credit card alert emails into transactions</span>
+            <span class="text-xs text-base-content/60 block truncate">Auto-sync bank &amp; credit card alert emails into transactions</span>
           </div>
-          <span class="material-symbols-outlined text-base opacity-40">chevron_right</span>
+          <span class="material-symbols-outlined text-base opacity-45">chevron_right</span>
         </a>
         {% endif %}
         {% for a in reconnect_needed %}
-        <a href="{% url 'expenses_settings' %}#gmail" class="flex items-center gap-3 p-3 hover:bg-base-content/5 transition-all text-xs">
+        <a href="{% url 'expenses_settings' %}#gmail" class="flex items-center gap-3 p-3.5 min-h-12 hover:bg-base-content/5 transition-all text-xs">
           <span class="w-8 h-8 rounded-lg bg-error/15 text-error flex items-center justify-center shrink-0">
             <span class="material-symbols-outlined text-base">sync_problem</span>
           </span>
           <div class="flex-1 min-w-0">
             <span class="font-bold text-error block truncate">Reconnect {{ a.email }}</span>
-            <span class="text-[11px] opacity-60 block">OAuth token expired — new transactions are paused</span>
+            <span class="text-xs text-base-content/60 block">OAuth token expired — new transactions are paused</span>
           </div>
-          <span class="material-symbols-outlined text-base opacity-40">chevron_right</span>
+          <span class="material-symbols-outlined text-base opacity-45">chevron_right</span>
         </a>
         {% endfor %}
         {% if pending_passwords %}
-        <a href="{% url 'expenses_statements' %}" class="flex items-center gap-3 p-3 hover:bg-base-content/5 transition-all text-xs">
+        <a href="{% url 'expenses_statements' %}" class="flex items-center gap-3 p-3.5 min-h-12 hover:bg-base-content/5 transition-all text-xs">
           <span class="w-8 h-8 rounded-lg bg-info/15 text-info flex items-center justify-center shrink-0">
             <span class="material-symbols-outlined text-base">lock</span>
           </span>
           <div class="flex-1 min-w-0">
             <span class="font-bold text-info block">Unlock {{ pending_passwords }} PDF statement{{ pending_passwords|pluralize }}</span>
-            <span class="text-[11px] opacity-60 block">Provide statement password to reconcile missed line items</span>
+            <span class="text-xs text-base-content/60 block">Provide statement password to reconcile missed line items</span>
           </div>
-          <span class="material-symbols-outlined text-base opacity-40">chevron_right</span>
+          <span class="material-symbols-outlined text-base opacity-45">chevron_right</span>
         </a>
         {% endif %}
       </div>
@@ -249,114 +254,131 @@
     {% endif %}
 
     {# Master Transaction Ledger Container #}
-    <div id="expFeedCard" class="v-panel flex flex-col overflow-hidden">
-      
+    <div id="expFeedCard" class="v-panel !self-stretch !w-full max-w-full min-w-0 flex flex-col overflow-hidden">
+
       {# Pinned Search & Filter Bar #}
-      <div class="p-3.5 border-b border-base-content/8 bg-base-200/90 backdrop-blur-md flex flex-col gap-2.5 shrink-0 z-10">
-        <form method="get" id="expFilterForm">
+      <div class="p-3.5 border-b border-base-content/10 bg-base-200/90 backdrop-blur-md flex flex-col items-stretch gap-2.5 shrink-0 w-full max-w-full min-w-0 z-10">
+        <form method="get" id="expFilterForm" class="w-full min-w-0">
           <input type="hidden" name="m" value="{{ month_param }}">
           {% if f_cat %}<input type="hidden" name="cat" value="{{ f_cat }}">{% endif %}
           {% if f_member %}<input type="hidden" name="member" value="{{ f_member }}">{% endif %}
           <div class="relative">
-            <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-base-content/40">
-              <span class="material-symbols-outlined text-[17px]">search</span>
+            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-base-content/50 z-10">
+              <span class="material-symbols-outlined text-lg">search</span>
             </span>
             <input type="search" name="q" value="{{ f_query }}" placeholder="Filter by merchant, description, notes…" autocomplete="off"
-                   class="input w-full h-[38px] min-h-[38px] pl-9 bg-base-100 border border-base-content/10 rounded-xl text-xs sm:text-sm transition-all focus:border-primary/50">
+                   aria-label="Filter expenses by merchant, description, or notes"
+                   class="v-input input w-full min-h-11 lg:min-h-10 !pl-10 !pr-3 bg-base-100 border border-[var(--v-hairline-strong)] rounded-xl text-base sm:text-sm transition-all focus:border-primary/50">
           </div>
         </form>
 
-        <div class="flex items-center justify-between gap-1.5">
-          <div class="flex gap-1.5 overflow-x-auto scrollbar-hide py-0.5 flex-1 min-w-0 touch-pan-x">
-            <a href="?m={{ month_param }}" class="filter-pill cursor-pointer {% if not is_filtered %}is-active{% endif %}">All</a>
-            <a href="?m={{ month_param }}&flagged=1" class="filter-pill cursor-pointer {% if f_flagged %}is-active{% endif %}">
-              <span class="material-symbols-outlined text-xs text-warning">flag</span>Flagged{% if open_flags %} · {{ open_flags }}{% endif %}
+        <div class="v-pill-rail flex gap-1.5 overflow-x-auto scrollbar-hide py-0.5 pr-4 !w-full !max-w-full min-w-0 touch-pan-x">
+          <a href="?m={{ month_param }}" class="filter-pill !min-h-11 lg:!min-h-8 cursor-pointer {% if not is_filtered %}is-active{% endif %}">All</a>
+          <a href="?m={{ month_param }}&flagged=1" class="filter-pill !min-h-11 lg:!min-h-8 cursor-pointer {% if f_flagged %}is-active{% endif %}">
+            <span class="material-symbols-outlined text-xs text-warning">flag</span>Flagged{% if open_flags %} · <span class="tabular-nums">{{ open_flags }}</span>{% endif %}
+          </a>
+          <a href="?m={{ month_param }}&refunds=1" class="filter-pill !min-h-11 lg:!min-h-8 cursor-pointer {% if f_refunds %}is-active{% endif %}">
+            <span class="material-symbols-outlined text-xs text-emerald-400">replay</span>Refunds{% if summary.refund_count %} · <span class="tabular-nums">{{ summary.refund_count }}</span>{% endif %}
+          </a>
+          <a href="?m={{ month_param }}&emis=1" class="filter-pill !min-h-11 lg:!min-h-8 cursor-pointer {% if f_emis %}is-active{% endif %}">
+            <span class="material-symbols-outlined text-xs text-purple-400">event_repeat</span>EMIs{% if summary.emi_count %} · <span class="tabular-nums">{{ summary.emi_count }}</span>{% endif %}
+          </a>
+          <a href="?m={{ month_param }}&source=EMAIL" class="filter-pill !min-h-11 lg:!min-h-8 cursor-pointer {% if f_source == 'EMAIL' %}is-active{% endif %}">
+            <span class="material-symbols-outlined text-xs">mail</span>Email
+          </a>
+          <a href="?m={{ month_param }}&source=STATEMENT" class="filter-pill !min-h-11 lg:!min-h-8 cursor-pointer {% if f_source == 'STATEMENT' %}is-active{% endif %}">
+            <span class="material-symbols-outlined text-xs">request_quote</span>Statement
+          </a>
+          <a href="?m={{ month_param }}&source=MANUAL" class="filter-pill !min-h-11 lg:!min-h-8 cursor-pointer {% if f_source == 'MANUAL' %}is-active{% endif %}">
+            <span class="material-symbols-outlined text-xs">edit</span>Manual
+          </a>
+          {% if members|length > 1 %}
+            {% for m in members %}
+            <a href="?m={{ month_param }}&member={{ m.pk }}" class="filter-pill !min-h-11 lg:!min-h-8 cursor-pointer {% if f_member == m.pk|stringformat:'s' %}is-active{% endif %}">
+              <span class="material-symbols-outlined text-xs">person</span>{{ m.first_name|default:m.username }}
             </a>
-            <a href="?m={{ month_param }}&refunds=1" class="filter-pill cursor-pointer {% if f_refunds %}is-active{% endif %}">
-              <span class="material-symbols-outlined text-xs text-emerald-400">replay</span>Refunds{% if summary.refund_count %} · {{ summary.refund_count }}{% endif %}
-            </a>
-            <a href="?m={{ month_param }}&emis=1" class="filter-pill cursor-pointer {% if f_emis %}is-active{% endif %}">
-              <span class="material-symbols-outlined text-xs text-purple-400">event_repeat</span>EMIs{% if summary.emi_count %} · {{ summary.emi_count }}{% endif %}
-            </a>
-            <a href="?m={{ month_param }}&source=EMAIL" class="filter-pill cursor-pointer {% if f_source == 'EMAIL' %}is-active{% endif %}">
-              <span class="material-symbols-outlined text-xs">mail</span>Email
-            </a>
-            <a href="?m={{ month_param }}&source=STATEMENT" class="filter-pill cursor-pointer {% if f_source == 'STATEMENT' %}is-active{% endif %}">
-              <span class="material-symbols-outlined text-xs">request_quote</span>Statement
-            </a>
-            <a href="?m={{ month_param }}&source=MANUAL" class="filter-pill cursor-pointer {% if f_source == 'MANUAL' %}is-active{% endif %}">
-              <span class="material-symbols-outlined text-xs">edit</span>Manual
-            </a>
-          </div>
+            {% endfor %}
+          {% endif %}
         </div>
 
         {% if is_filtered %}
-        <div class="flex items-center justify-between pt-1 px-1 border-t border-base-content/6">
-          <span class="text-[10px] font-bold uppercase tracking-wider text-base-content/50">{{ row_count }} matching transaction{{ row_count|pluralize }}</span>
-          <a href="?m={{ month_param }}" class="btn btn-ghost btn-xs text-error/80 hover:text-error gap-1 cursor-pointer">
-            <span class="material-symbols-outlined text-xs">close</span>Clear filters
+        <div class="flex items-center justify-between gap-2 pt-1.5 px-1 border-t border-[var(--v-hairline)] flex-wrap">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="text-xs font-semibold text-base-content/80 tabular-nums">{{ row_count }} matching transaction{{ row_count|pluralize }}</span>
+            {% if f_cat %}
+              {% if f_cat == 'none' %}
+              <span class="badge badge-xs badge-warning font-semibold">Uncategorised</span>
+              {% else %}
+                {% for c in categories %}{% if f_cat == c.pk|stringformat:'s' %}<span class="badge badge-xs badge-primary font-semibold">{{ c.name }}</span>{% endif %}{% endfor %}
+              {% endif %}
+            {% endif %}
+          </div>
+          <a href="?m={{ month_param }}" class="btn btn-ghost btn-xs !min-h-11 lg:!min-h-8 px-2.5 text-error/85 hover:text-error gap-1 cursor-pointer rounded-lg">
+            <span class="material-symbols-outlined text-sm">close</span>Clear filters
           </a>
         </div>
         {% endif %}
       </div>
 
-      {# Scrollable Day-Grouped Activity Feed Area #}
-      <div id="expFeedList" class="overflow-y-auto flex-1 min-h-0 p-3 sm:p-4 scrollbar-thin">
+      {# Scrollable Day-Grouped Activity Feed Area (Flush Hairline Ledger, FAB-safe bottom padding) #}
+      <div id="expFeedList" class="overflow-y-auto flex-1 min-h-0 pb-24 lg:pb-2 scrollbar-thin">
         {% if days %}
-        <div class="flex flex-col gap-3">
+        <div class="flex flex-col">
           {% for day in days %}
-          <div>
-            {# Sticky Day Header Bar #}
-            <div class="exp-day-header flex items-center justify-between px-3 py-1.5 mb-1.5 rounded-lg bg-base-300/40 border border-base-content/6">
-              <span class="text-[11px] font-bold uppercase tracking-wider text-base-content/70">
+          <div class="border-b border-[var(--v-hairline)] last:border-b-0">
+            {# Sticky Flush Day Header Band (zero white capsule ring) #}
+            <div class="exp-day-header flex items-center justify-between gap-2 px-4 py-2 bg-[var(--v-elevated)] border-b border-[var(--v-hairline)]">
+              <span class="text-xs font-bold uppercase tracking-wider text-base-content/70">
                 {% if day.date == today %}Today · {{ day.date|date:"j M" }}{% else %}{{ day.date|date:"l, j F" }}{% endif %}
               </span>
               {% if day.spend %}
-              <span class="text-[11px] font-bold tabular-nums text-primary">{{ day.spend|inr }}</span>
+              <span class="text-xs font-bold tabular-nums text-base-content">{{ day.spend|inr }}</span>
               {% endif %}
             </div>
 
-            {# Transaction Rows #}
-            <div class="flex flex-col gap-1.5">
+            {# Flush Hairline Transaction Rows (zero nested cards) #}
+            <div class="divide-y divide-[var(--v-hairline-subtle)]">
               {% for e in day.items %}
               <button type="button"
-                      class="table-card cursor-pointer flex items-center gap-3 text-left w-full p-3 rounded-xl border border-base-content/8 bg-base-200/60 hover:bg-base-200 hover:border-primary/30 transition-all {% if e.needs_review %}border-amber-500/40 bg-amber-500/5{% endif %}"
+                      class="exp-ledger-row cursor-pointer flex items-center gap-3 text-left w-full px-4 py-3 min-h-14 bg-transparent hover:bg-[var(--v-hover)] transition-colors {% if e.needs_review %}bg-amber-500/5{% endif %}"
                       onclick="Expenses.open({{ e.pk }})">
-                
+
                 {# Category Avatar #}
-                <span class="jw-type-avatar shrink-0" style="--h:{% if e.category.name == 'Credit Card Payment' or e.category.kind == 'TRANSFER' %}260{% elif e.direction == 'CREDIT' %}160{% elif e.category %}{{ e.category.hue }}{% else %}40{% endif %};width:2.25rem;height:2.25rem;border-radius:.75rem">
+                <span class="jw-type-avatar shrink-0" style="--h:{% if e.category.name == 'Credit Card Payment' or e.category.kind == 'TRANSFER' %}260{% elif e.direction == 'CREDIT' %}160{% elif e.category %}{{ e.category.hue }}{% else %}40{% endif %};width:2.35rem;height:2.35rem;border-radius:.75rem">
                   <span class="icon-filled material-symbols-outlined text-lg">{% if e.category.name == 'Credit Card Payment' or e.category.kind == 'TRANSFER' %}credit_score{% elif e.direction == 'CREDIT' %}replay{% else %}{{ e.icon }}{% endif %}</span>
                 </span>
 
                 {# Transaction Title & Meta #}
                 <div class="flex-1 min-w-0">
                   <div class="flex items-center gap-1.5 flex-wrap">
-                    <span class="font-bold text-sm truncate tracking-tight text-base-content">{{ e.merchant|default:"Unknown Payee" }}</span>
+                    <span class="font-bold text-sm truncate tracking-tight text-base-content max-w-full">{{ e.merchant|default:"Unknown Payee" }}</span>
                     {% if e.is_refunded %}
-                    <span class="v-delta v-delta-pos text-[10px] py-0 px-1.5">
-                      <span class="material-symbols-outlined text-[11px]">replay</span>Refunded
+                    <span class="v-delta v-delta-pos text-xs py-0 px-1.5">
+                      <span class="material-symbols-outlined text-xs">replay</span>Refunded
                     </span>
                     {% elif e.direction == 'CREDIT' and e.category.kind != 'TRANSFER' and e.category.name != 'Credit Card Payment' %}
-                    <span class="v-delta v-delta-pos text-[10px] py-0 px-1.5">
-                      <span class="material-symbols-outlined text-[11px]">replay</span>Refund
+                    <span class="v-delta v-delta-pos text-xs py-0 px-1.5">
+                      <span class="material-symbols-outlined text-xs">replay</span>Refund
                     </span>
                     {% endif %}
                     {% if e.is_emi %}
-                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-purple-500/15 text-purple-300 border border-purple-500/25 leading-none">
-                      <span class="material-symbols-outlined text-[11px]">event_repeat</span>EMI{% if e.emi_installment_num %} #{{ e.emi_installment_num }}{% endif %}
+                    <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-xs font-bold bg-purple-500/15 text-purple-300 border border-purple-500/25 leading-none tabular-nums">
+                      <span class="material-symbols-outlined text-xs">event_repeat</span>EMI{% if e.emi_installment_num %} #{{ e.emi_installment_num }}{% endif %}
                     </span>
                     {% endif %}
                     {% if e.needs_review %}
-                    <span class="material-symbols-outlined text-[15px] text-amber-400 icon-filled" title="Audited: Looks unusual">flag</span>
+                    <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/25 leading-none" title="Audited: Looks unusual">
+                      <span class="material-symbols-outlined text-xs icon-filled">flag</span>Review
+                    </span>
                     {% endif %}
                     {% if e.source == 'STATEMENT' %}
-                    <span class="material-symbols-outlined text-[15px] text-sky-400" title="Imported from card PDF statement">request_quote</span>
+                    <span class="material-symbols-outlined text-xs text-sky-400" title="Imported from card PDF statement">request_quote</span>
                     {% endif %}
                   </div>
 
-                  <div class="text-[11px] opacity-60 truncate mt-0.5 flex items-center gap-1.5 flex-wrap">
+                  <div class="text-xs text-base-content/60 truncate mt-0.5 flex items-center gap-1.5 flex-wrap">
                     {% if e.is_refunded and e.refund_date %}
-                      <span class="text-emerald-400 font-semibold">Purchased {{ e.txn_date|date:"d M" }} · Refunded on {{ e.refund_date|date:"d M" }}</span>
+                      <span class="text-emerald-400 font-semibold">Purchased {{ e.txn_date|date:"d M" }} · Refunded {{ e.refund_date|date:"d M" }}</span>
                     {% elif e.category.name == 'Credit Card Payment' or e.category.kind == 'TRANSFER' %}
                       <span class="text-secondary font-semibold">{% if e.direction == 'CREDIT' %}Payment credited{% else %}Payment sent{% endif %}</span>
                       {% if e.category %} · <span>{{ e.category.name }}</span>{% endif %}
@@ -365,18 +387,18 @@
                       {% if e.category %} · <span>{{ e.category.name }}</span>{% endif %}
                     {% else %}
                       {% if e.category %}
-                        <span>{{ e.category.name }}</span>
-                        {% if e.category_source == 'AI' %}<span class="badge badge-xs badge-soft badge-primary font-bold">AI</span>{% endif %}
+                        <span class="font-medium text-base-content/80">{{ e.category.name }}</span>
+                        {% if e.category_source == 'AI' %}<span class="px-1.5 py-0 rounded text-xs font-bold bg-primary/15 text-primary border border-primary/25 leading-tight">AI</span>{% endif %}
                       {% else %}
                         <span class="text-amber-400 font-semibold">Tap to categorise</span>
                       {% endif %}
                     {% endif %}
                     {% if e.payment_source %}
-                      <span class="opacity-30">·</span>
-                      <span class="font-mono text-[10px] opacity-80">{{ e.payment_source.short_name }}{% if e.paired_source %} → {{ e.paired_source.short_name }}{% endif %}</span>
+                      <span class="opacity-35">·</span>
+                      <span class="font-mono text-xs text-base-content/60">{{ e.payment_source.short_name }}{% if e.paired_source %} → {{ e.paired_source.short_name }}{% endif %}</span>
                     {% elif e.paired_source %}
-                      <span class="opacity-30">·</span>
-                      <span class="font-mono text-[10px] opacity-80">{{ e.paired_source.short_name }}</span>
+                      <span class="opacity-35">·</span>
+                      <span class="font-mono text-xs text-base-content/60">{{ e.paired_source.short_name }}</span>
                     {% endif %}
                   </div>
                 </div>
@@ -385,20 +407,20 @@
                 <div class="text-right shrink-0">
                   <div class="text-sm font-bold tabular-nums">
                     {% if e.is_fully_refunded %}
-                      <span class="line-through opacity-40 text-xs">₹{{ e.amount|inr }}</span>
+                      <span class="line-through opacity-40 text-xs block">{{ e.amount|inr }}</span>
                       <span class="block text-xs text-emerald-400 font-bold">₹0 Net</span>
                     {% elif e.refunded_amount > 0 %}
-                      <span class="line-through opacity-40 text-xs">₹{{ e.amount|inr }}</span>
-                      <span class="text-sm font-bold text-primary">₹{{ e.net_amount|inr }}</span>
+                      <span class="line-through opacity-40 text-xs block">{{ e.amount|inr }}</span>
+                      <span class="text-sm font-bold text-base-content block">{{ e.net_amount|inr }}</span>
                     {% elif e.direction == 'CREDIT' %}
                       <span class="text-emerald-400 font-bold">-{% if e.currency != 'INR' %}{{ e.currency }} {{ e.amount|floatformat:2 }}{% else %}{{ e.amount|inr }}{% endif %}</span>
                     {% elif not e.is_spend %}
-                      <span class="opacity-50">{% if e.currency != 'INR' %}{{ e.currency }} {{ e.amount|floatformat:2 }}{% else %}{{ e.amount|inr }}{% endif %}</span>
+                      <span class="opacity-55">{% if e.currency != 'INR' %}{{ e.currency }} {{ e.amount|floatformat:2 }}{% else %}{{ e.amount|inr }}{% endif %}</span>
                     {% else %}
                       <span class="text-base-content">{% if e.currency != 'INR' %}{{ e.currency }} {{ e.amount|floatformat:2 }}{% else %}{{ e.amount|inr }}{% endif %}</span>
                     {% endif %}
                   </div>
-                  {% if e.txn_time %}<div class="text-[10px] opacity-40 tabular-nums font-mono">{{ e.txn_time|time:"H:i" }}</div>{% endif %}
+                  {% if e.txn_time %}<div class="text-xs text-base-content/60 tabular-nums font-mono">{{ e.txn_time|time:"H:i" }}</div>{% endif %}
                 </div>
 
               </button>
@@ -408,15 +430,22 @@
           {% endfor %}
         </div>
         {% else %}
-        <div class="py-16 px-4 text-center flex flex-col items-center justify-center gap-3">
-          <div class="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
-            <span class="icon-filled material-symbols-outlined text-3xl text-primary">receipt_long</span>
+        <div class="v-empty py-14 px-4 text-center flex flex-col items-center justify-center gap-3">
+          <div class="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+            <span class="icon-filled material-symbols-outlined text-2xl text-primary">receipt_long</span>
           </div>
           <p class="font-bold text-base text-base-content">{% if is_filtered %}No matching transactions found{% else %}No expenses recorded in {{ summary.label }}{% endif %}</p>
-          <p class="text-xs opacity-50 max-w-xs">{% if accounts %}Incoming bank and card alert emails sync automatically.{% else %}Connect Gmail in settings to auto-import statements and alerts.{% endif %}</p>
-          <button type="button" class="v-btn v-btn-primary v-btn-sm gap-1.5 mt-2 cursor-pointer" onclick="Expenses.open()">
-            <span class="material-symbols-outlined text-base">add</span>Add expense manually
-          </button>
+          <p class="text-xs opacity-60 max-w-xs">{% if is_filtered %}Try clearing your active search or filter chips to view all entries in {{ summary.label }}.{% elif accounts %}Incoming bank and card alert emails sync automatically.{% else %}Connect Gmail in settings to auto-import statements and alerts.{% endif %}</p>
+          <div class="flex items-center gap-2 mt-1">
+            {% if is_filtered %}
+            <a href="?m={{ month_param }}" class="v-btn v-btn-secondary !min-h-11 lg:!min-h-9 gap-1.5">
+              <span class="material-symbols-outlined text-base">filter_alt_off</span>Clear filters
+            </a>
+            {% endif %}
+            <button type="button" class="v-btn v-btn-primary !min-h-11 lg:!min-h-9 gap-1.5 cursor-pointer" onclick="Expenses.open()">
+              <span class="material-symbols-outlined text-base">add</span>Add expense manually
+            </button>
+          </div>
         </div>
         {% endif %}
       </div>
@@ -425,29 +454,29 @@
 
   </div>
 
-  {# --- RIGHT CONTEXTUAL RAIL (4 cols on lg+): Categories, Spend Pulse & Dues --- #}
-  <div id="expInsightsColumn" class="lg:col-span-4 hidden lg:flex flex-col gap-4">
+  {# --- RIGHT CONTEXTUAL RAIL (4 cols on lg+): Categories, Spend Pulse, 6M Trend & Dues --- #}
+  <div id="expInsightsColumn" class="lg:col-span-4 hidden lg:flex flex-col gap-4 min-w-0 pb-24 lg:pb-0">
 
     {# Category Burn Breakdown Panel #}
     {% if summary.categories %}
-    <div class="v-panel animate-up">
+    <div class="v-panel !self-stretch !w-full max-w-full min-w-0 animate-up">
       <div class="v-panel-header">
         <h2 class="v-panel-title">
           <span class="material-symbols-outlined text-base text-primary">pie_chart</span>
           Category Distribution
         </h2>
         {% if summary.uncategorised %}
-        <a href="?m={{ month_param }}&cat=none" class="badge badge-xs badge-warning font-semibold cursor-pointer hover:underline">
+        <a href="?m={{ month_param }}&cat=none" class="inline-flex items-center !min-h-11 lg:!min-h-7 px-2.5 rounded-full text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/25 cursor-pointer hover:bg-amber-500/25 tabular-nums">
           {{ summary.uncategorised }} unfiled
         </a>
         {% endif %}
       </div>
 
-      <div class="p-3 flex flex-col gap-1.5">
+      <div class="divide-y divide-[var(--v-hairline-subtle)]">
         {% for c in summary.categories %}
           {% if forloop.counter <= 6 %}
           <a href="?m={{ month_param }}&cat={% if c.id %}{{ c.id }}{% else %}none{% endif %}"
-             class="exp-cat-row p-2 rounded-xl hover:bg-base-300/40 border border-transparent hover:border-base-content/8 transition-all cursor-pointer flex items-center gap-2.5 {% if f_cat == c.id|stringformat:'s' %}bg-primary/10 border-primary/30{% endif %}">
+             class="exp-cat-row px-3.5 py-2.5 min-h-12 hover:bg-[var(--v-hover)] transition-colors cursor-pointer flex items-center gap-2.5 {% if f_cat == c.id|stringformat:'s' or not c.id and f_cat == 'none' %}bg-primary/10{% endif %}">
             <span class="jw-type-avatar shrink-0" style="--h:{{ c.hue }};width:2.25rem;height:2.25rem;border-radius:.75rem">
               <span class="icon-filled material-symbols-outlined text-base">{{ c.icon }}</span>
             </span>
@@ -458,8 +487,8 @@
               </div>
               <div class="flex items-center gap-2 mt-1">
                 <div class="exp-bar flex-1" style="--h:{{ c.hue }}"><span style="width:{{ c.pct }}%"></span></div>
-                <span class="text-[10px] opacity-50 tabular-nums shrink-0">{{ c.pct }}%</span>
-                <span class="text-[10px] font-bold tabular-nums w-14 text-right shrink-0 {% if c.gap < 1 %}opacity-30{% elif c.delta > 0 %}text-error{% else %}text-success{% endif %}">
+                <span class="text-xs text-base-content/60 tabular-nums shrink-0">{{ c.pct }}%</span>
+                <span class="text-xs font-bold tabular-nums w-14 text-right shrink-0 {% if c.gap < 1 %}opacity-30{% elif c.delta > 0 %}text-error{% else %}text-success{% endif %}">
                   {% if c.gap < 1 %}-{% elif c.delta > 0 %}▲ {{ c.gap|inr_short }}{% else %}▼ {{ c.gap|inr_short }}{% endif %}
                 </span>
               </div>
@@ -470,11 +499,11 @@
 
         {# Collapsible extra categories (7+) #}
         {% if summary.categories|length > 6 %}
-        <div id="expMoreCategories" class="flex flex-col gap-1.5 hidden pt-1">
+        <div id="expMoreCategories" class="divide-y divide-[var(--v-hairline-subtle)] hidden">
           {% for c in summary.categories %}
             {% if forloop.counter > 6 %}
             <a href="?m={{ month_param }}&cat={% if c.id %}{{ c.id }}{% else %}none{% endif %}"
-               class="exp-cat-row p-2 rounded-xl hover:bg-base-300/40 border border-transparent hover:border-base-content/8 transition-all cursor-pointer flex items-center gap-2.5 {% if f_cat == c.id|stringformat:'s' %}bg-primary/10 border-primary/30{% endif %}">
+               class="exp-cat-row px-3.5 py-2.5 min-h-12 hover:bg-[var(--v-hover)] transition-colors cursor-pointer flex items-center gap-2.5 {% if f_cat == c.id|stringformat:'s' or not c.id and f_cat == 'none' %}bg-primary/10{% endif %}">
               <span class="jw-type-avatar shrink-0" style="--h:{{ c.hue }};width:2.25rem;height:2.25rem;border-radius:.75rem">
                 <span class="icon-filled material-symbols-outlined text-base">{{ c.icon }}</span>
               </span>
@@ -485,8 +514,8 @@
                 </div>
                 <div class="flex items-center gap-2 mt-1">
                   <div class="exp-bar flex-1" style="--h:{{ c.hue }}"><span style="width:{{ c.pct }}%"></span></div>
-                  <span class="text-[10px] opacity-50 tabular-nums shrink-0">{{ c.pct }}%</span>
-                  <span class="text-[10px] font-bold tabular-nums w-14 text-right shrink-0 {% if c.gap < 1 %}opacity-30{% elif c.delta > 0 %}text-error{% else %}text-success{% endif %}">
+                  <span class="text-xs text-base-content/60 tabular-nums shrink-0">{{ c.pct }}%</span>
+                  <span class="text-xs font-bold tabular-nums w-14 text-right shrink-0 {% if c.gap < 1 %}opacity-30{% elif c.delta > 0 %}text-error{% else %}text-success{% endif %}">
                     {% if c.gap < 1 %}-{% elif c.delta > 0 %}▲ {{ c.gap|inr_short }}{% else %}▼ {{ c.gap|inr_short }}{% endif %}
                   </span>
                 </div>
@@ -496,94 +525,58 @@
           {% endfor %}
         </div>
 
-        <button type="button" id="expMoreCatBtn" class="v-btn v-btn-ghost v-btn-xs self-center mt-1 text-primary gap-1 font-semibold cursor-pointer" onclick="toggleMoreCategories()">
-          <span id="expMoreCatTxt" data-collapsed="Show all {{ summary.categories|length }} categories" data-expanded="Show top 6 only">Show all {{ summary.categories|length }} categories</span>
-          <span id="expMoreCatIcon" class="material-symbols-outlined text-sm">expand_more</span>
-        </button>
+        <div class="p-2 flex justify-center">
+          <button type="button" id="expMoreCatBtn" class="v-btn v-btn-ghost !min-h-11 lg:!min-h-8 text-primary gap-1 font-semibold cursor-pointer" onclick="toggleMoreCategories()">
+            <span id="expMoreCatTxt" data-collapsed="Show all {{ summary.categories|length }} categories" data-expanded="Show top 6 only">Show all {{ summary.categories|length }} categories</span>
+            <span id="expMoreCatIcon" class="material-symbols-outlined text-sm">expand_more</span>
+          </button>
+        </div>
         {% endif %}
       </div>
     </div>
     {% endif %}
 
-    {# Spend Highlights: Ruled Ledger Pulse List #}
-    {% if summary.count %}
-    <div class="v-panel animate-up">
+    {# Upcoming Credit Card Bills Panel #}
+    {% if dues %}
+    <div class="v-panel !self-stretch !w-full max-w-full min-w-0 animate-up">
       <div class="v-panel-header">
         <h2 class="v-panel-title">
-          <span class="material-symbols-outlined text-base text-amber-400">insights</span>
-          Monthly Spend Pulse
+          <span class="material-symbols-outlined text-secondary text-base">credit_card</span>
+          Upcoming Statement Bills
         </h2>
+        <span class="badge badge-xs badge-secondary font-bold tabular-nums">{{ total_dues_amount|inr }}</span>
       </div>
 
-      <div class="divide-y divide-base-content/8 text-xs">
-        {# Daily flexible burn #}
-        <div class="p-3 flex items-center justify-between gap-3">
+      <div class="divide-y divide-[var(--v-hairline)]">
+        {% for st in dues %}
+        <a href="{% url 'expenses_statement_detail' st.pk %}" class="p-3 min-h-12 flex items-center justify-between gap-3 hover:bg-base-content/5 transition-all cursor-pointer">
           <div class="flex items-center gap-2.5 min-w-0">
-            <span class="w-7 h-7 rounded-lg bg-orange-400/15 text-orange-400 flex items-center justify-center shrink-0">
-              <span class="material-symbols-outlined text-sm">speed</span>
+            <span class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 {% if st.days_left < 0 %}bg-error/15 text-error{% elif st.days_left <= 3 %}bg-warning/15 text-warning{% else %}bg-secondary/15 text-secondary{% endif %}">
+              <span class="material-symbols-outlined text-base">credit_card</span>
             </span>
             <div class="min-w-0">
-              <span class="font-semibold text-base-content block truncate">Day-to-day Burn</span>
-              <span class="text-[10px] opacity-50 block truncate">Excludes rent, EMIs, insurance</span>
+              <span class="text-xs font-bold truncate block text-base-content">{{ st.payment_source.short_name }}</span>
+              <span class="text-xs {% if st.days_left < 0 %}text-error font-semibold{% else %}text-base-content/60{% endif %} block tabular-nums">
+                {% if st.days_left < 0 %}Overdue since {{ st.due_date|date:"j M" }}{% elif st.days_left == 0 %}Due today{% else %}Due {{ st.due_date|date:"D, j M" }} ({{ st.days_left }}d left){% endif %}
+              </span>
             </div>
           </div>
-          <span class="font-bold tabular-nums text-sm text-base-content">{{ summary.per_day|inr }}<span class="text-[10px] font-normal opacity-50">/d</span></span>
-        </div>
 
-        {# Biggest buy #}
-        {% if summary.biggest %}
-        <button type="button" class="w-full p-3 flex items-center justify-between gap-3 hover:bg-base-content/5 transition-all text-left cursor-pointer" onclick="Expenses.open({{ summary.biggest.pk }})">
-          <div class="flex items-center gap-2.5 min-w-0">
-            <span class="w-7 h-7 rounded-lg bg-rose-400/15 text-rose-400 flex items-center justify-center shrink-0">
-              <span class="material-symbols-outlined text-sm">vertical_align_top</span>
-            </span>
-            <div class="min-w-0">
-              <span class="font-semibold text-base-content block truncate">{{ summary.biggest.merchant }}</span>
-              <span class="text-[10px] opacity-50 block truncate">Largest individual purchase</span>
-            </div>
+          <div class="text-right shrink-0">
+            <div class="text-xs font-bold tabular-nums text-secondary">{{ st.remaining_due|default:st.total_due|inr }}</div>
+            {% if st.is_partial %}
+            <div class="text-xs text-amber-400 font-semibold">Partially paid</div>
+            {% endif %}
           </div>
-          <span class="font-bold tabular-nums text-sm text-rose-400">{{ summary.biggest.amount|inr }}</span>
-        </button>
-        {% endif %}
-
-        {# Most visited #}
-        {% if summary.frequent %}{% with m=summary.frequent %}
-        <a href="?m={{ month_param }}&q={{ m.merchant|urlencode }}" class="p-3 flex items-center justify-between gap-3 hover:bg-base-content/5 transition-all cursor-pointer">
-          <div class="flex items-center gap-2.5 min-w-0">
-            <span class="w-7 h-7 rounded-lg bg-sky-400/15 text-sky-400 flex items-center justify-center shrink-0">
-              <span class="material-symbols-outlined text-sm">storefront</span>
-            </span>
-            <div class="min-w-0">
-              <span class="font-semibold text-base-content block truncate">{{ m.merchant }}</span>
-              <span class="text-[10px] opacity-50 block truncate">Most frequent merchant</span>
-            </div>
-          </div>
-          <span class="font-bold tabular-nums text-xs text-sky-400">{{ m.count }} visits</span>
         </a>
-        {% endwith %}{% endif %}
-
-        {# Rising category #}
-        {% if summary.riser %}
-        <a href="?m={{ month_param }}&cat={{ summary.riser.id|default:'none' }}" class="p-3 flex items-center justify-between gap-3 hover:bg-base-content/5 transition-all cursor-pointer">
-          <div class="flex items-center gap-2.5 min-w-0">
-            <span class="w-7 h-7 rounded-lg bg-amber-400/15 text-amber-400 flex items-center justify-center shrink-0">
-              <span class="material-symbols-outlined text-sm">trending_up</span>
-            </span>
-            <div class="min-w-0">
-              <span class="font-semibold text-base-content block truncate">{{ summary.riser.name }}</span>
-              <span class="text-[10px] opacity-50 block truncate">Highest increase vs last month</span>
-            </div>
-          </div>
-          <span class="font-bold tabular-nums text-xs text-amber-400">+{{ summary.riser.delta|inr_short }}</span>
-        </a>
-        {% endif %}
+        {% endfor %}
       </div>
     </div>
     {% endif %}
 
     {# Active Credit Card EMIs Panel #}
     {% if summary.emi_summary.count or emi_plan.cards or summary.emi_summary.converted %}
-    <div class="v-panel animate-up">
+    <div class="v-panel !self-stretch !w-full max-w-full min-w-0 animate-up">
       <div class="v-panel-header">
         <h2 class="v-panel-title">
           <span class="material-symbols-outlined text-purple-400 text-base">event_repeat</span>
@@ -596,8 +589,8 @@
 
       <div class="p-3 flex flex-col gap-2">
         {# Subheader with Loan Count & Status #}
-        <div class="flex items-center justify-between text-[11px] opacity-65 px-1 pb-1 flex-wrap gap-x-2 gap-y-0.5 border-b border-base-content/6">
-          <span>
+        <div class="flex items-center justify-between text-xs text-base-content/80 px-1 pb-1.5 flex-wrap gap-x-2 gap-y-0.5 border-b border-[var(--v-hairline)]">
+          <span class="tabular-nums">
             {% if emi_plan.cards %}
               {{ emi_plan.cards|length }} active loan{{ emi_plan.cards|length|pluralize }} · {{ emi_plan.remaining_total|inr }} left to pay
             {% else %}
@@ -605,94 +598,155 @@
             {% endif %}
           </span>
           {% if emi_plan.this_month_paid and not emi_plan.this_month_expected %}
-            <span class="text-emerald-300 font-semibold inline-flex items-center gap-0.5"><span class="material-symbols-outlined text-[12px]">check_circle</span> All paid this month</span>
+            <span class="text-emerald-300 font-semibold inline-flex items-center gap-0.5"><span class="material-symbols-outlined text-xs">check_circle</span> All paid this month</span>
           {% elif emi_plan.this_month_expected %}
             <span class="text-purple-300 font-semibold tabular-nums">{{ emi_plan.this_month_expected|inr }} expected this month</span>
           {% endif %}
         </div>
 
-        {% for loan in emi_plan.cards %}
-        <div class="p-2.5 rounded-xl bg-base-300/40 border border-base-content/6 flex flex-col gap-2">
-          <div class="flex items-center justify-between gap-2">
-            <div class="flex items-center gap-2 min-w-0">
-              <span class="w-7 h-7 rounded-lg bg-purple-500/15 text-purple-400 flex items-center justify-center shrink-0">
-                <span class="material-symbols-outlined text-sm">payments</span>
-              </span>
-              <div class="min-w-0">
-                <div class="flex items-center gap-1.5 flex-wrap">
-                  <span class="font-bold text-xs truncate text-base-content">Loan ••{{ loan.ref }}</span>
-                  {% if loan.status_badge %}
-                    <span class="text-[11px] font-semibold text-purple-300">{{ loan.status_badge }}</span>
-                  {% elif loan.total_installments and loan.current_or_last_num %}
-                    <span class="text-[11px] font-semibold text-purple-300">Installment #{{ loan.current_or_last_num }} of {{ loan.total_installments }}</span>
-                  {% endif %}
-                </div>
-                <span class="text-[10px] opacity-50 block truncate">
-                  {% if loan.payment_source %}{{ loan.payment_source.short_name }} · {% endif %}
-                  {% if loan.is_paid %}Paid on {{ loan.status_date|date:"j M" }}{% elif loan.is_due %}Due {{ loan.status_date|date:"j M" }}{% endif %}
+        <div class="divide-y divide-[var(--v-hairline)]">
+          {% for loan in emi_plan.cards %}
+          <div class="py-2.5 first:pt-0.5 last:pb-0.5 flex flex-col gap-2">
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <span class="w-8 h-8 rounded-lg bg-purple-500/15 text-purple-400 flex items-center justify-center shrink-0">
+                  <span class="material-symbols-outlined text-sm">payments</span>
                 </span>
+                <div class="min-w-0">
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <span class="font-bold text-xs truncate text-base-content">Loan ••{{ loan.ref }}</span>
+                    {% if loan.status_badge %}
+                      <span class="text-xs font-semibold text-purple-300 tabular-nums">{{ loan.status_badge }}</span>
+                    {% elif loan.total_installments and loan.current_or_last_num %}
+                      <span class="text-xs font-semibold text-purple-300 tabular-nums">Installment #{{ loan.current_or_last_num }} of {{ loan.total_installments }}</span>
+                    {% endif %}
+                  </div>
+                  <span class="text-xs text-base-content/60 block truncate tabular-nums">
+                    {% if loan.payment_source %}{{ loan.payment_source.short_name }} · {% endif %}
+                    {% if loan.is_paid %}Paid on {{ loan.status_date|date:"j M" }}{% elif loan.is_due %}Due {{ loan.status_date|date:"j M" }}{% endif %}
+                  </span>
+                </div>
+              </div>
+
+              <div class="text-right shrink-0 flex items-center gap-1">
+                <span class="text-xs font-bold tabular-nums text-purple-300">{{ loan.monthly_amount|inr }}<span class="text-xs font-normal text-base-content/60">/mo</span></span>
+                <button type="button" class="v-icon-btn btn btn-ghost btn-xs btn-square !min-h-11 !min-w-11 lg:!min-h-8 lg:!min-w-8 text-base-content/50 hover:text-purple-300 cursor-pointer"
+                        onclick="openEmiTenureModal('{{ loan.ref }}', '{{ loan.item_id|default:'' }}', '{{ loan.current_or_last_num|default:'' }}', '{{ loan.total_installments|default:'' }}')"
+                        aria-label="Edit tenure for Loan {{ loan.ref }}"
+                        title="Edit tenure for Loan ••{{ loan.ref }}">
+                  <span class="material-symbols-outlined text-sm">edit</span>
+                </button>
               </div>
             </div>
 
-            <div class="text-right shrink-0 flex items-center gap-1.5">
-              <span class="text-xs font-bold tabular-nums text-purple-300">{{ loan.monthly_amount|inr }}<span class="text-[10px] font-normal opacity-50">/mo</span></span>
-              <button type="button" class="btn btn-ghost btn-xs btn-square h-6 w-6 text-base-content/40 hover:text-purple-300 cursor-pointer"
-                      onclick="openEmiTenureModal('{{ loan.ref }}', '{{ loan.item_id|default:'' }}', '{{ loan.current_or_last_num|default:'' }}', '{{ loan.total_installments|default:'' }}')"
-                      title="Edit tenure for Loan ••{{ loan.ref }}">
-                <span class="material-symbols-outlined text-xs">edit</span>
-              </button>
+            {% if loan.total_installments %}
+            <div class="flex items-center gap-2">
+              <div class="exp-bar flex-1" style="--h:275"><span style="width:{{ loan.progress_pct }}%"></span></div>
+              <span class="text-xs text-base-content/80 tabular-nums shrink-0 font-semibold">{{ loan.paid_installments }}/{{ loan.total_installments }} paid</span>
+              {% if loan.remaining_total is not None %}
+              <span class="text-xs text-purple-300 tabular-nums font-semibold shrink-0">{{ loan.remaining_total|inr_short }} left to pay</span>
+              {% endif %}
             </div>
-          </div>
-
-          {% if loan.total_installments %}
-          <div class="flex items-center gap-2 pt-0.5">
-            <div class="exp-bar flex-1" style="--h:275"><span style="width:{{ loan.progress_pct }}%"></span></div>
-            <span class="text-[10px] opacity-60 tabular-nums shrink-0 font-semibold">{{ loan.paid_installments }}/{{ loan.total_installments }} paid</span>
-            {% if loan.remaining_total is not None %}
-            <span class="text-[10px] text-purple-300 tabular-nums font-semibold shrink-0">{{ loan.remaining_total|inr_short }} left to pay</span>
             {% endif %}
           </div>
-          {% endif %}
+          {% endfor %}
         </div>
-        {% endfor %}
       </div>
     </div>
     {% endif %}
 
-    {# Upcoming Credit Card Bills Panel #}
-    {% if dues %}
-    <div class="v-panel animate-up">
+    {# Spend Highlights: Ruled Ledger Pulse List #}
+    {% if summary.count %}
+    <div class="v-panel !self-stretch !w-full max-w-full min-w-0 animate-up">
       <div class="v-panel-header">
         <h2 class="v-panel-title">
-          <span class="material-symbols-outlined text-secondary text-base">credit_card</span>
-          Upcoming Statement Bills
+          <span class="material-symbols-outlined text-base text-amber-400">insights</span>
+          Monthly Spend Pulse
         </h2>
-        <span class="badge badge-xs badge-secondary font-bold tabular-nums">{{ total_dues_amount|inr }}</span>
       </div>
 
-      <div class="divide-y divide-base-content/8">
-        {% for st in dues %}
-        <a href="{% url 'expenses_statement_detail' st.pk %}" class="p-3 flex items-center justify-between gap-3 hover:bg-base-content/5 transition-all cursor-pointer">
+      <div class="divide-y divide-[var(--v-hairline)] text-xs">
+        {# Daily flexible burn #}
+        <div class="p-3 min-h-12 flex items-center justify-between gap-3">
           <div class="flex items-center gap-2.5 min-w-0">
-            <span class="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 {% if st.days_left < 0 %}bg-error/15 text-error{% elif st.days_left <= 3 %}bg-warning/15 text-warning{% else %}bg-secondary/15 text-secondary{% endif %}">
-              <span class="material-symbols-outlined text-sm">credit_card</span>
+            <span class="w-7 h-7 rounded-lg bg-orange-400/15 text-orange-400 flex items-center justify-center shrink-0">
+              <span class="material-symbols-outlined text-sm">speed</span>
             </span>
             <div class="min-w-0">
-              <span class="text-xs font-bold truncate block text-base-content">{{ st.payment_source.short_name }}</span>
-              <span class="text-[10px] {% if st.days_left < 0 %}text-error font-semibold{% else %}opacity-50{% endif %} block">
-                {% if st.days_left < 0 %}Overdue since {{ st.due_date|date:"j M" }}{% elif st.days_left == 0 %}Due today{% else %}Due {{ st.due_date|date:"D, j M" }} ({{ st.days_left }}d left){% endif %}
-              </span>
+              <span class="font-semibold text-base-content block truncate">Day-to-day Burn</span>
+              <span class="text-xs text-base-content/60 block truncate">Excludes rent, EMIs, insurance</span>
             </div>
           </div>
+          <span class="font-bold tabular-nums text-sm text-base-content shrink-0">{{ summary.per_day|inr }}<span class="text-xs font-normal text-base-content/60">/d</span></span>
+        </div>
 
-          <div class="text-right shrink-0">
-            <div class="text-xs font-bold tabular-nums text-secondary">{{ st.remaining_due|default:st.total_due|inr }}</div>
-            {% if st.is_partial %}
-            <div class="text-[9px] text-amber-400 font-semibold">Partially paid</div>
-            {% endif %}
+        {# Biggest buy #}
+        {% if summary.biggest %}
+        <button type="button" class="w-full p-3 min-h-12 flex items-center justify-between gap-3 hover:bg-base-content/5 transition-all text-left cursor-pointer" onclick="Expenses.open({{ summary.biggest.pk }})">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <span class="w-7 h-7 rounded-lg bg-rose-400/15 text-rose-400 flex items-center justify-center shrink-0">
+              <span class="material-symbols-outlined text-sm">vertical_align_top</span>
+            </span>
+            <div class="min-w-0">
+              <span class="font-semibold text-base-content block truncate">{{ summary.biggest.merchant }}</span>
+              <span class="text-xs text-base-content/60 block truncate">Largest individual purchase</span>
+            </div>
           </div>
+          <span class="font-bold tabular-nums text-sm text-rose-400 shrink-0">{{ summary.biggest.amount|inr }}</span>
+        </button>
+        {% endif %}
+
+        {# Most visited #}
+        {% if summary.frequent %}{% with m=summary.frequent %}
+        <a href="?m={{ month_param }}&q={{ m.merchant|urlencode }}" class="p-3 min-h-12 flex items-center justify-between gap-3 hover:bg-base-content/5 transition-all cursor-pointer">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <span class="w-7 h-7 rounded-lg bg-sky-400/15 text-sky-400 flex items-center justify-center shrink-0">
+              <span class="material-symbols-outlined text-sm">storefront</span>
+            </span>
+            <div class="min-w-0">
+              <span class="font-semibold text-base-content block truncate">{{ m.merchant }}</span>
+              <span class="text-xs text-base-content/60 block truncate">Most frequent merchant</span>
+            </div>
+          </div>
+          <span class="font-bold tabular-nums text-xs text-sky-400 shrink-0">{{ m.count }} visits</span>
         </a>
-        {% endfor %}
+        {% endwith %}{% endif %}
+
+        {# Rising category #}
+        {% if summary.riser %}
+        <a href="?m={{ month_param }}&cat={{ summary.riser.id|default:'none' }}" class="p-3 min-h-12 flex items-center justify-between gap-3 hover:bg-base-content/5 transition-all cursor-pointer">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <span class="w-7 h-7 rounded-lg bg-amber-400/15 text-amber-400 flex items-center justify-center shrink-0">
+              <span class="material-symbols-outlined text-sm">trending_up</span>
+            </span>
+            <div class="min-w-0">
+              <span class="font-semibold text-base-content block truncate">{{ summary.riser.name }}</span>
+              <span class="text-xs text-base-content/60 block truncate">Highest increase vs last month</span>
+            </div>
+          </div>
+          <span class="font-bold tabular-nums text-xs text-amber-400 shrink-0">+{{ summary.riser.delta|inr_short }}</span>
+        </a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    {# 6-Month Spend Trend Context #}
+    {% if trend_chart and trend_chart.labels %}
+    <div class="v-panel !self-stretch !w-full max-w-full min-w-0 animate-up">
+      <div class="v-panel-header">
+        <h2 class="v-panel-title">
+          <span class="material-symbols-outlined text-base text-orange-400">bar_chart</span>
+          6-Month Spend Trend
+        </h2>
+        {% if trend_chart.avg %}
+        <span class="text-xs font-semibold text-base-content/80 tabular-nums">Avg {{ trend_chart.avg|inr_short }}/mo</span>
+        {% endif %}
+      </div>
+      <div class="p-3.5">
+        <div class="w-full" style="height:130px">
+          <canvas id="trendChart" data-month-url="{% url 'expenses_home' %}" aria-label="Six month spend trend"></canvas>
+        </div>
       </div>
     </div>
     {% endif %}
@@ -708,21 +762,23 @@
 
 {# Quick Modal to set/edit EMI tenure and installment count #}
 <dialog id="emiTenureModal" class="modal modal-bottom sm:modal-middle">
-  <div class="modal-box p-5 max-w-md bg-base-100 border border-purple-500/25 shadow-2xl rounded-2xl">
-    <div class="flex items-center justify-between mb-3.5">
-      <div class="flex items-center gap-2">
-        <div class="w-8 h-8 rounded-lg bg-purple-500/15 flex items-center justify-center text-purple-400">
+  <div class="modal-box p-5 max-w-md bg-base-100 border border-purple-500/25 shadow-2xl rounded-t-2xl sm:rounded-2xl">
+    <div class="v-modal-header flex items-center justify-between mb-3.5 pb-3 border-b border-base-content/10">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div class="w-8 h-8 rounded-lg bg-purple-500/15 flex items-center justify-center text-purple-400 shrink-0">
           <span class="material-symbols-outlined text-lg">event_repeat</span>
         </div>
-        <div>
-          <h3 class="text-sm font-bold text-base-content" id="emiModalTitle">Set Loan EMI Tenure</h3>
-          <p class="text-[11px] opacity-60">Amortization &amp; remaining installment tracker</p>
+        <div class="min-w-0">
+          <h3 class="text-sm font-bold text-base-content truncate" id="emiModalTitle">Set Loan EMI Tenure</h3>
+          <p class="text-xs text-base-content/60 truncate">Amortization &amp; remaining installment tracker</p>
         </div>
       </div>
-      <button type="button" class="btn btn-ghost btn-xs btn-circle text-base-content/60" onclick="closeModal('emiTenureModal')" aria-label="Close">✕</button>
+      <button type="button" class="v-icon-btn btn btn-ghost btn-sm btn-circle !min-h-11 !min-w-11 lg:!min-h-9 lg:!min-w-9 text-base-content/60 hover:text-base-content cursor-pointer" onclick="closeModal('emiTenureModal')" aria-label="Close">
+        <span class="material-symbols-outlined text-lg">close</span>
+      </button>
     </div>
 
-    <form method="post" action="{% url 'expense_set_emi_tenure' %}" id="emiTenureForm" class="flex flex-col gap-3">
+    <form method="post" action="{% url 'expense_set_emi_tenure' %}" id="emiTenureForm" class="flex flex-col gap-3.5">
       {% csrf_token %}
       <input type="hidden" name="ref" id="emiRefInput">
       <input type="hidden" name="expense_id" id="emiExpenseIdInput">
@@ -730,47 +786,47 @@
 
       <div class="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs">
         <div class="font-bold text-purple-200" id="emiLoanNameDisplay">Loan Details</div>
-        <div class="text-[11px] opacity-75 mt-0.5">
+        <div class="text-xs text-base-content/80 mt-0.5">
           Enter total tenure in months. All statements for this loan will automatically compute remaining installments.
         </div>
       </div>
 
       <div class="grid grid-cols-2 gap-3">
         <label class="flex flex-col gap-1">
-          <span class="text-[11px] font-semibold text-base-content/70">Current Installment #</span>
-          <input type="number" name="installment_num" id="emiCurrentNumInput" min="1" max="120"
-                 class="input input-bordered input-sm w-full font-bold tabular-nums bg-base-100 rounded-lg" placeholder="e.g. 5" oninput="calculateEmiPending()">
+          <span class="text-xs font-semibold text-base-content/75">Current Installment #</span>
+          <input type="number" name="installment_num" id="emiCurrentNumInput" inputmode="numeric" min="1" max="120"
+                 class="v-input input input-bordered w-full min-h-11 lg:min-h-9 font-bold tabular-nums bg-base-100 rounded-lg text-base sm:text-sm" placeholder="e.g. 5" oninput="calculateEmiPending()">
         </label>
         <label class="flex flex-col gap-1">
-          <span class="text-[11px] font-semibold text-base-content/70">Total Tenure (Months)</span>
-          <input type="number" name="total_installments" id="emiTotalNumInput" min="1" max="120" required
-                 class="input input-bordered input-sm w-full font-bold tabular-nums bg-base-100 rounded-lg" placeholder="e.g. 12" oninput="calculateEmiPending()">
+          <span class="text-xs font-semibold text-base-content/75">Total Tenure (Months)</span>
+          <input type="number" name="total_installments" id="emiTotalNumInput" inputmode="numeric" min="1" max="120" required
+                 class="v-input input input-bordered w-full min-h-11 lg:min-h-9 font-bold tabular-nums bg-base-100 rounded-lg text-base sm:text-sm" placeholder="e.g. 12" oninput="calculateEmiPending()">
         </label>
       </div>
 
       {# Quick Preset Buttons #}
       <div>
-        <div class="text-[10px] font-bold uppercase tracking-wider opacity-45 mb-1.5">Common Tenure Presets</div>
+        <div class="text-xs font-semibold text-base-content/70 mb-1.5">Common Tenure Presets</div>
         <div class="flex flex-wrap gap-1.5">
-          <button type="button" class="btn btn-xs btn-outline hover:btn-primary rounded-md" onclick="setTenurePreset(3)">3 mo</button>
-          <button type="button" class="btn btn-xs btn-outline hover:btn-primary rounded-md" onclick="setTenurePreset(6)">6 mo</button>
-          <button type="button" class="btn btn-xs btn-outline hover:btn-primary rounded-md" onclick="setTenurePreset(9)">9 mo</button>
-          <button type="button" class="btn btn-xs btn-outline hover:btn-primary rounded-md" onclick="setTenurePreset(12)">12 mo</button>
-          <button type="button" class="btn btn-xs btn-outline hover:btn-primary rounded-md" onclick="setTenurePreset(18)">18 mo</button>
-          <button type="button" class="btn btn-xs btn-outline hover:btn-primary rounded-md" onclick="setTenurePreset(24)">24 mo</button>
-          <button type="button" class="btn btn-xs btn-outline hover:btn-primary rounded-md" onclick="setTenurePreset(36)">36 mo</button>
+          <button type="button" class="btn btn-xs !min-h-11 lg:!min-h-8 px-3 btn-outline hover:btn-primary rounded-lg tabular-nums cursor-pointer" onclick="setTenurePreset(3)">3 mo</button>
+          <button type="button" class="btn btn-xs !min-h-11 lg:!min-h-8 px-3 btn-outline hover:btn-primary rounded-lg tabular-nums cursor-pointer" onclick="setTenurePreset(6)">6 mo</button>
+          <button type="button" class="btn btn-xs !min-h-11 lg:!min-h-8 px-3 btn-outline hover:btn-primary rounded-lg tabular-nums cursor-pointer" onclick="setTenurePreset(9)">9 mo</button>
+          <button type="button" class="btn btn-xs !min-h-11 lg:!min-h-8 px-3 btn-outline hover:btn-primary rounded-lg tabular-nums cursor-pointer" onclick="setTenurePreset(12)">12 mo</button>
+          <button type="button" class="btn btn-xs !min-h-11 lg:!min-h-8 px-3 btn-outline hover:btn-primary rounded-lg tabular-nums cursor-pointer" onclick="setTenurePreset(18)">18 mo</button>
+          <button type="button" class="btn btn-xs !min-h-11 lg:!min-h-8 px-3 btn-outline hover:btn-primary rounded-lg tabular-nums cursor-pointer" onclick="setTenurePreset(24)">24 mo</button>
+          <button type="button" class="btn btn-xs !min-h-11 lg:!min-h-8 px-3 btn-outline hover:btn-primary rounded-lg tabular-nums cursor-pointer" onclick="setTenurePreset(36)">36 mo</button>
         </div>
       </div>
 
       {# Live Pending Preview #}
-      <div id="emiPendingPreviewBox" class="p-2.5 rounded-xl bg-base-200/70 border border-base-content/8 flex items-center justify-between text-xs">
-        <span class="opacity-60">Pending installments:</span>
+      <div id="emiPendingPreviewBox" class="p-2.5 rounded-xl bg-base-200/70 border border-[var(--v-hairline)] flex items-center justify-between text-xs">
+        <span class="opacity-65">Pending installments:</span>
         <span class="font-bold text-purple-300 tabular-nums" id="emiPendingResultText">-</span>
       </div>
 
-      <div class="flex items-center justify-end gap-2 pt-2 border-t border-base-content/8">
-        <button type="button" class="btn btn-ghost btn-sm cursor-pointer rounded-lg" onclick="closeModal('emiTenureModal')">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm px-4 cursor-pointer rounded-lg font-bold">Save Tenure</button>
+      <div class="v-modal-footer flex items-center justify-end gap-2 pt-3 border-t border-base-content/10">
+        <button type="button" class="btn btn-ghost btn-sm !min-h-11 lg:!min-h-9 px-3.5 cursor-pointer rounded-lg" onclick="closeModal('emiTenureModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm !min-h-11 lg:!min-h-9 px-4 cursor-pointer rounded-lg font-bold">Save Tenure</button>
       </div>
     </form>
   </div>
@@ -780,6 +836,7 @@
 {% include 'expenses/_expense_modal.html' %}
 {{ payload|json_script:"expense-data" }}
 {{ chart|json_script:"expense-chart" }}
+{% if trend_chart %}{{ trend_chart|json_script:"expense-trend-chart" }}{% endif %}
 
 <script>
 function openEmiTenureModal(ref, expenseId, currentNum, totalNum) {
@@ -823,14 +880,14 @@ function calculateEmiPending() {
       var pending = Math.max(0, tot - cur);
       if (pending === 0) {
         resultText.textContent = '0 (Final installment)';
-        resultText.className = 'font-bold text-emerald-400';
+        resultText.className = 'font-bold text-emerald-400 tabular-nums';
       } else {
         resultText.textContent = pending + ' installment' + (pending === 1 ? '' : 's') + ' pending';
-        resultText.className = 'font-bold text-purple-300';
+        resultText.className = 'font-bold text-purple-300 tabular-nums';
       }
     } else {
       resultText.textContent = tot + ' total installments';
-      resultText.className = 'font-bold text-purple-300';
+      resultText.className = 'font-bold text-purple-300 tabular-nums';
     }
   } else {
     resultText.textContent = 'Enter total installments above';
@@ -854,23 +911,34 @@ function switchExpMobileTab(tab) {
   var feedBtn = document.getElementById('expTabFeedBtn');
   var insightsBtn = document.getElementById('expTabInsightsBtn');
   if (!feedCol || !insightsCol || !feedBtn || !insightsBtn) return;
-  if (tab === 'insights') {
-    feedCol.classList.add('hidden');
-    insightsCol.classList.remove('hidden');
-    insightsCol.classList.add('flex');
-    insightsBtn.classList.add('tab-active', 'font-bold', 'text-primary');
-    insightsBtn.classList.remove('opacity-70');
-    feedBtn.classList.remove('tab-active', 'font-bold', 'text-primary');
-    feedBtn.classList.add('opacity-70');
-    setTimeout(function() { window.dispatchEvent(new Event('resize')); }, 60);
-  } else {
-    insightsCol.classList.add('hidden');
-    insightsCol.classList.remove('flex');
-    feedCol.classList.remove('hidden');
-    feedBtn.classList.add('tab-active', 'font-bold', 'text-primary');
-    feedBtn.classList.remove('opacity-70');
-    insightsBtn.classList.remove('tab-active', 'font-bold', 'text-primary');
-    insightsBtn.classList.add('opacity-70');
+  var isInsights = tab === 'insights';
+  feedCol.classList.toggle('hidden', isInsights);
+  insightsCol.classList.toggle('hidden', !isInsights);
+  insightsCol.classList.toggle('flex', isInsights);
+
+  feedBtn.setAttribute('aria-selected', isInsights ? 'false' : 'true');
+  insightsBtn.setAttribute('aria-selected', isInsights ? 'true' : 'false');
+
+  feedBtn.classList.toggle('bg-base-100', !isInsights);
+  feedBtn.classList.toggle('shadow-xs', !isInsights);
+  feedBtn.classList.toggle('font-bold', !isInsights);
+  feedBtn.classList.toggle('text-primary', !isInsights);
+  feedBtn.classList.toggle('opacity-70', isInsights);
+
+  insightsBtn.classList.toggle('bg-base-100', isInsights);
+  insightsBtn.classList.toggle('shadow-xs', isInsights);
+  insightsBtn.classList.toggle('font-bold', isInsights);
+  insightsBtn.classList.toggle('text-primary', isInsights);
+  insightsBtn.classList.toggle('opacity-70', !isInsights);
+
+  if (isInsights) {
+    setTimeout(function() {
+      window.dispatchEvent(new Event('resize'));
+      if (window.Chart && typeof Chart.getChart === 'function') {
+        var tc = Chart.getChart('trendChart');
+        if (tc) tc.resize();
+      }
+    }, 60);
   }
 }
 </script>

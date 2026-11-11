@@ -1,22 +1,16 @@
-# Financial Precision, Security & Data Handling Rules
+# Financial Precision, Multi-Tenancy & Security Rules
 
-1. **Absolute Ban on Exposing Secrets**:
-   - NEVER read, dump, print, or commit `.env`, `scripts/DEPLOY.env`, `.deploy-keys/`, `credentials/`, `*.pem`, `*.key`, `portfolio/investor_profile.md`, or service account JSON files.
-   - NEVER query the database or Django shell to print user password hashes, encrypted tokens, or WebAuthn credentials in chat or terminal logs.
-   - Reference environment variable names only (e.g. `GOOGLE_SHEETS_CREDENTIALS`, `DJANGO_SECRET_KEY`) and refer users to `.env.example`.
+1. **Secrets Policy**:
+   - Follow [`.agents/rules/no-secrets.md`](no-secrets.md) strictly: never read, grep, echo, or commit secret files or environment dumps.
 
-2. **Financial Precision & Math**:
-   - ALWAYS use Python's `Decimal` type for monetary amounts, interest rates, unit quantities, and holdings.
-   - NEVER use `float` arithmetic for financial totals, balances, or transactions.
-   - Quantize calculated values to 2 decimal places (`.quantize(Decimal('0.01'))`) or integer rupees (`.quantize(Decimal('0'))`) as appropriate.
-   - Percentage returns must be formatted using the helper `pct(part, total)` or `pnl_pct(pnl, invested)` from `pftracker.utils`.
+2. **Financial Precision & Indian Fiscal Conventions**:
+   - Use Python `Decimal` exclusively for currency amounts, interest rates, weights, and holdings; never use `float` for monetary balances or aggregations.
+   - Quantize currency and percentage results to `Decimal('0.01')` or whole rupees (`Decimal('0')`), using `pct(part, total)` and `pnl_pct(pnl, invested)` from `pftracker.utils`.
+   - Use the Indian Financial Year (April 1 – March 31; Jan–Mar belong to prior calendar year's FY) via `fy_start_year(date)` and `fy_label(fy_start)` in `pftracker.utils`.
+   - Format rupee values in templates using `{% load indian_format %}` (`|inr`, `|inr_short`, `|indian_number` from `portfolio/templatetags/indian_format.py`).
 
-3. **Indian Fiscal Year Conventions**:
-   - The fiscal cycle is April 1 through March 31.
-   - Dates in January, February, or March belong to the previous calendar year's FY (e.g., February 2026 is FY 2025-26).
-   - Use `fy_start_year(date)` and `fy_label(fy_start)` from `pftracker.utils` for consistent FY formatting.
-
-4. **Multi-Tenancy & Access Isolation**:
-   - Querysets MUST be scoped to the authenticated user's `group` (`AccountGroup`).
-   - Sensitive investment portfolio and jewellery endpoints MUST remain protected behind `_vault_gate` with session expiration checks.
-   - Household expenses tagged under `INVESTMENT_CATEGORY` MUST be excluded from views when accessed by non-primary account holders (`_hides_investments`).
+3. **Multi-Tenancy & Access Control**:
+   - Scope every group-owned queryset to the authenticated user's `AccountGroup` using fail-closed filtering (`_gf(group)` returns `{"id__in": []}` when `group is None`).
+   - Enforce `_vault_gate` (`30-minute` password or WebAuthn passkey session TTL + brute-force lockout) on all `portfolio` and `jewellery` endpoints, and `EXPENSES_UNLOCK_TTL` on `expenses` when a vault password is set.
+   - Enforce `_hides_investments(request)` (`hide_investments=True`) across all `expenses` views, totals (`month_summary`, `fy_summary`), and categorization rules so non-primary members (`ACCOUNT_HOLDER`) never access `INVESTMENT_CATEGORY` records.
+   - Require `@require_POST` + CSRF verification on every state-changing endpoint, and validate `next` redirect targets via `url_has_allowed_host_and_scheme`.

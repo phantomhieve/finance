@@ -27,80 +27,113 @@
 {% block content %}
 
 {# --- SIGNATURE LEDGER SUMMARY BAND --- #}
-<div class="v-ledger-band">
+<section class="v-ledger-band" aria-label="Cash Reserves Summary">
   <div class="v-lead-cell">
     <div>
       <div class="v-lead-label">
         <span>Total Liquid Cash Reserves</span>
-        <span class="v-delta v-delta-pos text-[10px] py-0 px-2 font-semibold">Immediate Liquidity</span>
+        <span class="v-delta v-delta-pos text-xs py-0 px-2 font-semibold">Immediate Liquidity</span>
       </div>
       <div class="v-lead-figure-row">
-        <span class="v-lead-figure">{{ total|inr }}</span>
+        <span class="v-lead-figure tabular-nums">{{ total|inr }}</span>
       </div>
       <div class="v-lead-sub">
-        Aggregated across <strong class="text-base-content/80">{{ positions|length }} bank &amp; cash accounts</strong>
+        Aggregated across <strong class="text-base-content/85 tabular-nums">{{ positions|length }} bank &amp; cash accounts</strong>
       </div>
     </div>
+
+    {% if total > 0 and positions %}
+    <div class="v-horizon">
+      <div class="v-horizon-bar" role="img" aria-label="Cash account distribution">
+        {% for c in positions|slice:":4" %}
+        <div class="v-horizon-seg" style="width: {% widthratio c.amount total 100 %}%; background: {% cycle '#0ea5e9' '#10b981' '#14b8a6' '#94a3b8' %};" title="{{ c.name }}: {{ c.amount|inr }}"></div>
+        {% endfor %}
+      </div>
+      <div class="v-horizon-legend">
+        {% for c in positions|slice:":3" %}
+        <span class="v-horizon-item">
+          <span class="v-horizon-dot" style="background: {% cycle '#0ea5e9' '#10b981' '#14b8a6' %};"></span>
+          {{ c.name|truncatechars:18 }} <strong>{% widthratio c.amount total 100 %}%</strong>
+        </span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
   </div>
 
   <div class="v-stat-grid">
     <div class="v-stat-cell">
       <div class="v-stat-label">Total Liquid Capital</div>
-      <div class="v-stat-value text-emerald-400">{{ total|inr }}</div>
+      <div class="v-stat-value text-base-content tabular-nums">{{ total|inr }}</div>
       <div class="v-stat-sub">Zero-notice liquidity</div>
     </div>
     <div class="v-stat-cell">
+      <div class="v-stat-label">Primary Account</div>
+      <div class="v-stat-value text-base-content tabular-nums">{% if positions %}{{ positions.0.amount|inr }}{% else %}₹0{% endif %}</div>
+      <div class="v-stat-sub truncate">{% if positions %}{{ positions.0.name }}{% else %}No accounts{% endif %}</div>
+    </div>
+    <div class="v-stat-cell">
       <div class="v-stat-label">Account Count</div>
-      <div class="v-stat-value text-indigo-400">{{ positions|length }}</div>
-      <div class="v-stat-sub">Bank &amp; physical positions</div>
+      <div class="v-stat-value text-base-content tabular-nums">{{ positions|length }}</div>
+      <div class="v-stat-sub">Bank &amp; cash positions</div>
+    </div>
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Settlement</div>
+      <div class="v-stat-value text-sky-400">Instant</div>
+      <div class="v-stat-sub">Emergency buffer</div>
     </div>
   </div>
-</div>
+</section>
 
 {# --- CASH POSITIONS BLOTTER --- #}
-<div class="v-panel mb-6">
+<section class="v-panel mb-6" aria-label="All Bank and Cash Accounts">
   <div class="v-panel-header">
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-2 min-w-0">
       <h2 class="v-panel-title">
-        <span class="material-symbols-outlined text-base text-primary">payments</span>
+        <span class="material-symbols-outlined text-base text-sky-400">payments</span>
         All Bank &amp; Cash Accounts
       </h2>
-      <span class="v-delta v-delta-neutral text-xs font-semibold">{{ positions|length }} Accounts</span>
+      <span class="v-delta v-delta-neutral text-xs font-semibold tabular-nums">{{ positions|length }} Accounts</span>
     </div>
-    <button type="button" class="v-btn v-btn-secondary v-btn-xs" onclick="openAddModal()">
-      <span class="material-symbols-outlined text-sm">add</span>Add
+    <button type="button" class="v-btn v-btn-secondary v-btn-sm" onclick="openAddModal()">
+      <span class="material-symbols-outlined text-sm">add</span>Add Position
     </button>
   </div>
   <div class="v-panel-body p-0">
     {% if positions %}
-    <div class="v-table-wrap">
+    {# Desktop Table #}
+    <div class="v-panel-table hidden md:block overflow-x-auto">
       <table class="v-table" id="cashTable">
         <thead>
           <tr>
             <th class="sortable-th cursor-pointer select-none">Bank / Account Name <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
             <th class="sortable-th cursor-pointer select-none v-num">Current Balance <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
-            <th>Operational Remarks</th>
-            <th class="text-center w-12">Action</th>
+            <th class="v-num">Share</th>
+            <th>Remarks</th>
+            <th class="text-right w-16">Action</th>
           </tr>
         </thead>
         <tbody>
           {% for c in positions %}
           <tr>
             <td class="font-bold text-xs text-base-content">{{ c.name }}</td>
-            <td class="v-num font-bold text-emerald-400" data-val="{{ c.amount }}">{{ c.amount|inr }}</td>
-            <td class="text-xs text-base-content/60 max-w-xs truncate">{{ c.remarks|default:"-" }}</td>
-            <td class="text-center">
-              <button type="button" class="v-btn v-btn-ghost v-btn-xs" data-edit-cash
+            <td class="v-num text-xs font-bold text-base-content" data-val="{{ c.amount }}">{{ c.amount|inr }}</td>
+            <td class="v-num text-xs text-base-content/60">{% if total > 0 %}{% widthratio c.amount total 100 %}%{% else %}0%{% endif %}</td>
+            <td class="text-xs text-base-content/60 max-w-xs truncate">{{ c.remarks|default:"—" }}</td>
+            <td class="text-right">
+              <button type="button" class="v-icon-btn" data-edit-cash
                       data-id="{{ c.id }}" data-name="{{ c.name }}"
-                      data-amount="{{ c.amount }}" data-remarks="{{ c.remarks }}">
+                      data-amount="{{ c.amount }}" data-remarks="{{ c.remarks }}"
+                      aria-label="Edit {{ c.name }}">
                 <span class="material-symbols-outlined text-sm">edit</span>
               </button>
             </td>
           </tr>
           {% endfor %}
-          <tr class="total-row border-t-2 border-base-content/10 font-bold">
-            <td class="text-primary">Total Liquid Reserves</td>
-            <td class="v-num text-primary" data-val="{{ total }}">{{ total|inr }}</td>
+          <tr class="total-row border-t-2 border-[var(--v-hairline)] font-bold">
+            <td class="text-xs text-base-content">Total Liquid Reserves</td>
+            <td class="v-num text-xs text-base-content" data-val="{{ total }}">{{ total|inr }}</td>
+            <td class="v-num text-xs text-base-content/60">100%</td>
             <td colspan="2"></td>
           </tr>
         </tbody>
@@ -108,19 +141,22 @@
     </div>
 
     {# Mobile View #}
-    <div class="md:hidden divide-y divide-base-content/6">
+    <div class="md:hidden divide-y divide-[var(--v-hairline)]">
       {% for c in positions %}
-      <div class="p-3.5 flex items-center justify-between gap-3">
-        <div class="min-w-0">
-          <div class="font-bold text-xs text-base-content truncate">{{ c.name }}</div>
-          <div class="text-[10px] text-base-content/50 mt-0.5 truncate">{{ c.remarks|default:"-" }}</div>
+      <div class="v-mobile-row gap-3">
+        <div class="min-w-0 flex-1">
+          <div class="font-bold text-sm text-base-content truncate">{{ c.name }}</div>
+          <div class="text-xs text-base-content/55 mt-0.5 truncate">
+            {% if total > 0 %}<span class="tabular-nums">{% widthratio c.amount total 100 %}% share</span>{% endif %}{% if c.remarks %} &middot; {{ c.remarks }}{% endif %}
+          </div>
         </div>
-        <div class="flex items-center gap-2 shrink-0">
-          <span class="font-bold text-xs text-emerald-400 tabular-nums">{{ c.amount|inr }}</span>
-          <button type="button" class="v-btn v-btn-ghost v-btn-xs" data-edit-cash
+        <div class="flex items-center gap-1.5 shrink-0">
+          <span class="font-bold text-sm text-base-content tabular-nums">{{ c.amount|inr }}</span>
+          <button type="button" class="v-icon-btn" data-edit-cash
                   data-id="{{ c.id }}" data-name="{{ c.name }}"
-                  data-amount="{{ c.amount }}" data-remarks="{{ c.remarks }}">
-            <span class="material-symbols-outlined text-sm">edit</span>
+                  data-amount="{{ c.amount }}" data-remarks="{{ c.remarks }}"
+                  aria-label="Edit {{ c.name }}">
+            <span class="material-symbols-outlined text-base">edit</span>
           </button>
         </div>
       </div>
@@ -132,14 +168,14 @@
         <span class="material-symbols-outlined text-3xl">account_balance</span>
       </div>
       <h3 class="v-empty-title">No Cash Accounts Recorded</h3>
-      <p class="v-empty-desc">Track primary bank balances, savings accounts, and cash envelopes.</p>
+      <p class="v-empty-desc">Track primary bank balances, savings accounts, and liquid emergency funds.</p>
       <button type="button" class="v-btn v-btn-primary" onclick="openAddModal()">
         <span class="material-symbols-outlined text-sm">add</span>Add First Account
       </button>
     </div>
     {% endif %}
   </div>
-</div>
+</section>
 
 {% include 'portfolio/_cash_form_modal.html' with form_obj=form %}
 
@@ -154,7 +190,10 @@ function openAddModal() {
   form.action = "{% url 'add_cash' %}";
   form.reset();
   var delBtn = document.getElementById('cashDeleteBtn');
-  if (delBtn) delBtn.style.display = 'none';
+  if (delBtn) {
+    delBtn.classList.add('hidden');
+    delBtn.style.display = 'none';
+  }
   var titleEl = document.getElementById('cashModalTitle');
   if (titleEl) {
     titleEl.innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span> Add Cash Position';
@@ -172,7 +211,10 @@ document.addEventListener('click', function(e) {
   var delForm = document.getElementById('deleteCashForm');
   if (delForm) delForm.action = "{% url 'delete_cash' pk=0 %}".replace('/0/', '/' + id + '/');
   var delBtn = document.getElementById('cashDeleteBtn');
-  if (delBtn) delBtn.style.display = 'inline-flex';
+  if (delBtn) {
+    delBtn.classList.remove('hidden');
+    delBtn.style.display = 'inline-flex';
+  }
   var titleEl = document.getElementById('cashModalTitle');
   if (titleEl) {
     titleEl.innerHTML = '<span class="material-symbols-outlined text-primary">edit</span> Edit Cash Position';

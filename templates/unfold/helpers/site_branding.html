@@ -1,0 +1,10 @@
+{% load i18n %}
+<div id="site-name" class="vault-admin-brand">
+    <a href="{% url 'admin:index' %}" class="vault-admin-brand-link">
+        <span class="vault-admin-brand-mark">
+            {% include "includes/vault_icon.html" with size="20" %}
+        </span>
+        <span class="vault-admin-brand-title">{{ site_header|default:_('Vault') }}</span>
+        <span class="vault-admin-brand-badge">Console</span>
+    </a>
+</div>

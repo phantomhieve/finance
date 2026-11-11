@@ -27,61 +27,97 @@
 {% block content %}
 
 {# --- SIGNATURE LEDGER SUMMARY BAND --- #}
-<div class="v-ledger-band">
+<section class="v-ledger-band" aria-label="Fixed Deposits Summary">
   <div class="v-lead-cell">
     <div>
       <div class="v-lead-label">
         <span>Active Fixed Deposits Total</span>
-        <span class="v-delta v-delta-pos text-[10px] py-0 px-2 font-semibold">Bank Guaranteed</span>
+        <span class="v-delta v-delta-pos text-xs py-0 px-2 font-semibold">Bank Guaranteed</span>
       </div>
       <div class="v-lead-figure-row">
-        <span class="v-lead-figure">{{ active_total|inr }}</span>
-        <span class="v-delta v-delta-pos text-xs font-bold">
-          <span class="material-symbols-outlined text-xs">trending_up</span>+{{ total_interest|inr }} Total Interest
+        <span class="v-lead-figure tabular-nums">{{ active_total|inr }}</span>
+        <span class="v-delta v-delta-pos text-xs font-bold tabular-nums">
+          <span class="material-symbols-outlined text-xs">trending_up</span>+{{ total_interest|inr }} Accrued Interest
         </span>
       </div>
       <div class="v-lead-sub">
-        Matured deposits cumulative: <strong class="text-base-content/80 tabular-nums">{{ matured_total|inr }}</strong>
+        Active Ladder: <strong class="text-base-content/85 tabular-nums">{{ active_fds|length }} deposits</strong>
+        {% if matured_total > 0 %}
+        &middot; Matured History: <strong class="text-base-content/85 tabular-nums">{{ matured_total|inr }}</strong>
+        {% endif %}
       </div>
     </div>
+
+    {% with combined=active_total|add:matured_total %}
+    {% if combined > 0 %}
+    <div class="v-horizon">
+      <div class="v-horizon-bar" role="img" aria-label="Active versus matured fixed deposits">
+        {% if active_total > 0 %}
+        <div class="v-horizon-seg" style="width: {% widthratio active_total combined 100 %}%; background: #0ea5e9;" title="Active FDs: {{ active_total|inr }}"></div>
+        {% endif %}
+        {% if matured_total > 0 %}
+        <div class="v-horizon-seg" style="width: {% widthratio matured_total combined 100 %}%; background: #64748b;" title="Matured FDs: {{ matured_total|inr }}"></div>
+        {% endif %}
+      </div>
+      <div class="v-horizon-legend">
+        <span class="v-horizon-item">
+          <span class="v-horizon-dot" style="background: #0ea5e9;"></span>
+          Active <strong>{{ active_fds|length }}</strong> ({{ active_total|inr }})
+        </span>
+        {% if matured_total > 0 %}
+        <span class="v-horizon-item">
+          <span class="v-horizon-dot" style="background: #64748b;"></span>
+          Matured <strong>{{ matured_fds|length }}</strong> ({{ matured_total|inr }})
+        </span>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+    {% endwith %}
   </div>
 
   <div class="v-stat-grid">
     <div class="v-stat-cell">
       <div class="v-stat-label">Active Deposits Total</div>
-      <div class="v-stat-value text-emerald-400">{{ active_total|inr }}</div>
+      <div class="v-stat-value text-base-content tabular-nums">{{ active_total|inr }}</div>
       <div class="v-stat-sub">{{ active_fds|length }} active deposits</div>
     </div>
     <div class="v-stat-cell">
-      <div class="v-stat-label">Matured Deposits</div>
-      <div class="v-stat-value text-base-content/70">{{ matured_total|inr }}</div>
+      <div class="v-stat-label">Accrued Interest</div>
+      <div class="v-stat-value text-emerald-400 tabular-nums">+{{ total_interest|inr }}</div>
+      <div class="v-stat-sub">Compounded return</div>
+    </div>
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Matured History</div>
+      <div class="v-stat-value text-base-content/75 tabular-nums">{{ matured_total|inr }}</div>
       <div class="v-stat-sub">{{ matured_fds|length }} closed deposits</div>
     </div>
     <div class="v-stat-cell">
-      <div class="v-stat-label">Total Accrued Interest</div>
-      <div class="v-stat-value text-indigo-400">+{{ total_interest|inr }}</div>
-      <div class="v-stat-sub">Compounded return</div>
+      <div class="v-stat-label">Active Count</div>
+      <div class="v-stat-value text-base-content tabular-nums">{{ active_fds|length }}</div>
+      <div class="v-stat-sub">Term instruments</div>
     </div>
   </div>
-</div>
+</section>
 
 {# --- ACTIVE FDs BLOTTER --- #}
-<div class="v-panel mb-6">
+<section class="v-panel mb-6" aria-label="Active Fixed Deposit Ladder">
   <div class="v-panel-header">
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-2 min-w-0">
       <h2 class="v-panel-title">
-        <span class="material-symbols-outlined text-base text-primary">schedule</span>
+        <span class="material-symbols-outlined text-base text-sky-400">schedule</span>
         Active Fixed Deposit Ladder
       </h2>
-      <span class="v-delta v-delta-neutral text-xs font-semibold">{{ active_fds|length }} Active</span>
+      <span class="v-delta v-delta-neutral text-xs font-semibold tabular-nums">{{ active_fds|length }} Active</span>
     </div>
-    <button type="button" class="v-btn v-btn-secondary v-btn-xs" onclick="openAddModal()">
+    <button type="button" class="v-btn v-btn-secondary v-btn-sm" onclick="openAddModal()">
       <span class="material-symbols-outlined text-sm">add</span>Add FD
     </button>
   </div>
   <div class="v-panel-body p-0">
     {% if active_fds %}
-    <div class="v-table-wrap">
+    {# Desktop Table #}
+    <div class="v-panel-table hidden md:block overflow-x-auto">
       <table class="v-table" id="fdActiveTable">
         <thead>
           <tr>
@@ -92,37 +128,38 @@
             <th>Compounding</th>
             <th class="sortable-th cursor-pointer select-none v-num">Current Value <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
             <th class="sortable-th cursor-pointer select-none">Maturity Date <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
-            <th class="text-center w-12">Action</th>
+            <th class="text-right w-16">Action</th>
           </tr>
         </thead>
         <tbody>
           {% for fd in active_fds %}
           <tr>
             <td class="font-bold text-xs text-base-content">{{ fd.name }}</td>
-            <td class="text-xs text-base-content/60">{{ fd.account_name }}</td>
-            <td class="v-num text-xs text-base-content/70" data-val="{{ fd.principal }}">{{ fd.principal|inr }}</td>
+            <td class="text-xs text-base-content/65">{{ fd.account_name }}</td>
+            <td class="v-num text-xs text-base-content/75" data-val="{{ fd.principal }}">{{ fd.principal|inr }}</td>
             <td class="v-num text-xs font-semibold text-emerald-400" data-val="{{ fd.interest_rate }}">{{ fd.interest_rate }}%</td>
-            <td><span class="v-delta v-delta-neutral text-[10px] py-0 px-1.5">{{ fd.get_compounding_display }}</span></td>
-            <td class="v-num text-xs font-bold text-emerald-400" data-val="{{ fd.current_value }}">{{ fd.current_value|inr }}</td>
-            <td class="text-xs text-base-content/60 whitespace-nowrap" data-val="{{ fd.maturity_date|date:'Ymd' }}">
+            <td><span class="v-delta v-delta-neutral text-xs py-0 px-1.5">{{ fd.get_compounding_display }}</span></td>
+            <td class="v-num text-xs font-bold text-base-content" data-val="{{ fd.current_value }}">{{ fd.current_value|inr }}</td>
+            <td class="text-xs text-base-content/65 whitespace-nowrap tabular-nums" data-val="{{ fd.maturity_date|date:'Ymd' }}">
               {{ fd.maturity_date|date:"d M Y" }}
-              {% if fd.days_remaining > 0 %}<span class="text-[10px] opacity-60">({{ fd.days_remaining }}d)</span>{% endif %}
+              {% if fd.days_remaining > 0 %}<span class="text-xs text-base-content/45">({{ fd.days_remaining }}d)</span>{% endif %}
             </td>
-            <td class="text-center">
-              <button type="button" class="v-btn v-btn-ghost v-btn-xs" data-edit-fd
+            <td class="text-right">
+              <button type="button" class="v-icon-btn" data-edit-fd
                       data-id="{{ fd.id }}" data-name="{{ fd.name }}" data-account="{{ fd.account_name }}"
                       data-principal="{{ fd.principal }}" data-rate="{{ fd.interest_rate }}"
                       data-compounding="{{ fd.compounding }}" data-start="{{ fd.start_date|date:'Y-m-d' }}"
                       data-maturity="{{ fd.maturity_date|date:'Y-m-d' }}" data-active="{{ fd.is_active|yesno:'true,false' }}"
-                      data-remarks="{{ fd.remarks }}">
+                      data-remarks="{{ fd.remarks }}"
+                      aria-label="Edit {{ fd.name }}">
                 <span class="material-symbols-outlined text-sm">edit</span>
               </button>
             </td>
           </tr>
           {% endfor %}
-          <tr class="total-row border-t-2 border-base-content/10 font-bold">
-            <td class="text-primary" colspan="5">Total Active Fixed Deposits</td>
-            <td class="v-num text-primary" data-val="{{ active_total }}">{{ active_total|inr }}</td>
+          <tr class="total-row border-t-2 border-[var(--v-hairline)] font-bold">
+            <td class="text-xs text-base-content" colspan="5">Total Active Fixed Deposits</td>
+            <td class="v-num text-xs text-base-content" data-val="{{ active_total }}">{{ active_total|inr }}</td>
             <td colspan="2"></td>
           </tr>
         </tbody>
@@ -130,60 +167,73 @@
     </div>
 
     {# Mobile View #}
-    <div class="md:hidden divide-y divide-base-content/6">
+    <div class="md:hidden divide-y divide-[var(--v-hairline)]">
       {% for fd in active_fds %}
-      <div class="p-3.5 space-y-1.5">
-        <div class="flex items-start justify-between gap-2">
-          <div class="min-w-0">
-            <div class="font-bold text-xs text-base-content truncate">{{ fd.name }}</div>
-            <div class="text-[10px] text-base-content/50">{{ fd.account_name }} &middot; {{ fd.interest_rate }}% &middot; {{ fd.get_compounding_display }}</div>
+      <div class="v-mobile-row flex-col !items-stretch gap-2">
+        <div class="w-full flex items-start justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <div class="font-bold text-sm text-base-content truncate">{{ fd.name }}</div>
+            <div class="text-xs text-base-content/55 mt-0.5 truncate tabular-nums">
+              {{ fd.account_name }} &middot; <span class="text-emerald-400 font-semibold">{{ fd.interest_rate }}%</span> &middot; {{ fd.get_compounding_display }}
+            </div>
           </div>
-          <button type="button" class="v-btn v-btn-ghost v-btn-xs shrink-0" data-edit-fd
+          <button type="button" class="v-icon-btn shrink-0" data-edit-fd
                   data-id="{{ fd.id }}" data-name="{{ fd.name }}" data-account="{{ fd.account_name }}"
                   data-principal="{{ fd.principal }}" data-rate="{{ fd.interest_rate }}"
                   data-compounding="{{ fd.compounding }}" data-start="{{ fd.start_date|date:'Y-m-d' }}"
                   data-maturity="{{ fd.maturity_date|date:'Y-m-d' }}" data-active="{{ fd.is_active|yesno:'true,false' }}"
-                  data-remarks="{{ fd.remarks }}">
-            <span class="material-symbols-outlined text-sm">edit</span>
+                  data-remarks="{{ fd.remarks }}"
+                  aria-label="Edit {{ fd.name }}">
+            <span class="material-symbols-outlined text-base">edit</span>
           </button>
         </div>
-        <div class="grid grid-cols-2 gap-2 text-[11px] pt-1 border-t border-base-content/6 tabular-nums">
+        <div class="w-full grid grid-cols-2 gap-3 text-xs pt-2 border-t border-[var(--v-hairline)] tabular-nums">
           <div class="flex justify-between">
-            <span class="text-base-content/50">Principal:</span>
-            <span class="text-base-content/80 font-semibold">{{ fd.principal|inr }}</span>
+            <span class="text-base-content/50">Principal</span>
+            <span class="text-base-content/85 font-semibold">{{ fd.principal|inr }}</span>
           </div>
           <div class="flex justify-between">
-            <span class="text-base-content/50">Value:</span>
-            <span class="text-emerald-400 font-bold">{{ fd.current_value|inr }}</span>
+            <span class="text-base-content/50">Current</span>
+            <span class="text-base-content font-bold">{{ fd.current_value|inr }}</span>
           </div>
         </div>
-        <div class="text-[10px] text-base-content/40 flex justify-between">
-          <span>Matures: {{ fd.maturity_date|date:"d M Y" }}</span>
+        <div class="w-full text-xs text-base-content/45 flex justify-between tabular-nums">
+          <span>Matures {{ fd.maturity_date|date:"d M Y" }}</span>
           {% if fd.days_remaining > 0 %}<span>{{ fd.days_remaining }} days left</span>{% endif %}
         </div>
       </div>
       {% endfor %}
     </div>
     {% else %}
-    <div class="p-6 text-center text-xs text-base-content/50">No active fixed deposits.</div>
+    <div class="v-empty py-10">
+      <div class="v-empty-icon text-sky-400">
+        <span class="material-symbols-outlined text-3xl">account_balance_wallet</span>
+      </div>
+      <h3 class="v-empty-title">No Active Fixed Deposits</h3>
+      <p class="v-empty-desc">Track bank term deposits with automatic compounding accrual and maturity countdowns.</p>
+      <button type="button" class="v-btn v-btn-primary" onclick="openAddModal()">
+        <span class="material-symbols-outlined text-sm">add</span>Add First FD
+      </button>
+    </div>
     {% endif %}
   </div>
-</div>
+</section>
 
 {# --- MATURED FDs --- #}
 {% if matured_fds %}
-<div class="v-panel mb-6">
+<section class="v-panel mb-6" aria-label="Matured Deposits History">
   <div class="v-panel-header">
     <div class="flex items-center gap-2">
-      <h3 class="v-panel-title">
-        <span class="material-symbols-outlined text-base text-base-content/40">history</span>
+      <h2 class="v-panel-title text-base-content/75">
+        <span class="material-symbols-outlined text-base text-base-content/45">history</span>
         Matured / Closed Deposits
-      </h3>
-      <span class="v-delta v-delta-neutral text-xs font-semibold">{{ matured_fds|length }} Closed</span>
+      </h2>
+      <span class="v-delta v-delta-neutral text-xs font-semibold tabular-nums">{{ matured_fds|length }} Closed</span>
     </div>
   </div>
-  <div class="v-panel-body p-0 opacity-75">
-    <div class="v-table-wrap">
+  <div class="v-panel-body p-0 opacity-85">
+    {# Desktop Table #}
+    <div class="v-panel-table hidden md:block overflow-x-auto">
       <table class="v-table" id="fdMaturedTable">
         <thead>
           <tr>
@@ -193,25 +243,26 @@
             <th class="v-num">Rate</th>
             <th class="v-num">Maturity Value</th>
             <th>Maturity Date</th>
-            <th class="text-center w-12">Action</th>
+            <th class="text-right w-16">Action</th>
           </tr>
         </thead>
         <tbody>
           {% for fd in matured_fds %}
           <tr>
             <td class="font-bold text-xs text-base-content">{{ fd.name }}</td>
-            <td class="text-xs text-base-content/60">{{ fd.account_name }}</td>
-            <td class="v-num text-xs">{{ fd.principal|inr }}</td>
-            <td class="v-num text-xs">{{ fd.interest_rate }}%</td>
+            <td class="text-xs text-base-content/65">{{ fd.account_name }}</td>
+            <td class="v-num text-xs text-base-content/75">{{ fd.principal|inr }}</td>
+            <td class="v-num text-xs text-base-content/75">{{ fd.interest_rate }}%</td>
             <td class="v-num text-xs font-bold text-base-content">{{ fd.current_value|inr }}</td>
-            <td class="text-xs text-base-content/60 whitespace-nowrap">{{ fd.maturity_date|date:"d M Y" }}</td>
-            <td class="text-center">
-              <button type="button" class="v-btn v-btn-ghost v-btn-xs" data-edit-fd
+            <td class="text-xs text-base-content/65 whitespace-nowrap tabular-nums">{{ fd.maturity_date|date:"d M Y" }}</td>
+            <td class="text-right">
+              <button type="button" class="v-icon-btn" data-edit-fd
                       data-id="{{ fd.id }}" data-name="{{ fd.name }}" data-account="{{ fd.account_name }}"
                       data-principal="{{ fd.principal }}" data-rate="{{ fd.interest_rate }}"
                       data-compounding="{{ fd.compounding }}" data-start="{{ fd.start_date|date:'Y-m-d' }}"
                       data-maturity="{{ fd.maturity_date|date:'Y-m-d' }}" data-active="{{ fd.is_active|yesno:'true,false' }}"
-                      data-remarks="{{ fd.remarks }}">
+                      data-remarks="{{ fd.remarks }}"
+                      aria-label="Edit matured FD {{ fd.name }}">
                 <span class="material-symbols-outlined text-sm">edit</span>
               </button>
             </td>
@@ -220,8 +271,34 @@
         </tbody>
       </table>
     </div>
+
+    {# Mobile View #}
+    <div class="md:hidden divide-y divide-[var(--v-hairline)]">
+      {% for fd in matured_fds %}
+      <div class="v-mobile-row gap-3">
+        <div class="min-w-0 flex-1">
+          <div class="font-semibold text-sm text-base-content truncate">{{ fd.name }}</div>
+          <div class="text-xs text-base-content/55 mt-0.5 tabular-nums truncate">
+            {{ fd.account_name }} &middot; {{ fd.interest_rate }}% &middot; Matured {{ fd.maturity_date|date:"d M Y" }}
+          </div>
+        </div>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <span class="font-bold text-sm text-base-content tabular-nums">{{ fd.current_value|inr }}</span>
+          <button type="button" class="v-icon-btn" data-edit-fd
+                  data-id="{{ fd.id }}" data-name="{{ fd.name }}" data-account="{{ fd.account_name }}"
+                  data-principal="{{ fd.principal }}" data-rate="{{ fd.interest_rate }}"
+                  data-compounding="{{ fd.compounding }}" data-start="{{ fd.start_date|date:'Y-m-d' }}"
+                  data-maturity="{{ fd.maturity_date|date:'Y-m-d' }}" data-active="{{ fd.is_active|yesno:'true,false' }}"
+                  data-remarks="{{ fd.remarks }}"
+                  aria-label="Edit matured FD {{ fd.name }}">
+            <span class="material-symbols-outlined text-base">edit</span>
+          </button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
   </div>
-</div>
+</section>
 {% endif %}
 
 {% include 'portfolio/_fd_form_modal.html' with form_obj=form %}
@@ -237,7 +314,10 @@ function openAddModal() {
   form.action = "{% url 'add_fd' %}";
   form.reset();
   var delBtn = document.getElementById('fdDeleteBtn');
-  if (delBtn) delBtn.style.display = 'none';
+  if (delBtn) {
+    delBtn.classList.add('hidden');
+    delBtn.style.display = 'none';
+  }
   var titleEl = document.getElementById('fdModalTitle');
   if (titleEl) {
     titleEl.innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span> Add Fixed Deposit';
@@ -255,7 +335,10 @@ document.addEventListener('click', function(e) {
   var delForm = document.getElementById('deleteFdForm');
   if (delForm) delForm.action = "{% url 'delete_fd' pk=0 %}".replace('/0/', '/' + id + '/');
   var delBtn = document.getElementById('fdDeleteBtn');
-  if (delBtn) delBtn.style.display = 'inline-flex';
+  if (delBtn) {
+    delBtn.classList.remove('hidden');
+    delBtn.style.display = 'inline-flex';
+  }
   var titleEl = document.getElementById('fdModalTitle');
   if (titleEl) {
     titleEl.innerHTML = '<span class="material-symbols-outlined text-primary">edit</span> Edit Fixed Deposit';

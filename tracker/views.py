@@ -319,13 +319,16 @@ def _build_monthly_data(transactions, user, fy_start, today, per_month_goals):
 # ---------------------------------------------------------------------------
 
 def _make_tracker_crud(model_class, form_class, label, redirect_to='dashboard',
-                       allowed_roles=('PRIMARY', 'ACCOUNT_HOLDER')):
+                       allowed_roles=('PRIMARY', 'ACCOUNT_HOLDER'),
+                       feature_name=None):
     """Generate add / edit / delete views for user-owned tracker models."""
 
     @login_required
     @require_POST
     @_require_role(*allowed_roles)
     def add_view(request):
+        if feature_name and not feature_enabled(request.user, feature_name):
+            raise Http404
         form = form_class(request.POST)
         if form.is_valid():
             obj = form.save(commit=False)
@@ -340,6 +343,8 @@ def _make_tracker_crud(model_class, form_class, label, redirect_to='dashboard',
     @require_POST
     @_require_role(*allowed_roles)
     def edit_view(request, pk):
+        if feature_name and not feature_enabled(request.user, feature_name):
+            raise Http404
         gf = group_user_filter(request.user)
         obj = get_object_or_404(model_class.objects.filter(gf), pk=pk)
         form = form_class(request.POST, instance=obj)
@@ -354,6 +359,8 @@ def _make_tracker_crud(model_class, form_class, label, redirect_to='dashboard',
     @require_POST
     @_require_role(*allowed_roles)
     def delete_view(request, pk):
+        if feature_name and not feature_enabled(request.user, feature_name):
+            raise Http404
         gf = group_user_filter(request.user)
         obj = get_object_or_404(model_class.objects.filter(gf), pk=pk)
         amt = obj.amount
@@ -372,10 +379,10 @@ def _make_tracker_crud(model_class, form_class, label, redirect_to='dashboard',
 # read-only access to Monthly Savings.
 add_transaction, edit_transaction, delete_transaction = _make_tracker_crud(
     Transaction, TransactionForm, 'Transaction', 'dashboard',
-    allowed_roles=('PRIMARY',))
+    allowed_roles=('PRIMARY',), feature_name='savings')
 
 add_hra_entry, edit_hra_entry, delete_hra_entry = _make_tracker_crud(
-    HRAExpense, HRAExpenseForm, 'HRA', 'hra_tracker')
+    HRAExpense, HRAExpenseForm, 'HRA', 'hra_tracker', feature_name='hra')
 
 
 # ---------------------------------------------------------------------------
@@ -385,6 +392,7 @@ add_hra_entry, edit_hra_entry, delete_hra_entry = _make_tracker_crud(
 @login_required
 @require_POST
 @_require_role('PRIMARY')
+@_require_feature('savings')
 def add_goal_increment(request):
     gf = group_user_filter(request.user)
     inc_id = request.POST.get('increment_id')
@@ -413,6 +421,7 @@ def add_goal_increment(request):
 @login_required
 @require_POST
 @_require_role('PRIMARY')
+@_require_feature('savings')
 def delete_goal_increment(request, inc_id):
     gf = group_user_filter(request.user)
     deleted, _ = GoalIncrement.objects.filter(gf, id=inc_id).delete()
@@ -426,6 +435,7 @@ def delete_goal_increment(request, inc_id):
 @login_required
 @require_POST
 @_require_role('PRIMARY')
+@_require_feature('savings')
 def set_annual_goal(request):
     """Create or update the FinancialGoal for a specific FY start year."""
     form = FinancialGoalForm(request.POST)
@@ -465,6 +475,7 @@ def set_annual_goal(request):
 @login_required
 @require_POST
 @_require_role('PRIMARY')
+@_require_feature('savings')
 def add_goal_adjustment(request):
     """Create or update a one-off monthly adjustment."""
     gf = group_user_filter(request.user)
@@ -504,6 +515,7 @@ def add_goal_adjustment(request):
 @login_required
 @require_POST
 @_require_role('PRIMARY')
+@_require_feature('savings')
 def delete_goal_adjustment(request, adj_id):
     gf = group_user_filter(request.user)
     deleted, _ = MonthlyGoalAdjustment.objects.filter(gf, id=adj_id).delete()
@@ -517,14 +529,19 @@ def delete_goal_adjustment(request, adj_id):
 @login_required
 @require_POST
 @_require_role('PRIMARY')
+@_require_feature('savings')
 def save_month_comment(request):
     """Create or update a comment for a specific month's savings."""
     month_str = request.POST.get('month', '')
     comment_text = request.POST.get('comment', '').strip()
     try:
-        month_date = datetime.date.fromisoformat(month_str)
+        month_date = datetime.date.fromisoformat(month_str).replace(day=1)
     except (ValueError, TypeError):
         messages.error(request, 'Invalid month.')
+        return _safe_redirect(request, 'dashboard')
+
+    if len(comment_text) > 500:
+        messages.error(request, 'Comment must be 500 characters or fewer.')
         return _safe_redirect(request, 'dashboard')
 
     if comment_text:
@@ -844,5 +861,6 @@ def dev_login(request):
     except (User.DoesNotExist, ValueError, TypeError):
         messages.error(request, 'User not found.')
         return redirect('login')
+    request.session.flush()
     login(request, user, backend='allauth.account.auth_backends.AuthenticationBackend')
     return redirect(settings.LOGIN_REDIRECT_URL)

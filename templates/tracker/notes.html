@@ -6,19 +6,19 @@
 {% block page_header %}
 <header class="v-page-header">
   <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
-    <div>
+    <div class="min-w-0">
       <h1 class="v-title">My Notes</h1>
       <p class="v-subtitle">Private ledger: only visible to you</p>
     </div>
-    <div class="v-toolbar">
-      <div class="fy-tabs" id="fySwitcher">
-        <a href="?fy=all{% if active_section %}&section={{ active_section|urlencode }}{% endif %}" class="fy-tab {% if not active_fy %}fy-tab-active{% endif %}">All FYs</a>
+    <div class="v-toolbar flex flex-wrap items-center gap-2">
+      <div class="fy-tabs" id="fySwitcher" role="navigation" aria-label="Financial year">
+        <a href="?fy=all{% if active_section %}&section={{ active_section|urlencode }}{% endif %}" class="fy-tab !min-h-11 lg:!min-h-8 {% if not active_fy %}fy-tab-active{% endif %}">All FYs</a>
         {% for opt in fy_options %}
-        <a href="?fy={{ opt.year }}{% if active_section %}&section={{ active_section|urlencode }}{% endif %}" class="fy-tab {% if opt.year == active_fy %}fy-tab-active{% endif %}">{{ opt.label }}</a>
+        <a href="?fy={{ opt.year }}{% if active_section %}&section={{ active_section|urlencode }}{% endif %}" class="fy-tab !min-h-11 lg:!min-h-8 tabular-nums {% if opt.year == active_fy %}fy-tab-active{% endif %}">{{ opt.label }}</a>
         {% endfor %}
       </div>
-      <button type="button" class="v-btn v-btn-primary text-xs gap-1" onclick="openNoteModal()">
-        <span class="material-symbols-outlined text-sm">add_circle</span>
+      <button type="button" class="v-btn v-btn-primary !min-h-11 lg:!min-h-9 text-xs gap-1.5 cursor-pointer" onclick="openNoteModal()">
+        <span class="material-symbols-outlined text-base">add_circle</span>
         <span>Add Note</span>
       </button>
     </div>
@@ -28,39 +28,73 @@
 
 {% block content %}
 
-{# --- SECTION FILTER PILLS --- #}
-<div class="flex flex-wrap items-center gap-1.5 mb-5">
-  <a href="?fy={{ active_fy|default:'all' }}"
-     class="px-3 py-1.5 rounded-lg text-xs font-semibold {% if not active_section %}bg-primary text-primary-content font-bold{% else %}bg-base-300/40 border border-base-content/10 opacity-70 hover:opacity-100{% endif %} transition-colors">
-    All
-  </a>
-  {% for sec in all_sections %}
-  <a href="?section={{ sec|urlencode }}{% if active_fy %}&fy={{ active_fy }}{% else %}&fy=all{% endif %}"
-     class="px-3 py-1.5 rounded-lg text-xs font-semibold {% if active_section == sec %}bg-primary text-primary-content font-bold{% else %}bg-base-300/40 border border-base-content/10 opacity-70 hover:opacity-100{% endif %} transition-colors"
-     data-section="{{ sec|escapejs }}">{{ sec }}</a>
-  {% endfor %}
-  {% if active_section and active_section not in all_sections %}
-  <span class="px-3 py-1.5 rounded-lg text-xs font-bold bg-primary text-primary-content">{{ active_section }}</span>
+{# --- RULED SUMMARY STRIP --- #}
+<section class="v-stat-strip" aria-label="Notes and tasks overview">
+  <div class="v-stat-cell">
+    <div class="v-stat-label">Open Tasks</div>
+    <div class="v-stat-value text-violet-400 tabular-nums">{{ todo_open|length }}</div>
+    <div class="v-stat-sub">Active checklist items</div>
+  </div>
+  <div class="v-stat-cell">
+    <div class="v-stat-label">Completed Tasks</div>
+    <div class="v-stat-value text-emerald-400 tabular-nums">{{ todo_done|length }}</div>
+    <div class="v-stat-sub">Resolved items</div>
+  </div>
+  <div class="v-stat-cell">
+    <div class="v-stat-label">Saved Notes</div>
+    <div class="v-stat-value text-base-content tabular-nums">{{ notes|length }}</div>
+    <div class="v-stat-sub">Entries in ledger</div>
+  </div>
+  <div class="v-stat-cell">
+    <div class="v-stat-label">Active Scope</div>
+    <div class="v-stat-value text-base-content truncate">{{ active_section|default:"All Sections" }}</div>
+    <div class="v-stat-sub tabular-nums">{% if active_fy %}FY {{ active_fy }}-{{ active_fy|add:1|stringformat:"d"|slice:"2:" }}{% else %}All financial years{% endif %}</div>
+  </div>
+</section>
+
+{# --- SECTION FILTER PILLS & SEARCH --- #}
+<div class="v-filter-bar flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-5">
+  <div class="v-pill-rail flex items-center gap-1.5 overflow-x-auto" role="navigation" aria-label="Note sections">
+    <a href="?fy={{ active_fy|default:'all' }}"
+       class="filter-pill !min-h-11 lg:!min-h-8 text-xs shrink-0 {% if not active_section %}is-active{% endif %}">
+      All
+    </a>
+    {% for sec in all_sections %}
+    <a href="?section={{ sec|urlencode }}{% if active_fy %}&fy={{ active_fy }}{% else %}&fy=all{% endif %}"
+       class="filter-pill !min-h-11 lg:!min-h-8 text-xs shrink-0 {% if active_section == sec %}is-active{% endif %}">
+      {{ sec }}
+    </a>
+    {% endfor %}
+    {% if active_section and active_section not in all_sections %}
+    <span class="filter-pill is-active !min-h-11 lg:!min-h-8 text-xs shrink-0">{{ active_section }}</span>
+    {% endif %}
+  </div>
+
+  {% if notes or todo_open or todo_done %}
+  <div class="relative w-full sm:w-64 shrink-0">
+    <span class="material-symbols-outlined text-base text-base-content/50 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10">search</span>
+    <input type="search" id="noteSearchInput" class="v-input !h-11 lg:!h-9 !pl-9 !pr-3 text-base sm:text-xs w-full" placeholder="Search notes &amp; tasks…" oninput="filterNotesAndTodos(this.value)" aria-label="Search notes and tasks">
+  </div>
   {% endif %}
 </div>
 
 {# --- TODO SECTION --- #}
 {% if todo_open or todo_done or not active_section or active_section == 'Todo' %}
-<section class="v-panel mb-6 border-violet-500/20" id="todoSection">
-  <div class="v-panel-header flex items-center justify-between">
-    <div class="flex items-center gap-2">
-      <div class="w-7 h-7 rounded-lg bg-violet-500/15 text-violet-400 flex items-center justify-center shrink-0">
+<section class="v-panel mb-6" id="todoSection">
+  <div class="v-panel-header flex items-center justify-between gap-2">
+    <div class="flex items-center gap-2.5 min-w-0">
+      <div class="w-8 h-8 rounded-lg bg-violet-500/15 text-violet-400 flex items-center justify-center shrink-0">
         <span class="material-symbols-outlined text-base">checklist</span>
       </div>
-      <h2 class="v-panel-title text-violet-400">To-Do</h2>
+      <h2 class="v-panel-title">To-Do</h2>
       {% if todo_open %}
-      <span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30 tabular-nums">{{ todo_open|length }}</span>
+      <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-400 border border-violet-500/25 tabular-nums">{{ todo_open|length }}</span>
       {% endif %}
     </div>
     {% if todo_done %}
-    <button type="button" class="v-btn v-btn-ghost text-xs gap-1 opacity-60 hover:opacity-100" id="toggleDoneBtn" onclick="toggleDoneItems()">
-      <span class="material-symbols-outlined text-sm" id="toggleDoneIcon">expand_more</span>
-      <span>{{ todo_done|length }} done</span>
+    <button type="button" class="v-btn v-btn-ghost !min-h-11 lg:!min-h-8 text-xs gap-1 text-base-content/70 hover:text-base-content cursor-pointer" id="toggleDoneBtn" onclick="toggleDoneItems()">
+      <span class="material-symbols-outlined text-base" id="toggleDoneIcon">expand_more</span>
+      <span class="tabular-nums">{{ todo_done|length }} done</span>
     </button>
     {% endif %}
   </div>
@@ -68,19 +102,20 @@
   <div class="v-panel-body p-0">
     {# Quick-add row #}
     <form method="post" action="{% url 'add_note' %}" id="quickTodoForm"
-      class="flex items-center gap-2.5 px-4 py-3 border-b border-base-content/10 bg-base-300/20">
+      class="flex items-center gap-2.5 px-4 min-h-12 py-2 border-b border-base-content/10 bg-base-200/30">
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ request.get_full_path }}">
       <input type="hidden" name="section" value="Todo">
       <input type="hidden" name="date" id="quickTodoDate" value="">
-      <span class="material-symbols-outlined text-base opacity-40 shrink-0 select-none">add_task</span>
+      <span class="material-symbols-outlined text-base text-base-content/45 shrink-0 select-none">add_task</span>
       <input type="text" name="title" id="quickTodoInput"
-        style="height:auto;padding:0;border:none;background:transparent;box-shadow:none;"
-        class="flex-1 outline-none placeholder:opacity-40 min-w-0 text-xs sm:text-sm text-base-content"
+        style="border:none;background:transparent;box-shadow:none;"
+        class="flex-1 outline-none placeholder:text-base-content/45 min-w-0 !min-h-11 lg:!min-h-9 py-2 text-base sm:text-sm text-base-content"
         placeholder="Add a task and press Enter…"
-        autocomplete="off">
+        autocomplete="off"
+        aria-label="New task title">
       <button type="submit" id="quickTodoSubmit"
-        class="v-btn v-btn-primary text-xs px-2.5 py-1 gap-1 shrink-0 hidden transition-all">
+        class="v-btn v-btn-primary !min-h-11 lg:!min-h-8 text-xs px-3 gap-1 shrink-0 hidden transition-all cursor-pointer">
         <span class="material-symbols-outlined text-sm">add</span>
         <span>Add</span>
       </button>
@@ -88,60 +123,66 @@
 
     {# Open items #}
     {% if todo_open %}
-    <div id="todoOpenList" class="divide-y divide-base-content/5">
+    <div id="todoOpenList" class="divide-y divide-[var(--v-hairline-subtle)]">
       {% for note in todo_open %}
-      <div class="group flex items-start gap-3 px-4 py-3 hover:bg-base-200/50 transition-colors">
-        <form method="post" action="{% url 'toggle_todo' note.id %}" class="m-0 shrink-0 flex items-center pt-0.5">
+      <div class="todo-open-row group flex items-center gap-2 px-4 py-2.5 hover:bg-[var(--v-hover)] transition-colors"
+           data-search="{{ note.title|lower }} {{ note.body|default:''|lower }}">
+        <form method="post" action="{% url 'toggle_todo' note.id %}" class="m-0 shrink-0">
           {% csrf_token %}
-          <button type="submit" title="Mark done"
-            class="w-5 h-5 rounded-full border border-base-content/25 hover:border-violet-400 flex items-center justify-center transition-all hover:bg-violet-500/10 focus:outline-none cursor-pointer">
-            <span class="material-symbols-outlined text-xs text-violet-400 opacity-0 group-hover:opacity-100 transition-opacity">check</span>
+          <button type="submit" title="Mark done" aria-label="Mark {{ note.title }} done"
+            class="v-icon-btn !min-h-11 !min-w-11 lg:!min-h-9 lg:!min-w-9 -ml-2 flex items-center justify-center rounded-lg cursor-pointer group/chk focus:outline-none">
+            <span class="w-5 h-5 rounded-full border border-base-content/30 group-hover/chk:border-violet-400 group-hover/chk:bg-violet-500/15 flex items-center justify-center transition-all">
+              <span class="material-symbols-outlined text-xs text-violet-400 opacity-0 group-hover/chk:opacity-100 transition-opacity">check</span>
+            </span>
           </button>
         </form>
 
-        <div class="flex-1 min-w-0 cursor-pointer"
+        <div class="flex-1 min-w-0 py-1 cursor-pointer"
           onclick="editNote({{ note.id }}, '{{ note.date|date:'Y-m-d' }}', 'Todo', '{{ note.title|escapejs }}', '{{ note.body|escapejs }}', '', '', '', '')">
-          <p class="text-xs sm:text-sm font-semibold text-base-content">{{ note.title }}</p>
+          <p class="text-sm font-semibold text-base-content">{{ note.title }}</p>
           {% if note.body %}
-          <p class="text-xs opacity-55 mt-0.5 line-clamp-2 leading-relaxed">{{ note.body }}</p>
+          <p class="text-xs text-base-content/60 mt-0.5 line-clamp-2 leading-relaxed">{{ note.body }}</p>
           {% endif %}
-          <p class="text-[10px] opacity-40 mt-1 tabular-nums">{{ note.date|date:"d M Y" }}</p>
+          <p class="text-xs text-base-content/45 mt-1 tabular-nums">{{ note.date|date:"d M Y" }}</p>
         </div>
 
-        <button type="button" class="v-btn v-btn-ghost p-1 shrink-0 opacity-40 sm:opacity-0 group-hover:opacity-100 transition-opacity"
+        <button type="button" class="v-icon-btn v-btn v-btn-ghost !min-h-11 !min-w-11 lg:!min-h-9 lg:!min-w-9 shrink-0 text-base-content/60 hover:text-base-content cursor-pointer"
           onclick="editNote({{ note.id }}, '{{ note.date|date:'Y-m-d' }}', 'Todo', '{{ note.title|escapejs }}', '{{ note.body|escapejs }}', '', '', '', '')"
-          aria-label="Edit todo">
-          <span class="material-symbols-outlined text-sm">more_horiz</span>
+          aria-label="Edit task {{ note.title }}">
+          <span class="material-symbols-outlined text-base">more_horiz</span>
         </button>
       </div>
       {% endfor %}
     </div>
     {% else %}
-    <div class="flex flex-col items-center justify-center py-8 gap-2 opacity-40">
-      <span class="material-symbols-outlined text-2xl">task_alt</span>
-      <p class="text-xs font-semibold">All tasks completed · add a new task above</p>
+    <div class="flex flex-col items-center justify-center py-8 px-4 gap-1.5 text-center">
+      <span class="material-symbols-outlined text-2xl text-emerald-400/70">task_alt</span>
+      <p class="text-xs font-semibold text-base-content/65">All tasks completed · add a new task above</p>
     </div>
     {% endif %}
 
     {# Done items #}
     {% if todo_done %}
-    <div id="todoDoneList" class="hidden border-t border-base-content/10 bg-base-300/10">
-      <div class="px-4 py-2 border-b border-base-content/5">
-        <span class="text-[10px] uppercase tracking-wider font-bold opacity-40">Completed Tasks</span>
+    <div id="todoDoneList" class="hidden border-t border-[var(--v-hairline)] bg-base-200/20">
+      <div class="px-4 py-2 border-b border-[var(--v-hairline-subtle)]">
+        <span class="text-xs font-semibold text-base-content/60">Completed Tasks</span>
       </div>
       {% for note in todo_done %}
-      <div class="flex items-center gap-3 px-4 py-2.5 border-b border-base-content/5 last:border-0 hover:bg-base-200/40 transition-colors">
+      <div class="todo-done-row flex items-center gap-2 px-4 py-1.5 border-b border-[var(--v-hairline-subtle)] last:border-0 hover:bg-[var(--v-hover)] transition-colors"
+           data-search="{{ note.title|lower }}">
         <form method="post" action="{% url 'toggle_todo' note.id %}" class="m-0 shrink-0">
           {% csrf_token %}
-          <button type="submit" title="Mark undone"
-            class="w-5 h-5 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center transition-all hover:bg-rose-500/15 hover:border-rose-500/30 focus:outline-none cursor-pointer group/undo">
-            <span class="material-symbols-outlined text-xs text-emerald-400 group-hover/undo:text-rose-400 transition-colors">check</span>
+          <button type="submit" title="Mark undone" aria-label="Reopen {{ note.title }}"
+            class="v-icon-btn !min-h-11 !min-w-11 lg:!min-h-9 lg:!min-w-9 -ml-2 flex items-center justify-center rounded-lg cursor-pointer group/undo focus:outline-none">
+            <span class="w-5 h-5 rounded-full bg-emerald-500/15 border border-emerald-500/35 group-hover/undo:bg-rose-500/15 group-hover/undo:border-rose-500/35 flex items-center justify-center transition-all">
+              <span class="material-symbols-outlined text-xs text-emerald-400 group-hover/undo:text-rose-400 transition-colors">check</span>
+            </span>
           </button>
         </form>
-        <span class="flex-1 text-xs sm:text-sm line-through opacity-40 truncate">{{ note.title }}</span>
-        <button type="button" class="v-btn v-btn-ghost p-1 text-rose-400/80 hover:text-rose-400"
-          onclick="confirmNoteDelete({{ note.id }}, '{{ note.title|escapejs }}')" aria-label="Delete">
-          <span class="material-symbols-outlined text-sm">delete</span>
+        <span class="flex-1 text-sm line-through text-base-content/45 truncate">{{ note.title }}</span>
+        <button type="button" class="v-icon-btn v-btn v-btn-ghost !min-h-11 !min-w-11 lg:!min-h-9 lg:!min-w-9 shrink-0 text-rose-400/80 hover:text-rose-400 cursor-pointer"
+          onclick="confirmNoteDelete({{ note.id }}, '{{ note.title|escapejs }}')" aria-label="Delete {{ note.title }}">
+          <span class="material-symbols-outlined text-base">delete</span>
         </button>
       </div>
       {% endfor %}
@@ -151,35 +192,38 @@
 </section>
 {% endif %}
 
-{# --- NOTES HEADER --- #}
+{# --- NOTES LEDGER --- #}
 {% if notes %}
-<div class="flex items-center gap-3 mb-3 mt-2">
-  <span class="text-[10px] font-bold uppercase tracking-wider opacity-40">Notes Ledger</span>
-  <div class="flex-1 h-px bg-base-content/10"></div>
+<div class="flex items-center justify-between gap-3 mb-3 mt-2" id="notesLedgerHeader">
+  <div class="flex items-center gap-2">
+    <h2 class="text-sm font-bold text-base-content">Notes Ledger</h2>
+    <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-base-200/80 border border-base-content/10 text-base-content/70 tabular-nums">{{ notes|length }}</span>
+  </div>
 </div>
 
-{# Desktop: Asymmetric multi-column grid #}
+{# Desktop: Multi-column ledger grid #}
 <div class="hidden md:grid grid-cols-2 lg:grid-cols-3 gap-4 mb-5" id="notesGrid">
   {% for note in notes %}
-  <div class="v-panel p-4 flex flex-col justify-between hover:border-base-content/20 transition-all">
+  <article class="note-item v-panel p-4 flex flex-col justify-between hover:border-base-content/20 transition-colors"
+           data-search="{{ note.title|lower }} {{ note.body|default:''|lower }} {{ note.section|default:''|lower }}">
     <div>
       {# Header row: section badge + FY + date #}
-      <div class="flex items-center justify-between gap-2 mb-2">
+      <div class="flex items-center justify-between gap-2 mb-2.5 flex-wrap">
         <div>
           {% if note.section %}
-          <span class="note-sec-badge text-[10px] font-bold px-2 py-0.5 rounded-full border inline-flex items-center gap-1" data-section="{{ note.section|escapejs }}">
-            <span class="material-symbols-outlined text-[11px]">label</span>
+          <span class="note-sec-badge text-xs font-semibold px-2 py-0.5 rounded-full border inline-flex items-center gap-1" data-section="{{ note.section|escapejs }}">
+            <span class="material-symbols-outlined text-xs">label</span>
             {{ note.section }}
           </span>
           {% else %}
-          <span class="text-[10px] opacity-40 px-2 py-0.5 rounded bg-base-300/40">General</span>
+          <span class="text-xs text-base-content/60 px-2 py-0.5 rounded-md bg-base-200/70">General</span>
           {% endif %}
         </div>
-        <div class="flex items-center gap-1.5">
+        <div class="flex items-center gap-1.5 text-xs text-base-content/55 tabular-nums">
           {% if note.financial_year %}
-          <span class="text-[9px] opacity-50 px-1.5 py-0.5 rounded bg-base-300/50 font-bold uppercase tracking-wider">FY {{ note.financial_year }}-{{ note.financial_year|add:1|stringformat:"d"|slice:"2:" }}</span>
+          <span class="px-1.5 py-0.5 rounded bg-base-200/70 font-semibold">FY {{ note.financial_year }}-{{ note.financial_year|add:1|stringformat:"d"|slice:"2:" }}</span>
           {% endif %}
-          <span class="text-[11px] opacity-45 whitespace-nowrap">{{ note.date|date:"d M Y" }}</span>
+          <span class="whitespace-nowrap">{{ note.date|date:"d M Y" }}</span>
         </div>
       </div>
 
@@ -188,32 +232,32 @@
 
       {# Body #}
       {% if note.body %}
-      <p class="text-xs opacity-60 leading-relaxed mt-1.5 whitespace-pre-wrap">{{ note.body }}</p>
+      <p class="text-xs text-base-content/65 leading-relaxed mt-1.5 whitespace-pre-wrap">{{ note.body }}</p>
       {% endif %}
 
-      {# Pending Widget #}
+      {# Pending Settlement Strip (hairline-separated, no nested heavy card) #}
       {% if note.section == 'Pending' and note.pending_type %}
-      <div class="mt-3 p-2.5 rounded-xl border {% if note.pending_type == 'CREDIT' %}bg-emerald-500/5 border-emerald-500/20{% else %}bg-rose-500/5 border-rose-500/20{% endif %} flex flex-col gap-1.5 text-xs">
+      <div class="mt-3 pt-3 border-t border-base-content/10 flex flex-col gap-1.5 text-xs">
         <div class="flex items-center justify-between font-bold">
           {% if note.pending_type == 'CREDIT' %}
-          <span class="text-emerald-400 flex items-center gap-1 text-xs">
+          <span class="text-emerald-400 inline-flex items-center gap-1 text-xs">
             <span class="material-symbols-outlined text-sm">arrow_downward</span>To Receive
           </span>
           <span class="text-emerald-400 font-extrabold text-sm tabular-nums">{{ note.pending_amount|inr }}</span>
           {% else %}
-          <span class="text-rose-400 flex items-center gap-1 text-xs">
+          <span class="text-rose-400 inline-flex items-center gap-1 text-xs">
             <span class="material-symbols-outlined text-sm">arrow_upward</span>To Pay
           </span>
           <span class="text-rose-400 font-extrabold text-sm tabular-nums">{{ note.pending_amount|inr }}</span>
           {% endif %}
         </div>
         {% if note.initial_amount %}
-        <div class="flex justify-between items-center text-[10px] opacity-50 border-t border-base-content/10 pt-1.5 mt-0.5">
+        <div class="flex justify-between items-center text-xs text-base-content/55 tabular-nums">
           <span>Initial: {{ note.initial_amount|inr }}</span>
           {% if note.settled_pct is not None %}<span>{{ note.settled_pct }}% settled</span>{% endif %}
         </div>
         {% if note.settled_pct is not None %}
-        <div class="w-full h-1 bg-base-content/10 rounded-full overflow-hidden">
+        <div class="w-full h-1.5 bg-base-content/10 rounded-full overflow-hidden">
           <div class="h-full {% if note.pending_type == 'CREDIT' %}bg-emerald-400{% else %}bg-rose-400{% endif %}" style="width: {{ note.settled_pct }}%;"></div>
         </div>
         {% endif %}
@@ -225,63 +269,65 @@
     {# Footer: Amount + actions #}
     <div class="flex items-center {% if note.amount and note.section != 'Pending' %}justify-between border-t border-base-content/10 pt-2.5 mt-3{% else %}justify-end mt-3 pt-1{% endif %}">
       {% if note.amount and note.section != 'Pending' %}
-      <span class="text-sm font-bold text-primary tabular-nums">{{ note.amount|inr }}</span>
+      <span class="text-sm font-bold text-base-content tabular-nums">{{ note.amount|inr }}</span>
       {% endif %}
       <div class="flex items-center gap-1">
-        <button type="button" class="v-btn v-btn-ghost p-1"
+        <button type="button" class="v-icon-btn v-btn v-btn-ghost !min-h-11 !min-w-11 lg:!min-h-9 lg:!min-w-9 cursor-pointer"
           onclick="editNote({{ note.id }}, '{{ note.date|date:'Y-m-d' }}', '{{ note.section|escapejs }}', '{{ note.title|escapejs }}', '{{ note.body|escapejs }}', '{{ note.amount|default:'' }}', '{{ note.pending_type|escapejs }}', '{{ note.initial_amount|default:'' }}', '{{ note.pending_amount|default:'' }}')"
-          aria-label="Edit note">
-          <span class="material-symbols-outlined text-sm">edit</span>
+          aria-label="Edit note {{ note.title }}">
+          <span class="material-symbols-outlined text-base">edit</span>
         </button>
-        <button type="button" class="v-btn v-btn-ghost p-1 text-rose-400/80 hover:text-rose-400"
+        <button type="button" class="v-icon-btn v-btn v-btn-ghost !min-h-11 !min-w-11 lg:!min-h-9 lg:!min-w-9 text-rose-400/80 hover:text-rose-400 cursor-pointer"
           onclick="confirmNoteDelete({{ note.id }}, '{{ note.title|escapejs }}')"
-          aria-label="Delete note">
-          <span class="material-symbols-outlined text-sm">delete</span>
+          aria-label="Delete note {{ note.title }}">
+          <span class="material-symbols-outlined text-base">delete</span>
         </button>
       </div>
     </div>
-  </div>
+  </article>
   {% endfor %}
 </div>
 
-{# Mobile card view #}
-<div class="md:hidden space-y-2 mb-5" id="noteCards">
+{# Mobile: Ruled ledger list (flush .v-mobile-row — zero nested cards) #}
+<div class="md:hidden v-panel mb-5 overflow-hidden" id="noteCards">
   {% for note in notes %}
-  <div class="v-mobile-row p-3">
+  <div class="note-item v-mobile-row px-4 py-3.5"
+       data-search="{{ note.title|lower }} {{ note.body|default:''|lower }} {{ note.section|default:''|lower }}">
     <div class="flex items-start justify-between gap-3">
       <div class="flex-1 min-w-0">
-        <div class="flex items-center gap-2 mb-1">
+        <div class="flex flex-wrap items-center gap-1.5 mb-1.5">
           {% if note.section %}
-          <span class="note-sec-badge text-[9px] font-bold px-1.5 py-0.2 rounded border" data-section="{{ note.section|escapejs }}">{{ note.section }}</span>
+          <span class="note-sec-badge text-xs font-semibold px-2 py-0.5 rounded-full border" data-section="{{ note.section|escapejs }}">{{ note.section }}</span>
           {% endif %}
           {% if note.financial_year %}
-          <span class="text-[8px] opacity-50 px-1 py-0.2 rounded bg-base-300 font-semibold">FY {{ note.financial_year }}-{{ note.financial_year|add:1|stringformat:"d"|slice:"2:" }}</span>
+          <span class="text-xs text-base-content/60 px-1.5 py-0.5 rounded bg-base-200/70 font-semibold tabular-nums">FY {{ note.financial_year }}-{{ note.financial_year|add:1|stringformat:"d"|slice:"2:" }}</span>
           {% endif %}
-          <span class="text-[10px] opacity-40">{{ note.date|date:"d M Y" }}</span>
+          <span class="text-xs text-base-content/50 tabular-nums">{{ note.date|date:"d M Y" }}</span>
         </div>
-        <div class="font-bold text-xs sm:text-sm text-base-content">{{ note.title }}</div>
+
+        <div class="font-bold text-sm text-base-content leading-snug">{{ note.title }}</div>
         {% if note.body %}
-        <div class="text-xs opacity-55 mt-0.5 line-clamp-2 leading-relaxed">{{ note.body }}</div>
+        <div class="text-xs text-base-content/65 mt-1 line-clamp-3 leading-relaxed whitespace-pre-wrap">{{ note.body }}</div>
         {% endif %}
 
         {% if note.section == 'Pending' and note.pending_type %}
-        <div class="mt-2 p-2 rounded-lg border {% if note.pending_type == 'CREDIT' %}bg-emerald-500/5 border-emerald-500/20{% else %}bg-rose-500/5 border-rose-500/20{% endif %} flex flex-col gap-1 text-xs">
+        <div class="mt-2.5 pt-2.5 border-t border-base-content/10 flex flex-col gap-1 text-xs">
           <div class="flex items-center justify-between font-bold">
             {% if note.pending_type == 'CREDIT' %}
-            <span class="text-emerald-400 flex items-center gap-0.5 text-[11px]"><span class="material-symbols-outlined text-xs">arrow_downward</span>Receive</span>
-            <span class="text-emerald-400 font-bold tabular-nums">{{ note.pending_amount|inr }}</span>
+            <span class="text-emerald-400 inline-flex items-center gap-1 text-xs"><span class="material-symbols-outlined text-sm">arrow_downward</span>To Receive</span>
+            <span class="text-emerald-400 font-bold text-sm tabular-nums">{{ note.pending_amount|inr }}</span>
             {% else %}
-            <span class="text-rose-400 flex items-center gap-0.5 text-[11px]"><span class="material-symbols-outlined text-xs">arrow_upward</span>Pay</span>
-            <span class="text-rose-400 font-bold tabular-nums">{{ note.pending_amount|inr }}</span>
+            <span class="text-rose-400 inline-flex items-center gap-1 text-xs"><span class="material-symbols-outlined text-sm">arrow_upward</span>To Pay</span>
+            <span class="text-rose-400 font-bold text-sm tabular-nums">{{ note.pending_amount|inr }}</span>
             {% endif %}
           </div>
           {% if note.initial_amount %}
-          <div class="flex justify-between items-center text-[9px] opacity-50 pt-1 mt-0.5 border-t border-base-content/10">
+          <div class="flex justify-between items-center text-xs text-base-content/55 tabular-nums">
             <span>Initial: {{ note.initial_amount|inr }}</span>
-            {% if note.settled_pct is not None %}<span>{{ note.settled_pct }}%</span>{% endif %}
+            {% if note.settled_pct is not None %}<span>{{ note.settled_pct }}% settled</span>{% endif %}
           </div>
           {% if note.settled_pct is not None %}
-          <div class="w-full h-1 bg-base-content/10 rounded-full overflow-hidden">
+          <div class="w-full h-1.5 bg-base-content/10 rounded-full overflow-hidden">
             <div class="h-full {% if note.pending_type == 'CREDIT' %}bg-emerald-400{% else %}bg-rose-400{% endif %}" style="width: {{ note.settled_pct }}%;"></div>
           </div>
           {% endif %}
@@ -290,19 +336,20 @@
         {% endif %}
 
         {% if note.amount and note.section != 'Pending' %}
-        <div class="text-xs sm:text-sm font-bold text-primary mt-1 tabular-nums">{{ note.amount|inr }}</div>
+        <div class="text-sm font-bold text-base-content mt-2 tabular-nums">{{ note.amount|inr }}</div>
         {% endif %}
       </div>
-      <div class="flex flex-col gap-1 shrink-0">
-        <button type="button" class="v-btn v-btn-ghost p-1"
+
+      <div class="flex items-center gap-1 shrink-0 -mr-1">
+        <button type="button" class="v-icon-btn v-btn v-btn-ghost !min-h-11 !min-w-11 cursor-pointer"
           onclick="editNote({{ note.id }}, '{{ note.date|date:'Y-m-d' }}', '{{ note.section|escapejs }}', '{{ note.title|escapejs }}', '{{ note.body|escapejs }}', '{{ note.amount|default:'' }}', '{{ note.pending_type|escapejs }}', '{{ note.initial_amount|default:'' }}', '{{ note.pending_amount|default:'' }}')"
-          aria-label="Edit note">
-          <span class="material-symbols-outlined text-sm">edit</span>
+          aria-label="Edit note {{ note.title }}">
+          <span class="material-symbols-outlined text-base">edit</span>
         </button>
-        <button type="button" class="v-btn v-btn-ghost p-1 text-rose-400/80 hover:text-rose-400"
+        <button type="button" class="v-icon-btn v-btn v-btn-ghost !min-h-11 !min-w-11 text-rose-400/80 hover:text-rose-400 cursor-pointer"
           onclick="confirmNoteDelete({{ note.id }}, '{{ note.title|escapejs }}')"
-          aria-label="Delete note">
-          <span class="material-symbols-outlined text-sm">delete</span>
+          aria-label="Delete note {{ note.title }}">
+          <span class="material-symbols-outlined text-base">delete</span>
         </button>
       </div>
     </div>
@@ -311,97 +358,106 @@
 </div>
 {% endif %}
 
+<div id="noteSearchEmpty" class="v-panel hidden flex-col items-center justify-center py-12 px-4 text-center gap-2 mb-5">
+  <span class="material-symbols-outlined text-2xl text-base-content/40">search_off</span>
+  <p class="text-sm font-semibold text-base-content/75">No notes or tasks match your search</p>
+</div>
+
 {% if not notes and not todo_open and not todo_done %}
 {# Empty State #}
-<div class="v-panel flex flex-col items-center justify-center py-16 gap-3 text-center my-6">
-  <div class="w-14 h-14 rounded-2xl bg-violet-400/10 border border-violet-400/20 flex items-center justify-center">
-    <span class="icon-filled material-symbols-outlined text-2xl text-violet-400">sticky_note_2</span>
-  </div>
-  <div class="text-center">
-    <p class="font-bold opacity-75">
+<div class="v-panel my-4">
+  <div class="v-empty py-14 px-4">
+    <div class="v-empty-icon">
+      <span class="icon-filled material-symbols-outlined text-2xl text-violet-400">sticky_note_2</span>
+    </div>
+    <p class="v-empty-title">
       {% if active_section %}No notes found under "{{ active_section }}"{% else %}No notes recorded yet{% endif %}
       {% if active_fy %}for FY {{ active_fy }}-{{ active_fy|add:1|stringformat:"d"|slice:"2:" }}{% endif %}
     </p>
-    <p class="text-xs opacity-45 mt-1">Select "Add Note" to create your first entry.</p>
+    <p class="v-empty-body">Capture private financial notes, tax reminders, or receivable/payable settlements.</p>
+    <button type="button" class="v-btn v-btn-primary !min-h-11 lg:!min-h-9 text-xs gap-1.5 mt-3 cursor-pointer" onclick="openNoteModal()">
+      <span class="material-symbols-outlined text-base">add_circle</span><span>Add Note</span>
+    </button>
   </div>
-  <button type="button" class="v-btn v-btn-primary text-xs gap-1 mt-2" onclick="openNoteModal()">
-    <span class="material-symbols-outlined text-sm">add_circle</span>Add Note
-  </button>
 </div>
 {% endif %}
 
 {# --- ADD / EDIT NOTE MODAL --- #}
-<dialog class="modal" id="noteModal">
-  <div class="modal-box max-w-lg rounded-2xl bg-base-200 border border-base-content/10 p-5">
-    <h3 class="font-bold text-base flex items-center gap-2" id="noteModalTitle">
-      <span class="icon-filled material-symbols-outlined text-violet-400">sticky_note_2</span>
-      Add Note
-    </h3>
+<dialog class="modal modal-bottom sm:modal-middle" id="noteModal">
+  <div class="modal-box max-w-lg rounded-t-2xl sm:rounded-2xl bg-base-100 border border-[var(--v-hairline)] p-5">
+    <div class="v-modal-header flex items-center justify-between gap-2 pb-3 border-b border-[var(--v-hairline)]">
+      <h3 class="font-bold text-base flex items-center gap-2 truncate" id="noteModalTitle">
+        <span class="icon-filled material-symbols-outlined text-violet-400">sticky_note_2</span>
+        Add Note
+      </h3>
+      <button type="button" class="v-icon-btn btn btn-ghost btn-sm btn-circle !min-h-11 !min-w-11 lg:!min-h-9 lg:!min-w-9 text-base-content/60 hover:text-base-content cursor-pointer" onclick="closeModal('noteModal')" aria-label="Close">
+        <span class="material-symbols-outlined text-lg">close</span>
+      </button>
+    </div>
 
     <form id="noteForm" method="post" action="{% url 'add_note' %}">
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ request.get_full_path }}">
 
       {# Row 1: Date + Type Dropdown #}
-      <div class="grid grid-cols-2 gap-3 mt-4">
-        <div>
-          <label class="block text-xs font-semibold opacity-70 mb-1" for="id_note_date">Date</label>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+        <div class="form-field">
+          <label class="block text-xs font-semibold text-base-content/75 mb-1" for="id_note_date">Date</label>
           {{ note_form.date }}
         </div>
-        <div>
-          <label class="block text-xs font-semibold opacity-70 mb-1" for="id_note_section">Type</label>
+        <div class="form-field">
+          <label class="block text-xs font-semibold text-base-content/75 mb-1" for="id_note_section">Type</label>
           {{ note_form.section }}
         </div>
       </div>
 
       {# Pending extra fields #}
-      <div id="pending-fields-wrap" style="display:none" class="bg-base-300/40 rounded-xl p-3.5 mt-3 border border-base-content/10">
-        <p class="text-[10px] font-bold uppercase tracking-wider text-violet-400 mb-2">Pending Details</p>
-        <div class="mb-2">
-          <label class="block text-xs font-semibold opacity-70 mb-1" for="id_note_pending_type">Direction</label>
+      <div id="pending-fields-wrap" style="display:none" class="bg-base-200/50 rounded-xl p-3.5 mt-3 border border-base-content/10">
+        <p class="text-xs font-semibold text-violet-400 mb-2.5">Pending Settlement Details</p>
+        <div class="mb-3 form-field">
+          <label class="block text-xs font-semibold text-base-content/75 mb-1" for="id_note_pending_type">Direction</label>
           {{ note_form.pending_type }}
         </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-semibold opacity-70 mb-1" for="id_note_initial_amount">Initial Amount (₹)</label>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div class="form-field">
+            <label class="block text-xs font-semibold text-base-content/75 mb-1" for="id_note_initial_amount">Initial Amount (₹)</label>
             {{ note_form.initial_amount }}
           </div>
-          <div>
-            <label class="block text-xs font-semibold opacity-70 mb-1" for="id_note_pending_amount">Remaining (₹)</label>
+          <div class="form-field">
+            <label class="block text-xs font-semibold text-base-content/75 mb-1" for="id_note_pending_amount">Remaining (₹)</label>
             {{ note_form.pending_amount }}
           </div>
         </div>
       </div>
 
       {# Title #}
-      <div class="mt-3">
-        <label class="block text-xs font-semibold opacity-70 mb-1" for="id_note_title">Title</label>
+      <div class="mt-3 form-field">
+        <label class="block text-xs font-semibold text-base-content/75 mb-1" for="id_note_title">Title</label>
         {{ note_form.title }}
       </div>
 
       {# Body #}
-      <div class="mt-3">
-        <label class="block text-xs font-semibold opacity-70 mb-1" for="id_note_body">Note</label>
+      <div class="mt-3 form-field">
+        <label class="block text-xs font-semibold text-base-content/75 mb-1" for="id_note_body">Note</label>
         {{ note_form.body }}
       </div>
 
       {# Amount #}
-      <div id="note-amount-field-wrap" class="mt-3">
-        <label class="block text-xs font-semibold opacity-70 mb-1 flex items-center gap-1" for="id_note_amount">
-          Amount (₹)
-          <span class="text-[10px] opacity-40 font-normal">optional</span>
+      <div id="note-amount-field-wrap" class="mt-3 form-field">
+        <label class="block text-xs font-semibold text-base-content/75 mb-1" for="id_note_amount">
+          Amount (₹) <span class="font-normal text-base-content/45">optional</span>
         </label>
         {{ note_form.amount }}
       </div>
 
-      <div class="modal-action mt-5 flex items-center justify-between">
-        <button type="button" id="noteDeleteBtn" class="v-btn v-btn-ghost text-xs text-rose-400 px-2.5 py-1" style="display:none"
+      <div class="v-modal-footer modal-action mt-5 pt-3 border-t border-base-content/10 flex items-center justify-between gap-2">
+        <button type="button" id="noteDeleteBtn" class="v-btn v-btn-ghost !min-h-11 lg:!min-h-9 text-xs text-rose-400 px-3 cursor-pointer" style="display:none"
           onclick="confirmNoteDeleteFromModal()">
           <span class="material-symbols-outlined text-sm">delete</span>Delete
         </button>
         <div class="flex items-center gap-2 ml-auto">
-          <button type="button" class="v-btn v-btn-ghost text-xs px-3 py-1" onclick="closeModal('noteModal')">Cancel</button>
-          <button type="submit" class="v-btn v-btn-primary text-xs px-3 py-1 gap-1">
+          <button type="button" class="v-btn v-btn-ghost !min-h-11 lg:!min-h-9 text-xs px-3.5 cursor-pointer" onclick="closeModal('noteModal')">Cancel</button>
+          <button type="submit" class="v-btn v-btn-primary !min-h-11 lg:!min-h-9 text-xs px-4 gap-1 cursor-pointer">
             <span class="material-symbols-outlined text-sm">save</span>Save
           </button>
         </div>
@@ -417,6 +473,18 @@
   <form method="dialog" class="modal-backdrop"><button>close</button></form>
 </dialog>
 
+<script>
+(function() {
+  ['id_note_amount', 'id_note_initial_amount', 'id_note_pending_amount'].forEach(function(id) {
+    var el = document.getElementById(id);
+    if (el) {
+      el.setAttribute('inputmode', 'decimal');
+      el.classList.add('v-input', 'tabular-nums');
+    }
+  });
+})();
+</script>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -430,7 +498,8 @@ var TAG_COLORS = {
 };
 
 function applyNoteSecColours() {
-  document.querySelectorAll('[data-section]').forEach(function(el) {
+  var isLight = document.documentElement.getAttribute('data-theme') === 'winter';
+  document.querySelectorAll('.note-sec-badge[data-section]').forEach(function(el) {
     var sec = el.getAttribute('data-section');
     if (!sec) return;
     var color = TAG_COLORS[sec];
@@ -444,12 +513,71 @@ function applyNoteSecColours() {
       }
       h = Math.abs(hash) % 360;
     }
-    el.style.color       = 'hsl(' + h + ' 75% 72%)';
-    el.style.borderColor = 'hsl(' + h + ' 60% 60% / 0.35)';
-    el.style.background  = 'hsl(' + h + ' 60% 50% / 0.08)';
+    if (isLight) {
+      el.style.color       = 'hsl(' + h + ' 70% 30%)';
+      el.style.borderColor = 'hsl(' + h + ' 55% 42% / 0.35)';
+      el.style.background  = 'hsl(' + h + ' 70% 45% / 0.10)';
+    } else {
+      el.style.color       = 'hsl(' + h + ' 75% 74%)';
+      el.style.borderColor = 'hsl(' + h + ' 60% 60% / 0.35)';
+      el.style.background  = 'hsl(' + h + ' 60% 50% / 0.10)';
+    }
   });
 }
-document.addEventListener('DOMContentLoaded', applyNoteSecColours);
+
+document.addEventListener('DOMContentLoaded', function() {
+  applyNoteSecColours();
+  if (typeof MutationObserver !== 'undefined') {
+    new MutationObserver(applyNoteSecColours).observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme']
+    });
+  }
+});
+
+function filterNotesAndTodos(rawQuery) {
+  var q = (rawQuery || '').trim().toLowerCase();
+  var matches = 0;
+  var totalTargets = 0;
+
+  document.querySelectorAll('.todo-open-row, .todo-done-row').forEach(function(el) {
+    totalTargets++;
+    var ok = !q || (el.getAttribute('data-search') || '').indexOf(q) !== -1;
+    el.style.display = ok ? '' : 'none';
+    if (ok) matches++;
+  });
+
+  var deskNotes = document.querySelectorAll('#notesGrid .note-item');
+  var mobNotes = document.querySelectorAll('#noteCards .note-item');
+  var noteMatches = 0;
+
+  deskNotes.forEach(function(el) {
+    totalTargets++;
+    var ok = !q || (el.getAttribute('data-search') || '').indexOf(q) !== -1;
+    el.style.display = ok ? '' : 'none';
+    if (ok) noteMatches++;
+  });
+  mobNotes.forEach(function(el) {
+    var ok = !q || (el.getAttribute('data-search') || '').indexOf(q) !== -1;
+    el.style.display = ok ? '' : 'none';
+  });
+
+  var hdr = document.getElementById('notesLedgerHeader');
+  if (hdr && deskNotes.length > 0) {
+    hdr.style.display = (!q || noteMatches > 0) ? '' : 'none';
+  }
+  var mobWrap = document.getElementById('noteCards');
+  if (mobWrap && mobNotes.length > 0) {
+    mobWrap.style.display = (!q || noteMatches > 0) ? '' : 'none';
+  }
+
+  var emptyEl = document.getElementById('noteSearchEmpty');
+  if (emptyEl && totalTargets > 0) {
+    var noneFound = q.length > 0 && (matches + noteMatches) === 0;
+    emptyEl.classList.toggle('hidden', !noneFound);
+    emptyEl.classList.toggle('flex', noneFound);
+  }
+}
 
 // Quick-add todo inline
 (function() {

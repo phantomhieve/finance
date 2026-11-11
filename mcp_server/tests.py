@@ -86,6 +86,9 @@ class OAuthTenancyTests(TestCase):
         self.owner = User.objects.create_user(username="owner", password="x", user_type="PRIMARY", group=self.home)
         self.outsider = User.objects.create_user(username="outsider", password="x", user_type="PRIMARY", group=self.other)
 
+    def tearDown(self):
+        mw.current_mcp_user.set(None)
+
     def _token(self, user, scope='read write'):
         import datetime
         from django.utils import timezone
@@ -257,4 +260,87 @@ class MCPServerToolsAndResourcesTests(TestCase):
         self.assertIsNotNone(d_log)
         self.assertEqual(d_log.data_before['title'], 'Audit Test Note')
         self.assertIsNone(d_log.data_after)
+
+    def test_read_only_scope_allowlist_blocks_unknown_tools_and_malformed_json(self):
+        # Unknown/future tool must be blocked under read-only scope (fail-closed allowlist)
+        status_unknown, downstream = _call({'read'}, _rpc('future_unregistered_mutation_tool'))
+        self.assertEqual(status_unknown, 403)
+        self.assertIsNone(downstream)
+
+        # Malformed JSON body under read-only scope must return 400 (never pass through)
+        status_bad_json, downstream_bad = _call({'read'}, b'{not-valid-json')
+        self.assertEqual(status_bad_json, 400)
+        self.assertIsNone(downstream_bad)
+
+    def test_private_spouse_notes_isolated_from_mcp_tools_and_resources(self):
+        from mcp_server.server import delete_record, get_notes, tracker_notes, update_note
+        from tracker.models import Note, User
+
+        spouse = User.objects.create_user(
+            username="mcp_spouse", password="x", user_type="ACCOUNT_HOLDER", group=self.group
+        )
+        primary_note = Note.objects.create(
+            user=self.primary, title="Primary Note", body="Visible",
+            date=datetime.date(2026, 6, 1), financial_year=2026,
+        )
+        spouse_note = Note.objects.create(
+            user=spouse, title="Spouse Private Note", body="Top Secret",
+            date=datetime.date(2026, 6, 1), financial_year=2026,
+        )
+
+        # Resource & tool must only return PRIMARY user's own notes
+        res_notes = json.loads(tracker_notes())
+        self.assertEqual([n['id'] for n in res_notes], [primary_note.pk])
+        tool_notes = json.loads(get_notes())
+        self.assertEqual([n['id'] for n in tool_notes], [primary_note.pk])
+
+        # Attempting to update or delete spouse's note must fail closed
+        upd = update_note(note_id=spouse_note.pk, title="Hijacked")
+        self.assertTrue(upd.startswith("Error:"))
+        spouse_note.refresh_from_db()
+        self.assertEqual(spouse_note.title, "Spouse Private Note")
+
+        dele = delete_record('tracker.Note', spouse_note.pk)
+        self.assertTrue(dele.startswith("Error:"))
+        self.assertTrue(Note.objects.filter(pk=spouse_note.pk).exists())
+
+    def test_audit_revert_fails_closed_on_other_group_and_disallowed_model(self):
+        from mcp_server.audit import revert_entry
+        from mcp_server.models import MCPAuditLog
+        from tracker.models import AccountGroup, Note, User
+
+        # 1. group=None fails closed
+        fake_log = MCPAuditLog.objects.create(
+            tool_name='add_note', action='CREATE', model_name='tracker.Note',
+            object_id=99999, data_after={'id': 99999, 'user_id': self.primary.pk},
+        )
+        res_no_group = revert_entry(fake_log, group=None)
+        self.assertTrue(res_no_group.startswith("Error:"))
+
+        # 2. Disallowed model fails closed
+        bad_model_log = MCPAuditLog.objects.create(
+            tool_name='evil', action='DELETE', model_name='tracker.User',
+            object_id=99999, data_before={'id': 99999, 'group_id': self.group.pk},
+        )
+        res_bad_model = revert_entry(bad_model_log, group=self.group)
+        self.assertTrue(res_bad_model.startswith("Error:"))
+
+        # 3. Cross-household audit entry cannot be reverted by self.group
+        other_group = AccountGroup.objects.create(name="OtherAuditGroup")
+        outsider = User.objects.create_user(
+            username="audit_outsider", password="x", user_type="PRIMARY", group=other_group
+        )
+        other_note = Note.objects.create(
+            user=outsider, title="Outsider Note", body="x",
+            date=datetime.date(2026, 6, 1), financial_year=2026,
+        )
+        cross_log = MCPAuditLog.objects.create(
+            tool_name='add_note', action='CREATE', model_name='tracker.Note',
+            object_id=other_note.pk,
+            data_after={'id': other_note.pk, 'user_id': outsider.pk, 'title': 'Outsider Note'},
+        )
+        res_cross = revert_entry(cross_log, group=self.group)
+        self.assertTrue(res_cross.startswith("Error:"))
+        self.assertTrue(Note.objects.filter(pk=other_note.pk).exists())
+
 

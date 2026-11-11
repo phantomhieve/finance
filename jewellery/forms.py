@@ -14,6 +14,7 @@ register_heif_opener()
 # formats. We validate both the extension AND the real decoded format so a
 # renamed/polyglot file can't slip through.
 MAX_PHOTO_BYTES = 5 * 1024 * 1024  # 5 MB
+MAX_PHOTO_PIXELS = 40_000_000      # 40 MP decompression-bomb guard
 ALLOWED_PHOTO_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.webp', '.gif', '.heic', '.heif'}
 ALLOWED_PHOTO_FORMATS = {'JPEG', 'PNG', 'WEBP', 'GIF', 'HEIF'}
 
@@ -35,7 +36,11 @@ class JewelleryItemForm(forms.ModelForm):
         """Coerce blank/None → 0 so the NOT NULL DB column is never sent NULL."""
         from decimal import Decimal
         val = self.cleaned_data.get('weight_grams')
-        return val if val is not None else Decimal('0')
+        if val is None:
+            return Decimal('0')
+        if val < 0:
+            raise forms.ValidationError('Weight in grams cannot be negative.')
+        return val
 
     def clean_photo(self):
         photo = self.cleaned_data.get('photo')
@@ -67,9 +72,13 @@ class JewelleryItemForm(forms.ModelForm):
             photo.seek(0)
             image = Image.open(photo)
             fmt = image.format          # capture BEFORE verify() destroys the object
+            w, h = image.size
             image.verify()              # raises if the file is not a valid image
         except Exception:
             raise forms.ValidationError('The uploaded file is not a valid image.')
+
+        if w <= 0 or h <= 0 or (w * h) > MAX_PHOTO_PIXELS:
+            raise forms.ValidationError('Image dimensions are too large.')
 
         if fmt not in ALLOWED_PHOTO_FORMATS:
             raise forms.ValidationError('Unsupported image format.')

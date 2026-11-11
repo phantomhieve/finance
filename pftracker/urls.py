@@ -39,7 +39,7 @@ def oauth_discovery(request):
         "introspection_endpoint": f"{base}/o/introspect/",
         "response_types_supported": ["code"],
         "grant_types_supported": ["authorization_code", "refresh_token"],
-        "code_challenge_methods_supported": ["plain", "S256"],
+        "code_challenge_methods_supported": ["S256"],
         "token_endpoint_auth_methods_supported": ["client_secret_basic", "client_secret_post", "none"],
         "scopes_supported": ["read", "write"],
         "service_documentation": f"{base}/",
@@ -106,9 +106,3 @@ urlpatterns = [
     path('expenses/', include('expenses.urls')),
     path('', include('tracker.urls')),
 ]
-
-from django.conf import settings
-from django.conf.urls.static import static
-
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

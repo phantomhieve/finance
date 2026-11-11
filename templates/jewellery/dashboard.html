@@ -11,16 +11,16 @@
     {% if is_primary %}
     <div class="flex flex-wrap items-center gap-2 mt-2">
       {% if gold_rate %}
-      <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-400/10 text-amber-400 border border-amber-400/20 tabular-nums">
-        <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-        <span>24K Gold: {{ gold_rate|inr }}/g</span>
-      </div>
+      <span class="v-delta v-delta-caution">
+        <span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+        <span>24K Gold {{ gold_rate|inr }}/g</span>
+      </span>
       {% endif %}
       {% if silver_rate %}
-      <div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-400/10 text-slate-300 border border-slate-400/20 tabular-nums">
+      <span class="v-delta v-delta-neutral">
         <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
-        <span>Silver: {{ silver_rate|inr }}/g</span>
-      </div>
+        <span>Silver {{ silver_rate|inr }}/g</span>
+      </span>
       {% endif %}
       {% if rates_as_of %}
       <span class="text-xs text-base-content/50" title="{{ rates_as_of|date:'d M Y, H:i' }}">Updated {{ rates_as_of|timesince }} ago</span>
@@ -59,22 +59,22 @@
     <div class="v-lead-figure-row">
       <span class="v-lead-figure">{{ total_estimated_value|inr }}</span>
     </div>
-    <div class="v-lead-sub">Intrinsic commodity value at live bullion spot rates, adjusted for hallmarked purity</div>
+    <div class="v-lead-sub">Intrinsic bullion value at live spot rates, adjusted for hallmarked purity</div>
 
     {% if value_by_location|length > 0 %}
     <div class="v-horizon">
       <div class="v-horizon-bar">
         {% for loc in value_by_location %}
-        <span class="v-horizon-seg" style="width: {{ loc.pct }}%; background: {% if loc.value == 'BANK_LOCKER' %}var(--v-outflow){% else %}var(--v-caution){% endif %};" title="{{ loc.label }}: {{ loc.pct }}%"></span>
+        <span class="v-horizon-seg" style="width: {{ loc.pct }}%; background: {% if loc.value == 'BANK_LOCKER' %}#14b8a6{% else %}#eab308{% endif %};" title="{{ loc.label }}: {{ loc.pct }}%"></span>
         {% endfor %}
       </div>
       <div class="v-horizon-legend">
         {% for loc in value_by_location %}
         <div class="v-horizon-item">
-          <span class="v-horizon-dot" style="background: {% if loc.value == 'BANK_LOCKER' %}var(--v-outflow){% else %}var(--v-caution){% endif %};"></span>
+          <span class="v-horizon-dot" style="background: {% if loc.value == 'BANK_LOCKER' %}#14b8a6{% else %}#eab308{% endif %};"></span>
           <span>{{ loc.label }} ({{ loc.count }}):</span>
-          <span class="v-horizon-amount">{{ loc.amount|inr }}</span>
-          <span class="v-horizon-pct">({{ loc.pct }}%)</span>
+          <span class="v-horizon-amount tabular-nums">{{ loc.amount|inr }}</span>
+          <span class="v-horizon-pct tabular-nums">({{ loc.pct }}%)</span>
         </div>
         {% endfor %}
       </div>
@@ -82,39 +82,45 @@
     {% endif %}
   </div>
 
-  {# Right Hairline Grid: Metal Weights & Inventory #}
+  {# Right Hairline Grid: 4 Balanced Cells #}
   <div class="v-stat-grid">
     <div class="v-stat-cell">
-      <div class="v-stat-label">Gold Holdings</div>
-      <div class="v-stat-value text-amber-400">{{ total_weight_gold|floatformat:2 }}g</div>
-      <div class="v-stat-sub">24K / 22K / 18K / 14K Purity</div>
+      <div class="v-stat-label">Gold Weight</div>
+      <div class="v-stat-value text-amber-400 tabular-nums">{{ total_weight_gold|floatformat:2 }}g</div>
+      <div class="v-stat-sub">24K / 22K / 18K / 14K</div>
     </div>
     <div class="v-stat-cell">
-      <div class="v-stat-label">Silver Holdings</div>
-      <div class="v-stat-value text-slate-300">{{ total_weight_silver|floatformat:2 }}g</div>
-      <div class="v-stat-sub">999 / 925 Hallmarked</div>
+      <div class="v-stat-label">Silver Weight</div>
+      <div class="v-stat-value text-slate-300 tabular-nums">{{ total_weight_silver|floatformat:2 }}g</div>
+      <div class="v-stat-sub">999 / 925 Fineness</div>
     </div>
-    <div class="v-stat-cell col-span-2 sm:col-span-1">
+    <div class="v-stat-cell">
       <div class="v-stat-label">Vault Inventory</div>
-      <div class="v-stat-value">{{ items|length }}{% if is_filtered %}<span class="text-xs font-normal text-base-content/50"> / {{ all_items_count }}</span>{% endif %}</div>
-      <div class="v-stat-sub">{% if is_filtered %}Filtered active view{% else %}Verified assets on record{% endif %}</div>
+      <div class="v-stat-value tabular-nums">{{ items|length }}{% if is_filtered %}<span class="text-xs font-normal text-base-content/50"> / {{ all_items_count }}</span>{% endif %}</div>
+      <div class="v-stat-sub">{% if is_filtered %}Matching filters{% else %}Catalogued pieces{% endif %}</div>
+    </div>
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Custody Split</div>
+      <div class="v-stat-value tabular-nums">
+        {% if value_by_location %}{{ value_by_location.0.pct }}% {{ value_by_location.0.label }}{% else %}—{% endif %}
+      </div>
+      <div class="v-stat-sub">{% if value_by_location %}{{ value_by_location|length }} active location{% if value_by_location|length != 1 %}s{% endif %}{% else %}No custody records{% endif %}</div>
     </div>
   </div>
 </div>
 {% endif %}
 
-{# --- 2. UNIFIED FILTER & CUSTODY CONTROL PANEL --- #}
+{# --- 2. UNIFIED SINGLE-ROW FILTER & CUSTODY CONTROL BAR --- #}
 <div class="v-panel mb-5">
-  <form method="get" id="filterForm" action="{% url 'jewellery_dashboard' %}" class="v-panel-body p-3 lg:p-4">
+  <form method="get" id="filterForm" action="{% url 'jewellery_dashboard' %}" class="v-panel-body p-3">
     <input type="hidden" name="metal" id="filter_metal_input" value="{{ filter_metal }}" />
     <input type="hidden" name="category" id="filter_category_input" value="{{ filter_category }}" />
     <input type="hidden" name="location" id="filter_location_input" value="{{ filter_location }}" />
 
-    <div class="flex flex-col gap-3">
-      {# Top Row: Custody Location Pills & Search #}
-      <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-        {# Location Segmented Switcher #}
-        <div class="v-segmented shrink-0">
+    <div class="flex flex-col lg:flex-row lg:items-center gap-2.5">
+      {# Custody Location Segmented Switcher — horizontally scrollable on narrow phones #}
+      <div class="overflow-x-auto scrollbar-hide max-w-full shrink-0">
+        <div class="v-segmented min-w-max">
           <button type="button" onclick="setJFilter('filter_location_input','')"
              class="v-segmented-item {% if not filter_location %}is-active{% endif %}">
             <span class="material-symbols-outlined text-sm">inventory_2</span>All Locations
@@ -122,81 +128,82 @@
           {% for val, label in location_choices %}
           <button type="button" onclick="setJFilter('filter_location_input','{{ val }}')"
              class="v-segmented-item {% if filter_location == val %}is-active{% endif %}">
-            <span class="w-2 h-2 rounded-full {% if val == 'BANK_LOCKER' %}bg-rose-500{% else %}bg-amber-500{% endif %}"></span>
+            <span class="w-2 h-2 rounded-full {% if val == 'BANK_LOCKER' %}bg-teal-400{% else %}bg-amber-400{% endif %}"></span>
             {{ label }}
           </button>
           {% endfor %}
         </div>
-
-        {# Search input with autocomplete #}
-        <div class="relative flex-1 max-w-md">
-          <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-base-content/50">
-            <span class="material-symbols-outlined text-lg">search</span>
-          </span>
-          <input type="text" name="search" id="filter_search" placeholder="Search type, notes, purity…"
-                 value="{{ filter_search }}"
-                 class="v-input w-full pl-9 text-xs"
-                 autocomplete="off" />
-          <div id="search_results" class="absolute z-[80] mt-1 w-full bg-base-100 rounded-xl shadow-2xl border border-base-content/10 hidden max-h-72 overflow-y-auto"></div>
-        </div>
       </div>
 
-      {# Bottom Row: Metal and Category Filter Controls #}
-      <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-base-content/6">
+      {# Compact Metal & Category Dropdowns #}
+      <div class="grid grid-cols-2 lg:flex items-center gap-2 shrink-0">
         {# Metal Dropdown #}
-        <details class="dropdown w-full">
-          <summary class="v-btn v-btn-secondary w-full justify-between text-xs font-normal list-none [&::-webkit-details-marker]:hidden">
+        <details class="dropdown w-full lg:w-36">
+          <summary class="v-btn v-btn-secondary !min-h-11 lg:!min-h-9 w-full justify-between text-xs font-normal list-none [&::-webkit-details-marker]:hidden">
             <span class="truncate">{% if filter_metal %}{% for val, label in metal_choices %}{% if filter_metal == val %}{{ label }}{% endif %}{% endfor %}{% else %}All Metals{% endif %}</span>
-            <span class="material-symbols-outlined text-base opacity-60">expand_more</span>
+            <span class="material-symbols-outlined text-base opacity-60 shrink-0">expand_more</span>
           </summary>
-          <ul class="dropdown-content z-[80] w-full mt-1.5 p-1.5 bg-base-100 rounded-xl shadow-2xl border border-base-content/10 flex flex-col gap-0.5">
-            <li><button type="button" onclick="setJFilter('filter_metal_input','')" class="jw-opt {% if not filter_metal %}jw-opt-on{% endif %}">All Metals</button></li>
+          <ul class="dropdown-content z-[80] left-0 w-48 mt-1.5 p-1.5 bg-base-100 rounded-xl shadow-xl border border-[var(--v-hairline)] flex flex-col gap-0.5">
+            <li><button type="button" onclick="setJFilter('filter_metal_input','')" class="jw-opt !min-h-[46px] !py-3 lg:!min-h-9 lg:!py-1.5 {% if not filter_metal %}jw-opt-on{% endif %}">All Metals</button></li>
             {% for val, label in metal_choices %}
-            <li><button type="button" onclick="setJFilter('filter_metal_input','{{ val }}')" class="jw-opt {% if filter_metal == val %}jw-opt-on{% endif %}">{{ label }}</button></li>
+            <li><button type="button" onclick="setJFilter('filter_metal_input','{{ val }}')" class="jw-opt !min-h-[46px] !py-3 lg:!min-h-9 lg:!py-1.5 {% if filter_metal == val %}jw-opt-on{% endif %}">{{ label }}</button></li>
             {% endfor %}
           </ul>
         </details>
 
-        {# Category Dropdown #}
-        <details class="dropdown w-full">
-          <summary class="v-btn v-btn-secondary w-full justify-between text-xs font-normal list-none [&::-webkit-details-marker]:hidden">
+        {# Category Dropdown — right-aligned on mobile so it never clips off the right viewport edge #}
+        <details class="dropdown dropdown-end sm:dropdown-start w-full lg:w-44">
+          <summary class="v-btn v-btn-secondary !min-h-11 lg:!min-h-9 w-full justify-between text-xs font-normal list-none [&::-webkit-details-marker]:hidden">
             <span class="truncate flex items-center gap-1.5">
               {% if filter_category %}
                 {% for c in category_meta %}
                   {% if filter_category == c.value %}
-                    <span class="material-symbols-outlined text-sm" style="color:hsl({{ c.hue }} 70% 70%)">{{ c.icon }}</span>{{ c.label }}
+                    <span class="material-symbols-outlined text-sm shrink-0" style="color:hsl({{ c.hue }} 70% 70%)">{{ c.icon }}</span><span class="truncate">{{ c.label }}</span>
                   {% endif %}
                 {% endfor %}
               {% else %}
                 All Categories
               {% endif %}
             </span>
-            <span class="material-symbols-outlined text-base opacity-60">expand_more</span>
+            <span class="material-symbols-outlined text-base opacity-60 shrink-0">expand_more</span>
           </summary>
-          <ul class="dropdown-content z-[80] w-64 mt-1.5 p-1.5 bg-base-100 rounded-xl shadow-2xl border border-base-content/10 flex flex-col gap-0.5 max-h-72 overflow-y-auto">
-            <li><button type="button" onclick="setJFilter('filter_category_input','')" class="jw-opt {% if not filter_category %}jw-opt-on{% endif %}">
+          <ul class="dropdown-content z-[80] w-60 max-w-[85vw] mt-1.5 p-1.5 bg-base-100 rounded-xl shadow-xl border border-[var(--v-hairline)] flex flex-col gap-0.5 max-h-72 overflow-y-auto">
+            <li><button type="button" onclick="setJFilter('filter_category_input','')" class="jw-opt !min-h-[46px] !py-3 lg:!min-h-9 lg:!py-1.5 {% if not filter_category %}jw-opt-on{% endif %}">
               <span class="material-symbols-outlined text-sm opacity-60">apps</span>All Categories
             </button></li>
             {% for c in category_meta %}
-            <li><button type="button" onclick="setJFilter('filter_category_input','{{ c.value }}')" class="jw-opt {% if filter_category == c.value %}jw-opt-on{% endif %}">
+            <li><button type="button" onclick="setJFilter('filter_category_input','{{ c.value }}')" class="jw-opt !min-h-[46px] !py-3 lg:!min-h-9 lg:!py-1.5 {% if filter_category == c.value %}jw-opt-on{% endif %}">
               <span class="material-symbols-outlined text-sm" style="color:hsl({{ c.hue }} 70% 70%)">{{ c.icon }}</span>{{ c.label }}
-              <span class="ml-auto opacity-50 font-mono text-xs">{{ c.count }}</span>
+              <span class="ml-auto opacity-50 font-mono text-xs tabular-nums">{{ c.count }}</span>
             </button></li>
             {% endfor %}
           </ul>
         </details>
+      </div>
 
-        {# Filter Summary & Reset #}
-        <div class="col-span-2 flex items-center justify-between sm:justify-end gap-3 px-1">
-          {% if is_filtered %}
-          <a href="{% url 'jewellery_dashboard' %}" class="v-btn v-btn-ghost v-btn-xs text-rose-400 hover:text-rose-300 gap-1">
-            <span class="material-symbols-outlined text-sm">close</span>Clear Filters
-          </a>
-          {% endif %}
-          <span class="text-xs font-semibold text-base-content/50 uppercase tracking-wider">
-            {{ items|length }} of {{ all_items_count }} item{% if all_items_count != 1 %}s{% endif %}
-          </span>
-        </div>
+      {# Search input with autocomplete (!pl-10 prevents icon overlap regardless of CSS cascade) #}
+      <div class="relative flex-1 min-w-0">
+        <label for="filter_search" class="sr-only">Search jewellery collection</label>
+        <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-base-content/45">
+          <span class="material-symbols-outlined text-base">search</span>
+        </span>
+        <input type="search" name="search" id="filter_search" placeholder="Search type, notes, purity…"
+               value="{{ filter_search }}"
+               class="v-input !min-h-11 lg:!min-h-9 w-full !pl-10 text-xs"
+               autocomplete="off" />
+        <div id="search_results" class="absolute z-[80] mt-1 w-full bg-base-100 rounded-xl shadow-xl border border-[var(--v-hairline)] hidden max-h-72 overflow-y-auto"></div>
+      </div>
+
+      {# Inline Count & Clear Action #}
+      <div class="flex items-center justify-between lg:justify-end gap-2 shrink-0 px-0.5">
+        {% if is_filtered %}
+        <a href="{% url 'jewellery_dashboard' %}" class="v-btn v-btn-ghost v-btn-sm text-rose-400 hover:text-rose-300 gap-1">
+          <span class="material-symbols-outlined text-sm">close</span>Clear
+        </a>
+        {% endif %}
+        <span class="text-xs font-medium text-base-content/50 tabular-nums whitespace-nowrap ml-auto lg:ml-0">
+          {% if is_filtered %}{{ items|length }} / {{ all_items_count }}{% else %}{{ all_items_count }}{% endif %} item{% if all_items_count != 1 %}s{% endif %}
+        </span>
       </div>
     </div>
   </form>
@@ -205,79 +212,104 @@
 {# --- 3. CUSTODY CATALOG --- #}
 {% if items %}
 
-{# Desktop & Tablet Grid #}
-<div class="hidden md:grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 animate-up" id="jewelleryGrid">
+{# Desktop & Tablet Grid — Photo Frame ONLY when item.photo exists; Compact Fiduciary Assay Card otherwise #}
+<div class="hidden md:grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3.5 items-stretch animate-up" id="jewelleryGrid">
   {% for item in items %}
   <a href="{% url 'jewellery_detail' item.pk %}{% if request.GET %}?next={{ request.get_full_path|urlencode }}{% endif %}"
-     class="v-panel group flex flex-col h-full hover:border-indigo-500/40 transition-all duration-200">
-    <div class="relative aspect-square w-full overflow-hidden flex items-center justify-center shrink-0 jw-type-tile" style="--h:{{ item.category_hue }}">
-      {# Procedural category icon #}
-      <span class="icon-filled material-symbols-outlined jw-type-icon text-5xl lg:text-6xl opacity-80 group-hover:scale-105 transition-transform duration-300">{{ item.category_icon }}</span>
-      {% if item.photo %}
-      <img src="{% url 'jewellery_photo' item.pk %}?size=thumb&t={{ item.updated_at.timestamp }}" alt="{{ item.display_label }}" onerror="this.remove()"
-           class="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
-      {% endif %}
-
-      {# Badges on image #}
-      <span class="jw-type-badge jw-badge-overlay absolute top-2.5 left-2.5 z-10" style="--h:{{ item.category_hue }}">
-        <span class="icon-filled material-symbols-outlined text-xs">{{ item.category_icon }}</span>{{ item.get_category_display }}
-      </span>
-      <span class="absolute top-2.5 right-2.5 z-10 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-base-100/90 text-base-content backdrop-blur-sm border border-base-content/10 shadow-sm">
-        <span class="w-1.5 h-1.5 rounded-full {% if item.location == 'BANK_LOCKER' %}bg-rose-500{% else %}bg-amber-500{% endif %}"></span>
+     class="v-panel v-panel-fill group hover:border-indigo-500/40 transition-colors duration-200 no-underline text-inherit overflow-hidden">
+    {% if item.photo %}
+    <div class="relative aspect-[16/10] w-full overflow-hidden bg-base-200/60 border-b border-[var(--v-hairline)] shrink-0">
+      <img src="{% url 'jewellery_photo' item.pk %}?size=thumb&t={{ item.updated_at.timestamp }}" alt="{{ item.display_label }}" onerror="this.parentElement.remove()"
+           class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+      <span class="absolute top-2.5 right-2.5 z-10 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-base-100/90 text-base-content backdrop-blur-sm border border-[var(--v-hairline)]">
+        <span class="w-1.5 h-1.5 rounded-full {% if item.location == 'BANK_LOCKER' %}bg-teal-400{% else %}bg-amber-400{% endif %}"></span>
         {{ item.get_location_display }}
       </span>
     </div>
+    {% endif %}
 
-    <div class="v-panel-body p-3.5 flex-1 flex flex-col justify-between gap-3">
-      <div>
-        <h3 class="font-semibold text-sm text-base-content group-hover:text-indigo-400 transition-colors line-clamp-1">{{ item.display_label }}</h3>
-        <div class="flex items-center gap-1.5 mt-1.5 text-xs text-base-content/60">
-          <span class="w-2 h-2 rounded-full shrink-0 {% if item.metal_type == 'GOLD' %}bg-amber-400{% elif item.metal_type == 'SILVER' %}bg-slate-300{% else %}bg-indigo-400{% endif %}"></span>
-          <span>{{ item.get_metal_type_display }}{% if item.purity %} · {{ item.purity }}{% endif %}</span>
-          <span class="ml-auto font-mono font-medium text-base-content/80 tabular-nums">{{ item.weight_grams|floatformat:2 }}g</span>
+    <div class="p-4 flex-1 flex flex-col justify-between gap-3">
+      <div class="flex items-start justify-between gap-2.5">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <span class="jw-type-avatar w-9 h-9 rounded-lg flex items-center justify-center shrink-0" style="--h:{{ item.category_hue }}">
+            <span class="icon-filled material-symbols-outlined text-lg">{{ item.category_icon }}</span>
+          </span>
+          <div class="min-w-0">
+            <h3 class="font-semibold text-sm text-base-content group-hover:text-primary transition-colors truncate">{{ item.display_label }}</h3>
+            <div class="text-xs text-base-content/50 truncate">{{ item.get_category_display }}</div>
+          </div>
+        </div>
+        {% if not item.photo %}
+        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-base-200/70 text-base-content/80 border border-[var(--v-hairline)] shrink-0">
+          <span class="w-1.5 h-1.5 rounded-full {% if item.location == 'BANK_LOCKER' %}bg-teal-400{% else %}bg-amber-400{% endif %}"></span>
+          {{ item.get_location_display }}
+        </span>
+        {% endif %}
+      </div>
+
+      {% if item.notes %}
+      <p class="text-xs text-base-content/55 line-clamp-1">{{ item.notes }}</p>
+      {% endif %}
+    </div>
+
+    <div class="mt-auto border-t border-[var(--v-hairline)] grid grid-cols-2 divide-x divide-[var(--v-hairline)] bg-base-200/15">
+      <div class="px-3.5 py-2.5 min-w-0">
+        <div class="text-[11px] font-medium text-base-content/45">Assay &amp; Weight</div>
+        <div class="text-xs font-semibold text-base-content tabular-nums mt-0.5 flex items-center gap-1.5 truncate">
+          <span class="w-1.5 h-1.5 rounded-full shrink-0 {% if item.metal_type == 'GOLD' %}bg-amber-400{% elif item.metal_type == 'SILVER' %}bg-slate-300{% else %}bg-sky-400{% endif %}"></span>
+          <span class="truncate">{% if item.purity %}{{ item.purity }} · {% endif %}{{ item.weight_grams|floatformat:2 }}g</span>
         </div>
       </div>
-      {% if is_primary %}
-      <div class="flex items-baseline justify-between pt-2 border-t border-base-content/6">
-        <span class="text-xs uppercase tracking-wider text-base-content/50 font-medium">Est. Value</span>
-        <span class="text-sm font-bold text-indigo-400 tabular-nums">{% if item.estimated_value %}{{ item.estimated_value|inr }}{% else %}—{% endif %}</span>
+      <div class="px-3.5 py-2.5 text-right min-w-0">
+        {% if is_primary %}
+        <div class="text-[11px] font-medium text-base-content/45">Est. Spot Value</div>
+        <div class="text-sm font-bold text-base-content tabular-nums mt-0.5 truncate">{% if item.estimated_value %}{{ item.estimated_value|inr }}{% else %}&mdash;{% endif %}</div>
+        {% else %}
+        <div class="text-[11px] font-medium text-base-content/45">Metal</div>
+        <div class="text-xs font-semibold text-base-content mt-0.5 truncate">{{ item.get_metal_type_display }}</div>
+        {% endif %}
       </div>
-      {% endif %}
     </div>
   </a>
   {% endfor %}
 </div>
 
-{# Mobile List View #}
-<div class="md:hidden space-y-2 animate-up">
+{# Mobile Single-Hairline Ledger Panel #}
+<div class="v-panel md:hidden overflow-hidden animate-up">
   {% for item in items %}
-  <a href="{% url 'jewellery_detail' item.pk %}{% if request.GET %}?next={{ request.get_full_path|urlencode }}{% endif %}" class="v-mobile-row rounded-xl border border-base-content/10">
-    <div class="flex items-center gap-3 min-w-0">
-      <div class="relative w-14 h-14 shrink-0 rounded-xl overflow-hidden">
-        <span class="jw-type-avatar absolute inset-0 w-14 h-14 rounded-xl flex items-center justify-center" style="--h:{{ item.category_hue }}">
-          <span class="icon-filled material-symbols-outlined text-2xl">{{ item.category_icon }}</span>
+  <a href="{% url 'jewellery_detail' item.pk %}{% if request.GET %}?next={{ request.get_full_path|urlencode }}{% endif %}" class="v-mobile-row gap-3">
+    <div class="flex items-center gap-3 min-w-0 flex-1">
+      <div class="relative w-12 h-12 shrink-0 rounded-xl overflow-hidden">
+        <span class="jw-type-avatar absolute inset-0 w-12 h-12 rounded-xl flex items-center justify-center" style="--h:{{ item.category_hue }}">
+          <span class="icon-filled material-symbols-outlined text-xl">{{ item.category_icon }}</span>
         </span>
         {% if item.photo %}
         <img src="{% url 'jewellery_photo' item.pk %}?size=thumb&t={{ item.updated_at.timestamp }}" alt="{{ item.display_label }}" onerror="this.remove()"
-             class="absolute inset-0 w-14 h-14 rounded-xl object-cover" loading="lazy" />
+             class="absolute inset-0 w-12 h-12 rounded-xl object-cover" loading="lazy" />
         {% endif %}
       </div>
-      <div class="min-w-0">
-        <div class="font-semibold text-xs text-base-content truncate">{{ item.display_label }}</div>
-        <div class="flex items-center gap-1.5 mt-0.5 text-xs text-base-content/60">
-          <span class="w-1.5 h-1.5 rounded-full shrink-0 {% if item.metal_type == 'GOLD' %}bg-amber-400{% elif item.metal_type == 'SILVER' %}bg-slate-300{% else %}bg-indigo-400{% endif %}"></span>
-          <span>{{ item.get_metal_type_display }}{% if item.purity %} · {{ item.purity }}{% endif %} · {{ item.weight_grams|floatformat:2 }}g</span>
+      <div class="min-w-0 flex-1">
+        <div class="font-semibold text-sm text-base-content truncate">{{ item.display_label }}</div>
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-xs text-base-content/60">
+          <span class="inline-flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full shrink-0 {% if item.metal_type == 'GOLD' %}bg-amber-400{% elif item.metal_type == 'SILVER' %}bg-slate-300{% else %}bg-sky-400{% endif %}"></span>
+            <span>{{ item.get_metal_type_display }}{% if item.purity %} · {{ item.purity }}{% endif %}</span>
+          </span>
+          <span class="font-mono tabular-nums text-base-content/75">{{ item.weight_grams|floatformat:2 }}g</span>
         </div>
-        <div class="flex items-center gap-1 mt-0.5 text-xs text-base-content/40">
-          <span class="material-symbols-outlined text-xs">location_on</span>{{ item.get_location_display }}
+        <div class="flex items-center gap-1 mt-0.5 text-xs text-base-content/45">
+          <span class="w-1.5 h-1.5 rounded-full {% if item.location == 'BANK_LOCKER' %}bg-teal-400{% else %}bg-amber-400{% endif %}"></span>
+          <span>{{ item.get_location_display }}</span>
         </div>
       </div>
     </div>
     {% if is_primary %}
     <div class="text-right shrink-0 pl-2">
-      <div class="text-xs font-bold text-indigo-400 tabular-nums">{% if item.estimated_value %}{{ item.estimated_value|inr }}{% else %}—{% endif %}</div>
-      <div class="text-xs text-base-content/40 uppercase">est.</div>
+      <div class="text-sm font-bold text-base-content tabular-nums">{% if item.estimated_value %}{{ item.estimated_value|inr }}{% else %}—{% endif %}</div>
+      <div class="text-xs text-base-content/45">Est. spot</div>
     </div>
+    {% else %}
+    <span class="material-symbols-outlined text-base text-base-content/35 shrink-0">chevron_right</span>
     {% endif %}
   </a>
   {% endfor %}
@@ -287,37 +319,39 @@
 {# --- EMPTY STATE --- #}
 <div class="v-empty animate-up">
   <div class="v-empty-icon">
-    <span class="material-symbols-outlined text-2xl text-indigo-400">diamond</span>
+    <span class="material-symbols-outlined text-2xl text-amber-400">diamond</span>
   </div>
   <h3 class="v-empty-title">No jewellery items found</h3>
-  <p class="v-empty-desc">
+  <p class="v-empty-sub">
     {% if is_filtered %}
-      No items match the active custody or metal filters. Try clearing your search parameters.
+      No items match the active custody or metal filters. Clear your search parameters to view the full vault inventory.
     {% else %}
-      Begin cataloguing your household gold, silver, and precious jewellery to monitor live purity-adjusted valuations.
+      Catalogue your household gold, silver, and precious jewellery to track custody locations and purity-adjusted valuations.
     {% endif %}
   </p>
   {% if is_filtered %}
-  <a href="{% url 'jewellery_dashboard' %}" class="v-btn v-btn-secondary">
+  <a href="{% url 'jewellery_dashboard' %}" class="v-btn v-btn-secondary mt-2">
     <span class="material-symbols-outlined text-base">filter_alt_off</span>Clear All Filters
   </a>
   {% elif is_primary %}
-  <button type="button" onclick="openAddJewelleryModal()" class="v-btn v-btn-primary">
-    <span class="material-symbols-outlined text-base">add_circle</span>Add First Item
+  <button type="button" onclick="openAddJewelleryModal()" class="v-btn v-btn-primary mt-2">
+    <span class="material-symbols-outlined text-base">add</span>Add First Item
   </button>
   {% endif %}
 </div>
 {% endif %}
 
 
-{# --- 4. ADD ASSET SLIDE-OVER / MODAL --- #}
+{# --- 4. ADD ASSET MODAL --- #}
 <dialog id="jewelleryAddModal" class="modal modal-bottom sm:modal-middle">
-  <div class="modal-box bg-base-100 border border-base-content/10 max-w-lg rounded-2xl shadow-2xl p-6">
-    <div class="flex justify-between items-center pb-3 border-b border-base-content/8 mb-4">
-      <h3 class="font-bold text-base flex items-center gap-2">
-        <span class="material-symbols-outlined text-indigo-400">diamond</span>Add Jewellery Item
+  <div class="modal-box max-w-lg max-h-[90dvh] overflow-y-auto overscroll-contain">
+    <div class="v-modal-header flex justify-between items-center pb-3 border-b border-[var(--v-hairline)] mb-4">
+      <h3 class="font-semibold text-base text-base-content flex items-center gap-2">
+        <span class="material-symbols-outlined text-amber-400 text-xl">diamond</span>Add Jewellery Item
       </h3>
-      <form method="dialog"><button class="v-btn v-btn-ghost v-btn-xs">✕</button></form>
+      <button type="button" class="v-icon-btn" onclick="closeModal('jewelleryAddModal')" aria-label="Close">
+        <span class="material-symbols-outlined text-lg">close</span>
+      </button>
     </div>
     <form id="jewelleryAddForm" method="POST" action="{% url 'add_jewellery' %}" enctype="multipart/form-data">
       {% csrf_token %}
@@ -325,16 +359,16 @@
       <div class="v-form-grid">
         <div class="v-form-grid-2">
           <div class="v-field">
-            <label class="v-label">Type / Category</label>
-            <select name="category" id="ja_category" class="v-input">
+            <label class="v-label" for="ja_category">Type / Category</label>
+            <select name="category" id="ja_category" class="v-select">
               {% for val, label in form.fields.category.choices %}
               <option value="{{ val }}">{{ label }}</option>
               {% endfor %}
             </select>
           </div>
           <div class="v-field">
-            <label class="v-label">Precious Metal</label>
-            <select name="metal_type" id="ja_metal" class="v-input">
+            <label class="v-label" for="ja_metal">Precious Metal</label>
+            <select name="metal_type" id="ja_metal" class="v-select">
               {% for val, label in form.fields.metal_type.choices %}
               <option value="{{ val }}">{{ label }}</option>
               {% endfor %}
@@ -344,12 +378,12 @@
 
         <div class="v-form-grid-2">
           <div class="v-field">
-            <label class="v-label">Purity / Fineness</label>
-            <select name="purity" id="ja_purity" class="v-input"></select>
+            <label class="v-label" for="ja_purity">Purity / Fineness</label>
+            <select name="purity" id="ja_purity" class="v-select"></select>
           </div>
           <div class="v-field">
-            <label class="v-label">Net Weight (grams) *</label>
-            <input type="number" step="0.01" name="weight_grams" id="ja_weight" value="0.00" min="0" required class="v-input font-mono" />
+            <label class="v-label" for="ja_weight">Net Weight (grams) *</label>
+            <input type="number" step="0.01" inputmode="decimal" name="weight_grams" id="ja_weight" value="0.00" min="0" required class="v-input font-mono tabular-nums" />
           </div>
         </div>
 
@@ -357,10 +391,10 @@
           <label class="v-label">Custody Location</label>
           <input type="hidden" name="location" id="ja_location" value="BANK_LOCKER" />
           <div class="grid grid-cols-2 gap-2" id="ja_location_chips">
-            <button type="button" data-loc="BANK_LOCKER" class="v-btn v-btn-secondary gap-1.5 justify-start">
+            <button type="button" data-loc="BANK_LOCKER" class="v-btn v-btn-secondary gap-1.5 justify-center sm:justify-start">
               <span class="material-symbols-outlined text-base">account_balance</span>Bank Locker
             </button>
-            <button type="button" data-loc="HOME_SAFE" class="v-btn v-btn-secondary gap-1.5 justify-start">
+            <button type="button" data-loc="HOME_SAFE" class="v-btn v-btn-secondary gap-1.5 justify-center sm:justify-start">
               <span class="material-symbols-outlined text-base">lock</span>Home Safe
             </button>
           </div>
@@ -368,25 +402,25 @@
 
         {# Photo Upload #}
         <div class="v-field">
-          <label class="v-label">Photo / Provenance Proof</label>
+          <label class="v-label" for="ja_photo">Photo / Provenance Proof</label>
 
-          <div id="ja_photo_preview_container" class="hidden mb-2 relative group w-full h-36 rounded-xl overflow-hidden bg-base-200 border border-base-content/10">
+          <div id="ja_photo_preview_container" class="hidden mb-2 relative group w-full h-36 rounded-xl overflow-hidden bg-base-200 border border-[var(--v-hairline)]">
             <img id="ja_photo_preview_img" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" alt="Photo preview" class="w-full h-full object-cover opacity-0 transition-opacity duration-300" />
             <div data-photo-loader class="hidden absolute inset-0 z-20 flex flex-col items-center justify-center gap-2 bg-base-300/80 backdrop-blur-sm">
               <span class="loading loading-spinner loading-md text-primary"></span>
-              <span class="text-xs font-semibold uppercase tracking-wider text-base-content/60">Processing photo…</span>
+              <span class="text-xs font-medium text-base-content/70">Processing photo…</span>
             </div>
             <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer" onclick="document.getElementById('ja_photo').click()">
               <span class="text-xs font-semibold text-white flex items-center gap-1"><span class="material-symbols-outlined text-sm">cached</span>Change</span>
             </div>
-            <button type="button" class="absolute top-2 right-2 v-btn v-btn-danger v-btn-xs" onclick="clearAddPhoto(event)">
+            <button type="button" class="absolute top-2 right-2 v-btn v-btn-danger v-btn-xs" onclick="clearAddPhoto(event)" aria-label="Remove selected photo">
               <span class="material-symbols-outlined text-xs">close</span>
             </button>
           </div>
 
           <label for="ja_photo" id="ja_photo_upload_box"
-                 class="flex flex-col items-center justify-center py-5 px-4 rounded-xl border border-dashed border-base-content/15 bg-base-200/50 cursor-pointer hover:border-indigo-500/40 hover:bg-base-200 transition-all group">
-            <span class="material-symbols-outlined text-2xl text-base-content/40 group-hover:text-indigo-400 group-hover:scale-105 transition-all mb-1">add_a_photo</span>
+                 class="flex flex-col items-center justify-center py-5 px-4 rounded-xl border border-dashed border-[var(--v-border-strong)] bg-base-200/40 cursor-pointer hover:border-primary/40 hover:bg-base-200/70 transition-colors group">
+            <span class="material-symbols-outlined text-2xl text-base-content/40 group-hover:text-primary transition-colors mb-1">add_a_photo</span>
             <span class="text-xs font-medium text-base-content/60 group-hover:text-base-content">Tap to add ornament photo (optional)</span>
           </label>
 
@@ -394,18 +428,20 @@
         </div>
 
         <div class="v-field">
-          <label class="v-label">Notes &amp; Inscriptions</label>
-          <textarea name="notes" id="ja_notes" rows="2" class="v-input h-auto py-2" placeholder="Heirloom provenance, hallmark numbers, bills…"></textarea>
+          <label class="v-label" for="ja_notes">Notes &amp; Inscriptions</label>
+          <textarea name="notes" id="ja_notes" rows="2" class="v-textarea" placeholder="Heirloom provenance, hallmark numbers, bills…"></textarea>
         </div>
       </div>
 
-      <div class="flex justify-end gap-2 pt-4 border-t border-base-content/8 mt-5">
+      <div class="v-modal-footer modal-action flex-wrap items-center gap-2 mt-6 pt-3 border-t border-[var(--v-hairline)]">
         <button type="button" class="v-btn v-btn-ghost" onclick="closeModal('jewelleryAddModal')">Cancel</button>
-        <button type="submit" class="v-btn v-btn-primary px-6">Add to Vault</button>
+        <button type="submit" class="v-btn v-btn-primary">
+          <span class="material-symbols-outlined text-base">save</span>Add to Vault
+        </button>
       </div>
     </form>
   </div>
-  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+  <form method="dialog" class="modal-backdrop"><button aria-label="Close modal">close</button></form>
 </dialog>
 
 {% endblock %}
@@ -422,6 +458,7 @@ function setJFilter(inputId, val) {
 (function() {
   var searchInput = document.getElementById('filter_search');
   var searchResults = document.getElementById('search_results');
+  if (!searchInput || !searchResults) return;
   var acTimer, acSeq = 0;
 
   searchInput.addEventListener('input', function() {
@@ -432,27 +469,27 @@ function setJFilter(inputId, val) {
 
     acTimer = setTimeout(function() {
       fetch('/jewellery/api/search/?q=' + encodeURIComponent(val))
-        .then(res => res.json())
-        .then(data => {
+        .then(function(res) { return res.json(); })
+        .then(function(data) {
           if (seq !== acSeq) return;
           if (!data.results || data.results.length === 0) {
             searchResults.innerHTML = '<div class="p-3 text-xs text-base-content/50 text-center">No matching jewellery items found</div>';
           } else {
             var html = '<ul class="menu menu-sm w-full p-1.5 gap-0.5">';
             data.results.forEach(function(item) {
-              var avatar = `<span class="jw-type-avatar absolute inset-0" style="--h:${item.hue};width:2.25rem;height:2.25rem;border-radius:0.5rem">
-                     <span class="icon-filled material-symbols-outlined text-base">${item.icon}</span></span>`;
-              var thumb = `<span class="relative w-9 h-9 shrink-0 block">${avatar}` +
-                (item.photo_url ? `<img src="${escapeHtml(item.photo_url)}" onerror="this.remove()" class="absolute inset-0 w-9 h-9 rounded-lg object-cover" />` : '') +
-                `</span>`;
-              html += `<li><a href="/jewellery/${item.id}/" class="flex items-center gap-2.5 py-1.5 rounded-lg">
-                         ${thumb}
-                         <span class="flex-1 min-w-0">
-                           <span class="font-semibold text-xs block truncate text-base-content">${escapeHtml(item.label)}</span>
-                           <span class="text-xs text-base-content/50">${escapeHtml(item.category)}</span>
-                         </span>
-                         <span class="text-xs text-base-content/40 text-right shrink-0">${escapeHtml(item.location)}<br>${escapeHtml(item.weight)}</span>
-                       </a></li>`;
+              var avatar = '<span class="jw-type-avatar absolute inset-0" style="--h:' + item.hue + ';width:2.25rem;height:2.25rem;border-radius:0.5rem">' +
+                     '<span class="icon-filled material-symbols-outlined text-base">' + escapeHtml(item.icon) + '</span></span>';
+              var thumb = '<span class="relative w-9 h-9 shrink-0 block">' + avatar +
+                (item.photo_url ? '<img src="' + escapeHtml(item.photo_url) + '" onerror="this.remove()" class="absolute inset-0 w-9 h-9 rounded-lg object-cover" />' : '') +
+                '</span>';
+              html += '<li><a href="/jewellery/' + item.id + '/" class="flex items-center gap-2.5 py-2 rounded-lg">' +
+                         thumb +
+                         '<span class="flex-1 min-w-0">' +
+                           '<span class="font-semibold text-xs block truncate text-base-content">' + escapeHtml(item.label) + '</span>' +
+                           '<span class="text-xs text-base-content/50">' + escapeHtml(item.category) + '</span>' +
+                         '</span>' +
+                         '<span class="text-xs text-base-content/45 text-right shrink-0 tabular-nums">' + escapeHtml(item.location) + '<br>' + escapeHtml(item.weight) + '</span>' +
+                       '</a></li>';
             });
             html += '</ul>';
             searchResults.innerHTML = html;
@@ -486,6 +523,7 @@ function clearAddPhoto(e) {
 
 function openAddJewelleryModal() {
   var form = document.getElementById('jewelleryAddForm');
+  if (!form) return;
   form.reset();
   var metalSelect = document.getElementById('ja_metal');
   var puritySelect = document.getElementById('ja_purity');
@@ -500,10 +538,13 @@ function openAddJewelleryModal() {
 
 document.addEventListener('DOMContentLoaded', function() {
   Jewellery.initGridPagination('jewelleryGrid', 16);
-  Jewellery.initLocation('ja');
-  document.getElementById('ja_metal').addEventListener('change', function() {
-    Jewellery.updatePurityChoices(this, document.getElementById('ja_purity'));
-  });
+  var jaMetal = document.getElementById('ja_metal');
+  if (jaMetal) {
+    Jewellery.initLocation('ja');
+    jaMetal.addEventListener('change', function() {
+      Jewellery.updatePurityChoices(this, document.getElementById('ja_purity'));
+    });
+  }
 
   // Close any open <details> dropdown when clicking outside of it.
   document.addEventListener('click', function(e) {

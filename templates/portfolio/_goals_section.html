@@ -1,18 +1,18 @@
 {% load indian_format %}
 {# FY goals: current-year pacing, upcoming targets, closed-year track record. Expects `goal_roadmap`, `fy_performance`, `total_value`. #}
 {% with rm=goal_roadmap %}
-<div class="flex items-center justify-between mb-3 mt-6 scroll-mt-24" id="goals-section">
-  <div class="flex items-center gap-2">
-    <span class="material-symbols-outlined text-primary text-xl">flag</span>
+<div class="flex flex-wrap items-center justify-between gap-2 mb-3 mt-6 scroll-mt-24" id="goals-section">
+  <div class="flex items-center gap-2 flex-wrap">
+    <span class="material-symbols-outlined text-indigo-400 text-xl">flag</span>
     <h2 class="v-title text-base lg:text-lg m-0">Financial Year Goals &amp; Milestones</h2>
     {% if exclude_re %}
-    <span class="v-delta v-delta-caution text-[11px] py-0.5 px-2">
+    <span class="v-delta v-delta-caution text-xs py-0.5 px-2">
       <span class="material-symbols-outlined text-xs">visibility_off</span>excl. Real Estate
     </span>
     {% endif %}
   </div>
   {% if rm and rm.cur_fy_label %}
-  <button type="button" class="v-btn v-btn-secondary v-btn-xs sm:v-btn-sm" onclick="openGoalModal('{{ rm.cur_fy_label }}')">
+  <button type="button" class="v-btn v-btn-secondary v-btn-sm" onclick="openGoalModal('{{ rm.cur_fy_label }}')">
     <span class="material-symbols-outlined text-sm">add</span>Add Goal
   </button>
   {% endif %}
@@ -24,15 +24,15 @@
 {% with s=rm.spotlight %}
 <div class="v-panel mb-4">
   <div class="v-panel-header">
-    <div class="flex items-center gap-2">
-      <span class="v-panel-title">
-        <span class="material-symbols-outlined text-base text-primary">target</span>
+    <div class="flex items-center gap-2 flex-wrap min-w-0">
+      <h3 class="v-panel-title">
+        <span class="material-symbols-outlined text-base text-indigo-400">target</span>
         {{ rm.cur_fy_label }} Performance &amp; Target Pacing
-      </span>
-      <span class="text-xs text-base-content/50">· {{ rm.time_pct }}% of FY elapsed</span>
+      </h3>
+      <span class="text-xs text-base-content/50 tabular-nums">&middot; {{ rm.time_pct }}% of FY elapsed</span>
     </div>
     {% if s %}
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-1.5 shrink-0">
       {% if s.status == 'achieved' %}
         <span class="v-delta v-delta-pos text-xs">
           <span class="material-symbols-outlined text-xs">emoji_events</span>Achieved
@@ -48,21 +48,21 @@
       {% else %}
         <span class="v-delta v-delta-neutral text-xs">On Track</span>
       {% endif %}
-      <button type="button" class="v-btn v-btn-ghost v-btn-xs" {% include 'portfolio/_goal_edit_attrs.html' with g=s %} title="Edit goal">
+      <button type="button" class="v-icon-btn" {% include 'portfolio/_goal_edit_attrs.html' with g=s %} title="Edit goal" aria-label="Edit {{ s.label }}">
         <span class="material-symbols-outlined text-sm">edit</span>
       </button>
     </div>
     {% endif %}
   </div>
 
-  <div class="v-panel-body">
-    {% if s %}
-    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
-      {# Left 7 cols: Target Figure, Progress Bar & Metrics #}
-      <div class="lg:col-span-7 flex flex-col justify-between">
+  {% if s %}
+  <div class="v-panel-body p-0">
+    <div class="grid grid-cols-1 lg:grid-cols-12 divide-y lg:divide-y-0 lg:divide-x divide-[var(--v-hairline)]">
+      {# Left 7 cols: Target Figure, Horizon Climb Bar, Pace Delta & Note #}
+      <div class="lg:col-span-7 p-4 sm:p-5 flex flex-col justify-between gap-4">
         <div>
-          <div class="text-xs font-semibold uppercase tracking-wider text-base-content/50">{{ s.label }}</div>
-          <div class="flex flex-wrap items-baseline gap-3 mt-1.5">
+          <div class="text-xs font-medium text-base-content/60">{{ s.label }}</div>
+          <div class="flex flex-wrap items-baseline gap-3 mt-1">
             <span class="text-3xl lg:text-4xl font-extrabold text-base-content tabular-nums">{{ s.target|inr }}</span>
             {% if exclude_re and s.is_re_deducted %}
             <span class="v-delta v-delta-caution text-xs">
@@ -71,120 +71,131 @@
             {% endif %}
           </div>
           {% if exclude_re and s.is_re_deducted %}
-          <div class="flex flex-wrap items-center gap-x-2 text-xs text-base-content/60 mt-1 tabular-nums">
+          <div class="flex flex-wrap items-center gap-x-2 text-xs text-base-content/60 mt-1.5 tabular-nums">
             <span>Full: <strong>{{ s.raw_target|inr }}</strong></span>
             <span>&minus;</span>
-            <span>Real Estate: <strong class="text-warning">{{ s.re_deduction|inr }}</strong></span>
+            <span>Real Estate: <strong class="text-amber-400">{{ s.re_deduction|inr }}</strong></span>
             <span>=</span>
-            <span>Target: <strong class="text-primary font-bold">{{ s.target|inr }}</strong></span>
+            <span>Target: <strong class="text-base-content font-bold">{{ s.target|inr }}</strong></span>
           </div>
           {% endif %}
         </div>
 
         {# Horizon Climb Progress #}
-        <div class="mt-4 mb-2">
-          <div class="relative h-3 rounded-full bg-base-content/8 overflow-visible">
+        <div class="space-y-2">
+          <div class="relative h-2.5 rounded-full bg-base-content/10 overflow-visible">
             <div class="absolute inset-y-0 left-0 rounded-full {% if s.achieved %}bg-emerald-500{% else %}bg-primary{% endif %} transition-all duration-500" style="width: {{ s.fy_progress_pct }}%"></div>
             {% if not s.achieved %}
             <div class="absolute -top-1 -bottom-1 w-0.5 rounded bg-amber-400 z-10" style="left: {{ rm.time_pct }}%" title="{{ rm.time_pct }}% of FY elapsed"></div>
             {% endif %}
           </div>
-          <div class="flex justify-between items-center text-[11px] text-base-content/50 mt-1.5">
-            <span class="font-medium text-base-content/70">{{ s.fy_progress_pct }}% attained{% if rm.opening_value %} since FY open{% endif %}</span>
+          <div class="flex justify-between items-center text-xs text-base-content/55 tabular-nums">
+            <span class="font-medium text-base-content/75">{{ s.fy_progress_pct }}% attained{% if rm.opening_value %} since FY open{% endif %}</span>
             <span class="flex items-center gap-1.5"><span class="w-2.5 h-0.5 bg-amber-400 rounded"></span>{{ rm.time_pct }}% FY time elapsed</span>
           </div>
+
+          {% if s.vs_expected is not None and not s.achieved %}
+          <div class="pt-1 flex items-center gap-1.5 text-xs {% if s.vs_expected >= 0 %}text-emerald-400{% else %}text-amber-400{% endif %}">
+            <span class="material-symbols-outlined text-sm">{% if s.vs_expected >= 0 %}trending_up{% else %}trending_down{% endif %}</span>
+            <span><strong class="tabular-nums">₹{% if s.vs_expected >= 0 %}{{ s.vs_expected|floatformat:0|indian_number }}</strong> ahead of{% else %}{{ s.vs_expected|floatformat:0|cut:'-'|indian_number }}</strong> behind{% endif %} where a steady climb would be today</span>
+          </div>
+          {% endif %}
         </div>
 
-        {# Ruled Stat Strip #}
-        <div class="v-stat-strip mt-3">
-          <div class="v-stat-cell">
-            <div class="v-stat-label">Current Net Worth{% if exclude_re %} (ex. RE){% endif %}</div>
-            <div class="v-stat-value text-base font-bold">{{ total_value|inr }}</div>
-            <div class="v-stat-sub">Baseline</div>
+        {% if s.notes %}
+        <div class="pt-3 border-t border-[var(--v-hairline)] flex items-start gap-2 text-xs text-base-content/60 whitespace-pre-line">
+          <span class="material-symbols-outlined text-sm text-base-content/40 shrink-0 mt-0.5">notes</span>
+          <span>{{ s.notes }}</span>
+        </div>
+        {% endif %}
+      </div>
+
+      {# Right 5 cols: Always-Present 2x2 Fiduciary Stat Matrix #}
+      <div class="lg:col-span-5 grid grid-cols-2">
+        <div class="p-4 sm:p-5 flex flex-col justify-between border-b border-r border-[var(--v-hairline)]">
+          <div class="v-stat-label">Current Net Worth{% if exclude_re %} (ex. RE){% endif %}</div>
+          <div class="mt-2">
+            <div class="text-base sm:text-lg font-bold text-base-content tabular-nums">{{ total_value|inr }}</div>
+            <div class="v-stat-sub">Live baseline</div>
           </div>
-          <div class="v-stat-cell">
-            <div class="v-stat-label">{% if s.achieved %}Surplus Corpus{% else %}Corpus Gap{% endif %}</div>
-            <div class="v-stat-value text-base font-bold {% if s.achieved %}text-emerald-400{% else %}text-amber-400{% endif %}">₹{% if s.achieved %}{{ s.surplus|floatformat:0|indian_number }}{% else %}{{ s.remaining|floatformat:0|indian_number }}{% endif %}</div>
+        </div>
+        <div class="p-4 sm:p-5 flex flex-col justify-between border-b border-[var(--v-hairline)]">
+          <div class="v-stat-label">{% if s.achieved %}Surplus Corpus{% else %}Corpus Gap{% endif %}</div>
+          <div class="mt-2">
+            <div class="text-base sm:text-lg font-bold tabular-nums {% if s.achieved %}text-emerald-400{% else %}text-amber-400{% endif %}">₹{% if s.achieved %}{{ s.surplus|floatformat:0|indian_number }}{% else %}{{ s.remaining|floatformat:0|indian_number }}{% endif %}</div>
             <div class="v-stat-sub">{% if s.achieved %}Over target{% else %}Remaining{% endif %}</div>
           </div>
-          <div class="v-stat-cell">
-            <div class="v-stat-label">Pace Run-Rate</div>
-            <div class="v-stat-value text-base font-bold">{% if s.monthly_needed %}{{ s.monthly_needed|inr }}{% else %}&mdash;{% endif %}</div>
+        </div>
+        <div class="p-4 sm:p-5 flex flex-col justify-between border-r border-[var(--v-hairline)]">
+          <div class="v-stat-label">Pace Run-Rate</div>
+          <div class="mt-2">
+            <div class="text-base sm:text-lg font-bold text-base-content tabular-nums">{% if s.monthly_needed %}{{ s.monthly_needed|inr }}{% else %}&mdash;{% endif %}</div>
             <div class="v-stat-sub">Required / month</div>
           </div>
-          <div class="v-stat-cell">
-            <div class="v-stat-label">Days Remaining</div>
-            <div class="v-stat-value text-base font-bold">{{ rm.days_left }}</div>
-            <div class="v-stat-sub">To March 31</div>
+        </div>
+        <div class="p-4 sm:p-5 flex flex-col justify-between">
+          <div class="v-stat-label">Days Remaining</div>
+          <div class="mt-2">
+            <div class="text-base sm:text-lg font-bold text-base-content tabular-nums">{{ rm.days_left }}</div>
+            <div class="v-stat-sub">Until 31 Mar {{ rm.cur_fy_end|date:"Y" }}</div>
           </div>
         </div>
-
-        {% if s.vs_expected is not None and not s.achieved %}
-        <div class="mt-3 flex items-center gap-1.5 text-xs {% if s.vs_expected >= 0 %}text-emerald-400{% else %}text-amber-400{% endif %}">
-          <span class="material-symbols-outlined text-sm">{% if s.vs_expected >= 0 %}trending_up{% else %}trending_down{% endif %}</span>
-          <span><strong class="tabular-nums">₹{% if s.vs_expected >= 0 %}{{ s.vs_expected|floatformat:0|indian_number }}</strong> ahead of{% else %}{{ s.vs_expected|floatformat:0|cut:'-'|indian_number }}</strong> behind{% endif %} where a steady climb would be today</span>
-        </div>
-        {% endif %}
-        {% if s.notes %}
-        <div class="text-xs text-base-content/50 mt-2 bg-base-content/4 p-2.5 rounded-lg border border-base-content/6 whitespace-pre-line">{{ s.notes }}</div>
-        {% endif %}
-      </div>
-
-      {# Right 5 cols: FY Capital Waterfall & Active Milestones #}
-      <div class="lg:col-span-5 flex flex-col justify-between space-y-4">
-        {% if fy_performance %}
-        <div class="p-4 rounded-xl bg-base-content/3 border border-base-content/6">
-          <div class="text-[11px] font-bold uppercase tracking-wider text-base-content/50 mb-2">FY Capital Waterfall</div>
-          <div class="flex items-baseline justify-between mb-2">
-            <span class="text-xs text-base-content/70">Net Worth Trajectory</span>
-            <span class="text-sm font-bold tabular-nums {% if fy_performance.change >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
-              {% if fy_performance.change >= 0 %}+{{ fy_performance.change|inr }}{% else %}−₹{{ fy_performance.change|floatformat:0|cut:'-'|indian_number }}{% endif %}
-              <span class="text-xs font-normal opacity-70">({{ fy_performance.change_pct }}%)</span>
-            </span>
-          </div>
-          <div class="space-y-1.5 text-xs">
-            <div class="flex items-center justify-between py-1 border-t border-base-content/6">
-              <span class="flex items-center gap-1.5 text-base-content/70"><span class="material-symbols-outlined text-sm text-indigo-400">savings</span>Fresh Capital Added</span>
-              <span class="tabular-nums font-semibold">{% if fy_performance.money_added < 0 %}−₹{{ fy_performance.money_added|floatformat:0|cut:'-'|indian_number }}{% else %}{{ fy_performance.money_added|inr }}{% endif %}</span>
-            </div>
-            <div class="flex items-center justify-between py-1 border-t border-base-content/6">
-              <span class="flex items-center gap-1.5 text-base-content/70"><span class="material-symbols-outlined text-sm text-emerald-400">show_chart</span>Market Compounding</span>
-              <span class="tabular-nums font-semibold {% if fy_performance.market_gain >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
-                {% if fy_performance.market_gain >= 0 %}+{{ fy_performance.market_gain|inr }}{% else %}−₹{{ fy_performance.market_gain|floatformat:0|cut:'-'|indian_number }}{% endif %}
-              </span>
-            </div>
-          </div>
-          <div class="text-[10px] text-base-content/40 mt-2">Opening snapshot: {{ fy_performance.opening_month|date:"M Y" }} ({{ fy_performance.opening_value|inr }})</div>
-        </div>
-        {% endif %}
-
-        {% if rm.current_year.total > 1 %}
-        <div class="p-3.5 rounded-xl bg-base-content/3 border border-base-content/6">
-          <div class="text-[11px] font-bold uppercase tracking-wider text-base-content/50 mb-2">Milestones this year · {{ rm.current_year.achieved }}/{{ rm.current_year.total }}</div>
-          <div class="space-y-1.5">
-            {% for g in rm.current_year.goals %}
-            <div class="flex items-center justify-between gap-2 p-2 rounded-lg hover:bg-base-content/4 transition-colors cursor-pointer" {% include 'portfolio/_goal_edit_attrs.html' %}>
-              <div class="flex items-center gap-2 min-w-0">
-                <span class="material-symbols-outlined text-base {% if g.achieved %}text-emerald-400{% else %}text-base-content/30{% endif %}">{% if g.achieved %}check_circle{% else %}radio_button_unchecked{% endif %}</span>
-                <span class="text-xs font-medium text-base-content/90 truncate">{{ g.label }}</span>
-              </div>
-              <div class="text-right shrink-0">
-                <div class="text-xs font-semibold tabular-nums">{{ g.target|inr }}</div>
-                {% if exclude_re and g.is_re_deducted %}
-                <div class="text-[9px] text-base-content/40">Base: {{ g.raw_target|inr }}</div>
-                {% endif %}
-              </div>
-            </div>
-            {% endfor %}
-          </div>
-        </div>
-        {% endif %}
       </div>
     </div>
-    {% else %}
+
+    {% if fy_performance %}
+    <div class="border-t border-[var(--v-hairline)] grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-[var(--v-hairline)] bg-base-200/20">
+      <div class="px-4 py-3">
+        <div class="v-stat-label">FY Opening ({{ fy_performance.opening_month|date:"M Y" }})</div>
+        <div class="text-sm font-semibold text-base-content tabular-nums mt-0.5">{{ fy_performance.opening_value|inr }}</div>
+      </div>
+      <div class="px-4 py-3">
+        <div class="v-stat-label">Fresh Capital Added</div>
+        <div class="text-sm font-semibold text-base-content tabular-nums mt-0.5">{% if fy_performance.money_added < 0 %}−₹{{ fy_performance.money_added|floatformat:0|cut:'-'|indian_number }}{% else %}{{ fy_performance.money_added|inr }}{% endif %}</div>
+      </div>
+      <div class="px-4 py-3">
+        <div class="v-stat-label">Market Compounding</div>
+        <div class="text-sm font-semibold tabular-nums mt-0.5 {% if fy_performance.market_gain >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+          {% if fy_performance.market_gain >= 0 %}+{{ fy_performance.market_gain|inr }}{% else %}−₹{{ fy_performance.market_gain|floatformat:0|cut:'-'|indian_number }}{% endif %}
+        </div>
+      </div>
+      <div class="px-4 py-3">
+        <div class="v-stat-label">FY Net Trajectory</div>
+        <div class="text-sm font-bold tabular-nums mt-0.5 {% if fy_performance.change >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+          {% if fy_performance.change >= 0 %}+{{ fy_performance.change|inr }}{% else %}−₹{{ fy_performance.change|floatformat:0|cut:'-'|indian_number }}{% endif %}
+          <span class="text-xs font-normal opacity-75">({{ fy_performance.change_pct }}%)</span>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if rm.current_year.total > 1 %}
+    <div class="border-t border-[var(--v-hairline)] px-4 sm:px-5 py-3">
+      <div class="text-xs font-semibold text-base-content/65 mb-1.5 tabular-nums">Milestones this year &middot; {{ rm.current_year.achieved }}/{{ rm.current_year.total }}</div>
+      <div class="divide-y divide-[var(--v-hairline)]">
+        {% for g in rm.current_year.goals %}
+        <div class="flex items-center justify-between gap-2 py-2 min-h-[44px] hover:bg-base-content/4 transition-colors cursor-pointer" {% include 'portfolio/_goal_edit_attrs.html' %}>
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="material-symbols-outlined text-base shrink-0 {% if g.achieved %}text-emerald-400{% else %}text-base-content/35{% endif %}">{% if g.achieved %}check_circle{% else %}radio_button_unchecked{% endif %}</span>
+            <span class="text-xs font-medium text-base-content truncate">{{ g.label }}</span>
+          </div>
+          <div class="text-right shrink-0 tabular-nums">
+            <div class="text-xs font-semibold text-base-content">{{ g.target|inr }}</div>
+            {% if exclude_re and g.is_re_deducted %}
+            <div class="text-xs text-base-content/45">Base: {{ g.raw_target|inr }}</div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  {% else %}
+  <div class="v-panel-body">
     <div class="v-empty py-8">
-      <div class="v-empty-icon">
-        <span class="material-symbols-outlined text-2xl text-primary">flag</span>
+      <div class="v-empty-icon text-indigo-400">
+        <span class="material-symbols-outlined text-2xl">flag</span>
       </div>
       <h3 class="v-empty-title">No target set for {{ rm.cur_fy_label }}</h3>
       <p class="v-empty-desc">Establish an annual net worth milestone for the April 1 – March 31 cycle to track monthly run rates and pace.</p>
@@ -192,64 +203,68 @@
         <span class="material-symbols-outlined text-base">flag</span>Set {{ rm.cur_fy_label }} Target
       </button>
     </div>
-    {% endif %}
   </div>
+  {% endif %}
 </div>
 {% endwith %}
 
-{# --- UPCOMING ROADMAP & HISTORICAL TRACK RECORD --- #}
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-  {# Upcoming Goals #}
+{# --- UPCOMING ROADMAP & HISTORICAL TRACK RECORD (STACKED FULL-WIDTH BANDS — ZERO DEAD COLUMN OR INTERIOR VOID) --- #}
+<div class="space-y-4 mb-4">
+  {# Upcoming Goals — Full-Width Multi-Column Grid #}
   <div class="v-panel">
     <div class="v-panel-header">
       <h3 class="v-panel-title">
-        <span class="material-symbols-outlined text-base text-primary">route</span>
+        <span class="material-symbols-outlined text-base text-indigo-400">route</span>
         Upcoming FY Roadmaps
       </h3>
       {% if rm.upcoming %}
-      <span class="text-xs text-base-content/50">{{ rm.upcoming|length }} Future Cycles</span>
+      <span class="text-xs text-base-content/50 tabular-nums">{{ rm.upcoming|length }} Future Cycle{{ rm.upcoming|length|pluralize }}</span>
       {% endif %}
     </div>
     <div class="v-panel-body p-0">
       {% if rm.upcoming %}
-      <div class="divide-y divide-base-content/6 max-h-72 overflow-y-auto">
-        {% for y in rm.upcoming %}{% for g in y.goals %}
-        <div class="p-3.5 hover:bg-base-content/3 transition-colors cursor-pointer" {% include 'portfolio/_goal_edit_attrs.html' %}>
-          <div class="flex items-center justify-between gap-2">
+      <div class="overflow-hidden">
+        <div class="grid grid-cols-1 {% if rm.upcoming|length == 2 %}md:grid-cols-2{% elif rm.upcoming|length >= 3 %}md:grid-cols-2 lg:grid-cols-3{% endif %}">
+          {% for y in rm.upcoming %}{% for g in y.goals %}
+          <div class="p-4 border-b border-r border-[var(--v-hairline)] -mb-px -mr-px hover:bg-base-content/4 transition-colors cursor-pointer flex flex-col justify-between gap-2.5" {% include 'portfolio/_goal_edit_attrs.html' %}>
+          <div class="flex items-start justify-between gap-2">
             <div class="min-w-0">
-              <span class="v-delta v-delta-neutral text-[10px] py-0.5 px-1.5">{{ g.fy }}</span>
-              <span class="text-xs font-semibold text-base-content/90 ml-1.5">{{ g.label }}</span>
+              <span class="v-delta v-delta-neutral text-xs py-0.5 px-1.5 tabular-nums">{{ g.fy }}</span>
+              <div class="text-xs font-semibold text-base-content truncate mt-1.5">{{ g.label }}</div>
             </div>
-            <div class="text-right shrink-0">
-              <span class="text-xs font-bold tabular-nums">{{ g.target|inr }}</span>
+            <div class="text-right shrink-0 tabular-nums">
+              <div class="text-sm font-bold text-base-content">{{ g.target|inr }}</div>
               {% if exclude_re and g.is_re_deducted %}
-              <div class="text-[10px] text-base-content/40">Base: {{ g.raw_target|inr }} (&minus;{{ g.re_deduction|inr }} RE)</div>
+              <div class="text-xs text-base-content/45">Base: {{ g.raw_target|inr }}</div>
               {% endif %}
             </div>
           </div>
-          <div class="flex items-center gap-3 mt-2">
-            <div class="flex-1 h-1.5 rounded-full bg-base-content/8 overflow-hidden">
-              <div class="h-full rounded-full {% if g.achieved %}bg-emerald-500{% else %}bg-primary{% endif %}" style="width: {{ g.pct|floatformat:0 }}%"></div>
+          <div>
+            <div class="flex items-center gap-3">
+              <div class="flex-1 h-1.5 rounded-full bg-base-content/10 overflow-hidden">
+                <div class="h-full rounded-full {% if g.achieved %}bg-emerald-500{% else %}bg-primary{% endif %}" style="width: {{ g.pct|floatformat:0 }}%"></div>
+              </div>
+              <span class="text-xs tabular-nums font-semibold text-base-content/65 w-11 text-right">{{ g.pct }}%</span>
             </div>
-            <span class="text-[11px] tabular-nums font-semibold text-base-content/60 w-10 text-right">{{ g.pct }}%</span>
+            <div class="text-xs text-base-content/50 mt-1.5 tabular-nums">
+              {% if g.achieved %}<span class="text-emerald-400 font-medium">Already reached{% if g.achieved_at %} on {{ g.achieved_at|date:"d M Y" }}{% endif %}</span>
+              {% elif g.monthly_needed %}Requires {{ g.monthly_needed|inr }}/mo over {{ g.months_left }} months
+              {% else %}{{ g.remaining|inr }} remaining corpus{% endif %}
+            </div>
           </div>
-          <div class="text-[10px] text-base-content/50 mt-1.5">
-            {% if g.achieved %}<span class="text-emerald-400 font-medium">Already reached{% if g.achieved_at %} on {{ g.achieved_at|date:"d M Y" }}{% endif %}</span>
-            {% elif g.monthly_needed %}Requires {{ g.monthly_needed|inr }}/mo over {{ g.months_left }} months
-            {% else %}{{ g.remaining|inr }} remaining corpus{% endif %}
           </div>
+          {% endfor %}{% endfor %}
         </div>
-        {% endfor %}{% endfor %}
       </div>
       {% else %}
-      <div class="p-6 text-center text-xs text-base-content/50">
+      <div class="p-5 text-center text-xs text-base-content/50">
         No upcoming multi-year targets recorded. Plan the next financial year to model required monthly capital additions.
       </div>
       {% endif %}
     </div>
   </div>
 
-  {# Historical Track Record #}
+  {# Historical Track Record — Compact Self-Sized Full-Width Ledger #}
   <div class="v-panel">
     <div class="v-panel-header">
       <h3 class="v-panel-title">
@@ -257,18 +272,22 @@
         Closed FY Track Record
       </h3>
       {% if rm.track_record.total %}
-      <span class="v-delta v-delta-pos text-[11px] py-0.5 px-2">
+      <span class="v-delta {% if rm.track_record.hit == rm.track_record.total %}v-delta-pos{% elif rm.track_record.hit > 0 %}v-delta-caution{% else %}v-delta-neutral{% endif %} text-xs py-0.5 px-2 tabular-nums">
         {{ rm.track_record.hit }}/{{ rm.track_record.total }} Targets Hit
       </span>
+      {% elif rm.closed %}
+      <span class="v-delta v-delta-neutral text-xs py-0.5 px-2">Awaiting Snapshot</span>
       {% endif %}
     </div>
     <div class="v-panel-body p-0">
       {% if rm.closed %}
-      <div class="v-table-wrap max-h-72 overflow-y-auto">
+      {# Desktop / Tablet Table #}
+      <div class="v-panel-table hidden sm:block max-h-72 overflow-y-auto">
         <table class="v-table">
           <thead>
             <tr>
               <th>Financial Year</th>
+              <th>Milestone</th>
               <th class="v-num">Target</th>
               <th class="v-num">Closed Value</th>
               <th class="text-right">Verdict</th>
@@ -276,25 +295,25 @@
           </thead>
           <tbody>
             {% for y in rm.closed %}{% for g in y.goals %}
-            <tr class="cursor-pointer" {% include 'portfolio/_goal_edit_attrs.html' %}>
-              <td>
-                <div class="font-semibold text-base-content">{{ g.fy }}</div>
-                <div class="text-[11px] text-base-content/50">{{ g.label }}</div>
-              </td>
-              <td class="v-num">
+            <tr class="cursor-pointer hover:bg-base-content/4" {% include 'portfolio/_goal_edit_attrs.html' %}>
+              <td class="font-semibold text-xs text-base-content whitespace-nowrap tabular-nums">{{ g.fy }}</td>
+              <td class="text-xs text-base-content/70">{{ g.label }}</td>
+              <td class="v-num text-xs">
                 {{ g.target|inr }}
                 {% if exclude_re and g.is_re_deducted %}
-                <div class="text-[10px] text-base-content/40">Base: {{ g.raw_target|inr }}</div>
+                <div class="text-xs text-base-content/45">Base: {{ g.raw_target|inr }}</div>
                 {% endif %}
               </td>
-              <td class="v-num">
-                {% if g.closing_value is not None %}{{ g.closing_value|inr }}{% else %}<span class="text-base-content/30">&mdash;</span>{% endif %}
+              <td class="v-num text-xs font-semibold">
+                {% if g.closing_value is not None %}{{ g.closing_value|inr }}{% else %}<span class="text-base-content/35">&mdash;</span>{% endif %}
               </td>
               <td class="text-right">
-                {% if g.achieved %}
+                {% if g.status == 'achieved' %}
                 <span class="v-delta v-delta-pos text-xs">Achieved</span>
+                {% elif g.status == 'unrecorded' %}
+                <span class="v-delta v-delta-neutral text-xs" title="No March 31 closing snapshot recorded for {{ g.fy }}">No Snapshot</span>
                 {% else %}
-                <span class="v-delta v-delta-neg text-xs">Missed{% if g.closing_value is not None %} · {{ g.pct }}%{% endif %}</span>
+                <span class="v-delta v-delta-neg text-xs tabular-nums">Missed &middot; {{ g.pct }}%</span>
                 {% endif %}
               </td>
             </tr>
@@ -302,8 +321,43 @@
           </tbody>
         </table>
       </div>
+
+      {# Mobile Rows #}
+      <div class="sm:hidden divide-y divide-[var(--v-hairline)] max-h-72 overflow-y-auto">
+        {% for y in rm.closed %}{% for g in y.goals %}
+        <div class="v-mobile-row flex-col !items-stretch gap-1.5 cursor-pointer" {% include 'portfolio/_goal_edit_attrs.html' %}>
+          <div class="w-full flex items-center justify-between gap-2">
+            <div>
+              <span class="font-bold text-xs text-base-content">{{ g.fy }}</span>
+              <span class="text-xs text-base-content/55 ml-1.5">{{ g.label }}</span>
+            </div>
+            {% if g.status == 'achieved' %}
+            <span class="v-delta v-delta-pos text-xs py-0 px-1.5">Achieved</span>
+            {% elif g.status == 'unrecorded' %}
+            <span class="v-delta v-delta-neutral text-xs py-0 px-1.5">No Snapshot</span>
+            {% else %}
+            <span class="v-delta v-delta-neg text-xs py-0 px-1.5 tabular-nums">Missed &middot; {{ g.pct }}%</span>
+            {% endif %}
+          </div>
+          <div class="w-full flex items-center justify-between text-xs tabular-nums text-base-content/65">
+            <span>Target: <strong class="text-base-content">{{ g.target|inr }}</strong></span>
+            <span>Closed: <strong class="text-base-content">{% if g.closing_value is not None %}{{ g.closing_value|inr }}{% else %}&mdash;{% endif %}</strong></span>
+          </div>
+        </div>
+        {% endfor %}{% endfor %}
+      </div>
+
+      <div class="px-4 py-2.5 border-t border-[var(--v-hairline)] bg-base-200/15 flex flex-wrap items-center justify-between gap-2 text-xs text-base-content/45">
+        <span class="inline-flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-sm text-base-content/40">lock_clock</span>
+          Audited against March 31 fiscal closing snapshots
+        </span>
+        {% if rm.track_record.unrecorded %}
+        <span class="tabular-nums">{{ rm.track_record.unrecorded }} cycle without March closing snapshot</span>
+        {% endif %}
+      </div>
       {% else %}
-      <div class="p-6 text-center text-xs text-base-content/50">
+      <div class="p-5 text-center text-xs text-base-content/50">
         Closed financial years appear here with an achieved or missed audit verdict, locked at the March 31 fiscal snapshot.
       </div>
       {% endif %}
@@ -313,8 +367,8 @@
 
 {% else %}
 <div class="v-empty my-4">
-  <div class="v-empty-icon">
-    <span class="material-symbols-outlined text-2xl text-primary">flag</span>
+  <div class="v-empty-icon text-indigo-400">
+    <span class="material-symbols-outlined text-2xl">flag</span>
   </div>
   <h3 class="v-empty-title">No Financial Year Goals Configured</h3>
   <p class="v-empty-desc">Set an annual net-worth target for {{ rm.cur_fy_label|default:"this financial year" }}. Vault calculates pace run-rates against market compounding and archives your track record.</p>

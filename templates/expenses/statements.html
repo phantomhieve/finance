@@ -10,13 +10,13 @@
     <p class="v-subtitle">Password-protected PDF unlocking &amp; 3-stage transaction reconciliation</p>
   </div>
   <div class="v-toolbar">
-    <a href="{% url 'expenses_home' %}" class="v-btn v-btn-secondary">
-      <span class="material-symbols-outlined text-[17px]">arrow_back</span>
+    <a href="{% url 'expenses_home' %}" class="v-btn v-btn-secondary !min-h-11 lg:!min-h-9">
+      <span class="material-symbols-outlined text-lg">arrow_back</span>
       <span>Expenses</span>
     </a>
     {% if cards %}
-    <button type="button" class="v-btn v-btn-primary" onclick="openModal('uploadModal')">
-      <span class="material-symbols-outlined text-[17px]">upload_file</span>
+    <button type="button" class="v-btn v-btn-primary !min-h-11 lg:!min-h-9" onclick="openModal('uploadModal')">
+      <span class="material-symbols-outlined text-lg">upload_file</span>
       <span>Upload Statement</span>
     </button>
     {% endif %}
@@ -31,56 +31,118 @@
   {# Left Lead Cell: Reconciliation summary #}
   <div class="v-lead-cell">
     <div class="v-lead-label">
-      <span>Reconciliation Center</span>
-      <span class="badge badge-xs bg-primary/15 text-primary border border-primary/25 font-bold">{{ statements|length }} Statement{{ statements|length|pluralize }}</span>
-    </div>
-    <div class="v-lead-figure-row">
-      <span class="v-lead-figure text-base-content">
-        {% with unpaid_total=0 %}
-          {# Compute total unpaid in context #}
-          Credit Card Statements
-        {% endwith %}
+      <span>Statement Reconciliation Ledger</span>
+      <span class="text-xs font-semibold text-base-content/60 tabular-nums px-2 py-0.5 rounded-full bg-base-content/5 border border-base-content/10">
+        {{ cards|length }} Card{{ cards|length|pluralize }} Registered
       </span>
     </div>
-    <div class="v-lead-sub">
-      Statements in connected inboxes are unlocked automatically using AES-GCM encrypted passwords. Each line is cross-matched against your real-time bank alert emails.
+    <div class="v-lead-figure-row">
+      <span class="v-lead-figure tabular-nums" id="stmtLeadFigure">
+        {{ statements|length }} Statement{{ statements|length|pluralize }}
+      </span>
+      <span id="stmtLeadBadge" class="v-delta v-delta-neutral hidden tabular-nums"></span>
     </div>
+    <div class="v-lead-sub" id="stmtLeadSub">
+      {% if statements %}
+        Latest statement cycle: {{ statements.0.payment_source.display_name }}{% if statements.0.statement_date %} · {{ statements.0.statement_date|date:"j M Y" }}{% endif %}. Encrypted PDF passwords unlock statements automatically.
+      {% else %}
+        Statements in connected inboxes unlock automatically using AES-GCM encrypted passwords and cross-match against bank alert emails.
+      {% endif %}
+    </div>
+
+    {% if statements %}
+    <div class="v-horizon" id="stmtHorizonWrap">
+      <div class="v-horizon-bar" id="stmtHorizonBar">
+        <span class="v-horizon-seg" style="width:100%;background:var(--v-gain)"></span>
+      </div>
+      <div class="v-horizon-legend" id="stmtHorizonLegend">
+        <div class="v-horizon-item">
+          <span class="v-horizon-dot" style="background:var(--v-gain)"></span>
+          <span>Parsed:</span>
+          <span class="v-horizon-amount tabular-nums" id="stmtLegendParsed">0</span>
+        </div>
+        <div class="v-horizon-item">
+          <span class="v-horizon-dot" style="background:var(--v-caution)"></span>
+          <span>Action Needed:</span>
+          <span class="v-horizon-amount tabular-nums" id="stmtLegendAction">0</span>
+        </div>
+        <div class="v-horizon-item">
+          <span class="v-horizon-dot" style="background:var(--v-secondary)"></span>
+          <span>Paid Cycles:</span>
+          <span class="v-horizon-amount tabular-nums" id="stmtLegendPaid">0</span>
+        </div>
+      </div>
+    </div>
+    {% endif %}
   </div>
 
   {# Right Hairline Grid: Stats #}
   <div class="v-stat-grid">
     <div class="v-stat-cell">
       <div class="v-stat-label">Registered Cards</div>
-      <div class="v-stat-value text-base-content">{{ cards|length }}</div>
+      <div class="v-stat-value text-base-content tabular-nums">{{ cards|length }}</div>
       <div class="v-stat-sub">Active credit accounts</div>
     </div>
     <div class="v-stat-cell">
-      <div class="v-stat-label">Import Cadence</div>
-      <div class="v-stat-value text-secondary">Hourly</div>
-      <div class="v-stat-sub">Gmail read-only sync</div>
+      <div class="v-stat-label">Unpaid Statements</div>
+      <div class="v-stat-value text-secondary tabular-nums" id="stmtStatUnpaid">—</div>
+      <div class="v-stat-sub tabular-nums" id="stmtStatUnpaidSub">Current open bills</div>
     </div>
-    <div class="v-stat-cell col-span-2">
-      <div class="v-stat-label">Reconciliation Pipeline</div>
-      <div class="v-stat-value text-emerald-400">3-Stage Audit</div>
-      <div class="v-stat-sub">Exact rule match → Semantic AI match → Discrepancy triage</div>
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Password / Review</div>
+      <div class="v-stat-value text-amber-400 tabular-nums" id="stmtStatAttention">—</div>
+      <div class="v-stat-sub">Awaiting unlock or check</div>
+    </div>
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Audit Pipeline</div>
+      <div class="v-stat-value text-emerald-400">3-Stage</div>
+      <div class="v-stat-sub">Rule → AI → Triage</div>
     </div>
   </div>
 </div>
 
 {# --- STATEMENTS REGISTER TABLE / WORKBENCH --- #}
 <div class="v-panel animate-up">
-  <div class="v-panel-header">
+  <div class="v-panel-header flex-wrap gap-2">
     <h2 class="v-panel-title">
       <span class="material-symbols-outlined text-base text-secondary">receipt</span>
       Statement Register
     </h2>
-    <span class="text-xs text-base-content/50 font-mono">{{ statements|length }} record{{ statements|length|pluralize }}</span>
+    <span class="text-xs text-base-content/55 font-mono tabular-nums" id="stmtVisibleCount">{{ statements|length }} record{{ statements|length|pluralize }}</span>
   </div>
 
   {% if statements %}
+  {# Filter & Card Selector Bar #}
+  <div class="v-filter-bar px-3.5 py-3 border-b border-[var(--v-hairline)] bg-base-200/50 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+    <div class="v-pill-rail flex gap-1.5 overflow-x-auto scrollbar-hide py-0.5 pr-4 touch-pan-x" role="tablist" aria-label="Filter statements by status">
+      <button type="button" class="filter-pill !min-h-11 lg:!min-h-8 is-active stmt-filter-btn cursor-pointer" data-filter="ALL" onclick="filterStatements('ALL', this)">
+        All <span class="opacity-70 tabular-nums">({{ statements|length }})</span>
+      </button>
+      <button type="button" class="filter-pill !min-h-11 lg:!min-h-8 stmt-filter-btn cursor-pointer" data-filter="UNPAID" onclick="filterStatements('UNPAID', this)">
+        <span class="material-symbols-outlined text-xs text-secondary">schedule</span>Unpaid <span class="opacity-70 tabular-nums" id="pillUnpaidCount"></span>
+      </button>
+      <button type="button" class="filter-pill !min-h-11 lg:!min-h-8 stmt-filter-btn cursor-pointer" data-filter="PASSWORD" onclick="filterStatements('PASSWORD', this)">
+        <span class="material-symbols-outlined text-xs text-amber-400">lock</span>Needs Password <span class="opacity-70 tabular-nums" id="pillPwdCount"></span>
+      </button>
+      <button type="button" class="filter-pill !min-h-11 lg:!min-h-8 stmt-filter-btn cursor-pointer" data-filter="REVIEW" onclick="filterStatements('REVIEW', this)">
+        <span class="material-symbols-outlined text-xs text-warning">warning</span>Needs Review <span class="opacity-70 tabular-nums" id="pillRevCount"></span>
+      </button>
+      <button type="button" class="filter-pill !min-h-11 lg:!min-h-8 stmt-filter-btn cursor-pointer" data-filter="PAID" onclick="filterStatements('PAID', this)">
+        <span class="material-symbols-outlined text-xs text-emerald-400">check_circle</span>Paid
+      </button>
+    </div>
+
+    {% if cards|length > 1 %}
+    <select id="stmtCardFilter" aria-label="Filter statements by credit card" onchange="filterStatements()" class="v-input select select-bordered w-full sm:w-52 min-h-11 lg:min-h-9 bg-base-100 rounded-xl text-base sm:text-xs">
+      <option value="">All cards ({{ cards|length }})</option>
+      {% for c in cards %}<option value="{{ c.pk }}">{{ c.display_name }}</option>{% endfor %}
+    </select>
+    {% endif %}
+  </div>
+
   {# Desktop Institutional Table #}
-  <div class="v-table-wrap hidden md:block overflow-x-auto">
-    <table class="v-table">
+  <div class="v-table-wrap hidden md:block overflow-x-auto !border-0 !rounded-none">
+    <table class="v-table" id="stmtTable">
       <thead>
         <tr>
           <th>Card / Issuer</th>
@@ -88,26 +150,31 @@
           <th>Reconciliation Status</th>
           <th>Due Date</th>
           <th class="v-num">Total Due</th>
-          <th class="text-center">Action</th>
+          <th class="text-right">Action</th>
         </tr>
       </thead>
       <tbody>
         {% for st in statements %}
-        <tr>
+        <tr class="stmt-row"
+            data-card="{{ st.payment_source_id }}"
+            data-paid="{% if st.is_paid %}1{% else %}0{% endif %}"
+            data-status="{{ st.status }}"
+            data-review="{{ st.review_count|default:0 }}"
+            data-due="{{ st.total_due|default:0 }}">
           <td>
             <div class="flex items-center gap-2.5">
-              <span class="jw-type-avatar shrink-0" style="--h:{% if st.is_paid %}150{% elif st.due_date and st.due_date < today %}0{% else %}210{% endif %};width:2.2rem;height:2.2rem;border-radius:.65rem">
+              <span class="jw-type-avatar shrink-0" style="--h:{% if st.is_paid %}150{% elif st.due_date and st.due_date < today %}0{% elif st.status == 'NEEDS_PASSWORD' %}40{% else %}210{% endif %};width:2.25rem;height:2.25rem;border-radius:0.75rem">
                 <span class="icon-filled material-symbols-outlined text-base">{% if st.is_paid %}task_alt{% elif st.status == 'NEEDS_PASSWORD' %}lock{% else %}credit_card{% endif %}</span>
               </span>
-              <div>
-                <a href="{% url 'expenses_statement_detail' st.pk %}" class="font-bold text-sm text-base-content hover:text-primary transition-colors block">
-                  {{ st.payment_source.display_name }}
+              <div class="min-w-0">
+                <a href="{% url 'expenses_statement_detail' st.pk %}" class="font-bold text-sm text-base-content hover:text-primary transition-colors inline-flex items-center !min-h-11 lg:!min-h-6 max-w-full truncate">
+                  <span class="truncate">{{ st.payment_source.display_name }}</span>
                 </a>
-                <span class="text-[11px] opacity-50 block font-mono">ID #{{ st.pk }}</span>
+                <span class="text-xs text-base-content/60 block font-mono tabular-nums">Statement #{{ st.pk }}</span>
               </div>
             </div>
           </td>
-          <td class="text-xs">
+          <td class="text-xs tabular-nums">
             {% if st.statement_date %}
               <span class="font-semibold text-base-content">{{ st.statement_date|date:"j M Y" }}</span>
             {% else %}
@@ -117,49 +184,55 @@
           <td>
             {% if st.status == 'PARSED' %}
               <div class="flex items-center gap-1.5 flex-wrap">
-                <span class="v-delta v-delta-pos text-[10px] py-0.5">Parsed</span>
-                <span class="text-[11px] opacity-70">
+                <span class="v-delta v-delta-pos text-xs py-0.5">Parsed</span>
+                <span class="text-xs text-base-content/80 tabular-nums">
                   {{ st.matched_count }} matched{% if st.added_count %} · <strong class="text-info">{{ st.added_count }} added</strong>{% endif %}
                 </span>
                 {% if st.review_count %}
-                <span class="badge badge-xs badge-warning font-semibold">{{ st.review_count }} review</span>
+                <span class="badge badge-xs badge-warning font-semibold tabular-nums">{{ st.review_count }} review</span>
                 {% endif %}
               </div>
             {% elif st.status == 'NEEDS_PASSWORD' %}
-              <span class="v-delta v-delta-caution text-[10px] py-0.5">
+              <span class="v-delta v-delta-caution text-xs py-0.5">
                 <span class="material-symbols-outlined text-xs">lock</span>Needs Password
               </span>
             {% elif st.status == 'DUPLICATE' %}
-              <span class="v-delta v-delta-neutral text-[10px] py-0.5">Duplicate (Ignored)</span>
+              <span class="v-delta v-delta-neutral text-xs py-0.5">Duplicate (Ignored)</span>
             {% elif st.status == 'FAILED' %}
-              <span class="v-delta v-delta-neg text-[10px] py-0.5">PDF Read Failed</span>
+              <span class="v-delta v-delta-neg text-xs py-0.5">PDF Read Failed</span>
             {% else %}
-              <span class="v-delta v-delta-neutral text-[10px] py-0.5">Email Totals Only</span>
+              <span class="v-delta v-delta-neutral text-xs py-0.5">Email Totals Only</span>
             {% endif %}
           </td>
-          <td class="text-xs">
+          <td class="text-xs tabular-nums">
             {% if st.is_paid %}
-              <span class="text-emerald-400 font-bold flex items-center gap-1">
+              <span class="text-emerald-400 font-bold inline-flex items-center gap-1">
                 <span class="material-symbols-outlined text-xs">check_circle</span>Paid
               </span>
             {% elif st.due_date %}
-              <span class="font-semibold tabular-nums {% if st.due_date < today %}text-error{% else %}text-base-content/80{% endif %}">
+              <span class="font-semibold {% if st.due_date < today %}text-error{% else %}text-base-content/85{% endif %}">
                 {{ st.due_date|date:"j M Y" }}
               </span>
+              {% if st.due_date < today %}
+              <span class="block text-xs text-error font-semibold">Overdue</span>
+              {% endif %}
             {% else %}
-              <span class="opacity-30">-</span>
+              <span class="opacity-35">—</span>
             {% endif %}
           </td>
-          <td class="v-num font-bold text-sm">
+          <td class="v-num font-bold text-sm tabular-nums">
             {% if st.total_due is not None %}
               <span class="text-base-content">{{ st.total_due|inr }}</span>
+              {% if st.min_due and not st.is_paid %}
+              <span class="block text-xs font-normal text-base-content/60">Min {{ st.min_due|inr }}</span>
+              {% endif %}
             {% else %}
-              <span class="opacity-30">-</span>
+              <span class="opacity-35">—</span>
             {% endif %}
           </td>
-          <td class="text-center">
-            <a href="{% url 'expenses_statement_detail' st.pk %}" class="v-btn v-btn-secondary v-btn-xs gap-1">
-              <span>Inspect</span>
+          <td class="text-right">
+            <a href="{% url 'expenses_statement_detail' st.pk %}" class="v-btn v-btn-secondary !min-h-11 lg:!min-h-9 px-3 text-xs gap-1">
+              <span>{% if st.status == 'NEEDS_PASSWORD' %}Unlock{% else %}Inspect{% endif %}</span>
               <span class="material-symbols-outlined text-xs">arrow_forward</span>
             </a>
           </td>
@@ -169,47 +242,79 @@
     </table>
   </div>
 
-  {# Mobile Card List #}
-  <div class="md:hidden divide-y divide-base-content/8">
+  {# Mobile Ledger List (flush hairline rows via .v-mobile-row — zero nested cards) #}
+  <div class="md:hidden" id="stmtMobileList">
     {% for st in statements %}
-    <a href="{% url 'expenses_statement_detail' st.pk %}" class="p-3.5 flex items-center gap-3 hover:bg-base-content/5 transition-all block">
-      <span class="jw-type-avatar shrink-0" style="--h:{% if st.is_paid %}150{% elif st.due_date and st.due_date < today %}0{% else %}210{% endif %};width:2.4rem;height:2.4rem;border-radius:.75rem">
+    <a href="{% url 'expenses_statement_detail' st.pk %}"
+       class="v-mobile-row stmt-mobile-row p-3.5 min-h-16 flex items-center gap-3 hover:bg-[var(--v-hover)] transition-all"
+       data-card="{{ st.payment_source_id }}"
+       data-paid="{% if st.is_paid %}1{% else %}0{% endif %}"
+       data-status="{{ st.status }}"
+       data-review="{{ st.review_count|default:0 }}">
+      <span class="jw-type-avatar shrink-0" style="--h:{% if st.is_paid %}150{% elif st.due_date and st.due_date < today %}0{% elif st.status == 'NEEDS_PASSWORD' %}40{% else %}210{% endif %};width:2.5rem;height:2.5rem;border-radius:.75rem">
         <span class="icon-filled material-symbols-outlined text-base">{% if st.is_paid %}task_alt{% elif st.status == 'NEEDS_PASSWORD' %}lock{% else %}credit_card{% endif %}</span>
       </span>
       <div class="flex-1 min-w-0">
         <div class="flex items-center justify-between gap-2">
-          <span class="font-bold text-xs truncate text-base-content">{{ st.payment_source.display_name }}</span>
-          <span class="text-xs font-bold tabular-nums text-base-content">{% if st.total_due is not None %}{{ st.total_due|inr }}{% else %}-{% endif %}</span>
+          <span class="font-bold text-sm truncate text-base-content">{{ st.payment_source.display_name }}</span>
+          <span class="text-sm font-bold tabular-nums text-base-content shrink-0">{% if st.total_due is not None %}{{ st.total_due|inr }}{% else %}—{% endif %}</span>
         </div>
-        <div class="text-[11px] opacity-60 flex items-center justify-between gap-2 mt-0.5">
-          <span>{% if st.statement_date %}{{ st.statement_date|date:"j M Y" }}{% else %}{{ st.created_at|date:"j M" }}{% endif %}</span>
+        <div class="text-xs flex items-center justify-between gap-2 mt-1 flex-wrap">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span class="text-base-content/60 tabular-nums">{% if st.statement_date %}{{ st.statement_date|date:"j M Y" }}{% else %}{{ st.created_at|date:"j M" }}{% endif %}</span>
+            {% if st.status == 'NEEDS_PASSWORD' %}
+              <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/25">
+                <span class="material-symbols-outlined text-xs">lock</span>Unlock PDF
+              </span>
+            {% elif st.review_count %}
+              <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/25 tabular-nums">
+                {{ st.review_count }} review
+              </span>
+            {% elif st.status == 'PARSED' %}
+              <span class="text-xs text-emerald-400 font-semibold tabular-nums">{{ st.matched_count }} matched{% if st.added_count %} · +{{ st.added_count }}{% endif %}</span>
+            {% elif st.status == 'FAILED' %}
+              <span class="text-xs text-error font-semibold">Read failed</span>
+            {% endif %}
+          </div>
           {% if st.is_paid %}
-            <span class="text-emerald-400 font-semibold">Paid</span>
+            <span class="text-emerald-400 font-semibold inline-flex items-center gap-0.5"><span class="material-symbols-outlined text-xs">check_circle</span>Paid</span>
           {% elif st.due_date %}
-            <span class="{% if st.due_date < today %}text-error font-semibold{% else %}opacity-75{% endif %}">Due {{ st.due_date|date:"j M" }}</span>
+            <span class="tabular-nums text-xs {% if st.due_date < today %}text-error font-semibold{% else %}text-base-content/60{% endif %}">{% if st.due_date < today %}Overdue {% else %}Due {% endif %}{{ st.due_date|date:"j M" }}</span>
           {% endif %}
         </div>
       </div>
-      <span class="material-symbols-outlined text-base opacity-40">chevron_right</span>
+      <span class="material-symbols-outlined text-base opacity-40 shrink-0">chevron_right</span>
     </a>
     {% endfor %}
   </div>
 
+  <div id="stmtFilterEmpty" class="v-empty hidden py-12 px-4 text-center flex-col items-center justify-center gap-2">
+    <span class="material-symbols-outlined text-2xl opacity-40">filter_alt_off</span>
+    <p class="text-sm font-bold text-base-content">No statements match this filter</p>
+    <button type="button" class="v-btn v-btn-secondary !min-h-11 lg:!min-h-8 mt-1" onclick="resetStatementFilters()">Show all statements</button>
+  </div>
+
   {% else %}
   {# Empty State #}
-  <div class="py-16 px-4 text-center flex flex-col items-center justify-center gap-3">
+  <div class="v-empty py-16 px-4 text-center flex flex-col items-center justify-center gap-3">
     <div class="w-14 h-14 rounded-2xl bg-secondary/10 border border-secondary/20 flex items-center justify-center">
       <span class="icon-filled material-symbols-outlined text-3xl text-secondary">request_quote</span>
     </div>
     <p class="font-bold text-base text-base-content">No card statements imported yet</p>
-    <p class="text-xs opacity-50 max-w-sm">
+    <p class="text-xs opacity-60 max-w-sm">
       {% if cards %}Statements will automatically appear here as banks email monthly PDFs, or you can manually upload one below.{% else %}Connect Gmail or register your credit card in settings to begin receiving statements.{% endif %}
     </p>
-    {% if cards %}
-    <button type="button" class="v-btn v-btn-primary v-btn-sm gap-1.5 mt-2" onclick="openModal('uploadModal')">
-      <span class="material-symbols-outlined text-base">upload_file</span>Upload Statement PDF
-    </button>
-    {% endif %}
+    <div class="flex items-center gap-2 mt-2">
+      {% if cards %}
+      <button type="button" class="v-btn v-btn-primary !min-h-11 lg:!min-h-9 gap-1.5" onclick="openModal('uploadModal')">
+        <span class="material-symbols-outlined text-base">upload_file</span>Upload Statement PDF
+      </button>
+      {% else %}
+      <a href="{% url 'expenses_settings' %}#cards" class="v-btn v-btn-primary !min-h-11 lg:!min-h-9 gap-1.5">
+        <span class="material-symbols-outlined text-base">add_card</span>Register Credit Card
+      </a>
+      {% endif %}
+    </div>
   </div>
   {% endif %}
 </div>
@@ -217,52 +322,252 @@
 {% if cards %}
 {# Upload Statement Dialog Modal #}
 <dialog id="uploadModal" class="modal modal-bottom sm:modal-middle">
-  <div class="modal-box max-w-md p-5 bg-base-100 border border-base-content/10 shadow-2xl rounded-2xl">
-    <div class="flex items-center justify-between mb-4 pb-3 border-b border-base-content/8">
-      <div class="flex items-center gap-2">
+  <div class="modal-box max-w-md p-5 bg-base-100 border border-[var(--v-hairline)] shadow-2xl rounded-t-2xl sm:rounded-2xl">
+    <div class="v-modal-header flex items-center justify-between mb-4 pb-3 border-b border-[var(--v-hairline)]">
+      <div class="flex items-center gap-2.5 min-w-0">
         <span class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
           <span class="material-symbols-outlined text-lg">upload_file</span>
         </span>
-        <div>
-          <h3 class="font-bold text-base text-base-content">Upload Statement PDF</h3>
-          <p class="text-[11px] opacity-60">Parse statement lines and reconcile</p>
+        <div class="min-w-0">
+          <h3 class="font-bold text-base text-base-content truncate">Upload Statement PDF</h3>
+          <p class="text-[11px] opacity-60 truncate">Parse statement lines and reconcile</p>
         </div>
       </div>
-      <button type="button" class="btn btn-ghost btn-xs btn-circle text-base-content/60" onclick="closeModal('uploadModal')" aria-label="Close">✕</button>
+      <button type="button" class="v-icon-btn btn btn-ghost btn-sm btn-circle !min-h-11 !min-w-11 lg:!min-h-9 lg:!min-w-9 text-base-content/60 hover:text-base-content cursor-pointer" onclick="closeModal('uploadModal')" aria-label="Close">
+        <span class="material-symbols-outlined text-lg">close</span>
+      </button>
     </div>
 
     <form method="post" action="{% url 'expenses_statement_upload' %}" enctype="multipart/form-data" class="flex flex-col gap-3.5">
       {% csrf_token %}
       <label class="flex flex-col gap-1">
-        <span class="text-[11px] font-semibold text-base-content/70">Card Account</span>
-        <select name="payment_source" required class="select select-bordered select-sm w-full bg-base-100 rounded-lg text-xs">
+        <span class="text-xs font-semibold text-base-content/85">Card Account</span>
+        <select name="payment_source" required class="v-input select select-bordered w-full min-h-11 lg:min-h-10 bg-base-100 rounded-xl text-base sm:text-sm">
           {% for c in cards %}<option value="{{ c.pk }}">{{ c.display_name }}</option>{% endfor %}
         </select>
       </label>
 
-      <label class="flex flex-col gap-1">
-        <span class="text-[11px] font-semibold text-base-content/70">Statement PDF File</span>
-        <input type="file" name="pdf" accept="application/pdf" required class="file-input file-input-bordered file-input-sm w-full bg-base-100 rounded-lg text-xs">
+      {# Statement PDF Drag-and-Drop Dropzone #}
+      <div class="flex flex-col gap-1">
+        <span class="text-xs font-semibold text-base-content/85">Statement PDF File</span>
+        <div id="stmtDropzone"
+             class="border-2 border-dashed border-base-content/15 rounded-xl p-5 text-center flex flex-col items-center justify-center gap-2 bg-base-200/40 hover:bg-base-200/70 hover:border-primary/40 transition-all cursor-pointer relative"
+             onclick="document.getElementById('stmtPdfInput').click()">
+          <input type="file" name="pdf" id="stmtPdfInput" accept="application/pdf" required
+                 class="sr-only" onchange="handleStmtFileSelected(this)">
+          <div class="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center pointer-events-none">
+            <span class="material-symbols-outlined text-2xl">picture_as_pdf</span>
+          </div>
+          <div class="pointer-events-none">
+            <p class="text-xs font-bold text-base-content" id="stmtFileName">Drag &amp; drop statement PDF, or browse</p>
+            <p class="text-xs text-base-content/60 mt-0.5" id="stmtFileSize">Official credit card monthly e-statement (.pdf)</p>
+          </div>
+          <span class="inline-flex items-center gap-1 text-xs text-emerald-400 font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 pointer-events-none">
+            <span class="material-symbols-outlined text-xs">shield_lock</span>
+            <span>AES-GCM Password Encryption</span>
+          </span>
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-1">
+        <label for="stmtUploadPwd" class="text-xs font-semibold text-base-content/75">Password (if password-protected)</label>
+        <div class="relative w-full">
+          <input type="password" id="stmtUploadPwd" name="password" autocomplete="off"
+                 class="v-input input input-bordered w-full min-h-11 lg:min-h-10 !pr-12 bg-base-100 rounded-xl text-base sm:text-sm"
+                 placeholder="Leave blank to use saved card password">
+          <button type="button"
+                  class="v-icon-btn absolute right-1 inset-y-0 my-auto !min-h-9 !min-w-9 flex items-center justify-center rounded-lg text-base-content/55 hover:text-base-content z-10 cursor-pointer"
+                  aria-label="Toggle password visibility"
+                  onclick="var i=this.previousElementSibling;i.type=i.type==='password'?'text':'password';this.querySelector('span').textContent=i.type==='password'?'visibility':'visibility_off'">
+            <span class="material-symbols-outlined text-base">visibility</span>
+          </button>
+        </div>
+      </div>
+
+      <label class="flex items-center gap-2.5 cursor-pointer min-h-11 py-1">
+        <input type="checkbox" name="save_password" checked class="checkbox checkbox-sm checkbox-primary rounded">
+        <span class="text-xs text-base-content/85 font-medium">Save password for future statements of this card</span>
       </label>
 
-      <label class="flex flex-col gap-1">
-        <span class="text-[11px] font-semibold text-base-content/70">Password (if password-protected)</span>
-        <input type="password" name="password" autocomplete="off" class="input input-bordered input-sm w-full bg-base-100 rounded-lg text-sm" placeholder="Leave blank to use saved card password">
-      </label>
-
-      <label class="flex items-center gap-2 cursor-pointer py-1">
-        <input type="checkbox" name="save_password" checked class="checkbox checkbox-xs checkbox-primary rounded">
-        <span class="text-xs text-base-content/80 font-medium">Save password for future statements of this card</span>
-      </label>
-
-      <div class="flex items-center justify-end gap-2 pt-3 border-t border-base-content/8">
-        <button type="button" class="btn btn-ghost btn-sm rounded-lg" onclick="closeModal('uploadModal')">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm px-4 rounded-lg font-bold">Upload &amp; Reconcile</button>
+      <div class="v-modal-footer flex items-center justify-end gap-2 pt-3 border-t border-[var(--v-hairline)]">
+        <button type="button" class="btn btn-ghost btn-sm !min-h-11 lg:!min-h-9 px-3.5 rounded-lg cursor-pointer" onclick="closeModal('uploadModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary btn-sm !min-h-11 lg:!min-h-9 px-4 rounded-lg font-bold cursor-pointer">Upload &amp; Reconcile</button>
       </div>
     </form>
   </div>
   <form method="dialog" class="modal-backdrop"><button>close</button></form>
 </dialog>
 {% endif %}
+
+<script>
+function handleStmtFileSelected(input) {
+  var nameEl = document.getElementById('stmtFileName');
+  var sizeEl = document.getElementById('stmtFileSize');
+  var dropzone = document.getElementById('stmtDropzone');
+  if (input && input.files && input.files[0]) {
+    var file = input.files[0];
+    if (nameEl) nameEl.textContent = file.name;
+    if (sizeEl) sizeEl.textContent = (file.size / 1024 / 1024).toFixed(2) + ' MB · Ready to reconcile';
+    if (dropzone) {
+      dropzone.classList.add('border-primary/50', 'bg-primary/5');
+      dropzone.classList.remove('border-dashed');
+    }
+  }
+}
+(function() {
+  var dropzone = document.getElementById('stmtDropzone');
+  var fileInput = document.getElementById('stmtPdfInput');
+  if (dropzone && fileInput) {
+    ['dragenter', 'dragover'].forEach(function(eventName) {
+      dropzone.addEventListener(eventName, function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.add('border-primary', 'bg-primary/10');
+      }, false);
+    });
+    ['dragleave', 'drop'].forEach(function(eventName) {
+      dropzone.addEventListener(eventName, function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        dropzone.classList.remove('border-primary', 'bg-primary/10');
+      }, false);
+    });
+    dropzone.addEventListener('drop', function(e) {
+      var dt = e.dataTransfer;
+      if (dt && dt.files && dt.files.length) {
+        fileInput.files = dt.files;
+        handleStmtFileSelected(fileInput);
+      }
+    }, false);
+  }
+})();
+(function() {
+  var rows = document.querySelectorAll('.stmt-row');
+  var total = rows.length;
+  var unpaidCount = 0, unpaidSum = 0, pwdCount = 0, revCount = 0, parsedCount = 0, paidCount = 0;
+
+  rows.forEach(function(r) {
+    var isPaid = r.getAttribute('data-paid') === '1';
+    var status = r.getAttribute('data-status') || '';
+    var rev = parseInt(r.getAttribute('data-review') || '0', 10) || 0;
+    var due = parseFloat(r.getAttribute('data-due') || '0') || 0;
+
+    if (status !== 'DUPLICATE') {
+      if (isPaid) {
+        paidCount++;
+      } else {
+        unpaidCount++;
+        if (due > 0) unpaidSum += due;
+      }
+    }
+    if (status === 'NEEDS_PASSWORD' || status === 'FAILED') pwdCount++;
+    if (rev > 0) revCount++;
+    if (status === 'PARSED') parsedCount++;
+  });
+
+  function fmtInr(n) {
+    var rounded = Math.round(n);
+    return '₹' + rounded.toLocaleString('en-IN');
+  }
+
+  var statUnpaid = document.getElementById('stmtStatUnpaid');
+  var statUnpaidSub = document.getElementById('stmtStatUnpaidSub');
+  var statAttention = document.getElementById('stmtStatAttention');
+  if (statUnpaid) statUnpaid.textContent = String(unpaidCount);
+  if (statUnpaidSub) statUnpaidSub.textContent = unpaidCount > 0 ? (fmtInr(unpaidSum) + ' open due') : 'All statements settled';
+  if (statAttention) statAttention.textContent = String(pwdCount + revCount);
+
+  var leadFig = document.getElementById('stmtLeadFigure');
+  var leadBadge = document.getElementById('stmtLeadBadge');
+  if (total > 0 && leadFig) {
+    if (unpaidSum > 0) {
+      leadFig.textContent = fmtInr(unpaidSum);
+      if (leadBadge) {
+        leadBadge.textContent = unpaidCount + ' unpaid bill' + (unpaidCount === 1 ? '' : 's');
+        leadBadge.className = 'v-delta v-delta-caution tabular-nums';
+      }
+    } else if (paidCount > 0 && unpaidCount === 0) {
+      leadFig.textContent = '₹0 Due';
+      if (leadBadge) {
+        leadBadge.textContent = 'All ' + paidCount + ' settled';
+        leadBadge.className = 'v-delta v-delta-pos tabular-nums';
+      }
+    }
+  }
+
+  var pUnpaid = document.getElementById('pillUnpaidCount');
+  var pPwd = document.getElementById('pillPwdCount');
+  var pRev = document.getElementById('pillRevCount');
+  if (pUnpaid && unpaidCount) pUnpaid.textContent = '· ' + unpaidCount;
+  if (pPwd && pwdCount) pPwd.textContent = '· ' + pwdCount;
+  if (pRev && revCount) pRev.textContent = '· ' + revCount;
+
+  var hBar = document.getElementById('stmtHorizonBar');
+  var lParsed = document.getElementById('stmtLegendParsed');
+  var lAction = document.getElementById('stmtLegendAction');
+  var lPaid = document.getElementById('stmtLegendPaid');
+  if (lParsed) lParsed.textContent = String(parsedCount);
+  if (lAction) lAction.textContent = String(pwdCount + revCount);
+  if (lPaid) lPaid.textContent = String(paidCount);
+  if (hBar && total > 0) {
+    var actionN = pwdCount + revCount;
+    var okN = Math.max(0, total - actionN);
+    var okPct = Math.round((okN / total) * 100);
+    var actPct = Math.max(0, 100 - okPct);
+    hBar.innerHTML =
+      (okPct > 0 ? '<span class="v-horizon-seg" style="width:' + okPct + '%;background:var(--v-gain)"></span>' : '') +
+      (actPct > 0 ? '<span class="v-horizon-seg" style="width:' + actPct + '%;background:var(--v-caution)"></span>' : '');
+  }
+})();
+
+var _activeStmtFilter = 'ALL';
+function filterStatements(mode, btnEl) {
+  if (mode) {
+    _activeStmtFilter = mode;
+    document.querySelectorAll('.stmt-filter-btn').forEach(function(b) {
+      b.classList.toggle('is-active', b === btnEl);
+    });
+  }
+  var cardSel = document.getElementById('stmtCardFilter');
+  var cardId = cardSel ? cardSel.value : '';
+
+  function matches(el) {
+    if (cardId && el.getAttribute('data-card') !== cardId) return false;
+    var isPaid = el.getAttribute('data-paid') === '1';
+    var status = el.getAttribute('data-status') || '';
+    var rev = parseInt(el.getAttribute('data-review') || '0', 10) || 0;
+    if (_activeStmtFilter === 'UNPAID') return !isPaid && status !== 'DUPLICATE';
+    if (_activeStmtFilter === 'PAID') return isPaid;
+    if (_activeStmtFilter === 'PASSWORD') return status === 'NEEDS_PASSWORD' || status === 'FAILED';
+    if (_activeStmtFilter === 'REVIEW') return rev > 0;
+    return true;
+  }
+
+  var visible = 0;
+  document.querySelectorAll('.stmt-row').forEach(function(el) {
+    var show = matches(el);
+    el.classList.toggle('hidden', !show);
+    if (show) visible++;
+  });
+  document.querySelectorAll('.stmt-mobile-row').forEach(function(el) {
+    el.classList.toggle('hidden', !matches(el));
+  });
+
+  var countEl = document.getElementById('stmtVisibleCount');
+  if (countEl) countEl.textContent = visible + ' record' + (visible === 1 ? '' : 's');
+  var emptyEl = document.getElementById('stmtFilterEmpty');
+  if (emptyEl) {
+    emptyEl.classList.toggle('hidden', visible > 0);
+    emptyEl.classList.toggle('flex', visible === 0);
+  }
+}
+
+function resetStatementFilters() {
+  var cardSel = document.getElementById('stmtCardFilter');
+  if (cardSel) cardSel.value = '';
+  var firstBtn = document.querySelector('.stmt-filter-btn[data-filter="ALL"]');
+  filterStatements('ALL', firstBtn);
+}
+</script>
 
 {% endblock %}

@@ -277,7 +277,8 @@ def _months_until(today, deadline):
 def build_goal_roadmap(group, total_value, today=None, exclude_real_estate=False, real_estate_value=None):
     """Group portfolio goals by Indian FY with a frozen achieved/missed verdict for closed years.
 
-    - Closed FY:  judged on ``closing_value`` (March snapshot), else on ``achieved_at`` ≤ FY end.
+    - Closed FY:  judged strictly on ``closing_value`` (March snapshot); if no closing snapshot
+      exists, status is ``'unrecorded'`` and excluded from ``track_record``.
     - Current FY: live value; pace compares progress since FY open against time elapsed.
     - Future FY / Long term: live value, required monthly growth to the deadline.
 
@@ -304,32 +305,24 @@ def build_goal_roadmap(group, total_value, today=None, exclude_real_estate=False
     days_left = max(0, (cur_end - today).days)
 
     goal_objs = list(_gf(FinancialGoal.objects, group))
-    march_close = {}
+    march_close_full = {}
     march_close_re = {}
-    if any(g.fy_start is not None and g.fy_start < cur_fy and g.closing_value is None for g in goal_objs):
+    if any(g.fy_start is not None and g.fy_start < cur_fy for g in goal_objs):
         for s in _gf(MonthlySnapshot.objects, group).filter(month__month=3):
-            val = s.total_current_value
-            re_at_close = Decimal('0')
-            if exclude_real_estate:
-                re = (s.data or {}).get('real_estate')
-                if re and 'current' in re:
-                    re_at_close = Decimal(str(re.get('current', 0)))
-                    val = val - re_at_close
-                else:
-                    re_at_close = Decimal(str(re_val_float))
-                    val = max(Decimal('0'), val - re_at_close)
             fy_idx = s.month.year - 1
-            march_close[fy_idx] = val
-            march_close_re[fy_idx] = float(re_at_close)
+            march_close_full[fy_idx] = s.total_current_value
+            re = (s.data or {}).get('real_estate')
+            if re and 'current' in re:
+                march_close_re[fy_idx] = float(Decimal(str(re.get('current', 0))))
 
     opening_snap = _fy_opening_snapshot(group, cur_fy)
     opening_value = float(opening_snap.total_current_value) if opening_snap else None
     if exclude_real_estate and opening_snap:
         re = (opening_snap.data or {}).get('real_estate')
         if re and 'current' in re:
-            opening_value = float(Decimal(str(opening_snap.total_current_value)) - Decimal(str(re.get('current', 0))))
+            opening_value = max(0.0, float(Decimal(str(opening_snap.total_current_value)) - Decimal(str(re.get('current', 0)))))
         else:
-            opening_value = max(0.0, opening_value - re_val_float) if opening_value is not None else None
+            opening_value = None  # totals-only snapshot: can't separate real estate out
 
     goals = []
     for g in goal_objs:
@@ -341,17 +334,33 @@ def build_goal_roadmap(group, total_value, today=None, exclude_real_estate=False
             fy_name = fy_label(fy_s)
             state = 'closed' if fy_s < cur_fy else 'current' if fy_s == cur_fy else 'future'
 
-        if exclude_real_estate:
-            if state == 'closed' and fy_s in march_close_re:
+        if state == 'closed':
+            raw_closing = g.closing_value if g.closing_value is not None else march_close_full.get(fy_s)
+            if (
+                exclude_real_estate
+                and raw_closing is not None
+                and fy_s in march_close_re
+                and raw_target > march_close_re[fy_s]
+            ):
                 re_deduct = march_close_re[fy_s]
+                target = raw_target - re_deduct
+                is_re_deducted = re_deduct > 0
+                closing = max(Decimal('0'), Decimal(str(raw_closing)) - Decimal(str(re_deduct)))
             else:
-                re_deduct = re_val_float
+                re_deduct = 0.0
+                target = raw_target
+                is_re_deducted = False
+                closing = raw_closing
+        elif exclude_real_estate:
+            re_deduct = re_val_float
             target = max(0.0, raw_target - re_deduct)
             is_re_deducted = re_deduct > 0
+            closing = None
         else:
             re_deduct = 0.0
             target = raw_target
             is_re_deducted = False
+            closing = None
 
         item = {
             'id': g.id,
@@ -369,17 +378,23 @@ def build_goal_roadmap(group, total_value, today=None, exclude_real_estate=False
         }
 
         if state == 'closed':
-            closing = g.closing_value if g.closing_value is not None else march_close.get(fy_s)
             if closing is not None:
-                if exclude_real_estate and g.closing_value is not None:
-                    closing = max(Decimal('0'), closing - Decimal(str(re_deduct)))
-                achieved = float(closing) >= target
-                item['closing_value'] = float(closing)
+                closing_float = float(closing)
+                achieved = closing_float >= target
+                item['closing_value'] = closing_float
+                item['status'] = 'achieved' if achieved else 'missed'
+                ref = closing_float
+                item['pct'] = round(min(ref / target * 100, 100), 1) if target else 100.0
+                item['remaining'] = max(0.0, target - ref)
+                item['surplus'] = max(0.0, ref - target)
             else:
-                achieved = g.achieved_at is not None and g.achieved_at <= g.fy_end_date
+                achieved = False
                 item['closing_value'] = None
-            ref = item['closing_value'] if item['closing_value'] is not None else total
-            item['status'] = 'achieved' if achieved else 'missed'
+                item['status'] = 'unrecorded'
+                item['pct'] = 0.0
+                item['remaining'] = target
+                item['surplus'] = 0.0
+            item['achieved'] = achieved
         else:
             achieved = total >= target
             ref = total
@@ -394,11 +409,10 @@ def build_goal_roadmap(group, total_value, today=None, exclude_real_estate=False
             else:
                 item['achieved_at'] = g.achieved_at if achieved else None
             item['status'] = 'achieved' if achieved else ('on_track' if state == 'current' else 'upcoming')
-
-        item['achieved'] = achieved
-        item['pct'] = round(min(ref / target * 100, 100), 1) if target else 100.0
-        item['remaining'] = max(0.0, target - ref)
-        item['surplus'] = max(0.0, ref - target)
+            item['achieved'] = achieved
+            item['pct'] = round(min(ref / target * 100, 100), 1) if target else 100.0
+            item['remaining'] = max(0.0, target - ref)
+            item['surplus'] = max(0.0, ref - target)
 
         if state != 'closed' and not achieved:
             deadline = g.target_date or g.fy_end_date
@@ -431,12 +445,24 @@ def build_goal_roadmap(group, total_value, today=None, exclude_real_estate=False
     for item in goals:
         years.setdefault(item['fy'], {'label': item['fy'], 'state': item['state'], 'fy_start': item['fy_start'], 'goals': []})['goals'].append(item)
     for y in years.values():
-        y['achieved'] = sum(1 for x in y['goals'] if x['achieved'])
         y['total'] = len(y['goals'])
         y['top_target'] = max(x['target'] for x in y['goals'])
         if y['state'] == 'closed':
-            y['closing_value'] = next((x['closing_value'] for x in y['goals'] if x.get('closing_value') is not None), None)
-            y['verdict'] = 'achieved' if y['achieved'] == y['total'] else 'partial' if y['achieved'] else 'missed'
+            recorded_goals = [x for x in y['goals'] if x.get('closing_value') is not None]
+            y['recorded_total'] = len(recorded_goals)
+            y['achieved'] = sum(1 for x in recorded_goals if x['achieved'])
+            y['closing_value'] = next((x['closing_value'] for x in recorded_goals), None)
+            if not recorded_goals:
+                y['verdict'] = 'unrecorded'
+            elif y['achieved'] == len(recorded_goals):
+                y['verdict'] = 'achieved'
+            elif y['achieved'] > 0:
+                y['verdict'] = 'partial'
+            else:
+                y['verdict'] = 'missed'
+        else:
+            y['recorded_total'] = y['total']
+            y['achieved'] = sum(1 for x in y['goals'] if x['achieved'])
 
     current_year = next((y for y in years.values() if y['state'] == 'current'), None)
     spotlight = None
@@ -461,7 +487,8 @@ def build_goal_roadmap(group, total_value, today=None, exclude_real_estate=False
         'closed': closed,
         'track_record': {
             'hit': sum(y['achieved'] for y in closed),
-            'total': sum(y['total'] for y in closed),
+            'total': sum(y['recorded_total'] for y in closed),
+            'unrecorded': sum(y['total'] - y['recorded_total'] for y in closed),
         },
     }
 
@@ -1169,9 +1196,9 @@ def apply_annual_land_appreciation(pct=None, today=None, group=None, dry_run=Fal
 
     When ``pct`` is None and ``use_ai`` is True (default for annual cron execution),
     executes the Multi-Stage AI Land Appraisal DAG:
-      1. Stage 1 (Argon Grounding): Local comps, circle rates, and macro inflation via Search Grounding.
+      1. Stage 1 (Carbon Grounding): Local comps, circle rates, and macro inflation via Search Grounding.
       2. Stage 2 (DeepSeek / Shakti Auditor): Skeptical cross-examination deducting speculative listing & illiquidity haircuts.
-      3. Stage 3 (Argon Frontier Synthesis): Final conservative appreciation percentage synthesis.
+      3. Stage 3 (Carbon Frontier Synthesis): Final conservative appreciation percentage synthesis.
 
     If ``pct`` is explicitly provided (or ``use_ai=False``), applies that static percentage.
 

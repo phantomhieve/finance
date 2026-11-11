@@ -1,20 +1,21 @@
-# AGENTS.md — Antigravity Agent Guidelines & System Architecture
+# AGENTS.md — Agent Engineering Handbook
 
-This is the primary developer and agent guide for the **Vault Personal Finance & Portfolio Tracker** codebase.
-All agents operating in this repository MUST read and adhere to these guidelines.
+Authoritative architecture, security, precision, and verification standards for AI coding agents working in **Vault** (`/Users/phantomhive/Desktop/GitHub/finance`).
 
-For complete domain architecture and data models, also refer to:
-- [`GEMINI.md`](GEMINI.md)
-- [`.agents/skills/vault-architecture/SKILL.md`](.agents/skills/vault-architecture/SKILL.md)
-- [`.agents/rules/`](.agents/rules/)
+Companion references:
+- Quick-start index: [`GEMINI.md`](GEMINI.md)
+- Deep domain & service map: [`.agents/skills/vault-architecture/SKILL.md`](.agents/skills/vault-architecture/SKILL.md)
+- AI Gateway & DAG specification: [`docs/ux/0001-ai-calling-and-dag-strategy.md`](docs/ux/0001-ai-calling-and-dag-strategy.md)
+- Design system & UI components: [`DESIGN.md`](DESIGN.md), [`docs/ux/IA.md`](docs/ux/IA.md), [`docs/ux/components.md`](docs/ux/components.md)
+- Granular enforcement rules: [`.agents/rules/`](.agents/rules/)
 
 ---
 
 ## 1. System Topology & App Boundaries
 
-Vault is a multi-tenant, household-scoped wealth intelligence and personal finance engine built with **Django 6.0**, **Python 3.14**, **Starlette ASGI**, **Tailwind CSS v4 + DaisyUI 5**, **Chart.js 4**, and **FastMCP**.
+Vault is a household-scoped wealth management and expense intelligence platform built on **Django 6.0**, **Python 3.12+**, **Starlette ASGI**, **Tailwind CSS v4 (`@tailwindcss/browser@4`) + DaisyUI 5**, **Chart.js 4**, **Unfold Admin**, and **FastMCP**.
 
-```
+```text
                          ┌────────────────────────────────────────┐
                          │           pftracker/asgi.py            │
                          └──────────────────┬─────────────────────┘
@@ -38,126 +39,63 @@ Vault is a multi-tenant, household-scoped wealth intelligence and personal finan
              ┌─────────────▼─────────────┐
              │    Unified AI Gateway     │
              │ (pftracker/ai_gateway/)   │
-             │   Multi-Stage AI DAGs     │
+             │   Quant-Grounded AI DAGs  │
              └───────────────────────────┘
 ```
 
-### Module Responsibilities:
-- **`pftracker/`**: Project settings, ASGI dual-router, unified AI gateway (`ai_gateway/`), safe concurrency utilities (`concurrency.py`), SQLite WAL / database optimizations (`db_optimizations.py`), and shared financial helpers (`utils.py`).
-- **`tracker/`**: Core multi-tenancy (`User`, `AccountGroup`, `HouseholdConfig`), Indian FY Monthly Savings vs Goals pacing, HRA Rent Tracker, Personal Notes & To-Dos, and WebAuthn credentials.
-- **`portfolio/`**: Multi-asset portfolio engine (Indian Stocks, Mutual Funds, US RSUs, EPF, NPS, Fixed Deposits, Cash, Bonds, Crypto, Physical Gold/Silver, Real Estate), Google Sheets sync, live price scrapers, and the Multi-Stage DAG Workflow Engine (`dag.py`, `land_appraisal.py`).
-- **`expenses/`**: Automated expense intelligence, Gmail OAuth 2.0 synchronization (30+ Indian banks), credit card PDF statement unlocking & 3-stage reconciliation, dual-leg transfer settlement, EMI amortization tracking, refund netting, and AI anomaly auditing.
-- **`jewellery/`**: Physical precious metal & ornament inventory (`BANK_LOCKER` vs `HOME_SAFE`), live fineness-adjusted valuation, UUID-isolated photo storage, and WebP thumbnail caching.
-- **`mcp_server/`**: Starlette ASGI FastMCP server exposing 30+ read/write financial tools to external AI assistants with OAuth 2.0 PKCE, scope gating, and reversible `MCPAuditLog` snapshots.
+- **`pftracker/`**: Project settings, dual ASGI router (`asgi.py`), unified AI gateway (`ai_gateway/`), safe thread/async DB pools (`concurrency.py`), SQLite WAL PRAGMAs (`db_optimizations.py`), household context processor (`context_processors.py`), and shared Indian FY / `Decimal` helpers (`utils.py`).
+- **`tracker/`**: Multi-tenancy (`User`, `AccountGroup`, `HouseholdConfig`), April–March Monthly Savings vs. Goals ledger, HRA Rent Tracker, Personal Notes/To-Dos, and `WebAuthnCredential`.
+- **`portfolio/`**: 11-asset-class wealth engine (Indian Stocks, Mutual Funds, US RSUs, EPF, PPF, NPS, Fixed Deposits, Cash, Bonds, Crypto, Gold/Silver, Real Estate), Google Sheets sync & live rate fetchers (`services.py`), Indian rupee template filters (`templatetags/indian_format.py`), and multi-stage AI DAGs (`dag.py`, `land_appraisal.py`, `ai/`).
+- **`expenses/`**: Gmail OAuth 2.0 multi-inbox sync (`gmail.py`, `sync.py`), bank/UPI parsers (`parsing.py`), encrypted PDF statement 3-stage reconciliation (`statements.py`, `crypto.py`), dual-leg transfer settlement (`ingestion.py`), EMI tracking (`emi.py`), 4-tier categorization (`categories.py`), net-spend analytics (`analytics.py`), and AI operations (`ai/`, `anomaly.py`).
+- **`jewellery/`**: Precious metal & ornament custody ledger (`BANK_LOCKER` vs. `HOME_SAFE`), fineness-adjusted live bullion valuation, UUID-isolated photo storage, and WebP thumbnail caching (`utils.py`).
+- **`mcp_server/`**: FastMCP SSE server exposing 30+ read/write financial tools with OAuth 2.0 PKCE (`oauth.py`), `PRIMARY` role & scope guard (`middleware.py`), and reversible `MCPAuditLog` snapshots (`audit.py`).
 
 ---
 
-## 2. Multi-Tenancy & Security Invariants
+## 2. Multi-Tenancy, Access Control & Secrets
 
-### 2.1 User Scoping vs Group Scoping
-- **User-Scoped Models (`tracker`)**: `Transaction`, `HRAExpense`, `FinancialGoal` (monthly goal), `GoalIncrement`, `MonthlyGoalAdjustment`, `Note`, `MonthlySavingsComment`, and `WebAuthnCredential` filter by `user=request.user` or `group_user_filter(request.user)`.
-- **Group-Scoped Models (`portfolio`, `jewellery`, `expenses`, `mcp_server`)**: Models filter strictly by `group=request.user.group`.
-- **Fail-Closed Filtering (`_gf`)**:
-  - Never evaluate queries across tenants when `group is None`. Always pass `group=group` or use fail-closed scoping.
-
-### 2.2 Role Matrix (`tracker.User.user_type`)
-- **`PRIMARY`**: Full administrative access across all modules, investments, real estate, and MCP tools.
-- **`ACCOUNT_HOLDER`** (Spouse/Partner): View-only savings dashboard, full HRA, Spends (with `Investments` category strictly masked), and Jewellery. Portfolio views return `403 Forbidden`.
-- **`LANDLORD`**: Strictly view-only access restricted to the HRA rent records (`/hra/`). All other modules return `403 Forbidden`.
-
-### 2.3 Vault Gate (`_vault_gate`)
-- Sensitive views in `portfolio` and `jewellery` call `_vault_gate(request)` before execution.
-- Gated behind a 30-minute session TTL with biometric (WebAuthn) or master password unlock.
-- Brute-force rate limiting enforces 5 attempts / 5-minute lockout via Django's cache.
-
-### 2.4 Strict Secrets Protection
-- **NEVER** inspect, echo, grep, dump, or commit secret files:
-  - `.env`, `scripts/DEPLOY.env`, `.deploy-keys/`, `credentials/`, `*.pem`, `*.key`, `portfolio/investor_profile.md`, `**/google-service-account*.json`.
-- NEVER run shell commands dumping environment variables (`env`, `printenv`, `echo $SECRET_KEY`).
-- Reference variable names only and refer to `.env.example` or `scripts/DEPLOY.env.example`.
+1. **Tenant Isolation (`AccountGroup`)**:
+   - **User-scoped (`tracker`)**: `Category`, `Transaction`, `HRAExpense`, `FinancialGoal`, `GoalIncrement`, `MonthlyGoalAdjustment`, `Note`, `MonthlySavingsComment`, and `WebAuthnCredential` filter by resolved household owner or `group_user_filter(request.user)`.
+   - **Group-scoped (`portfolio`, `jewellery`, `expenses`, `mcp_server`)**: Filter strictly by `group=request.user.group` (and `_gf(group)` fail-closed `{"id__in": []}` when `group is None`). Never query across households on PK alone.
+2. **Role Enforcement (`tracker.User.user_type`)**:
+   - `PRIMARY`: Full access across all modules, investments, real estate, and `/mcp/sse`.
+   - `ACCOUNT_HOLDER`: View-only Savings, full HRA, read-only Jewellery catalog (valuations & CRUD restricted to `PRIMARY`), Notes, and Expenses (**`Investments` category masked** via `_hides_investments(request)`). Portfolio and MCP return `403 Forbidden`.
+   - `LANDLORD`: View-only access restricted strictly to `/hra/`.
+3. **Vault Session Gates & Mutations**:
+   - Portfolio and Jewellery routes enforce `_vault_gate` (`30-minute` password or WebAuthn passkey TTL, `5`-attempt / `5`-minute cache lockout). Expenses enforces `EXPENSES_UNLOCK_TTL` (`4-hour` default) when a household vault password is set.
+   - All state-changing HTTP endpoints MUST use `@require_POST` + CSRF protection, and login/`next` redirects MUST validate `url_has_allowed_host_and_scheme`.
+4. **Secrets Prohibition**:
+   - Enforced by `.agents/scripts/safety_pre_tool.py` and [`.agents/rules/no-secrets.md`](.agents/rules/no-secrets.md). Never read, grep, echo, or commit `.env`, `scripts/DEPLOY.env`, `.deploy-keys/`, `credentials/`, `*.pem`, `*.key`, `portfolio/investor_profile.md`, or service-account JSONs. Inspect `.env.example`, `scripts/DEPLOY.env.example`, `portfolio/investor_profile.md.example`, and `pftracker/settings.py` instead. Never delete `portfolio/investor_profile.md` (loaded at runtime by `portfolio/dag.py`).
 
 ---
 
-## 3. Financial Precision & Indian Fiscal Conventions
+## 3. Financial Precision & Indian Fiscal Standards
 
-1. **Python `Decimal` Exclusively**:
-   - ALWAYS use `decimal.Decimal` for currency amounts, holdings, weights, prices, and rates.
-   - NEVER use `float` for monetary balances or aggregations.
-   - For chart rendering contexts requiring JSON numbers, convert to float only at the terminal serialization layer.
-   - Percentage calculations MUST use `pftracker.utils.pct(part, total)` or `pnl_pct(pnl, invested)` to guarantee 2-decimal quantization (`Decimal('0.01')`) and type safety.
-2. **Indian Financial Year (April 1 – March 31)**:
-   - Dates in January, February, or March belong to the previous calendar year's FY (e.g. February 2026 is FY 2025-26).
-   - Use `fy_start_year(date)` and `fy_label(fy_start)` from `pftracker.utils`.
-3. **Number Formatting**:
-   - Use Indian numbering format (Lakhs `L`, Crores `Cr`, e.g., `₹12,50,000`) via `indian_comma` and `compact_inr` template tags.
+- **`Decimal` Exclusively**: Use `decimal.Decimal` for all currency amounts, quantities, weights, and interest rates. Convert to `float` only at terminal Chart.js JSON serialization or transient CAGR exponentiation before quantizing back to `Decimal('0.01')`. Use `pftracker.utils.pct` and `pnl_pct` for percentage math.
+- **Indian Financial Year (April 1 – March 31)**: January–March dates belong to the prior calendar year's FY (e.g., Feb 2026 -> `FY 2025-26`). Use `fy_start_year(date)` and `fy_label(fy_start)` from `pftracker.utils`.
+- **Indian Currency Formatting**: Load `{% load indian_format %}` (`portfolio/templatetags/indian_format.py`) and format figures with `|inr` (`₹12,50,000`), `|inr_short` (`₹12.5 L`, `₹1.24 Cr`), or `|indian_number` (`12,50,000`), paired with `font-variant-numeric: tabular-nums`.
 
 ---
 
-## 4. Query Performance & Anti-N+1 Mandate
+## 4. Database, Concurrency & AI Gateway Standards
 
-1. **Mandatory Relationship Prefetching**:
-   - Any query whose results iterate over foreign keys or one-to-one relations MUST use `.select_related()` (e.g. `Transaction.objects.select_related('user', 'category')`).
-   - Any query iterating over reverse foreign keys or many-to-many relationships MUST use `.prefetch_related()`.
-   - Never query foreign keys inside loops or list comprehensions.
-2. **Bulk Operations**:
-   - Use `bulk_create` and `bulk_update` with `batch_size` for multi-record mutations.
-   - Always specify `update_fields=[...]` when calling `.save()` on existing instances to prevent race conditions and unnecessary column writes.
-3. **Thread-Safe Concurrency**:
-   - When executing parallel operations (such as multi-stage DAG nodes), always use `DjangoSafeThreadPoolExecutor` or `safe_async_to_thread` from `pftracker.concurrency` to prevent database connection leaks and thread-local connection pollution.
-4. **Caching**:
-   - Use Django's cache framework (`from django.core.cache import cache`) for transient rate-limiting and expensive computations.
+- **Anti-N+1 & Write Safety**: Always attach `.select_related()` / `.prefetch_related()` when iterating relations, use `bulk_create` / `bulk_update` for batch writes, and pass `update_fields=[...]` on partial `.save()` calls.
+- **Safe Worker Concurrency**: Offload parallel threads exclusively through `DjangoSafeThreadPoolExecutor`, `parallel_map`, or `safe_async_to_thread` (`pftracker/concurrency.py`) so worker DB connections are cleaned up deterministically.
+- **AI Tiering & Quant-First DAGs (`pftracker/ai_gateway/`)**:
+  - Production deep reasoning and search tasks (`PORTFOLIO_INSIGHTS`, `PORTFOLIO_DAG_STRATEGY`, `PORTFOLIO_DAG_SYNTHESIS`, `LAND_APPRAISAL_*`) run on **`gemini-4-carbon`** (`ThinkingLevel.HIGH` in prod, `ThinkingLevel.LOW` in dev).
+  - Specialist Stage 1 lenses and expense extraction/classification tasks (`PORTFOLIO_DAG_ALLOCATION/QUALITY/MACRO`, `EXPENSE_*`, `RECEIPT_*`, `STATEMENT_*`) run on **`gemini-3.8-flash`** in prod (`gemini-2.5-flash-lite` in dev) with `thinking_budget=0`.
+  - Pre-compute exact `Decimal` metrics in Python before calling LLMs, wrap untrusted text via `use_boundary_tags=True` (per-call random-nonced `<user_payload_<hex>>`), and maintain portfolio/asset-grounded fallbacks on every DAG stage. See [`docs/ux/0001-ai-calling-and-dag-strategy.md`](docs/ux/0001-ai-calling-and-dag-strategy.md).
 
 ---
 
-## 5. Python Typing, Docstrings & Module Contracts
+## 5. CodeGraph Navigation & Pre-Push Verification
 
-- **Type Annotations**:
-  - All new or refactored functions, methods, and classes must include Python 3.12+ type hints (`int | None`, `list[str]`, `Decimal`).
-- **Docstrings**:
-  - Provide concise, informative docstrings explaining parameters, return contracts, and tenant scoping.
-- **Contract Integrity**:
-  - Keep models in `models.py`, business operations in `services.py`, UI validation in `forms.py`, and endpoint routing in `views.py`.
-
----
-
-## 6. Error Recovery & Fault Tolerance
-
-1. **AI Pipeline Fallbacks**:
-   - Every multi-stage AI workflow (`PortfolioInsightsDAG`, `run_land_appraisal_dag`) MUST implement deterministic, mathematically grounded fallbacks for every stage.
-   - In the event of model provider outages, rate limits (HTTP 429), or service errors (HTTP 503), the pipeline must seamlessly fall back and complete without crashing.
-2. **Safe Error Trapping**:
-   - Trap expected exceptions (`ObjectDoesNotExist`, `ValueError`, `KeyError`, `requests.RequestException`) cleanly.
-   - Avoid broad bare `except:` clauses. Log structured warnings with context.
-
----
-
-## 7. Code Intelligence with CodeGraph
-
-- The repository symbol knowledge graph is maintained in `.codegraph/`.
-- Prefer querying CodeGraph tools (`codegraph_query`, `codegraph_node`, `codegraph_callers`, `codegraph_callees`, `codegraph_impact`, `codegraph_affected`) or CLI commands (`codegraph query`, `codegraph callers`, etc.) over blind ripgrep searches.
-- Before refactoring shared utility or service functions, check the blast radius using `codegraph impact <symbol>`.
-- Run `codegraph sync` after adding or restructuring modules.
-
----
-
-## 8. Mandatory Pre-Push Verification & Git Standards
-
-Before committing or pushing code, Antigravity agents MUST execute and verify:
-1. **Lint Check**:
+1. **Query CodeGraph First**: Prefer `codegraph_query`, `codegraph_node`, `codegraph_callers`, `codegraph_callees`, `codegraph_impact`, and `codegraph_affected` (or `codegraph <cmd>`) over blind text searches. Run `codegraph impact <symbol>` before changing shared signatures.
+2. **Pre-Commit / Pre-Push Checks** (all mandatory):
    ```bash
    ./venv/bin/ruff check --select F,E9 .
-   ```
-   Must pass with **0 errors**.
-2. **Test Suite**:
-   ```bash
+   ./venv/bin/python manage.py check --fail-level WARNING
    ./venv/bin/python manage.py test --keepdb
-   ```
-   Must pass **100%**.
-3. **CodeGraph Sync**:
-   ```bash
    codegraph sync
    ```
-4. **Conventional Commits**:
-   - Format: `<type>(<scope>): <summary>` (types: `feat`, `fix`, `perf`, `refactor`, `test`, `chore`, `docs`).
-   - Scope must specify the affected module (e.g., `tracker`, `portfolio`, `expenses`, `jewellery`, `mcp`, `agents`).
-   - Every commit message MUST include an explanatory body detailing motivation and a bulleted list of modified components. Never use vague one-liners.
+3. **Conventional Commits**: Format `<type>(<scope>): <imperative summary>` (`feat`, `fix`, `perf`, `refactor`, `test`, `chore`, `docs`; scopes: `pftracker`, `tracker`, `portfolio`, `expenses`, `jewellery`, `mcp`, `ui`, `agents`, `docs`) with a clear motivation paragraph and bulleted change list.

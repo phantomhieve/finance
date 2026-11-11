@@ -27,77 +27,122 @@
 {% block content %}
 
 {# --- SIGNATURE LEDGER SUMMARY BAND --- #}
-<div class="v-ledger-band">
+<section class="v-ledger-band" aria-label="NPS Summary">
   <div class="v-lead-cell">
     <div>
       <div class="v-lead-label">
         <span>Accumulated NPS Corpus</span>
-        <span class="v-delta v-delta-pos text-[10px] py-0 px-2 font-semibold">Tier-I Retirement</span>
+        <span class="v-delta v-delta-pos text-xs py-0 px-2 font-semibold">Tier-I Retirement</span>
       </div>
       <div class="v-lead-figure-row">
-        <span class="v-lead-figure">{{ balance|inr }}</span>
+        <span class="v-lead-figure tabular-nums">{{ balance|inr }}</span>
+        {% if latest and latest.interest_earned %}
+        <span class="v-delta v-delta-pos text-xs font-bold tabular-nums">
+          <span class="material-symbols-outlined text-xs">trending_up</span>+{{ latest.interest_earned|inr }} Latest Return
+        </span>
+        {% endif %}
       </div>
       <div class="v-lead-sub">
-        Total recorded tranches: <strong class="text-base-content/80">{{ entries|length }} entries</strong>
+        Total recorded tranches: <strong class="text-base-content/85 tabular-nums">{{ entries|length }} entries</strong>
+        {% if latest %} &middot; Last updated <span class="tabular-nums">{{ latest.date|date:"d M Y" }}</span>{% endif %}
       </div>
     </div>
+
+    {% if latest %}
+    {% with latest_total=latest.contribution|add:latest.interest_earned %}
+    {% if latest_total > 0 %}
+    <div class="v-horizon">
+      <div class="v-horizon-bar" role="img" aria-label="Latest NPS statement contribution versus return">
+        {% if latest.contribution > 0 %}
+        <div class="v-horizon-seg" style="width: {% widthratio latest.contribution latest_total 100 %}%; background: #14b8a6;" title="Latest Contribution: {{ latest.contribution|inr }}"></div>
+        {% endif %}
+        {% if latest.interest_earned > 0 %}
+        <div class="v-horizon-seg" style="width: {% widthratio latest.interest_earned latest_total 100 %}%; background: #10b981;" title="Latest Market Return: {{ latest.interest_earned|inr }}"></div>
+        {% endif %}
+      </div>
+      <div class="v-horizon-legend">
+        <span class="v-horizon-item">
+          <span class="v-horizon-dot" style="background: #14b8a6;"></span>
+          Latest Contrib <strong>{{ latest.contribution|inr }}</strong>
+        </span>
+        <span class="v-horizon-item">
+          <span class="v-horizon-dot" style="background: #10b981;"></span>
+          Latest Return <strong>+{{ latest.interest_earned|inr }}</strong>
+        </span>
+      </div>
+    </div>
+    {% endif %}
+    {% endwith %}
+    {% endif %}
   </div>
 
   <div class="v-stat-grid">
     <div class="v-stat-cell">
       <div class="v-stat-label">Current NPS Balance</div>
-      <div class="v-stat-value text-emerald-400">{{ balance|inr }}</div>
+      <div class="v-stat-value text-base-content tabular-nums">{{ balance|inr }}</div>
       <div class="v-stat-sub">NAV-adjusted market value</div>
     </div>
     <div class="v-stat-cell">
-      <div class="v-stat-label">Total Tranches</div>
-      <div class="v-stat-value text-indigo-400">{{ entries|length }}</div>
-      <div class="v-stat-sub">Audited statement credits</div>
+      <div class="v-stat-label">Latest Contribution</div>
+      <div class="v-stat-value text-base-content tabular-nums">{% if latest %}+{{ latest.contribution|inr }}{% else %}₹0{% endif %}</div>
+      <div class="v-stat-sub">{% if latest %}{{ latest.date|date:"d M Y" }}{% else %}No statement{% endif %}</div>
+    </div>
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Latest Market Return</div>
+      <div class="v-stat-value text-emerald-400 tabular-nums">{% if latest %}+{{ latest.interest_earned|inr }}{% else %}₹0{% endif %}</div>
+      <div class="v-stat-sub">Scheme NAV appreciation</div>
+    </div>
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Statement Tranches</div>
+      <div class="v-stat-value text-base-content tabular-nums">{{ entries|length }}</div>
+      <div class="v-stat-sub">Audited PRAN credits</div>
     </div>
   </div>
-</div>
+</section>
 
 {# --- NPS PASSBOOK LEDGER --- #}
-<div class="v-panel mb-6">
+<section class="v-panel mb-6" aria-label="NPS Contribution and Return Ledger">
   <div class="v-panel-header">
-    <div class="flex items-center gap-2">
+    <div class="flex items-center gap-2 min-w-0">
       <h2 class="v-panel-title">
-        <span class="material-symbols-outlined text-base text-primary">receipt_long</span>
+        <span class="material-symbols-outlined text-base text-teal-400">receipt_long</span>
         NPS Contribution &amp; Return Ledger
       </h2>
-      <span class="v-delta v-delta-neutral text-xs font-semibold">{{ entries|length }} Entries</span>
+      <span class="v-delta v-delta-neutral text-xs font-semibold tabular-nums">{{ entries|length }} Entries</span>
     </div>
-    <button type="button" class="v-btn v-btn-secondary v-btn-xs" onclick="openNpsAddModal()">
+    <button type="button" class="v-btn v-btn-secondary v-btn-sm" onclick="openNpsAddModal()">
       <span class="material-symbols-outlined text-sm">add</span>Add Entry
     </button>
   </div>
   <div class="v-panel-body p-0">
     {% if entries %}
-    <div class="v-table-wrap">
+    {# Desktop Table #}
+    <div class="v-panel-table hidden md:block overflow-x-auto">
       <table class="v-table" id="npsTable">
         <thead>
           <tr>
             <th class="sortable-th cursor-pointer select-none">Date <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
             <th class="sortable-th cursor-pointer select-none v-num">Contribution Added <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
             <th class="sortable-th cursor-pointer select-none v-num">Returns Earned <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
-            <th class="sortable-th cursor-pointer select-none v-num">Total Entry Value <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Resulting Balance <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
             <th>Remarks</th>
-            <th class="text-center w-12">Action</th>
+            <th class="text-right w-16">Action</th>
           </tr>
         </thead>
         <tbody>
           {% for e in entries %}
           <tr>
-            <td class="text-xs text-base-content/70 whitespace-nowrap" data-val="{{ e.date|date:'Ymd' }}">{{ e.date|date:"d M Y" }}</td>
-            <td class="v-num font-semibold text-primary" data-val="{{ e.contribution }}">+{{ e.contribution|inr }}</td>
-            <td class="v-num font-semibold text-emerald-400" data-val="{{ e.interest_earned }}">+{{ e.interest_earned|inr }}</td>
-            <td class="v-num font-bold text-base-content" data-val="{{ e.contribution|add:e.interest_earned }}">₹{{ e.contribution|add:e.interest_earned|floatformat:0|indian_number }}</td>
-            <td class="text-xs text-base-content/60 max-w-xs truncate">{{ e.remarks|default:"-" }}</td>
-            <td class="text-center">
-              <button type="button" class="v-btn v-btn-ghost v-btn-xs" data-edit-nps
+            <td class="text-xs text-base-content/75 whitespace-nowrap tabular-nums" data-val="{{ e.date|date:'Ymd' }}">{{ e.date|date:"d M Y" }}</td>
+            <td class="v-num text-xs font-semibold text-base-content/85" data-val="{{ e.contribution }}">+{{ e.contribution|inr }}</td>
+            <td class="v-num text-xs font-semibold text-emerald-400" data-val="{{ e.interest_earned }}">+{{ e.interest_earned|inr }}</td>
+            <td class="v-num text-xs font-bold text-base-content" data-val="{{ e.total_balance }}">{{ e.total_balance|inr }}</td>
+            <td class="text-xs text-base-content/60 max-w-xs truncate">{{ e.remarks|default:"—" }}</td>
+            <td class="text-right">
+              <button type="button" class="v-icon-btn" data-edit-nps
                       data-id="{{ e.id }}" data-date="{{ e.date|date:'Y-m-d' }}"
                       data-contrib="{{ e.contribution }}" data-interest="{{ e.interest_earned }}"
-                      data-balance="{{ e.total_balance }}" data-remarks="{{ e.remarks }}">
+                      data-balance="{{ e.total_balance }}" data-remarks="{{ e.remarks }}"
+                      aria-label="Edit NPS entry from {{ e.date|date:'d M Y' }}">
                 <span class="material-symbols-outlined text-sm">edit</span>
               </button>
             </td>
@@ -108,22 +153,29 @@
     </div>
 
     {# Mobile View #}
-    <div class="md:hidden divide-y divide-base-content/6">
+    <div class="md:hidden divide-y divide-[var(--v-hairline)]">
       {% for e in entries %}
-      <div class="p-3.5 flex items-center justify-between gap-3">
-        <div class="min-w-0">
-          <div class="flex items-center gap-2 flex-wrap">
-            <span class="font-bold text-xs text-base-content tabular-nums">₹{{ e.contribution|add:e.interest_earned|floatformat:0|indian_number }}</span>
-            <span class="v-delta v-delta-pos text-[9px] py-0 px-1.5">+{{ e.interest_earned|inr }}</span>
+      <div class="v-mobile-row flex-col !items-stretch gap-2">
+        <div class="w-full flex items-center justify-between gap-2">
+          <div class="min-w-0">
+            <span class="font-bold text-sm text-base-content tabular-nums">{{ e.total_balance|inr }}</span>
+            <span class="text-xs text-base-content/50 ml-2 tabular-nums">{{ e.date|date:"d M Y" }}</span>
           </div>
-          <div class="text-[10px] text-base-content/50 mt-1 truncate">{{ e.date|date:"d M Y" }}{% if e.remarks %} · {{ e.remarks }}{% endif %}</div>
+          <button type="button" class="v-icon-btn shrink-0" data-edit-nps
+                  data-id="{{ e.id }}" data-date="{{ e.date|date:'Y-m-d' }}"
+                  data-contrib="{{ e.contribution }}" data-interest="{{ e.interest_earned }}"
+                  data-balance="{{ e.total_balance }}" data-remarks="{{ e.remarks }}"
+                  aria-label="Edit NPS entry from {{ e.date|date:'d M Y' }}">
+            <span class="material-symbols-outlined text-base">edit</span>
+          </button>
         </div>
-        <button type="button" class="v-btn v-btn-ghost v-btn-xs shrink-0" data-edit-nps
-                data-id="{{ e.id }}" data-date="{{ e.date|date:'Y-m-d' }}"
-                data-contrib="{{ e.contribution }}" data-interest="{{ e.interest_earned }}"
-                data-balance="{{ e.total_balance }}" data-remarks="{{ e.remarks }}">
-          <span class="material-symbols-outlined text-sm">edit</span>
-        </button>
+        <div class="w-full flex items-center justify-between gap-2 pt-1.5 border-t border-[var(--v-hairline)] text-xs tabular-nums">
+          <span class="text-base-content/65">Contrib: <strong class="text-base-content">+{{ e.contribution|inr }}</strong></span>
+          <span class="text-emerald-400 font-semibold">+{{ e.interest_earned|inr }} return</span>
+        </div>
+        {% if e.remarks %}
+        <div class="w-full text-xs text-base-content/45 truncate">{{ e.remarks }}</div>
+        {% endif %}
       </div>
       {% endfor %}
     </div>
@@ -140,9 +192,9 @@
     </div>
     {% endif %}
   </div>
-</div>
+</section>
 
-{% include 'portfolio/_nps_form_modal.html' %}
+{% include 'portfolio/_nps_form_modal.html' with form_obj=form nps_latest=latest %}
 
 {% endblock %}
 

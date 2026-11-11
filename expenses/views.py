@@ -37,7 +37,11 @@ logger = logging.getLogger(__name__)
 
 INLINE_SYNC_SECONDS = 20
 _OAUTH_STATE_KEY = 'expenses_gmail_oauth_state'
+_OAUTH_STATE_TTL = 600  # 10 minutes
 _VAULT_UNLOCK_KEY = 'portfolio_unlocked_at'  # shared with portfolio/jewellery (portfolio_unlock view)
+_MAX_STATEMENT_UNLOCK_ATTEMPTS = 5
+_MAX_STATEMENT_GROUP_UNLOCK_ATTEMPTS = 10
+_STATEMENT_LOCKOUT_SECONDS = 300
 
 
 def _require_expenses(view_func):
@@ -65,11 +69,8 @@ def _expenses_locked(request):
     group = request.user.group
     if not group or not group.portfolio_password:
         return False
-    unlocked_at = request.session.get(_VAULT_UNLOCK_KEY)
-    if unlocked_at and (time.time() - unlocked_at) <= settings.EXPENSES_UNLOCK_TTL:
-        return False
-    request.session.pop(_VAULT_UNLOCK_KEY, None)
-    return True
+    from portfolio.views import is_vault_session_valid
+    return not is_vault_session_valid(request.session, group, ttl=settings.EXPENSES_UNLOCK_TTL)
 
 
 def _group(request):
@@ -135,7 +136,7 @@ def _is_transfer_row(e: Expense) -> bool:
     return False
 
 
-def _collapse_transfer_legs(rows: list[Expense], group, start, end) -> list[Expense]:
+def _collapse_transfer_legs(rows: list[Expense], group, start, end, hide_investments: bool = False) -> list[Expense]:
     """Suppress the redundant CREDIT leg (Leg 2) of internal transfers and credit card bill payments
     when a matching DEBIT leg (Leg 1) exists within ±4 days, and attach `paired_source` to Leg 1."""
     credit_legs = [e for e in rows if e.direction == 'CREDIT' and _is_transfer_row(e)]
@@ -144,7 +145,7 @@ def _collapse_transfer_legs(rows: list[Expense], group, start, end) -> list[Expe
 
     row_debits = [e for e in rows if e.direction == 'DEBIT']
     row_debit_ids = {e.pk for e in row_debits}
-    boundary_debits = list(
+    boundary_qs = (
         Expense.objects.filter(
             group=group,
             is_deleted=False,
@@ -154,8 +155,10 @@ def _collapse_transfer_legs(rows: list[Expense], group, start, end) -> list[Expe
             txn_date__lte=end + datetime.timedelta(days=4),
         )
         .exclude(pk__in=row_debit_ids)
-        .select_related('category', 'payment_source')
     )
+    if hide_investments:
+        boundary_qs = boundary_qs.exclude(category__name=INVESTMENT_CATEGORY)
+    boundary_debits = list(boundary_qs.select_related('category', 'payment_source'))
     all_debits = row_debits + boundary_debits
 
     from collections import defaultdict
@@ -226,7 +229,8 @@ def expenses_home(request):
         qs = qs.filter(is_emi=True)
     if f_query:
         qs = qs.filter(Q(merchant__icontains=f_query) | Q(notes__icontains=f_query) | Q(merchant_raw__icontains=f_query))
-    rows = _collapse_transfer_legs(list(qs), group, summary['start'], summary['end'])
+    hide_inv = _hides_investments(request)
+    rows = _collapse_transfer_legs(list(qs), group, summary['start'], summary['end'], hide_investments=hide_inv)
     days = [{'date': d, 'items': list(items)} for d, items in groupby(rows, key=lambda e: e.txn_date)]
     for day in days:
         day['spend'] = sum((e.net_amount for e in day['items'] if e.is_spend and e.currency == 'INR'), Decimal('0.00'))
@@ -235,7 +239,7 @@ def expenses_home(request):
     ny, nm = shift_month(year, month, 1)
     accounts = list(GmailAccount.objects.filter(group=group))
     categories = ExpenseCategory.objects.filter(group=group)
-    if _hides_investments(request):
+    if hide_inv:
         categories = categories.exclude(name=INVESTMENT_CATEGORY)
     categories = list(categories)
     dues = upcoming_dues(group, today)
@@ -244,11 +248,14 @@ def expenses_home(request):
     total_dues_amount = sum((getattr(st, 'remaining_due', st.total_due or st.min_due or Decimal('0.00')) for st in dues), Decimal('0.00'))
     context_reconnect = [a for a in accounts if a.needs_reconnect]
     pending_passwords = CardStatement.objects.filter(group=group, status='NEEDS_PASSWORD').count()
-    trend = monthly_trend(group, year, month, today=today)
+    trend = monthly_trend(group, year, month, today=today, hide_investments=hide_inv)
     edit_tmpl = reverse('expense_edit', args=[0])
     delete_tmpl = reverse('expense_delete', args=[0])
     review_tmpl = reverse('expense_review', args=[0])
-    emi_plan = emi_projection(group, summary['start'], summary['end'], today=today, ongoing=summary['emi_summary']['ongoing'])
+    emi_plan = emi_projection(
+        group, summary['start'], summary['end'], today=today,
+        ongoing=summary['emi_summary']['ongoing'], hide_investments=hide_inv,
+    )
     context = {
         'summary': summary,
         'emi_plan': emi_plan,
@@ -296,13 +303,14 @@ def expenses_home(request):
 @_require_expenses
 def expenses_year(request):
     group = _group(request)
+    hide_inv = _hides_investments(request)
     current = fy_start_year(timezone.localdate())
     fy_start = parse_fy_param(request.GET.get('fy'), current)
-    summary = fy_summary(group, fy_start, hide_investments=_hides_investments(request))
+    summary = fy_summary(group, fy_start, hide_investments=hide_inv)
     return render(request, 'expenses/year.html', {
         'summary': summary,
         'fy_start': fy_start,
-        'fy_options': available_fys(group),
+        'fy_options': available_fys(group, hide_investments=hide_inv),
         'chart': {
             'labels': [m['label'] for m in summary['months']],
             'params': [m['param'] for m in summary['months']],
@@ -405,7 +413,7 @@ def expense_review(request, pk):
 @_require_expenses
 @require_POST
 def expense_set_emi_tenure(request):
-    group = _group(request)
+    visible_qs = _expenses(request)
     ref = request.POST.get('ref', '').strip()
     expense_id = request.POST.get('expense_id')
     total_raw = request.POST.get('total_installments', '').strip()
@@ -416,25 +424,27 @@ def expense_set_emi_tenure(request):
 
     if total_val is not None:
         if ref:
-            Expense.objects.filter(group=group, is_emi=True, emi_reference=ref).update(emi_total_installments=total_val)
+            updated = visible_qs.filter(is_emi=True, emi_reference=ref).update(emi_total_installments=total_val)
+            if not updated:
+                raise Http404
             if num_val is not None:
                 if expense_id:
-                    target = Expense.objects.filter(pk=expense_id, group=group).first()
+                    target = visible_qs.filter(pk=expense_id).first()
                     if target:
-                        Expense.objects.filter(
-                            group=group, is_emi=True, emi_reference=ref, txn_date=target.txn_date
+                        visible_qs.filter(
+                            is_emi=True, emi_reference=ref, txn_date=target.txn_date
                         ).update(emi_installment_num=num_val)
                 else:
-                    Expense.objects.filter(group=group, is_emi=True, emi_reference=ref).update(emi_installment_num=num_val)
+                    visible_qs.filter(is_emi=True, emi_reference=ref).update(emi_installment_num=num_val)
             messages.success(request, f"Updated tenure for Loan ••{ref} to {total_val} installments.")
         elif expense_id:
-            exp = get_object_or_404(Expense, pk=expense_id, group=group)
+            exp = get_object_or_404(visible_qs, pk=expense_id)
             exp.emi_total_installments = total_val
             if num_val is not None:
                 exp.emi_installment_num = num_val
             exp.save(update_fields=['emi_total_installments', 'emi_installment_num', 'updated_at'])
             if exp.emi_reference:
-                Expense.objects.filter(group=group, is_emi=True, emi_reference=exp.emi_reference).update(emi_total_installments=total_val)
+                visible_qs.filter(is_emi=True, emi_reference=exp.emi_reference).update(emi_total_installments=total_val)
             messages.success(request, f"Updated tenure to {total_val} installments.")
 
     if request.headers.get('x-requested-with') == 'XMLHttpRequest' or 'application/json' in request.headers.get('accept', ''):
@@ -528,7 +538,11 @@ def _redirect_uri(request):
 def gmail_connect(request):
     try:
         state = secrets.token_urlsafe(24)
-        request.session[_OAUTH_STATE_KEY] = state
+        request.session[_OAUTH_STATE_KEY] = {
+            'state': state,
+            'uid': request.user.pk,
+            'ts': time.time(),
+        }
         url = gmail.build_auth_url(_redirect_uri(request), state, login_hint=request.GET.get('hint', ''))
     except gmail.GmailError as exc:
         messages.error(request, str(exc))
@@ -538,8 +552,24 @@ def gmail_connect(request):
 
 @_require_expenses
 def gmail_callback(request):
-    expected = request.session.pop(_OAUTH_STATE_KEY, None)
-    if not expected or not secrets.compare_digest(expected, request.GET.get('state', '')):
+    raw_expected = request.session.pop(_OAUTH_STATE_KEY, None)
+    incoming_state = str(request.GET.get('state') or '')
+    state_ok = False
+    if isinstance(raw_expected, dict):
+        exp_state = str(raw_expected.get('state') or '')
+        exp_uid = raw_expected.get('uid')
+        exp_ts = raw_expected.get('ts', 0)
+        if (
+            exp_state
+            and exp_uid == request.user.pk
+            and (time.time() - float(exp_ts)) <= _OAUTH_STATE_TTL
+            and secrets.compare_digest(exp_state, incoming_state)
+        ):
+            state_ok = True
+    elif isinstance(raw_expected, str) and raw_expected:
+        state_ok = secrets.compare_digest(raw_expected, incoming_state)
+
+    if not state_ok:
         messages.error(request, 'Gmail connection expired or was tampered with — please try again.')
         return redirect('expenses_settings')
     if request.GET.get('error'):
@@ -723,11 +753,11 @@ def statement_upload(request):
         return redirect('expenses_statements')
     card = form.cleaned_data['payment_source']
     password = form.cleaned_data.get('password', '')
-    if password and form.cleaned_data.get('save_password'):
-        card.statement_password = password
-        card.save(update_fields=['statement_password_enc'])
     statement = CardStatement.objects.create(group=group, payment_source=card)
     read_pdf(statement, form.cleaned_data['pdf'].read(), password)
+    if password and form.cleaned_data.get('save_password') and statement.status != 'NEEDS_PASSWORD':
+        card.statement_password = password
+        card.save(update_fields=['statement_password_enc'])
     _statement_message(request, statement)
     target_pk = statement.duplicate_of_id if (statement.status == 'DUPLICATE' and statement.duplicate_of_id) else statement.pk
     return redirect('expenses_statement_detail', pk=target_pk)
@@ -736,12 +766,41 @@ def statement_upload(request):
 @_require_expenses
 @require_POST
 def statement_unlock(request, pk):
+    from django.core.cache import cache
     statement = get_object_or_404(CardStatement, pk=pk, group=_group(request), status='NEEDS_PASSWORD')
+    user_prefix = f"stmt_unlock_{statement.pk}_u_{request.user.pk}"
+    stmt_prefix = f"stmt_unlock_{statement.pk}"
+    user_attempt_key, user_lock_key = f"{user_prefix}_attempts", f"{user_prefix}_lockout"
+    stmt_attempt_key, stmt_lock_key = f"{stmt_prefix}_attempts", f"{stmt_prefix}_lockout"
+
+    lockout_until = max(cache.get(user_lock_key, 0), cache.get(stmt_lock_key, 0))
+    if lockout_until and time.time() < lockout_until:
+        remaining = int(lockout_until - time.time())
+        messages.error(request, f'Too many failed PDF password attempts. Try again in {remaining // 60}m {remaining % 60}s.')
+        return redirect('expenses_statement_detail', pk=statement.pk)
+
     password = request.POST.get('password', '')
-    if request.POST.get('save_password') and password:
-        statement.payment_source.statement_password = password
-        statement.payment_source.save(update_fields=['statement_password_enc'])
     read_pdf(statement, crypto.decrypt_bytes(statement.pdf_blob), password)
+    if statement.status == 'NEEDS_PASSWORD':
+        u_attempts = cache.get(user_attempt_key, 0) + 1
+        s_attempts = cache.get(stmt_attempt_key, 0) + 1
+        cache.set(user_attempt_key, u_attempts, timeout=_STATEMENT_LOCKOUT_SECONDS)
+        cache.set(stmt_attempt_key, s_attempts, timeout=_STATEMENT_LOCKOUT_SECONDS)
+        if u_attempts >= _MAX_STATEMENT_UNLOCK_ATTEMPTS or s_attempts >= _MAX_STATEMENT_GROUP_UNLOCK_ATTEMPTS:
+            lock_until = time.time() + _STATEMENT_LOCKOUT_SECONDS
+            if u_attempts >= _MAX_STATEMENT_UNLOCK_ATTEMPTS:
+                cache.set(user_lock_key, lock_until, timeout=_STATEMENT_LOCKOUT_SECONDS)
+                cache.delete(user_attempt_key)
+            if s_attempts >= _MAX_STATEMENT_GROUP_UNLOCK_ATTEMPTS:
+                cache.set(stmt_lock_key, lock_until, timeout=_STATEMENT_LOCKOUT_SECONDS)
+                cache.delete(stmt_attempt_key)
+            messages.error(request, f'Too many failed PDF password attempts. Locked for {_STATEMENT_LOCKOUT_SECONDS // 60} minutes.')
+            return redirect('expenses_statement_detail', pk=statement.pk)
+    else:
+        cache.delete_many([user_attempt_key, user_lock_key, stmt_attempt_key, stmt_lock_key])
+        if request.POST.get('save_password') and password and statement.payment_source_id:
+            statement.payment_source.statement_password = password
+            statement.payment_source.save(update_fields=['statement_password_enc'])
     _statement_message(request, statement)
     target_pk = statement.duplicate_of_id if (statement.status == 'DUPLICATE' and statement.duplicate_of_id) else statement.pk
     return redirect('expenses_statement_detail', pk=target_pk)

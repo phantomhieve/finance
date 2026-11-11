@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from django.conf import settings
 
 from .adapters import BaseAIAdapter, GeminiAdapter, OpenAICompatibleAdapter
+from .adapters.gemini import _normalize_model_name
 from .types import AINode, TaskType
 
 if TYPE_CHECKING:
@@ -159,25 +160,17 @@ class NodeRegistry:
         gemini_keys = [k.strip() for k in str(raw_gemini_keys).split(",") if k.strip()]
 
         is_debug = getattr(settings, "DEBUG", True)
-        gemini_model_prod = (
+        gemini_model_prod = _normalize_model_name(
             getattr(settings, "GEMINI_MODEL", "")
             or os.environ.get("GEMINI_MODEL", "")
-            or ("gemini-3.8-flash" if is_debug else "gemini-4-argon")
+            or ("gemini-3.8-flash" if is_debug else "gemini-4-carbon")
         )
-        if gemini_model_prod.strip().lower() in ("argon", "gemini-argon", "gemini_argon"):
-            gemini_model_prod = "gemini-4-argon"
-        elif gemini_model_prod.strip().lower() in ("flash", "gemini-flash", "3.8-flash", "gemini-3.8-flash"):
-            gemini_model_prod = "gemini-3.8-flash"
 
-        gemini_model_fast = (
+        gemini_model_fast = _normalize_model_name(
             getattr(settings, "EXPENSES_GEMINI_MODEL", "")
             or os.environ.get("EXPENSES_GEMINI_MODEL", "")
             or "gemini-3.8-flash"
         )
-        if gemini_model_fast.strip().lower() in ("argon", "gemini-argon", "gemini_argon"):
-            gemini_model_fast = "gemini-4-argon"
-        elif gemini_model_fast.strip().lower() in ("flash", "gemini-flash", "3.8-flash", "gemini-3.8-flash"):
-            gemini_model_fast = "gemini-3.8-flash"
 
         gemini_priority = 1 if pref_provider == "gemini" else 2
 

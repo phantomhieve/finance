@@ -30,7 +30,7 @@
     var form = typeSelect.closest('form');
     if (form) {
       var deleteBtn = form.querySelector('[id*="DeleteBtn"]') || form.querySelector('[id*="deleteBtn"]');
-      var isAddMode = !deleteBtn || deleteBtn.style.display === 'none';
+      var isAddMode = !deleteBtn || deleteBtn.style.display === 'none' || deleteBtn.classList.contains('hidden');
       if (isAddMode) {
         var purchaseInput = form.querySelector('[name=purchase_price_per_gram]');
         if (purchaseInput) {
