@@ -13,76 +13,99 @@
 <style>
   body, table, td { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
   table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; border-collapse: collapse; }
-  a { color: #4f46e5; }
-  .num { font-variant-numeric: tabular-nums; }
+  img { -ms-interpolation-mode: bicubic; border: 0; outline: none; text-decoration: none; }
+  a { color: #4f46e5; text-decoration: none; }
+  .num { font-variant-numeric: tabular-nums; -webkit-font-feature-settings: 'tnum'; font-feature-settings: 'tnum'; }
   @media only screen and (max-width: 620px) {
-    .em-container { width: 100% !important; }
+    .em-container { width: 100% !important; max-width: 100% !important; border-radius: 0 !important; }
+    .em-outer-pad { padding: 0 !important; }
     .em-pad { padding-left: 20px !important; padding-right: 20px !important; }
     .em-stack { display: block !important; width: 100% !important; box-sizing: border-box; padding: 0 0 10px 0 !important; }
     .em-hide-sm { display: none !important; }
-    .em-hero { font-size: 34px !important; line-height: 40px !important; }
+    .em-hero { font-size: 32px !important; line-height: 38px !important; }
+    .em-kpi-val { font-size: 16px !important; }
   }
   @media (prefers-color-scheme: dark) {
-    .em-body { background-color: #0b1120 !important; }
+    body, .em-body { background-color: #0b0f19 !important; }
+    .em-container { background-color: #111827 !important; border-color: #1e293b !important; }
     .em-card { background-color: #111827 !important; }
-    .em-soft { background-color: #1f2937 !important; }
-    .em-line { border-color: #1f2937 !important; }
-    .em-text { color: #e5e7eb !important; }
-    .em-muted { color: #9ca3af !important; }
-    .em-track { background-color: #374151 !important; }
+    .em-soft { background-color: #172033 !important; }
+    .em-line { border-color: #243047 !important; }
+    .em-text { color: #f8fafc !important; }
+    .em-muted { color: #94a3b8 !important; }
+    .em-section-title { color: #818cf8 !important; }
+    .em-track { background-color: #334155 !important; }
+    .em-footer { background-color: #0d1322 !important; border-color: #1e293b !important; }
   }
-  [data-ogsc] .em-body { background-color: #0b1120 !important; }
+  [data-ogsc] .em-body { background-color: #0b0f19 !important; }
+  [data-ogsc] .em-container { background-color: #111827 !important; border-color: #1e293b !important; }
   [data-ogsc] .em-card { background-color: #111827 !important; }
-  [data-ogsc] .em-soft { background-color: #1f2937 !important; }
-  [data-ogsc] .em-text { color: #e5e7eb !important; }
-  [data-ogsc] .em-muted { color: #9ca3af !important; }
+  [data-ogsc] .em-soft { background-color: #172033 !important; }
+  [data-ogsc] .em-line { border-color: #243047 !important; }
+  [data-ogsc] .em-text { color: #f8fafc !important; }
+  [data-ogsc] .em-muted { color: #94a3b8 !important; }
+  [data-ogsc] .em-track { background-color: #334155 !important; }
 </style>
 </head>
-<body class="em-body" style="margin:0; padding:0; width:100%; background-color:#eef1f5;">
+<body class="em-body" style="margin:0; padding:0; width:100%; background-color:#f1f5f9; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing:antialiased;">
 <div style="display:none; max-height:0; max-width:0; overflow:hidden; mso-hide:all; visibility:hidden; opacity:0; color:transparent; font-size:1px; line-height:1px;">{% block preheader %}{% endblock %}&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;&#8199;&#847;</div>
 
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="em-body" style="background-color:#eef1f5;">
-<tr><td align="center" style="padding:28px 12px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" class="em-body" style="background-color:#f1f5f9; width:100%;">
+<tr><td align="center" class="em-outer-pad" style="padding:32px 12px;">
 
-  <!--[if mso]><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
-  <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="em-container" style="width:600px; max-width:600px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
+  <!--[if (gte mso 9)|(IE)]><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" align="center"><tr><td><![endif]-->
+  <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" class="em-container" style="width:600px; max-width:600px; background-color:#ffffff; border-radius:16px; border:1px solid #e2e8f0; overflow:hidden; box-shadow:0 4px 20px -2px rgba(15, 23, 42, 0.05); font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;">
 
     {# Header band #}
-    <tr><td class="em-pad" style="background-color:#0f172a; padding:22px 32px; border-radius:14px 14px 0 0;">
+    <tr><td class="em-pad" style="background-color:#090e17; padding:20px 32px; border-bottom:1px solid #1e293b;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-        <td style="font-size:14px; font-weight:800; letter-spacing:4px; color:#ffffff; text-transform:uppercase;">Vault</td>
-        <td align="right" style="font-size:11px; font-weight:600; letter-spacing:1.5px; color:#a5b4fc; text-transform:uppercase;">{% block eyebrow %}{% endblock %}</td>
+        <td valign="middle" align="left">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              <td style="width:26px; height:26px; background-color:#4f46e5; border-radius:6px; text-align:center; vertical-align:middle; font-size:13px; font-weight:800; color:#ffffff; line-height:26px; mso-line-height-rule:exactly;">V</td>
+              <td style="padding-left:10px; font-size:14px; font-weight:800; letter-spacing:3px; color:#ffffff; text-transform:uppercase; vertical-align:middle;">Vault</td>
+            </tr>
+          </table>
+        </td>
+        <td valign="middle" align="right">
+          <span style="display:inline-block; padding:4px 12px; border-radius:999px; font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; background-color:rgba(99, 102, 241, 0.15); color:#a5b4fc; border:1px solid rgba(99, 102, 241, 0.28);">{% block eyebrow %}Wealth OS{% endblock %}</span>
+        </td>
       </tr></table>
     </td></tr>
 
-    {# Body #}
-    <tr><td class="em-card em-pad" style="background-color:#ffffff; padding:32px 32px 8px 32px;">
+    {# Body content #}
+    <tr><td class="em-card em-pad" style="background-color:#ffffff; padding:32px 32px 12px 32px;">
       {% block content %}{% endblock %}
     </td></tr>
 
-    {# CTA #}
+    {# Primary Call To Action #}
     {% if app_url %}
     <tr><td class="em-card em-pad" align="center" style="background-color:#ffffff; padding:8px 32px 32px 32px;">
-      <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
-        <td align="center" bgcolor="#4f46e5" style="border-radius:10px;">
-          <a href="{{ app_url }}" style="display:inline-block; padding:13px 28px; font-size:15px; font-weight:600; color:#ffffff; text-decoration:none; border-radius:10px;">{% block cta_label %}Open Vault{% endblock %} &rarr;</a>
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center"><tr>
+        <td align="center" bgcolor="#4f46e5" style="border-radius:10px; background-color:#4f46e5; box-shadow:0 3px 12px rgba(79, 70, 229, 0.25);">
+          <a href="{{ app_url }}" style="display:inline-block; padding:13px 28px; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size:14px; font-weight:700; color:#ffffff; text-decoration:none; border-radius:10px; letter-spacing:0.2px;">{% block cta_label %}Open Vault{% endblock %} &rarr;</a>
         </td>
       </tr></table>
     </td></tr>
     {% else %}
-    <tr><td class="em-card" style="background-color:#ffffff; font-size:0; line-height:0; height:24px;">&nbsp;</td></tr>
+    <tr><td class="em-card" style="background-color:#ffffff; font-size:0; line-height:0; height:20px;">&nbsp;</td></tr>
     {% endif %}
 
-    {# Footer #}
-    <tr><td class="em-soft em-pad" style="background-color:#f8fafc; padding:20px 32px; border-radius:0 0 14px 14px;">
-      <p class="em-muted" style="margin:0; font-size:12px; line-height:18px; color:#64748b;">
-        {% block footer_note %}{% endblock %}
-        {% block disclaimer %}Figures are from your Vault records and may lag live market prices. AI commentary is for personal planning only, not investment advice &mdash; verify before acting.{% endblock %}
-      </p>
+    {# Footer section #}
+    <tr><td class="em-soft em-pad em-footer em-line" style="background-color:#f8fafc; padding:22px 32px; border-radius:0 0 16px 16px; border-top:1px solid #e2e8f0;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr><td>
+        <p class="em-muted" style="margin:0; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size:12px; line-height:18px; color:#64748b;">
+          {% block footer_note %}{% endblock %}
+          {% block disclaimer %}Figures are derived from your Vault ledger records and may lag live exchange ticks. AI commentary is for personal planning only, not registered financial advice &mdash; verify before capital allocation.{% endblock %}
+        </p>
+        <p class="em-muted" style="margin:10px 0 0 0; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size:11px; line-height:16px; color:#94a3b8;">
+          Confidential household financial briefing &bull; Vault Intelligence System
+        </p>
+      </td></tr></table>
     </td></tr>
 
   </table>
-  <!--[if mso]></td></tr></table><![endif]-->
+  <!--[if (gte mso 9)|(IE)]></td></tr></table><![endif]-->
 
 </td></tr>
 </table>

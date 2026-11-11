@@ -1,25 +1,26 @@
 """Multi-Stage AI Land Appraisal DAG for Annual FY-End Real Estate Revaluation.
 
-Formulated via live adversarial consensus between Argon (Quantitative Growth Architect)
-and DeepSeek (Senior Fiduciary Auditor & Adversarial Risk Officer).
+Formulated via live adversarial consensus between Carbon (Quantitative Growth Architect)
+and DeepSeek (Senior Fiduciary Auditor & Adversarial Risk Officer); see ADR 0001.
 
 DAG Pipeline:
-1. Stage 1 (Argon Grounding): Raw broker asks vs actual circle rates, CPI inflation, repo rate,
-   and infrastructure delays via Google Search Grounding.
-2. Stage 2 (DeepSeek / Shakti Auditor): Fiduciary mathematical sanitization:
-   - Speculative Ask Haircut (SAH) 30% discount on raw broker asks
-   - Dynamic Illiquidity & Friction Discount (IFD, min 15% floor)
-   - Execution Slippage Penalty (ESP, 2.5% per 6mo delay)
-   - Maximum Allowable YoY Growth Cap (Repo + CPI + 3% Illiquidity Risk Premium)
-3. Stage 3 (Argon Frontier Consensus): Final balance-sheet recognition:
-   - Bounded by strict fiduciary ceilings (Argon Thinking High in Prod; Flash-Lite in Dev).
-   - Separates approved balance sheet markup from unrealized speculative buffer.
+1. Stage 1 (Carbon Search Grounding): Raw broker asks vs actual circle rates, CPI inflation,
+   repo rate, and infrastructure delays via Google Search Grounding.
+2. Stage 1.5 (Deterministic Decimal Fiduciary Haircuts): Exact unit-normalized Gaj (Sq. Yard)
+   conversion, Speculative Ask Haircut (SAH 30%), Dynamic Illiquidity & Friction Discount
+   (IFD = max(15%, 9% + 0.75*Repo)), Execution Slippage Penalty (ESP), and Macro Cap
+   (Repo + CPI + 3.0%).
+3. Stage 2 (Adversarial Fiduciary Auditor): Stress-tests market comps against the pre-computed
+   fiduciary haircut anchors to establish a conservative appreciation ceiling.
+4. Stage 3 (Carbon Frontier Synthesis + Hard Guardrail Reducer): Reconciles final recognition
+   strictly clamped by min(MAX_CONSERVATIVE_PCT, macro_cap, auditor_ceiling) with Decimal('0.01')
+   ledger precision, separating off-balance-sheet speculative upside.
 """
 from __future__ import annotations
 
 import datetime
-from decimal import Decimal
 import logging
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from django.conf import settings
@@ -33,6 +34,28 @@ logger = logging.getLogger(__name__)
 MIN_CONSERVATIVE_PCT = Decimal("0.0")
 MAX_CONSERVATIVE_PCT = Decimal("15.0")
 DEFAULT_CONSERVATIVE_FALLBACK_PCT = Decimal("6.0")
+
+
+def _dec(val: Any, default: str = "0") -> Decimal:
+    if val is None or val == "":
+        return Decimal(default)
+    if isinstance(val, Decimal):
+        return val
+    try:
+        return Decimal(str(val))
+    except (InvalidOperation, ValueError, TypeError):
+        return Decimal(default)
+
+
+def _holding_area_in_gaj(holding: Any) -> Decimal:
+    """Resolve plot area strictly normalized to Gaj (Sq. Yards) regardless of stored unit."""
+    gaj = getattr(holding, "area_in_gaj", None)
+    if gaj is not None:
+        d_gaj = _dec(gaj)
+        if d_gaj > 0:
+            return d_gaj
+    raw = _dec(getattr(holding, "area_value", None), default="250")
+    return raw if raw > 0 else Decimal("250")
 
 
 # ===========================================================================
@@ -71,6 +94,20 @@ class GroundedMarketComps(BaseModel):
         default_factory=list, description="Sources, revenue notifications, or market portals surveyed"
     )
     summary: str = Field(default="", description="Summary of grounded empirical findings")
+
+
+class FiduciaryHaircutQuant(BaseModel):
+    """Stage 1.5: Deterministic Decimal haircut anchor computed prior to Stage 2/3."""
+    area_sq_yd_gaj: float
+    current_book_per_sq_yd_inr: float
+    base_market_value_per_sq_yd_inr: float
+    net_realizable_per_sq_yd_inr: float
+    nrv_vs_book_spread_pct: float = 0.0
+    speculative_ask_haircut_pct: float = 30.0
+    illiquidity_friction_discount_pct: float = 15.0
+    execution_slippage_penalty_pct: float = 0.0
+    max_allowable_yoy_growth_cap_pct: float = 14.5
+    suggested_conservative_ceiling_pct: float = 6.0
 
 
 class DeepSeekAuditorReview(BaseModel):
@@ -144,8 +181,54 @@ class LandAppraisalSynthesis(BaseModel):
         default=0.88, description="Confidence score in the appraisal (0.0 to 1.0)"
     )
     model_chain_used: str = Field(
-        default="gemini-grounding -> argon-auditor -> gemini-argon",
+        default="gemini-grounding -> carbon-auditor -> gemini-4-carbon",
         description="AI models that participated in this appraisal consensus"
+    )
+
+
+def compute_fiduciary_haircuts(holding: Any | None, comps: GroundedMarketComps) -> FiduciaryHaircutQuant:
+    """Compute exact Decimal SAH, IFD, ESP, NRV, and macro cap from Stage 1 comps."""
+    area_gaj = _holding_area_in_gaj(holding) if holding is not None else Decimal("250")
+    cur_val = _dec(getattr(holding, "current_valuation", None), default="0") if holding is not None else Decimal("0")
+    book_per_gaj = (cur_val / area_gaj) if area_gaj > 0 else Decimal("0")
+
+    portal_ask = _dec(comps.median_portal_ask_per_sq_yd)
+    repo = _dec(comps.rbi_repo_rate_pct, default="6.5")
+    cpi = _dec(comps.cpi_inflation_pct, default="5.2")
+    gross_growth = _dec(comps.observed_market_growth_pct, default="7.0")
+    delay_months = max(0, int(comps.infrastructure_delay_months or 0))
+
+    sah_pct = Decimal("30.0")
+    ifd_pct = max(Decimal("15.0"), Decimal("9.0") + (repo * Decimal("0.75")))
+    esp_pct = min(Decimal("10.0"), Decimal(delay_months // 6) * Decimal("2.5"))
+    macro_cap_pct = repo + cpi + Decimal("3.0")
+
+    bmv_per_gaj = portal_ask * (Decimal("1") - sah_pct / Decimal("100"))
+    combined_discount = min(Decimal("45.0"), ifd_pct + esp_pct)
+    nrv_per_gaj = bmv_per_gaj * (Decimal("1") - combined_discount / Decimal("100"))
+    nrv_vs_book_pct = (
+        ((nrv_per_gaj - book_per_gaj) / book_per_gaj) * Decimal("100")
+        if book_per_gaj > 0
+        else Decimal("0")
+    )
+
+    # Fiduciary ceiling strips 150 bps friction buffer from gross growth and caps at min(15.0%, macro_cap_pct)
+    net_ceiling = max(
+        MIN_CONSERVATIVE_PCT,
+        min(MAX_CONSERVATIVE_PCT, macro_cap_pct, gross_growth - Decimal("1.5")),
+    )
+
+    return FiduciaryHaircutQuant(
+        area_sq_yd_gaj=float(area_gaj.quantize(Decimal("0.01"))),
+        current_book_per_sq_yd_inr=float(book_per_gaj.quantize(Decimal("0.01"))),
+        base_market_value_per_sq_yd_inr=float(bmv_per_gaj.quantize(Decimal("0.01"))),
+        net_realizable_per_sq_yd_inr=float(nrv_per_gaj.quantize(Decimal("0.01"))),
+        nrv_vs_book_spread_pct=float(nrv_vs_book_pct.quantize(Decimal("0.01"))),
+        speculative_ask_haircut_pct=float(sah_pct.quantize(Decimal("0.1"))),
+        illiquidity_friction_discount_pct=float(ifd_pct.quantize(Decimal("0.1"))),
+        execution_slippage_penalty_pct=float(esp_pct.quantize(Decimal("0.1"))),
+        max_allowable_yoy_growth_cap_pct=float(macro_cap_pct.quantize(Decimal("0.1"))),
+        suggested_conservative_ceiling_pct=float(net_ceiling.quantize(Decimal("0.01"))),
     )
 
 
@@ -158,8 +241,9 @@ def discover_land_market_comps(holding: Any, is_debug: bool = False) -> Grounded
     logger.info("[LandAppraisal DAG] Stage 1: Discovering market comps for '%s'...", holding.name)
 
     cfg = ai_config.resolve(TaskProfile.LAND_APPRAISAL_COMPS, is_debug=is_debug)
-
+    area_gaj = _holding_area_in_gaj(holding)
     corridor = holding.micro_market_tag or holding.locality
+
     prompt = f"""\
 You are an institutional Real Estate Data Aggregator operating under strict fiduciary constraints.
 Your sole purpose is to aggregate raw market data, macroeconomic indicators, and infrastructure timelines
@@ -171,7 +255,7 @@ ASSET DETAILS:
 - Locality / Corridor: {holding.locality}
 - City: {holding.city}, State: {holding.state}
 - Micro-Market Tag: {corridor}
-- Plot Size: {holding.area_value} {holding.area_unit}
+- Plot Size: {holding.area_value} {holding.area_unit} ({area_gaj:,.2f} Sq. Yard / Gaj)
 - Current Stated Book Value: INR {holding.current_valuation:,.0f}
 
 TASK 1: BROKER PORTAL AGGREGATION
@@ -191,7 +275,6 @@ For major regional corridor catalysts (e.g. Airport, Film City, Expressway, Metr
 - Estimate the total delay in months from original baseline deadlines.
 """
 
-    cfg = ai_config.resolve(TaskProfile.LAND_APPRAISAL_COMPS, is_debug=is_debug)
     try:
         comps = gateway.generate_structured(
             schema=GroundedMarketComps,
@@ -201,6 +284,7 @@ For major regional corridor catalysts (e.g. Airport, Film City, Expressway, Metr
             preferred_node_id=cfg.preferred_node_id,
             thinking_level=cfg.thinking_level,
             temperature=cfg.temperature,
+            enable_search_grounding=True,
         )
         if comps and (comps.observed_market_growth_pct or comps.median_portal_ask_per_sq_yd):
             logger.info(
@@ -216,8 +300,9 @@ For major regional corridor catalysts (e.g. Airport, Film City, Expressway, Metr
 
 def _fallback_market_comps(holding: Any) -> GroundedMarketComps:
     """Conservative baseline comps when live search grounding is inaccessible."""
-    area = float(holding.area_value) if holding.area_value else 250.0
-    implied_rate = float(holding.current_valuation) / area if area > 0 else 55000.0
+    area_gaj = _holding_area_in_gaj(holding)
+    cur_val = _dec(holding.current_valuation, default="0")
+    implied_rate = float(cur_val / area_gaj) if area_gaj > 0 and cur_val > 0 else 55000.0
 
     return GroundedMarketComps(
         locality=holding.locality or holding.city,
@@ -239,48 +324,39 @@ def _fallback_market_comps(holding: Any) -> GroundedMarketComps:
 
 
 # ===========================================================================
-# 3. Stage 2: Adversarial Fiduciary Auditor Review (DeepSeek / Shakti)
+# 3. Stage 2: Adversarial Fiduciary Auditor Review
 # ===========================================================================
 
 def run_deepseek_auditor_review(holding: Any, comps: GroundedMarketComps, is_debug: bool = False) -> DeepSeekAuditorReview:
-    """Stage 2: DeepSeek adversarial stress-testing applying illiquidity and speculative haircuts."""
-    logger.info("[LandAppraisal DAG] Stage 2: DeepSeek / Shakti Auditor scrutinizing market comps...")
+    """Stage 2: Adversarial stress-testing anchored by deterministic Decimal haircut formulas."""
+    logger.info("[LandAppraisal DAG] Stage 2: Fiduciary Auditor scrutinizing market comps...")
 
+    quant = compute_fiduciary_haircuts(holding, comps)
     prompt = f"""\
-You are DeepSeek-R1, acting as the Senior Fiduciary Auditor and Adversarial Risk Officer of Vault Family Wealth.
+You are the Senior Fiduciary Auditor and Adversarial Risk Officer of Vault Family Wealth.
 You do not trust market sentiment or broker portals; you trust fiduciary mathematics.
-You have received raw market data from Stage 1. You must execute a mandatory, rigid algorithm
-to strip out broker hallucinations and calculate the strict Net Realizable Value (NRV).
+Audit the Stage 1 empirical data using the pre-computed Decimal fiduciary anchor figures below:
 
-INPUT DATA:
+INPUT DATA & PRE-COMPUTED FIDUCIARY ANCHORS:
 - Asset: {holding.name} ({holding.locality}, {holding.city})
-- Area: {holding.area_value} {holding.area_unit}
-- Current Book Value: INR {holding.current_valuation:,.0f}
+- Normalized Area: {quant.area_sq_yd_gaj:,.2f} Sq. Yard (Gaj) (raw: {holding.area_value} {holding.area_unit})
+- Current Book Value: INR {holding.current_valuation:,.0f} (INR {quant.current_book_per_sq_yd_inr:,.0f} / Sq. Yard)
 - Median Portal Ask: INR {comps.median_portal_ask_per_sq_yd:,.0f} / Sq. Yard
 - Circle Rate Floor: INR {comps.circle_rate_floor_per_sq_yd:,.0f} / Sq. Yard
 - Observed Gross Growth: {comps.observed_market_growth_pct}%
-- RBI Repo Rate: {comps.rbi_repo_rate_pct}%
-- CPI Inflation: {comps.cpi_inflation_pct}%
-- Infrastructure Execution Delay: {comps.infrastructure_delay_months} months
+- Speculative Ask Haircut (SAH): {quant.speculative_ask_haircut_pct}% -> BMV INR {quant.base_market_value_per_sq_yd_inr:,.0f} / Sq. Yard
+- Dynamic Illiquidity & Friction Discount (IFD): {quant.illiquidity_friction_discount_pct}% (9.0% + 0.75 * Repo {comps.rbi_repo_rate_pct}%, floor 15.0%)
+- Execution Slippage Penalty (ESP): {quant.execution_slippage_penalty_pct}% ({comps.infrastructure_delay_months}m delay)
+- Net Realizable Value (NRV): INR {quant.net_realizable_per_sq_yd_inr:,.0f} / Sq. Yard
+- Maximum Allowable YoY Growth Cap: {quant.max_allowable_yoy_growth_cap_pct}% (Repo + CPI + 3.0%)
 - Infrastructure Catalysts: {', '.join(comps.infrastructure_catalysts)}
 
-MANDATORY AUDIT FORMULAS:
-1. THE SPECULATIVE ASK HAIRCUT (SAH):
-   Raw portal asks in emerging corridors are inflated by 25-35%. Apply a mandatory 30% discount
-   to simulate registry reality: Base Market Value (BMV) = Median Portal Ask * (1 - 0.30).
-2. DYNAMIC ILLIQUIDITY & FRICTION DISCOUNT (IFD):
-   Calculate the friction of liquidating vacant land over a 9-month horizon:
-   Transfer & Legal = 9.0% + Time Value Penalty (Repo * 0.75). Hard floor: 15.0%.
-3. EXECUTION SLIPPAGE PENALTY (ESP):
-   For every 6 months of infrastructure delay, deduct 2.5% (capped at 10.0%).
-4. MAXIMUM ALLOWABLE YOY GROWTH CAP (LEDGER GUARDRAIL):
-   Max Allowable YoY Growth = RBI Repo Rate ({comps.rbi_repo_rate_pct}%) + CPI Inflation ({comps.cpi_inflation_pct}%) + 3.0% (Risk Premium).
-5. FINAL AUDITOR CEILING:
-   Recommend a conservative, defensible annual appreciation percentage (typically 4.0% to 7.0%).
+Recommend a strict conservative_appreciation_ceiling_pct (typically 4.0% to 7.0%, never above {quant.max_allowable_yoy_growth_cap_pct}%)
+and state key skeptical concerns.
 """
 
     system = (
-        "You are DeepSeek-R1, an adversarial fiduciary real estate auditor. Your mandate is capital preservation "
+        "You are an adversarial fiduciary real estate auditor. Your mandate is capital preservation "
         "and prudent balance sheet valuation. Reject all speculative optimism. Return strictly structured JSON."
     )
 
@@ -297,40 +373,43 @@ MANDATORY AUDIT FORMULAS:
             thinking_level=cfg.thinking_level,
             temperature=cfg.temperature,
         )
-        if review and review.conservative_appreciation_ceiling_pct:
+        if review and review.conservative_appreciation_ceiling_pct is not None:
             logger.info(
-                "[LandAppraisal DAG] Stage 2 completed via Argon (%s): Auditor Ceiling %.1f%%",
+                "[LandAppraisal DAG] Stage 2 completed via Carbon (%s): Auditor Ceiling %.1f%%",
                 model, review.conservative_appreciation_ceiling_pct,
             )
             return review
     except Exception as exc:
-        logger.warning("[LandAppraisal DAG] Stage 2 Argon review failed (%s); using mathematical fallback...", exc)
+        logger.warning("[LandAppraisal DAG] Stage 2 Carbon review failed (%s); using mathematical fallback...", exc)
 
-    return _fallback_auditor_review(comps)
+    return _fallback_auditor_review(comps, holding=holding)
 
 
-def _fallback_auditor_review(comps: GroundedMarketComps) -> DeepSeekAuditorReview:
-    """Fiduciary mathematical haircuts applied deterministically if AI stages fail."""
+def _fallback_auditor_review(comps: GroundedMarketComps, holding: Any | None = None) -> DeepSeekAuditorReview:
+    """Fiduciary mathematical haircuts applied deterministically if AI stages fail.
+
+    When offline/degraded, additionally caps conservative recognition at DEFAULT_CONSERVATIVE_FALLBACK_PCT (6.0%).
+    """
+    quant = compute_fiduciary_haircuts(holding, comps)
     gross = comps.observed_market_growth_pct or 7.0
-    sah = 30.0  # 30% speculative ask haircut
-    ifd = max(15.0, 9.0 + (comps.rbi_repo_rate_pct * 0.75))
-    esp = min(10.0, (comps.infrastructure_delay_months // 6) * 2.5)
-    max_cap = comps.rbi_repo_rate_pct + comps.cpi_inflation_pct + 3.0
-
-    # Conservative net appreciation
-    net_ceiling = max(float(MIN_CONSERVATIVE_PCT), min(float(MAX_CONSERVATIVE_PCT), gross - 1.5))
-    net_ceiling = min(net_ceiling, max_cap, 6.0)
+    offline_ceiling = float(
+        min(_dec(quant.suggested_conservative_ceiling_pct), DEFAULT_CONSERVATIVE_FALLBACK_PCT).quantize(
+            Decimal("0.01")
+        )
+    )
 
     return DeepSeekAuditorReview(
         gross_market_growth_pct=gross,
-        speculative_ask_haircut_pct=sah,
-        illiquidity_friction_discount_pct=round(ifd, 1),
-        execution_slippage_penalty_pct=round(esp, 1),
-        max_allowable_yoy_growth_cap_pct=round(max_cap, 1),
-        conservative_appreciation_ceiling_pct=round(net_ceiling, 2),
+        speculative_ask_haircut_pct=quant.speculative_ask_haircut_pct,
+        illiquidity_friction_discount_pct=quant.illiquidity_friction_discount_pct,
+        execution_slippage_penalty_pct=quant.execution_slippage_penalty_pct,
+        max_allowable_yoy_growth_cap_pct=quant.max_allowable_yoy_growth_cap_pct,
+        conservative_appreciation_ceiling_pct=offline_ceiling,
         auditor_verdict=(
-            f"Mandatory 30% SAH and {ifd:.1f}% IFD applied against broker asks. "
-            f"YoY appreciation capped below fiduciary ceiling of {max_cap:.1f}%."
+            f"Mandatory {quant.speculative_ask_haircut_pct:.0f}% SAH and {quant.illiquidity_friction_discount_pct:.1f}% IFD "
+            f"applied against broker asks (NRV INR {quant.net_realizable_per_sq_yd_inr:,.0f}/Sq.Yd). "
+            f"Offline fallback YoY appreciation capped at {offline_ceiling:.1f}% below fiduciary ceiling of "
+            f"{quant.max_allowable_yoy_growth_cap_pct:.1f}%."
         ),
         key_skeptical_concerns=[
             "Broker asking prices exceed stamped registry deeds by ~25-35%",
@@ -341,7 +420,7 @@ def _fallback_auditor_review(comps: GroundedMarketComps) -> DeepSeekAuditorRevie
 
 
 # ===========================================================================
-# 4. Stage 3: Argon Frontier Synthesis & Revaluation
+# 4. Stage 3: Carbon Frontier Synthesis & Revaluation
 # ===========================================================================
 
 def synthesize_land_appreciation(
@@ -351,24 +430,25 @@ def synthesize_land_appreciation(
     closing_fy: str,
     is_debug: bool = False,
 ) -> LandAppraisalSynthesis:
-    """Stage 3: Argon reconciles Stage 1 comps and Stage 2 auditor review to set final growth rate."""
-    logger.info("[LandAppraisal DAG] Stage 3: Synthesizing final appreciation with Argon...")
+    """Stage 3: Carbon reconciles Stage 1 comps and Stage 2 auditor review to set final growth rate."""
+    logger.info("[LandAppraisal DAG] Stage 3: Synthesizing final appreciation with Carbon...")
 
     cfg = ai_config.resolve(TaskProfile.LAND_APPRAISAL_SYNTHESIS, is_debug=is_debug)
     model = cfg.model
 
-    current_val = float(holding.current_valuation)
-    area = float(holding.area_value) if holding.area_value else 250.0
+    current_val_dec = _dec(holding.current_valuation, default="0")
+    current_val = float(current_val_dec)
+    area_gaj_dec = _holding_area_in_gaj(holding)
 
     prompt = f"""\
-You are Argon, Chief Quantitative Real Estate Architect for Vault Family Wealth.
+You are Carbon, Chief Quantitative Real Estate Architect for Vault Family Wealth.
 You must synthesize the final conservative annual appreciation percentage for this land asset for {closing_fy}.
 
 ASSET DETAILS:
 - Name: {holding.name}
 - Type: {holding.get_property_type_display()}
 - Location: {holding.locality}, {holding.city}, {holding.state} ({holding.micro_market_tag or 'N/A'})
-- Area: {holding.area_value} {holding.area_unit}
+- Area: {holding.area_value} {holding.area_unit} ({area_gaj_dec:,.2f} Sq. Yard / Gaj)
 - Current Carrying Value: INR {current_val:,.0f}
 
 STAGE 1: GROUNDED RESEARCH FINDINGS
@@ -379,7 +459,7 @@ STAGE 1: GROUNDED RESEARCH FINDINGS
 - CPI Inflation Baseline: {comps.cpi_inflation_pct}%
 - RBI Repo Rate: {comps.rbi_repo_rate_pct}%
 
-STAGE 2: DEEPSEEK AUDITOR SKEPTICAL REVIEW
+STAGE 2: FIDUCIARY AUDITOR SKEPTICAL REVIEW
 - Speculative Ask Haircut (SAH): {auditor.speculative_ask_haircut_pct}%
 - Dynamic Illiquidity & Friction Discount (IFD): {auditor.illiquidity_friction_discount_pct}%
 - Execution Slippage Penalty (ESP): {auditor.execution_slippage_penalty_pct}%
@@ -390,15 +470,13 @@ STAGE 2: DEEPSEEK AUDITOR SKEPTICAL REVIEW
 RECONCILIATION & GUARDRAILS:
 1. Hard Fiduciary Ceiling: The final recommended_appreciation_pct MUST NOT exceed the auditor ceiling
    ({auditor.conservative_appreciation_ceiling_pct}%) or the macro cap ({auditor.max_allowable_yoy_growth_cap_pct}%).
-2. Conservative Margin of Safety: Reconcile between CPI inflation (~5%) and realizable growth.
-   Typically, a conservative number lies between 4.0% and 6.5%.
-3. Separate Speculative Buffer: If gross market asking growth exceeds the recognized ledger markup,
-   allocate the delta to unrealized_speculative_buffer_inr (held off-balance sheet).
+2. Conservative Margin of Safety: Reconcile between CPI inflation (~5%) and realizable growth (typically 4.0% to 6.5%).
+3. Separate Speculative Buffer: Allocate any excess gross market growth above recognized markup to unrealized_speculative_buffer_inr.
 4. Output the official YEIDA Fiduciary Valuation Certificate in methodology_summary.
 """
 
     system = (
-        "You are Argon, Chief Valuation Arbitrator for a private Family Office. "
+        "You are Carbon, Chief Valuation Arbitrator for a private Family Office. "
         "Enforce institutional conservatism. Return strictly valid JSON."
     )
 
@@ -413,26 +491,41 @@ RECONCILIATION & GUARDRAILS:
             temperature=cfg.temperature,
         )
         if synthesis and synthesis.recommended_appreciation_pct is not None:
-            # Enforce hard code-level guardrails
-            synth_pct = Decimal(str(synthesis.recommended_appreciation_pct))
-            capped_pct = max(MIN_CONSERVATIVE_PCT, min(synth_pct, MAX_CONSERVATIVE_PCT))
+            # Enforce hard code-level fiduciary ceilings: MAX_CONSERVATIVE_PCT, auditor ceiling, and macro cap
+            synth_pct = _dec(synthesis.recommended_appreciation_pct)
+            hard_ceiling = MAX_CONSERVATIVE_PCT
+            if auditor.conservative_appreciation_ceiling_pct is not None and auditor.conservative_appreciation_ceiling_pct > 0:
+                hard_ceiling = min(hard_ceiling, _dec(auditor.conservative_appreciation_ceiling_pct))
+            if auditor.max_allowable_yoy_growth_cap_pct is not None and auditor.max_allowable_yoy_growth_cap_pct > 0:
+                hard_ceiling = min(hard_ceiling, _dec(auditor.max_allowable_yoy_growth_cap_pct))
+
+            capped_pct = max(MIN_CONSERVATIVE_PCT, min(synth_pct, hard_ceiling))
             if capped_pct != synth_pct:
                 logger.warning(
-                    "[LandAppraisal DAG] Clamped appreciation from %.2f%% to %.2f%%",
+                    "[LandAppraisal DAG] Clamped appreciation from %.2f%% to fiduciary ceiling %.2f%%",
                     float(synth_pct), float(capped_pct),
                 )
                 synthesis.recommended_appreciation_pct = float(capped_pct)
-                synthesis.new_valuation_inr = round(current_val * (1 + float(capped_pct) / 100), 2)
-                synthesis.net_value_increase_inr = round(synthesis.new_valuation_inr - current_val, 2)
 
-            if not synthesis.implied_rate_per_sq_yd_inr and area > 0:
-                synthesis.implied_rate_per_sq_yd_inr = round(synthesis.new_valuation_inr / area, 2)
+            # Always deterministically reconcile ledger rupee figures in Decimal('0.01')
+            new_val_dec = (current_val_dec * (Decimal("1") + capped_pct / Decimal("100"))).quantize(Decimal("0.01"))
+            net_inc_dec = (new_val_dec - current_val_dec).quantize(Decimal("0.01"))
+            synthesis.new_valuation_inr = float(new_val_dec)
+            synthesis.net_value_increase_inr = float(net_inc_dec)
+
+            gross_pct_dec = _dec(comps.observed_market_growth_pct)
+            if not synthesis.unrealized_speculative_buffer_inr and gross_pct_dec > capped_pct:
+                spec_buf_dec = (current_val_dec * ((gross_pct_dec - capped_pct) / Decimal("100"))).quantize(Decimal("0.01"))
+                synthesis.unrealized_speculative_buffer_inr = float(max(Decimal("0"), spec_buf_dec))
+
+            if area_gaj_dec > 0:
+                synthesis.implied_rate_per_sq_yd_inr = float((new_val_dec / area_gaj_dec).quantize(Decimal("0.01")))
 
             synthesis.holding_id = holding.id
             synthesis.holding_name = holding.name
             synthesis.closing_fy = closing_fy
             synthesis.current_valuation_inr = current_val
-            synthesis.model_chain_used = f"gemini-grounding -> argon-auditor -> {model}"
+            synthesis.model_chain_used = f"gemini-grounding -> carbon-auditor -> {model}"
             return synthesis
     except Exception as exc:
         logger.warning("[LandAppraisal DAG] Stage 3 synthesis failed (%s); applying deterministic synthesis...", exc)
@@ -447,29 +540,41 @@ def _fallback_synthesis(
     auditor: DeepSeekAuditorReview,
 ) -> LandAppraisalSynthesis:
     """Deterministic fallback synthesis guaranteeing robust execution without crash."""
-    current_val = float(holding.current_valuation)
-    appreciation_pct = float(min(
-        Decimal(str(auditor.conservative_appreciation_ceiling_pct or DEFAULT_CONSERVATIVE_FALLBACK_PCT)),
+    current_val_dec = _dec(holding.current_valuation, default="0")
+    current_val = float(current_val_dec)
+    appreciation_dec = min(
+        _dec(auditor.conservative_appreciation_ceiling_pct or DEFAULT_CONSERVATIVE_FALLBACK_PCT),
         MAX_CONSERVATIVE_PCT,
-    ))
-    new_val = round(current_val * (1 + appreciation_pct / 100), 2)
-    net_increase = round(new_val - current_val, 2)
-    area = float(holding.area_value) if holding.area_value else 250.0
-    implied_rate = round(new_val / area, 2) if area > 0 else 0.0
+    )
+    if auditor.max_allowable_yoy_growth_cap_pct:
+        appreciation_dec = min(appreciation_dec, _dec(auditor.max_allowable_yoy_growth_cap_pct))
+    appreciation_dec = max(MIN_CONSERVATIVE_PCT, appreciation_dec)
+
+    appreciation_pct = float(appreciation_dec)
+    new_val_dec = (current_val_dec * (Decimal("1") + appreciation_dec / Decimal("100"))).quantize(Decimal("0.01"))
+    new_val = float(new_val_dec)
+    net_increase = float((new_val_dec - current_val_dec).quantize(Decimal("0.01")))
+    area_gaj_dec = _holding_area_in_gaj(holding)
+    implied_rate = float((new_val_dec / area_gaj_dec).quantize(Decimal("0.01"))) if area_gaj_dec > 0 else 0.0
+
+    gross_dec = _dec(comps.observed_market_growth_pct, default="6.5")
+    spec_buf = float(
+        max(Decimal("0"), (current_val_dec * ((gross_dec - appreciation_dec) / Decimal("100"))).quantize(Decimal("0.01")))
+    )
 
     return LandAppraisalSynthesis(
         holding_id=holding.id,
         holding_name=holding.name,
         closing_fy=closing_fy,
         current_valuation_inr=current_val,
-        raw_implied_growth_pct=comps.observed_market_growth_pct or 6.5,
+        raw_implied_growth_pct=float(gross_dec),
         max_allowable_yoy_growth_cap_pct=auditor.max_allowable_yoy_growth_cap_pct or 14.5,
         recommended_appreciation_pct=appreciation_pct,
         new_valuation_inr=new_val,
         net_value_increase_inr=net_increase,
-        unrealized_speculative_buffer_inr=0.0,
+        unrealized_speculative_buffer_inr=spec_buf,
         implied_rate_per_sq_yd_inr=implied_rate,
-        conservative_margin_of_safety_pct=3.0,
+        conservative_margin_of_safety_pct=float(max(Decimal("0"), gross_dec - appreciation_dec)),
         methodology_summary=(
             f"Fiduciary valuation recognized +{appreciation_pct:.2f}% markup for {closing_fy}. "
             f"Applied 30% Speculative Ask Haircut and {auditor.illiquidity_friction_discount_pct:.1f}% "
@@ -504,13 +609,13 @@ def run_land_appraisal_dag(
         holding.name, closing_fy, is_debug,
     )
 
-    # Stage 1: Market & Comps Discovery (Argon Search Grounding)
+    # Stage 1: Market & Comps Discovery (Carbon Search Grounding)
     comps = discover_land_market_comps(holding, is_debug=is_debug)
 
-    # Stage 2: Adversarial Fiduciary Auditor Review (DeepSeek / Shakti)
+    # Stage 2: Adversarial Fiduciary Auditor Review (anchored by Decimal haircuts)
     auditor = run_deepseek_auditor_review(holding, comps, is_debug=is_debug)
 
-    # Stage 3: Argon Frontier Synthesis & Revaluation
+    # Stage 3: Carbon Frontier Synthesis & Revaluation
     appraisal = synthesize_land_appreciation(
         holding=holding,
         comps=comps,

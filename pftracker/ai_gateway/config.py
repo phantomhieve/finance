@@ -14,6 +14,7 @@ from typing import Any
 
 from django.conf import settings
 
+from .adapters.gemini import _normalize_model_name
 from .types import TaskType
 
 logger = logging.getLogger(__name__)
@@ -80,6 +81,7 @@ class ResolvedTaskConfig:
     preferred_provider: str | None
     sanitize_input: bool
     use_boundary_tags: bool
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 # Canonical task specifications registry
@@ -90,7 +92,7 @@ DEFAULT_TASK_SPECS: dict[TaskProfile, TaskSpec] = {
     TaskProfile.PORTFOLIO_INSIGHTS: TaskSpec(
         task_type=TaskType.REASONING,
         dev_model="gemini-3.8-flash",
-        prod_model="gemini-4-argon",
+        prod_model="gemini-4-carbon",
         temperature=0.15,
         dev_temperature=0.2,
         dev_thinking_level="LOW",
@@ -132,7 +134,7 @@ DEFAULT_TASK_SPECS: dict[TaskProfile, TaskSpec] = {
     TaskProfile.PORTFOLIO_DAG_STRATEGY: TaskSpec(
         task_type=TaskType.REASONING,
         dev_model="gemini-3.8-flash",
-        prod_model="gemini-4-argon",
+        prod_model="gemini-4-carbon",
         temperature=0.2,
         dev_thinking_level="LOW",
         prod_thinking_level="HIGH",
@@ -142,7 +144,7 @@ DEFAULT_TASK_SPECS: dict[TaskProfile, TaskSpec] = {
     TaskProfile.PORTFOLIO_DAG_SYNTHESIS: TaskSpec(
         task_type=TaskType.REASONING,
         dev_model="gemini-3.8-flash",
-        prod_model="gemini-4-argon",
+        prod_model="gemini-4-carbon",
         temperature=0.15,
         dev_temperature=0.2,
         dev_thinking_level="LOW",
@@ -157,17 +159,18 @@ DEFAULT_TASK_SPECS: dict[TaskProfile, TaskSpec] = {
     TaskProfile.LAND_APPRAISAL_COMPS: TaskSpec(
         task_type=TaskType.RESEARCH,
         dev_model="gemini-2.5-flash-lite",
-        prod_model="gemini-4-argon",
+        prod_model="gemini-4-carbon",
         temperature=0.1,
         dev_thinking_level="LOW",
         prod_thinking_level="HIGH",
         preferred_node_id="gemini-cloud",
         sanitize_input=True,
+        metadata={"enable_search_grounding": True},
     ),
     TaskProfile.LAND_APPRAISAL_AUDIT: TaskSpec(
         task_type=TaskType.REASONING,
         dev_model="gemini-2.5-flash-lite",
-        prod_model="gemini-4-argon",
+        prod_model="gemini-4-carbon",
         temperature=0.1,
         dev_thinking_level="LOW",
         prod_thinking_level="HIGH",
@@ -177,7 +180,7 @@ DEFAULT_TASK_SPECS: dict[TaskProfile, TaskSpec] = {
     TaskProfile.LAND_APPRAISAL_SYNTHESIS: TaskSpec(
         task_type=TaskType.REASONING,
         dev_model="gemini-2.5-flash-lite",
-        prod_model="gemini-4-argon",
+        prod_model="gemini-4-carbon",
         temperature=0.1,
         dev_thinking_level="LOW",
         prod_thinking_level="HIGH",
@@ -319,13 +322,19 @@ class AIConfigRegistry:
             env_task_model = os.environ.get(env_task_var)
 
             # 2. Check for domain-specific environment variable overrides
+            # Note: GEMINI_MODEL only applies to REASONING/RESEARCH/GENERAL tasks so tiered
+            # TaskType.FAST specialist lenses (e.g. PORTFOLIO_DAG_ALLOCATION/QUALITY/MACRO)
+            # retain their low-latency Flash model in production unless overridden explicitly.
             domain_model = None
             if profile.name.startswith("EXPENSE") or profile.name in ("RECEIPT_PARSING", "STATEMENT_PARSING", "STATEMENT_MATCHING"):
                 domain_model = (
                     getattr(settings, "EXPENSES_GEMINI_MODEL", "")
                     or os.environ.get("EXPENSES_GEMINI_MODEL", "")
                 )
-            elif profile.name.startswith("PORTFOLIO"):
+            elif (
+                profile.name.startswith("PORTFOLIO")
+                or profile.name.startswith("LAND_APPRAISAL")
+            ) and spec.task_type in (TaskType.REASONING, TaskType.RESEARCH, TaskType.GENERAL):
                 domain_model = (
                     getattr(settings, "GEMINI_MODEL", "")
                     or os.environ.get("GEMINI_MODEL", "")
@@ -333,13 +342,13 @@ class AIConfigRegistry:
 
             # 3. Model precedence: direct override > task env var > (domain env var in prod) > spec
             if is_debug:
-                resolved_model = (
+                resolved_model = _normalize_model_name(
                     model_override
                     or env_task_model
                     or spec.dev_model
                 )
             else:
-                resolved_model = (
+                resolved_model = _normalize_model_name(
                     model_override
                     or env_task_model
                     or domain_model
@@ -369,19 +378,23 @@ class AIConfigRegistry:
                 preferred_provider=spec.preferred_provider,
                 sanitize_input=spec.sanitize_input,
                 use_boundary_tags=spec.use_boundary_tags,
+                metadata=dict(spec.metadata),
             )
 
         # Fallback for generic TaskType or unknown string
         raw_task_type = task if isinstance(task, TaskType) else TaskType.GENERAL
-        default_model = (
-            getattr(settings, "GEMINI_MODEL", "")
-            or os.environ.get("GEMINI_MODEL", "")
-            or ("gemini-3.8-flash" if is_debug else "gemini-4-argon")
-        )
+        if is_debug:
+            default_model = "gemini-3.8-flash"
+        else:
+            default_model = (
+                getattr(settings, "GEMINI_MODEL", "")
+                or os.environ.get("GEMINI_MODEL", "")
+                or "gemini-4-carbon"
+            )
         return ResolvedTaskConfig(
             profile=None,
             task_type=raw_task_type,
-            model=model_override or default_model,
+            model=_normalize_model_name(model_override or default_model),
             temperature=temperature_override if temperature_override is not None else 0.2,
             thinking_level="LOW" if is_debug else "HIGH",
             thinking_budget=None,
@@ -390,6 +403,7 @@ class AIConfigRegistry:
             preferred_provider=None,
             sanitize_input=True,
             use_boundary_tags=False,
+            metadata={},
         )
 
 

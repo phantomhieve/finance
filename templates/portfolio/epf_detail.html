@@ -2,83 +2,144 @@
 {% load indian_format %}
 {% load static %}
 
-{% block title %}EPF — Portfolio — Vault{% endblock %}
+{% block title %}EPF Passbook | Portfolio | Vault{% endblock %}
 
 {% block page_header %}
-<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+<div class="v-page-header">
   <div>
-    <p class="text-xs font-bold tracking-widest uppercase text-primary">Portfolio</p>
-    <h1 class="text-2xl font-bold mt-1">Employee Provident Fund</h1>
-    <p class="text-sm opacity-60 mt-0.5">All contributions &amp; interest entries</p>
+    <h1 class="v-title flex items-center gap-2">
+      <span class="material-symbols-outlined text-teal-400 text-2xl">account_balance</span>
+      Employees' Provident Fund (EPF)
+    </h1>
+    <p class="v-subtitle">Statutory retirement passbook ledger, employee contributions, and accrued interest</p>
   </div>
-  <div class="flex flex-wrap items-center gap-2">
-    <button type="button" class="btn btn-ghost btn-sm gap-1" onclick="openAddModal()">
-      <span class="material-symbols-outlined text-base">add</span>Add Entry
+  <div class="v-toolbar">
+    <button type="button" class="v-btn v-btn-primary" onclick="openAddModal()">
+      <span class="material-symbols-outlined text-sm">add</span>Add Entry
     </button>
-    <a href="{% url 'portfolio_tracker' %}" class="btn btn-ghost btn-sm gap-1">
-      <span class="material-symbols-outlined text-base">arrow_back</span>Portfolio
+    <a href="{% url 'portfolio_tracker' %}#debt" class="v-btn v-btn-secondary">
+      <span class="material-symbols-outlined text-sm">arrow_back</span>Portfolio
     </a>
   </div>
 </div>
 {% endblock %}
 
 {% block content %}
-<div class="card hero-gradient-portfolio shadow-sm card-hover animate-up">
-  <div class="card-body p-4">
-    <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
-      <div>
-        <div class="text-[10px] font-bold uppercase tracking-widest opacity-40">EPF Balance</div>
-        <div class="text-3xl font-bold mt-1">{{ balance|inr }}</div>
+
+{# --- SIGNATURE LEDGER SUMMARY BAND --- #}
+<section class="v-ledger-band" aria-label="EPF Summary">
+  <div class="v-lead-cell">
+    <div>
+      <div class="v-lead-label">
+        <span>Accumulated EPF Balance</span>
+        <span class="v-delta v-delta-pos text-xs py-0 px-2 font-semibold">Sovereign Debt</span>
       </div>
-      <div class="flex flex-wrap gap-3">
-        <div class="stat-card stat-card-primary">
-          <div class="text-[10px] uppercase tracking-wider opacity-50">Contributions</div>
-          <div class="text-lg font-bold mt-0.5">{{ total_contrib|inr }}</div>
-        </div>
-        <div class="stat-card stat-card-success">
-          <div class="text-[10px] uppercase tracking-wider opacity-50">Interest</div>
-          <div class="text-lg font-bold mt-0.5">{{ total_interest|inr }}</div>
-        </div>
+      <div class="v-lead-figure-row">
+        <span class="v-lead-figure tabular-nums">{{ balance|inr }}</span>
+        <span class="v-delta v-delta-pos text-xs font-bold tabular-nums">
+          <span class="material-symbols-outlined text-xs">trending_up</span>+{{ total_interest|inr }} Accrued Interest
+        </span>
       </div>
+      <div class="v-lead-sub">
+        Principal Contributions: <strong class="text-base-content/85 tabular-nums">{{ total_contrib|inr }}</strong>
+        &middot;
+        Interest Share: <strong class="text-emerald-400 tabular-nums">{% if balance > 0 %}{% widthratio total_interest balance 100 %}%{% else %}0%{% endif %}</strong>
+      </div>
+    </div>
+
+    {% if balance > 0 %}
+    <div class="v-horizon">
+      <div class="v-horizon-bar" role="img" aria-label="EPF contributions versus accrued interest">
+        {% if total_contrib > 0 %}
+        <div class="v-horizon-seg" style="width: {% widthratio total_contrib balance 100 %}%; background: #14b8a6;" title="Contributions: {{ total_contrib|inr }}"></div>
+        {% endif %}
+        {% if total_interest > 0 %}
+        <div class="v-horizon-seg" style="width: {% widthratio total_interest balance 100 %}%; background: #10b981;" title="Accrued Interest: {{ total_interest|inr }}"></div>
+        {% endif %}
+      </div>
+      <div class="v-horizon-legend">
+        <span class="v-horizon-item">
+          <span class="v-horizon-dot" style="background: #14b8a6;"></span>
+          Contributions <strong>{% widthratio total_contrib balance 100 %}%</strong>
+        </span>
+        <span class="v-horizon-item">
+          <span class="v-horizon-dot" style="background: #10b981;"></span>
+          Interest <strong>{% widthratio total_interest balance 100 %}%</strong>
+        </span>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="v-stat-grid">
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Total Contributions</div>
+      <div class="v-stat-value text-base-content tabular-nums">{{ total_contrib|inr }}</div>
+      <div class="v-stat-sub">Principal deducted</div>
+    </div>
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Accrued Interest</div>
+      <div class="v-stat-value text-emerald-400 tabular-nums">+{{ total_interest|inr }}</div>
+      <div class="v-stat-sub">Compounded EPFO return</div>
+    </div>
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Interest Yield Share</div>
+      <div class="v-stat-value text-base-content tabular-nums">{% if balance > 0 %}{% widthratio total_interest balance 100 %}%{% else %}0%{% endif %}</div>
+      <div class="v-stat-sub">Of accumulated corpus</div>
+    </div>
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Passbook Entries</div>
+      <div class="v-stat-value text-base-content tabular-nums">{{ entries|length }}</div>
+      <div class="v-stat-sub">Audited transactions</div>
     </div>
   </div>
-</div>
+</section>
 
-<div class="card bg-base-200 shadow-sm card-hover animate-up mt-4" style="animation-delay:0.1s">
-  <div class="card-body p-4">
-    <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
-      <h2 class="text-lg font-semibold">All Entries</h2>
-      <span class="badge badge-primary badge-sm">{{ entries|length }}</span>
+{# --- EPF PASSBOOK LEDGER --- #}
+<section class="v-panel mb-6" aria-label="EPF Passbook Audit Trail">
+  <div class="v-panel-header">
+    <div class="flex items-center gap-2 min-w-0">
+      <h2 class="v-panel-title">
+        <span class="material-symbols-outlined text-base text-teal-400">receipt_long</span>
+        EPF Passbook Audit Trail
+      </h2>
+      <span class="v-delta v-delta-neutral text-xs font-semibold tabular-nums">{{ entries|length }} Entries</span>
     </div>
+    <button type="button" class="v-btn v-btn-secondary v-btn-sm" onclick="openAddModal()">
+      <span class="material-symbols-outlined text-sm">add</span>Add Entry
+    </button>
+  </div>
+  <div class="v-panel-body p-0">
     {% if entries %}
-    {# Desktop table #}
-    <div class="hidden md:block overflow-x-auto">
-      <table class="table table-sm" id="epfTable">
+    {# Desktop Table #}
+    <div class="v-panel-table hidden md:block overflow-x-auto">
+      <table class="v-table" id="epfTable">
         <thead>
           <tr>
-            <th class="sortable-th cursor-pointer select-none">Date <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
-            <th class="sortable-th cursor-pointer select-none">Type <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
-            <th class="sortable-th cursor-pointer select-none text-right">Amount <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none">Date <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none">Transaction Type <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Amount Added <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
             <th>Remarks</th>
-            <th class="w-12"></th>
+            <th class="text-right w-16">Action</th>
           </tr>
         </thead>
         <tbody>
           {% for e in entries %}
-          <tr class="hover">
-            <td class="opacity-60 text-sm whitespace-nowrap" data-val="{{ e.date|date:'Ymd' }}">{{ e.date|date:"d M Y" }}</td>
+          <tr>
+            <td class="text-xs text-base-content/75 whitespace-nowrap tabular-nums" data-val="{{ e.date|date:'Ymd' }}">{{ e.date|date:"d M Y" }}</td>
             <td>
-              {% if e.entry_type == 'CONTRIBUTION' %}
-              <span class="badge badge-primary badge-sm">{{ e.get_entry_type_display }}</span>
-              {% else %}
-              <span class="badge badge-ghost badge-sm">{{ e.get_entry_type_display }}</span>
-              {% endif %}
+              <span class="v-delta {% if e.entry_type == 'CONTRIBUTION' %}v-delta-pos{% else %}v-delta-neutral{% endif %} text-xs py-0 px-2 font-semibold">
+                {{ e.get_entry_type_display }}
+              </span>
             </td>
-            <td class="text-right whitespace-nowrap font-semibold text-success" data-val="{{ e.amount }}">+{{ e.amount|inr }}</td>
-            <td class="opacity-60 text-sm">{{ e.remarks|default:"—" }}</td>
+            <td class="v-num text-xs text-emerald-400 font-bold" data-val="{{ e.amount }}">+{{ e.amount|inr }}</td>
+            <td class="text-xs text-base-content/60 max-w-xs truncate">{{ e.remarks|default:"—" }}</td>
             <td class="text-right">
-              <button type="button" class="btn btn-ghost btn-xs btn-square" data-edit-epf data-id="{{ e.id }}" data-date="{{ e.date|date:'Y-m-d' }}" data-type="{{ e.entry_type }}" data-amount="{{ e.amount }}" data-remarks="{{ e.remarks }}">
-                <span class="material-symbols-outlined text-base">edit</span>
+              <button type="button" class="v-icon-btn" data-edit-epf
+                      data-id="{{ e.id }}" data-date="{{ e.date|date:'Y-m-d' }}"
+                      data-type="{{ e.entry_type }}" data-amount="{{ e.amount }}" data-remarks="{{ e.remarks }}"
+                      aria-label="Edit EPF entry from {{ e.date|date:'d M Y' }}">
+                <span class="material-symbols-outlined text-sm">edit</span>
               </button>
             </td>
           </tr>
@@ -86,30 +147,48 @@
         </tbody>
       </table>
     </div>
-    {# Mobile card view #}
-    <div class="md:hidden space-y-2">
+
+    {# Mobile View #}
+    <div class="md:hidden divide-y divide-[var(--v-hairline)]">
       {% for e in entries %}
-      <div class="table-card flex items-center justify-between gap-3">
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-2">
-            <span class="font-semibold text-sm text-success">+{{ e.amount|inr }}</span>
-            {% if e.entry_type == 'CONTRIBUTION' %}<span class="badge badge-primary badge-xs">Contribution</span>{% else %}<span class="badge badge-ghost badge-xs">Interest</span>{% endif %}
+      <div class="v-mobile-row gap-3">
+        <div class="min-w-0 flex-1">
+          <div class="flex items-center gap-2 flex-wrap">
+            <span class="font-bold text-sm text-emerald-400 tabular-nums">+{{ e.amount|inr }}</span>
+            <span class="v-delta {% if e.entry_type == 'CONTRIBUTION' %}v-delta-pos{% else %}v-delta-neutral{% endif %} text-xs py-0 px-1.5 font-semibold">
+              {{ e.get_entry_type_display }}
+            </span>
           </div>
-          <div class="text-xs opacity-50 mt-0.5 truncate">{{ e.date|date:"d M Y" }}{% if e.remarks %} · {{ e.remarks }}{% endif %}</div>
+          <div class="text-xs text-base-content/55 mt-1 truncate tabular-nums">
+            {{ e.date|date:"d M Y" }}{% if e.remarks %} &middot; {{ e.remarks }}{% endif %}
+          </div>
         </div>
-        <button type="button" class="btn btn-ghost btn-xs btn-square shrink-0" data-edit-epf data-id="{{ e.id }}" data-date="{{ e.date|date:'Y-m-d' }}" data-type="{{ e.entry_type }}" data-amount="{{ e.amount }}" data-remarks="{{ e.remarks }}">
+        <button type="button" class="v-icon-btn shrink-0" data-edit-epf
+                data-id="{{ e.id }}" data-date="{{ e.date|date:'Y-m-d' }}"
+                data-type="{{ e.entry_type }}" data-amount="{{ e.amount }}" data-remarks="{{ e.remarks }}"
+                aria-label="Edit EPF entry from {{ e.date|date:'d M Y' }}">
           <span class="material-symbols-outlined text-base">edit</span>
         </button>
       </div>
       {% endfor %}
     </div>
     {% else %}
-    <p class="text-sm opacity-60 py-4">No EPF entries yet.</p>
+    <div class="v-empty py-10">
+      <div class="v-empty-icon text-teal-400">
+        <span class="material-symbols-outlined text-3xl">account_balance</span>
+      </div>
+      <h3 class="v-empty-title">No EPF Entries Recorded</h3>
+      <p class="v-empty-desc">Record monthly EPF contributions and annual EPFO interest credits from your UAN passbook.</p>
+      <button type="button" class="v-btn v-btn-primary" onclick="openAddModal()">
+        <span class="material-symbols-outlined text-sm">add</span>Add First Entry
+      </button>
+    </div>
     {% endif %}
   </div>
-</div>
+</section>
 
-{% include 'portfolio/_epf_form_modal.html' with form_obj=form %}
+{% include 'portfolio/_epf_form_modal.html' %}
+
 {% endblock %}
 
 {% block extra_js %}
@@ -117,26 +196,50 @@
 <script>
 function openAddModal() {
   var form = document.getElementById('epfForm');
+  if (!form) return;
   form.action = "{% url 'add_epf_entry' %}";
   form.reset();
-  document.getElementById('epfDeleteBtn').classList.add('hidden');
-  document.getElementById('epfModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span> Add EPF Entry';
+  var delBtn = document.getElementById('epfDeleteBtn');
+  if (delBtn) {
+    delBtn.classList.add('hidden');
+    delBtn.style.display = 'none';
+  }
+  var titleEl = document.getElementById('epfModalTitle');
+  if (titleEl) {
+    titleEl.innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span> Add EPF Entry';
+  }
   openModal('addEpfModal');
 }
+
 document.addEventListener('click', function(e) {
   var btn = e.target.closest('[data-edit-epf]');
   if (!btn) return;
   var form = document.getElementById('epfForm');
-  form.action = "{% url 'edit_epf_entry' pk=0 %}".replace('/0/', '/' + btn.dataset.id + '/');
-  document.getElementById('deleteEpfForm').action = "{% url 'delete_epf_entry' pk=0 %}".replace('/0/', '/' + btn.dataset.id + '/');
-  document.getElementById('epfDeleteBtn').classList.remove('hidden');
-  document.getElementById('epfModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">edit</span> Edit EPF Entry';
-  form.querySelector('[name=date]').value = btn.dataset.date;
-  form.querySelector('[name=entry_type]').value = btn.dataset.type;
-  form.querySelector('[name=amount]').value = btn.dataset.amount;
-  form.querySelector('[name=remarks]').value = btn.dataset.remarks;
+  if (!form) return;
+  var id = btn.dataset.id;
+  form.action = "{% url 'edit_epf_entry' pk=0 %}".replace('/0/', '/' + id + '/');
+  var delForm = document.getElementById('deleteEpfForm');
+  if (delForm) delForm.action = "{% url 'delete_epf_entry' pk=0 %}".replace('/0/', '/' + id + '/');
+  var delBtn = document.getElementById('epfDeleteBtn');
+  if (delBtn) {
+    delBtn.classList.remove('hidden');
+    delBtn.style.display = 'inline-flex';
+  }
+  var titleEl = document.getElementById('epfModalTitle');
+  if (titleEl) {
+    titleEl.innerHTML = '<span class="material-symbols-outlined text-primary">edit</span> Edit EPF Entry';
+  }
+
+  form.querySelector('[name=date]').value = btn.dataset.date || '';
+  form.querySelector('[name=entry_type]').value = btn.dataset.type || 'CONTRIBUTION';
+  form.querySelector('[name=amount]').value = btn.dataset.amount || '';
+  form.querySelector('[name=remarks]').value = btn.dataset.remarks || '';
+
   openModal('addEpfModal');
 });
-document.addEventListener('DOMContentLoaded', function() { initPagination('epfTable', 15); });
+
+document.addEventListener('DOMContentLoaded', function() {
+  initPagination('epfTable', 20);
+});
 </script>
 {% endblock %}

@@ -1,34 +1,116 @@
 {% load static %}<!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="night" class="dark pub-root">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Vault{% endblock %}</title>
-  <meta name="description" content="{% block description %}Vault is a private personal finance dashboard for a single household.{% endblock %}">
-  <link rel="icon" href="{% static 'icons/icon-192.png' %}">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{% block title %}Vault — Private Household Finance{% endblock %}</title>
+  <meta name="description" content="{% block description %}Vault is a private personal finance and wealth intelligence ledger engineered for a single household.{% endblock %}">
+  <link rel="icon" type="image/svg+xml" href="{% static 'favicon.svg' %}">
+  <link rel="apple-touch-icon" href="{% static 'icons/icon-180.png' %}">
+  <meta name="theme-color" content="#0b0f17">
+
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>@layer properties, theme, base, daisyui, components, utilities;</style>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <style type="text/tailwindcss">
+    @theme inline {
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      --color-base-100: var(--color-base-100);
+      --color-base-200: var(--color-base-200);
+      --color-base-300: var(--color-base-300);
+      --color-base-content: var(--color-base-content);
+      --color-primary: var(--color-primary);
+      --color-primary-content: var(--color-primary-content);
+      --color-secondary: var(--color-secondary);
+      --color-accent: var(--color-accent);
+      --color-info: var(--color-info);
+      --color-success: var(--color-success);
+      --color-warning: var(--color-warning);
+      --color-error: var(--color-error);
+    }
+  </style>
+  <link rel="stylesheet" href="{% static 'css/style.css' %}">
   <link rel="stylesheet" href="{% static 'css/public.css' %}">
 </head>
-<body>
-  <div class="glow glow-1"></div>
-  <div class="glow glow-2"></div>
-  <header class="nav">
-    <a href="{% url 'about' %}" class="brand"><img src="{% static 'icons/icon-192.png' %}" alt="Vault logo">VAULT</a>
-    <nav class="nav-links">
-      <a href="{% url 'about' %}" {% if page == 'about' %}class="active"{% endif %}>About</a>
-      <a href="{% url 'privacy' %}" {% if page == 'privacy' %}class="active"{% endif %}>Privacy</a>
-      <a href="{% url 'terms' %}" {% if page == 'terms' %}class="active"{% endif %}>Terms</a>
-      <a href="{% url 'login' %}" class="btn btn-primary" id="nav-signin">Sign in</a>
+<body class="pub-body selection:bg-indigo-500/25 selection:text-white">
+  <a href="#mainContent" class="v-skip-link">Skip to main content</a>
+
+  {# Shared SVG gradient definitions for Vault emblem #}
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <linearGradient id="vg" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#818cf8"/>
+        <stop offset="100%" stop-color="#6366f1"/>
+      </linearGradient>
+      <linearGradient id="vg2" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#a78bfa"/>
+        <stop offset="100%" stop-color="#0ea5e9"/>
+      </linearGradient>
+    </defs>
+  </svg>
+
+  {# Sticky Private Bank Folio Header #}
+  <header class="pub-header">
+    <div class="pub-header-inner">
+      <a href="{% url 'about' %}" class="pub-brand">
+        <span class="pub-brand-mark">
+          {% include "includes/vault_icon.html" with size="22" %}
+        </span>
+        <span>Vault</span>
+        <span class="hidden sm:inline-block text-xs font-medium text-slate-400 border-l border-white/10 pl-2.5 ml-0.5 tracking-normal">
+          Household Ledger
+        </span>
+      </a>
+
+      <div class="flex items-center gap-2">
+        <nav class="pub-nav-desktop" aria-label="Public pages">
+          <a href="{% url 'about' %}" class="pub-nav-link" {% if page == 'about' %}aria-current="page"{% endif %}>About</a>
+          <a href="{% url 'privacy' %}" class="pub-nav-link" {% if page == 'privacy' %}aria-current="page"{% endif %}>Privacy</a>
+          <a href="{% url 'terms' %}" class="pub-nav-link" {% if page == 'terms' %}aria-current="page"{% endif %}>Terms</a>
+        </nav>
+
+        <a href="{% url 'login' %}" id="nav-signin" class="v-btn v-btn-primary">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+            <polyline points="10 17 15 12 10 7"/>
+            <line x1="15" y1="12" x2="3" y2="12"/>
+          </svg>
+          <span>Sign in</span>
+        </a>
+      </div>
+    </div>
+
+    {# Ergonomic >=44px mobile folio navigation strip (<640px) #}
+    <nav class="pub-nav-mobile" aria-label="Public pages mobile">
+      <a href="{% url 'about' %}" class="pub-nav-mobile-link" {% if page == 'about' %}aria-current="page"{% endif %}>About</a>
+      <a href="{% url 'privacy' %}" class="pub-nav-mobile-link" {% if page == 'privacy' %}aria-current="page"{% endif %}>Privacy</a>
+      <a href="{% url 'terms' %}" class="pub-nav-mobile-link" {% if page == 'terms' %}aria-current="page"{% endif %}>Terms</a>
     </nav>
   </header>
-  <main>{% block content %}{% endblock %}</main>
-  <footer>
-    <a href="{% url 'about' %}">About</a>
-    <a href="{% url 'privacy' %}">Privacy Policy</a>
-    <a href="{% url 'terms' %}">Terms of Service</a>
-    <p style="margin-top:10px">&copy; {% now "Y" %} Vault &middot; Contact: <a href="mailto:{{ contact_email }}">{{ contact_email }}</a></p>
+
+  {# Main Folio Stage #}
+  <main id="mainContent" tabindex="-1" class="pub-main outline-none">
+    {% block content %}{% endblock %}
+  </main>
+
+  {# Fiduciary Footer #}
+  <footer class="pub-footer">
+    <div class="pub-footer-inner">
+      <nav class="pub-footer-links" aria-label="Legal and governance links">
+        <a href="{% url 'about' %}">About Vault</a>
+        <a href="{% url 'privacy' %}">Privacy Policy</a>
+        <a href="{% url 'terms' %}">Terms of Service</a>
+      </nav>
+      <p class="tabular-nums flex flex-wrap items-center gap-x-1.5">
+        <span>&copy; {% now "Y" %} Vault &middot; Invite-only single-household deployment &middot;</span>
+        <a href="mailto:{{ contact_email }}" class="inline-flex items-center min-h-[44px] lg:min-h-[32px] text-indigo-400 hover:text-indigo-300 underline underline-offset-4">{{ contact_email }}</a>
+      </p>
+    </div>
   </footer>
 </body>
 </html>

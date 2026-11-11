@@ -1,47 +1,37 @@
 # Strict Secrets & Credential Protection Policy
 
-This rule applies universally across all Antigravity interactions in this workspace.
+This rule applies across all agent interactions in this workspace.
 
 ---
 
-## 1. Absolute Prohibition on Reading Secrets
+## 1. Never Read or Inspect Secret Files
 
-Antigravity agents MUST NEVER open, read, print, grep, inspect, or transfer files containing sensitive secrets or private credentials:
-
-- **Environment & Deploy Secrets**:
-  - `.env`, `.env.*` (except `.env.example`)
-  - `scripts/DEPLOY.env` (except `scripts/DEPLOY.env.example`)
-  - `.deploy-keys/`
-- **Credential Stores & Certificates**:
-  - `credentials/`, `.credentials`
-  - `*.pem`, `*.key`, `*.p12`, `id_rsa`, `id_ed25519`
-  - `**/google-service-account*.json`
-  - `**/backup-sa*.json`
-- **Private Financial Data**:
-  - `portfolio/investor_profile.md` (personal household financial context; refer to `portfolio/investor_profile.md.example` instead)
+Never open, read, print, grep, or transfer files containing credentials or private household data:
+- **Environment & Deploy Secrets**: `.env`, `.env.*` (except `.env.example`), `scripts/DEPLOY.env` (except `scripts/DEPLOY.env.example`), `.deploy-keys/`
+- **Credentials & Keys**: `credentials/`, `.credentials`, `*.pem`, `*.key`, `*.p12`, `id_rsa`, `id_ed25519`, `**/google-service-account*.json`, `**/backup-sa*.json`
+- **Private Household Context**: `portfolio/investor_profile.md` (loaded at runtime by `portfolio/dag.py` — never read or delete it; inspect `portfolio/investor_profile.md.example` instead)
 
 ---
 
-## 2. Prohibition on Shell Environment & Credential Dumps
+## 2. Never Dump Environment or Auth Secrets
 
-Agents MUST NEVER run commands that dump or echo secrets to terminal or logs:
+Never execute commands or scripts that print environment variables or stored secrets:
 - `env`, `printenv`, `export -p`, `set`, `typeset`
-- `echo $SECRET_KEY`, `echo $DJANGO_SECRET_KEY`, `echo $EMAIL_HOST_PASSWORD`, `echo $GEMINI_API_KEY`
-- Inline scripts reading environment dictionaries (e.g. `python -c "import os; print(os.environ)"`)
-- Database dump commands on authentication tables (`python manage.py dumpdata tracker.User`, `tracker.WebAuthnCredential`)
+- `echo $SECRET_KEY`, `echo $DJANGO_SECRET_KEY`, `echo $EMAIL_HOST_PASSWORD`, `echo $GEMINI_API_KEY`, `echo $SHAKTI_API_KEY`, `echo $EXPENSES_ENCRYPTION_KEY`
+- Inline scripts dumping `os.environ` or `manage.py dumpdata` on `tracker.User`, `tracker.WebAuthnCredential`, or `expenses.GmailAccount`
 
 ---
 
-## 3. Allowed References
+## 3. Safe Configuration References
 
-When you need to verify or discuss configuration settings, variables, or credentials:
-- Refer to `.env.example`
-- Refer to `scripts/DEPLOY.env.example`
-- Refer to `pftracker/settings.py`
-- Refer to `portfolio/investor_profile.md.example`
+Inspect variable names and defaults via:
+- [`.env.example`](../../.env.example)
+- [`scripts/DEPLOY.env.example`](../../scripts/DEPLOY.env.example)
+- [`pftracker/settings.py`](../../pftracker/settings.py)
+- [`portfolio/investor_profile.md.example`](../../portfolio/investor_profile.md.example)
 
 ---
 
-## 4. Enforcement & Automated Interception
+## 4. Runtime Hook Enforcement
 
-This policy is actively enforced at runtime by the Antigravity PreToolUse hook ([`.agents/scripts/safety_pre_tool.py`](file:///Users/phantomhive/Desktop/Atul/finance/.agents/scripts/safety_pre_tool.py)). Any tool call targeting protected paths or command patterns will be denied immediately.
+This policy is enforced at runtime by the PreToolUse hook ([`../scripts/safety_pre_tool.py`](../scripts/safety_pre_tool.py)).

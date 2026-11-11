@@ -2,485 +2,584 @@
 {% load indian_format %}
 {% load static %}
 
-{% block extra_head %}
-{% endblock %}
-
-{% block title %}All Zerodha — Portfolio — Vault{% endblock %}
+{% block title %}Consolidated Equity Blotter | Vault{% endblock %}
 
 {% block page_header %}
-<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+<div class="v-page-header">
   <div>
-    <p class="text-xs font-bold tracking-widest uppercase text-primary">Zerodha</p>
-    <h1 class="text-2xl font-bold mt-1">Consolidated Holdings</h1>
-    <p class="text-sm opacity-60 mt-0.5">All accounts — {{ accounts|length }} portfolios combined</p>
+    <h1 class="v-title flex items-center gap-2">
+      <span class="material-symbols-outlined text-indigo-400 text-2xl">table_chart</span>
+      Consolidated Equity Blotter
+    </h1>
+    <p class="v-subtitle">Multi-account demat blotter combining {{ accounts|length }} Zerodha family portfolios</p>
   </div>
-  <div>
-    <a href="{% url 'portfolio_tracker' %}" class="btn btn-ghost btn-sm gap-1"><span class="material-symbols-outlined text-base">arrow_back</span>Portfolio</a>
+  <div class="v-toolbar">
+    <a href="{% url 'portfolio_tracker' %}#equity" class="v-btn v-btn-secondary">
+      <span class="material-symbols-outlined text-sm">arrow_back</span>Portfolio
+    </a>
   </div>
 </div>
 {% endblock %}
 
 {% block content %}
+{% with total_pnl=total_stocks_pnl|add:total_index_pnl|add:total_other_pnl %}
 
-{# ——— SUMMARY ——— #}
-<div class="card hero-gradient-portfolio shadow-sm card-hover animate-up mb-6">
-  <div class="card-body p-4">
-    <div class="grid grid-cols-1 lg:grid-cols-[1fr_auto] gap-6 items-center">
-      <div>
-        <div class="text-xs opacity-60 font-medium">Total Equity Portfolio</div>
-        <div class="text-3xl font-bold mt-1">{{ total_portfolio|inr }}</div>
-        {% with total_pnl=total_stocks_pnl|add:total_index_pnl|add:total_other_pnl %}
-        <div class="mt-2">
-          <span class="badge {% if total_pnl >= 0 %}badge-success{% else %}badge-error{% endif %} badge-sm font-semibold">
-            {% if total_pnl >= 0 %}+{% endif %}{{ total_pnl|inr }} P&amp;L
-          </span>
-        </div>
-        {% endwith %}
+{# --- SIGNATURE LEDGER SUMMARY BAND --- #}
+<section class="v-ledger-band" aria-label="Consolidated Demat Summary">
+  <div class="v-lead-cell">
+    <div>
+      <div class="v-lead-label">
+        <span>Consolidated Demat Valuation</span>
+        <span class="v-delta v-delta-neutral text-xs py-0 px-2 font-semibold tabular-nums">{{ accounts|length }} Accounts</span>
       </div>
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full lg:min-w-[min(100%,28rem)]">
-        <div class="stat-card flex flex-row items-center gap-3 bg-base-300/50 border border-base-content/10">
-          <span class="material-symbols-outlined text-primary shrink-0 text-xl">candlestick_chart</span>
-          <div class="min-w-0">
-            <div class="text-[10px] uppercase tracking-wider opacity-50 font-semibold">Stocks</div>
-            <div class="text-base font-bold mt-0.5">{{ total_stocks|inr }}</div>
-          </div>
+      <div class="v-lead-figure-row">
+        <span class="v-lead-figure tabular-nums">{{ total_portfolio|inr }}</span>
+        <span class="v-delta {% if total_pnl >= 0 %}v-delta-pos{% else %}v-delta-neg{% endif %} text-xs font-bold tabular-nums">
+          <span class="material-symbols-outlined text-xs">{% if total_pnl >= 0 %}trending_up{% else %}trending_down{% endif %}</span>
+          {% if total_pnl >= 0 %}+{% endif %}{{ total_pnl|inr }} ({{ total_pnl_pct }}%)
+        </span>
+      </div>
+      <div class="v-lead-sub">
+        Aggregated across Indian Stocks, Index Funds, and Active Mutual Funds
+      </div>
+    </div>
+
+    {# Proportional Horizon Bar: Stocks vs Index MF vs Other MF #}
+    {% if total_portfolio > 0 %}
+    <div class="v-horizon">
+      <div class="v-horizon-bar" role="img" aria-label="Consolidated equity and mutual fund mix">
+        {% if total_stocks > 0 %}
+        <span class="v-horizon-seg" style="width: {% widthratio total_stocks total_portfolio 100 %}%; background: var(--v-equity, #6366f1);" title="Stocks: {{ total_stocks|inr }}"></span>
+        {% endif %}
+        {% if total_index > 0 %}
+        <span class="v-horizon-seg" style="width: {% widthratio total_index total_portfolio 100 %}%; background: var(--v-debt, #14b8a6);" title="Index Funds: {{ total_index|inr }}"></span>
+        {% endif %}
+        {% if total_other > 0 %}
+        <span class="v-horizon-seg" style="width: {% widthratio total_other total_portfolio 100 %}%; background: var(--v-realty, #f97316);" title="Other MF: {{ total_other|inr }}"></span>
+        {% endif %}
+      </div>
+      <div class="v-horizon-legend">
+        <div class="v-horizon-item">
+          <span class="v-horizon-dot" style="background: var(--v-equity, #6366f1);"></span>
+          <span>Stocks</span>
+          <strong>{{ total_stocks|inr_short }}</strong>
         </div>
-        <div class="stat-card flex flex-row items-center gap-3 bg-base-300/50 border border-base-content/10">
-          <span class="material-symbols-outlined text-secondary shrink-0 text-xl">trending_up</span>
-          <div class="min-w-0">
-            <div class="text-[10px] uppercase tracking-wider opacity-50 font-semibold">Index Funds</div>
-            <div class="text-base font-bold mt-0.5">{{ total_index|inr }}</div>
-          </div>
+        <div class="v-horizon-item">
+          <span class="v-horizon-dot" style="background: var(--v-debt, #14b8a6);"></span>
+          <span>Index MF</span>
+          <strong>{{ total_index|inr_short }}</strong>
         </div>
-        <div class="stat-card flex flex-row items-center gap-3 bg-base-300/50 border border-base-content/10">
-          <span class="material-symbols-outlined text-accent shrink-0 text-xl">pie_chart</span>
-          <div class="min-w-0">
-            <div class="text-[10px] uppercase tracking-wider opacity-50 font-semibold">Other MF</div>
-            <div class="text-base font-bold mt-0.5">{{ total_other|inr }}</div>
-          </div>
+        <div class="v-horizon-item">
+          <span class="v-horizon-dot" style="background: var(--v-realty, #f97316);"></span>
+          <span>Other MF</span>
+          <strong>{{ total_other|inr_short }}</strong>
         </div>
       </div>
     </div>
+    {% endif %}
   </div>
+
+  <div class="v-stat-grid">
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Invested Cost Basis</div>
+      <div class="v-stat-value text-base-content tabular-nums">{{ total_purchased|inr }}</div>
+      <div class="v-stat-sub">Across merged positions</div>
+    </div>
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Total Unrealized P&amp;L</div>
+      <div class="v-stat-value tabular-nums {% if total_pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+        {% if total_pnl >= 0 %}+{% endif %}{{ total_pnl|inr }}
+      </div>
+      <div class="v-stat-sub tabular-nums">{{ total_pnl_pct }}% appreciation</div>
+    </div>
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Unique Instruments</div>
+      <div class="v-stat-value text-base-content tabular-nums">{{ holding_count }}</div>
+      <div class="v-stat-sub">Consolidated scrips &amp; funds</div>
+    </div>
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Demat Accounts</div>
+      <div class="v-stat-value text-base-content tabular-nums">{{ accounts|length }}</div>
+      <div class="v-stat-sub">Synced family profiles</div>
+    </div>
+  </div>
+</section>
+
+{# --- ASYMMETRIC WORKBENCH: ACCOUNT CONTRIBUTIONS & EQUITY MIX CHART --- #}
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-4 mb-6 items-stretch">
+  <section class="lg:col-span-8 v-panel v-panel-fill" aria-label="Individual Account Contributions">
+    <div class="v-panel-header">
+      <h2 class="v-panel-title">
+        <span class="material-symbols-outlined text-base text-indigo-400">account_tree</span>
+        Individual Account Contributions
+      </h2>
+      <span class="text-xs text-base-content/50">Zerodha Family Profiles</span>
+    </div>
+    <div class="v-panel-body p-0">
+      {% if acct_stats %}
+      <div class="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-[var(--v-hairline)]">
+        {% for a in acct_stats %}
+        <a href="{% url 'zerodha_detail' a.slug %}"
+           class="p-4 hover:bg-base-content/[0.03] transition-colors block text-inherit no-underline {% if forloop.counter > 2 %}sm:border-t sm:border-[var(--v-hairline)]{% endif %}">
+          <div class="flex justify-between items-center gap-2 mb-1">
+            <span class="font-bold text-xs text-base-content truncate">{{ a.name }}</span>
+            <span class="v-delta {% if a.pnl >= 0 %}v-delta-pos{% else %}v-delta-neg{% endif %} text-xs py-0 px-1.5 font-semibold tabular-nums shrink-0">
+              {% if a.pnl >= 0 %}+{% endif %}{{ a.pnl_pct }}%
+            </span>
+          </div>
+          <div class="text-lg font-extrabold text-base-content tabular-nums">{{ a.current|inr }}</div>
+          <div class="flex justify-between text-xs text-base-content/60 mt-1 tabular-nums">
+            <span>Inv: {{ a.invested|inr_short }}</span>
+            <span class="{% if a.pnl >= 0 %}text-emerald-400 font-semibold{% else %}text-rose-400 font-semibold{% endif %}">
+              {% if a.pnl >= 0 %}+{% endif %}{{ a.pnl|inr_short }}
+            </span>
+          </div>
+          <div class="mt-2.5 pt-2 border-t border-[var(--v-hairline)] flex justify-between items-center text-xs">
+            <span class="text-base-content/50 tabular-nums">{{ a.holdings }} holdings</span>
+            <span class="text-primary font-medium inline-flex items-center gap-0.5">Inspect <span class="material-symbols-outlined text-xs">arrow_forward</span></span>
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="v-empty py-8">
+        <p class="v-empty-desc">No Zerodha accounts synced yet.</p>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="lg:col-span-4 v-panel v-panel-fill" aria-label="Equity Class Allocation Chart">
+    <div class="v-panel-header">
+      <h2 class="v-panel-title">
+        <span class="material-symbols-outlined text-base text-indigo-400">pie_chart</span>
+        Demat Asset Split
+      </h2>
+      <span class="text-xs text-base-content/50">3 Buckets</span>
+    </div>
+    <div class="v-panel-body flex flex-col justify-center">
+      <div class="chart-wrap h-[190px] sm:h-[210px] w-full"><canvas id="equityAllocationChart"></canvas></div>
+    </div>
+  </section>
 </div>
 
-{# ——— DASHBOARD ROW ——— #}
-<div class="grid grid-cols-1 lg:grid-cols-5 gap-6 animate-up mb-6" style="animation-delay:0.05s">
-  <div class="card bg-base-200 shadow-sm card-hover lg:col-span-3">
-    <div class="card-body p-4">
-      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <h2 class="card-title text-base font-semibold">P&amp;L Summary</h2>
-      </div>
-      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <div class="stat-card flex flex-row items-center gap-2.5 bg-base-300/30 border border-base-content/[0.06]">
-          <span class="material-symbols-outlined text-primary shrink-0 text-lg">account_balance</span>
-          <div class="min-w-0">
-            <div class="text-[10px] uppercase tracking-wider opacity-50 font-semibold">Invested</div>
-            <div class="text-base font-bold mt-0.5">{{ total_purchased|inr }}</div>
-          </div>
-        </div>
-        <div class="stat-card flex flex-row items-center gap-2.5 bg-base-300/30 border border-base-content/[0.06]">
-          <span class="material-symbols-outlined text-accent shrink-0 text-lg">monitoring</span>
-          <div class="min-w-0">
-            <div class="text-[10px] uppercase tracking-wider opacity-50 font-semibold">Current</div>
-            <div class="text-base font-bold mt-0.5">{{ total_portfolio|inr }}</div>
-          </div>
-        </div>
-        <div class="stat-card flex flex-row items-center gap-2.5 bg-base-300/30 border border-base-content/[0.06]">
-          <span class="material-symbols-outlined {% if total_pnl >= 0 %}text-success{% else %}text-error{% endif %} shrink-0 text-lg">{% if total_pnl >= 0 %}trending_up{% else %}trending_down{% endif %}</span>
-          <div class="min-w-0">
-            <div class="text-[10px] uppercase tracking-wider opacity-50 font-semibold">Total P&amp;L</div>
-            <div class="text-base font-bold mt-0.5 {% if total_pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if total_pnl >= 0 %}+{% endif %}{{ total_pnl|inr }}</div>
-          </div>
-        </div>
-        <div class="stat-card flex flex-row items-center gap-2.5 bg-base-300/30 border border-base-content/[0.06]">
-          <span class="material-symbols-outlined {% if total_pnl_pct >= 0 %}text-success{% else %}text-error{% endif %} shrink-0 text-lg">percent</span>
-          <div class="min-w-0">
-            <div class="text-[10px] uppercase tracking-wider opacity-50 font-semibold">Return %</div>
-            <div class="text-base font-bold mt-0.5 {% if total_pnl_pct >= 0 %}text-success{% else %}text-error{% endif %}">{% if total_pnl_pct >= 0 %}+{% endif %}{{ total_pnl_pct }}%</div>
-          </div>
-        </div>
-        <div class="stat-card flex flex-row items-center gap-2.5 bg-base-300/30 border border-base-content/[0.06]">
-          <span class="material-symbols-outlined text-secondary shrink-0 text-lg">format_list_numbered</span>
-          <div class="min-w-0">
-            <div class="text-[10px] uppercase tracking-wider opacity-50 font-semibold">Holdings</div>
-            <div class="text-base font-bold mt-0.5">{{ holding_count }}</div>
-          </div>
-        </div>
-      </div>
+{# --- TOP GAINERS & DRAWDOWNS --- #}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch mb-6">
+  {# Gainers #}
+  <section class="v-panel v-panel-fill" aria-label="Top Consolidated Gainers">
+    <div class="v-panel-header">
+      <h2 class="v-panel-title">
+        <span class="material-symbols-outlined text-base text-emerald-400">trending_up</span>
+        Top Consolidated Gainers
+      </h2>
     </div>
-  </div>
-  <div class="card bg-base-200 shadow-sm card-hover lg:col-span-2">
-    <div class="card-body p-4">
-      <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-        <h2 class="card-title text-base">Allocation</h2>
-      </div>
-      <div class="chart-wrap"><canvas id="equityAllocationChart"></canvas></div>
-    </div>
-  </div>
-</div>
-
-{# ——— TOP GAINERS + LOSERS ——— #}
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-up mb-6" style="animation-delay:0.08s">
-  <div class="card bg-base-200 shadow-sm card-hover">
-    <div class="card-body p-4">
-      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <h2 class="card-title text-base">Top Gainers</h2>
-      </div>
+    <div class="v-panel-body p-0">
       {% if top_gainers %}
-      <div class="hidden md:block overflow-x-auto -mx-2 px-2">
-        <table class="table table-sm">
-          <thead><tr>
-            <th class="sortable-th cursor-pointer select-none">Name <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
-            <th class="sortable-th cursor-pointer select-none text-end">P&amp;L <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
-            <th class="sortable-th cursor-pointer select-none text-end">% <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
-          </tr></thead>
+      <div class="v-panel-table overflow-x-auto">
+        <table class="v-table">
+          <thead>
+            <tr>
+              <th class="sortable-th cursor-pointer select-none">Holding / Scrip <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+              <th class="sortable-th cursor-pointer select-none v-num">Unrealized P&amp;L <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+              <th class="sortable-th cursor-pointer select-none v-num">Return % <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            </tr>
+          </thead>
           <tbody>
-          {% for h in top_gainers %}
-          <tr class="hover">
-            <td class="font-semibold" data-val="{{ h.name }}">{{ h.name }}</td>
-            <td class="text-end whitespace-nowrap" data-val="{{ h.pnl }}"><span class="text-success">+{{ h.pnl|inr }}</span></td>
-            <td class="text-end" data-val="{{ h.pnl_pct }}"><span class="text-success">+{{ h.pnl_pct }}%</span></td>
-          </tr>
-          {% endfor %}
+            {% for h in top_gainers %}
+            <tr>
+              <td class="font-bold text-xs text-base-content max-w-[180px] sm:max-w-xs truncate" title="{{ h.name }}" data-val="{{ h.name }}">{{ h.name }}</td>
+              <td class="v-num text-xs text-emerald-400 font-bold whitespace-nowrap" data-val="{{ h.pnl }}">+{{ h.pnl|inr }}</td>
+              <td class="v-num text-xs text-emerald-400 font-semibold whitespace-nowrap" data-val="{{ h.pnl_pct }}">+{{ h.pnl_pct }}%</td>
+            </tr>
+            {% endfor %}
           </tbody>
         </table>
       </div>
-      {# Mobile cards #}
-      <div class="md:hidden space-y-2">
-        {% for h in top_gainers %}
-        <div class="table-card flex items-center justify-between gap-2">
-          <span class="font-semibold text-sm">{{ h.name }}</span>
-          <div class="text-right text-xs shrink-0">
-            <span class="text-success font-semibold">+{{ h.pnl|inr }}</span>
-            <span class="text-success opacity-70 ml-1">+{{ h.pnl_pct }}%</span>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
       {% else %}
-      <p class="text-sm opacity-60 py-3">No gainers yet.</p>
+      <div class="p-6 text-center text-xs text-base-content/50">No positive gainers recorded.</div>
       {% endif %}
     </div>
-  </div>
-  <div class="card bg-base-200 shadow-sm card-hover">
-    <div class="card-body p-4">
-      <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <h2 class="card-title text-base">Top Losers</h2>
-      </div>
+  </section>
+
+  {# Losers #}
+  <section class="v-panel v-panel-fill" aria-label="Top Consolidated Drawdowns">
+    <div class="v-panel-header">
+      <h2 class="v-panel-title">
+        <span class="material-symbols-outlined text-base text-rose-400">trending_down</span>
+        Top Consolidated Drawdowns
+      </h2>
+    </div>
+    <div class="v-panel-body p-0">
       {% if top_losers %}
-      <div class="hidden md:block overflow-x-auto -mx-2 px-2">
-        <table class="table table-sm">
-          <thead><tr>
-            <th class="sortable-th cursor-pointer select-none">Name <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
-            <th class="sortable-th cursor-pointer select-none text-end">P&amp;L <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
-            <th class="sortable-th cursor-pointer select-none text-end">% <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
-          </tr></thead>
+      <div class="v-panel-table overflow-x-auto">
+        <table class="v-table">
+          <thead>
+            <tr>
+              <th class="sortable-th cursor-pointer select-none">Holding / Scrip <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+              <th class="sortable-th cursor-pointer select-none v-num">Unrealized P&amp;L <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+              <th class="sortable-th cursor-pointer select-none v-num">Return % <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            </tr>
+          </thead>
           <tbody>
-          {% for h in top_losers %}
-          <tr class="hover">
-            <td class="font-semibold" data-val="{{ h.name }}">{{ h.name }}</td>
-            <td class="text-end whitespace-nowrap" data-val="{{ h.pnl }}"><span class="text-error">{{ h.pnl|inr }}</span></td>
-            <td class="text-end" data-val="{{ h.pnl_pct }}"><span class="text-error">{{ h.pnl_pct }}%</span></td>
-          </tr>
-          {% endfor %}
+            {% for h in top_losers %}
+            <tr>
+              <td class="font-bold text-xs text-base-content max-w-[180px] sm:max-w-xs truncate" title="{{ h.name }}" data-val="{{ h.name }}">{{ h.name }}</td>
+              <td class="v-num text-xs text-rose-400 font-bold whitespace-nowrap" data-val="{{ h.pnl }}">{{ h.pnl|inr }}</td>
+              <td class="v-num text-xs text-rose-400 font-semibold whitespace-nowrap" data-val="{{ h.pnl_pct }}">{{ h.pnl_pct }}%</td>
+            </tr>
+            {% endfor %}
           </tbody>
         </table>
       </div>
-      {# Mobile cards #}
-      <div class="md:hidden space-y-2">
-        {% for h in top_losers %}
-        <div class="table-card flex items-center justify-between gap-2">
-          <span class="font-semibold text-sm">{{ h.name }}</span>
-          <div class="text-right text-xs shrink-0">
-            <span class="text-error font-semibold">{{ h.pnl|inr }}</span>
-            <span class="text-error opacity-70 ml-1">{{ h.pnl_pct }}%</span>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
       {% else %}
-      <p class="text-sm opacity-60 py-3">No losers yet.</p>
+      <div class="p-6 text-center text-xs text-base-content/50">No holdings in drawdown.</div>
       {% endif %}
     </div>
-  </div>
+  </section>
 </div>
 
-{# ——— ACCOUNT DASHBOARDS ——— #}
-<div class="card bg-base-200 shadow-sm card-hover animate-up mb-6" style="animation-delay:0.1s">
-  <div class="card-body p-4">
-    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-      <h2 class="card-title text-base font-semibold">Account Breakdown</h2>
+{# --- MERGED STOCK HOLDINGS BLOTTER --- #}
+<section class="v-panel mb-6" aria-label="Consolidated Stock Holdings">
+  <div class="v-panel-header">
+    <div class="flex items-center gap-2 min-w-0">
+      <h2 class="v-panel-title">
+        <span class="material-symbols-outlined text-base text-indigo-400">show_chart</span>
+        Consolidated Stock Holdings
+      </h2>
+      <span class="v-delta v-delta-neutral text-xs font-semibold tabular-nums">{{ total_stocks|inr }}</span>
     </div>
-    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-      {% for a in acct_stats %}
-      <a href="{% url 'zerodha_detail' a.slug %}" class="group block p-4 rounded-xl bg-base-300/40 border border-base-content/5 hover:border-primary/30 hover:bg-base-300/70 transition-all duration-200 no-underline text-inherit">
-        <div class="flex justify-between items-start gap-2 mb-2">
-          <div class="font-semibold text-sm leading-tight text-base-content">{{ a.name }}</div>
-          <span class="badge {% if a.pnl >= 0 %}badge-success{% else %}badge-error{% endif %} badge-sm shrink-0 font-semibold">
-            {% if a.pnl >= 0 %}+{% endif %}{{ a.pnl_pct }}%
-          </span>
-        </div>
-        <div class="text-xl font-bold text-base-content">{{ a.current|inr }}</div>
-        <div class="grid grid-cols-2 gap-2 mt-3 text-xs text-base-content">
-          <div class="flex flex-col gap-0.5">
-            <span class="opacity-50">Invested</span>
-            <span class="font-semibold">{{ a.invested|inr }}</span>
-          </div>
-          <div class="flex flex-col gap-0.5">
-            <span class="opacity-50">P&amp;L</span>
-            <span class="font-semibold {% if a.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if a.pnl >= 0 %}+{% endif %}{{ a.pnl|inr }}</span>
-          </div>
-        </div>
-        <div class="mt-2 text-end text-xs opacity-40 text-base-content">
-          {{ a.holdings }} holdings
-        </div>
-      </a>
-      {% endfor %}
-    </div>
+    <span class="text-xs text-base-content/50">Tap row for account split</span>
   </div>
-</div>
-
-{# ——— STOCK HOLDINGS (MERGED) ——— #}
-<div class="card bg-base-200 shadow-sm card-hover animate-up mt-0" style="animation-delay:0.1s">
-  <div class="card-body p-4">
-    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-      <h2 class="card-title text-base">Stock Holdings</h2>
-      <span class="badge badge-primary badge-sm">{{ total_stocks|inr }}</span>
-    </div>
+  <div class="v-panel-body p-0">
     {% if stocks %}
-    <div class="hidden md:block overflow-x-auto -mx-2 px-2">
-      <table class="table table-sm" id="stocksTable">
-        <thead><tr>
-          <th class="sortable-th cursor-pointer select-none">Symbol <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
-          <th class="sortable-th cursor-pointer select-none text-end">Qty <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
-          <th class="sortable-th cursor-pointer select-none text-end">Purchased <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
-          <th class="sortable-th cursor-pointer select-none text-end">Current <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
-          <th class="sortable-th cursor-pointer select-none text-end">P&amp;L <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
-          <th class="sortable-th cursor-pointer select-none text-end">P&amp;L % <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
-                  </tr></thead>
+    {# Desktop Table #}
+    <div class="v-panel-table hidden md:block overflow-x-auto">
+      <table class="v-table" id="stocksTable">
+        <thead>
+          <tr>
+            <th class="sortable-th cursor-pointer select-none">Symbol <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Total Qty <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Cost Basis <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Current Value <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Unrealized P&amp;L <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Return % <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+          </tr>
+        </thead>
         <tbody>
-        {% for s in stocks %}
-        <tr class="hover {% if s.multi %}clickable-row{% endif %}" {% if s.multi %}onclick="showBreakdown('{{ s.name|escapejs }}', 'stock', {{ forloop.counter0 }})"{% endif %}>
-          <td class="font-semibold" data-val="{{ s.name }}">
-            {{ s.name }}
-            {% if s.multi %}<span class="material-symbols-outlined text-sm align-middle opacity-60 ml-1">unfold_more</span>{% endif %}
-          </td>
-          <td class="text-end" data-val="{{ s.quantity }}">{{ s.quantity }}</td>
-          <td class="text-end" data-val="{{ s.purchase_value }}">{{ s.purchase_value|inr }}</td>
-          <td class="text-end font-semibold" data-val="{{ s.current_value }}">{{ s.current_value|inr }}</td>
-          <td class="text-end" data-val="{{ s.pnl }}"><span class="{% if s.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if s.pnl >= 0 %}+{% endif %}{{ s.pnl|inr }}</span></td>
-          <td class="text-end" data-val="{{ s.pnl_pct }}"><span class="{% if s.pnl_pct >= 0 %}text-success{% else %}text-error{% endif %}">{{ s.pnl_pct }}%</span></td>
-        </tr>
-        {% endfor %}
-        </tr>
+          {% for s in stocks %}
+          <tr class="cursor-pointer hover:bg-base-content/4 transition-colors" onclick="showBreakdown('{{ s.name|escapejs }}', 'stock', {{ forloop.counter0 }})">
+            <td class="font-bold text-xs text-base-content" data-val="{{ s.name }}">
+              <span class="inline-flex items-center gap-1.5">
+                <span>{{ s.name }}</span>
+                {% if s.multi %}<span class="v-delta v-delta-neutral text-xs py-0 px-1.5">{{ s.entries|length }} accts</span>{% endif %}
+              </span>
+            </td>
+            <td class="v-num text-xs font-semibold" data-val="{{ s.quantity }}">{{ s.quantity }}</td>
+            <td class="v-num text-xs text-base-content/80" data-val="{{ s.purchase_value }}">₹{{ s.purchase_value|floatformat:2|indian_number }}</td>
+            <td class="v-num text-xs font-bold text-base-content" data-val="{{ s.current_value }}">₹{{ s.current_value|floatformat:2|indian_number }}</td>
+            <td class="v-num text-xs font-bold {% if s.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}" data-val="{{ s.pnl }}">
+              {% if s.pnl >= 0 %}+{% endif %}₹{{ s.pnl|floatformat:2|indian_number }}
+            </td>
+            <td class="v-num text-xs font-semibold {% if s.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}" data-val="{{ s.pnl_pct }}">
+              {% if s.pnl >= 0 %}+{% endif %}{{ s.pnl_pct }}%
+            </td>
+          </tr>
+          {% endfor %}
         </tbody>
+        <tfoot>
+          <tr class="total-row border-t-2 border-[var(--v-hairline)] font-bold">
+            <td class="text-xs text-base-content">Total Stock Capital</td>
+            <td></td>
+            <td class="v-num text-xs text-base-content/80">₹{{ total_stocks_purchased|floatformat:2|indian_number }}</td>
+            <td class="v-num text-xs text-base-content">₹{{ total_stocks|floatformat:2|indian_number }}</td>
+            <td class="v-num text-xs font-bold {% if total_stocks_pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+              {% if total_stocks_pnl >= 0 %}+{% endif %}₹{{ total_stocks_pnl|floatformat:2|indian_number }}
+            </td>
+            <td></td>
+          </tr>
+        </tfoot>
       </table>
     </div>
-    {# Mobile card view #}
-    <div class="md:hidden space-y-2">
+
+    {# Mobile View #}
+    <div class="md:hidden divide-y divide-[var(--v-hairline)]">
       {% for s in stocks %}
-      <div class="table-card {% if s.multi %}cursor-pointer active:bg-base-300/50{% endif %}" {% if s.multi %}onclick="showBreakdown('{{ s.name|escapejs }}', 'stock', {{ forloop.counter0 }})"{% endif %}>
-        <div class="flex items-center justify-between gap-2">
-          <span class="font-semibold text-sm">{{ s.name }}{% if s.multi %} <span class="material-symbols-outlined text-xs align-middle opacity-50">unfold_more</span>{% endif %}</span>
-          <span class="text-xs opacity-50">{{ s.quantity }} qty</span>
+      <div class="v-mobile-row flex-col !items-stretch gap-2 cursor-pointer active:bg-base-content/5" role="button" tabindex="0"
+           onclick="showBreakdown('{{ s.name|escapejs }}', 'stock', {{ forloop.counter0 }})"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showBreakdown('{{ s.name|escapejs }}', 'stock', {{ forloop.counter0 }});}">
+        <div class="w-full flex items-center justify-between gap-2">
+          <span class="font-bold text-sm text-base-content flex items-center gap-1.5 flex-wrap">
+            <span>{{ s.name }}</span>
+            {% if s.multi %}<span class="v-delta v-delta-neutral text-xs py-0 px-1.5">{{ s.entries|length }} accts</span>{% endif %}
+            <span class="material-symbols-outlined text-xs text-primary">open_in_new</span>
+          </span>
+          <span class="text-xs text-base-content/55 tabular-nums shrink-0">{{ s.quantity }} shares</span>
         </div>
-        <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
-          <div><span class="opacity-50">Bought</span><div class="font-semibold mt-0.5">{{ s.purchase_value|inr }}</div></div>
-          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5">{{ s.current_value|inr }}</div></div>
-          <div><span class="opacity-50">P&amp;L</span><div class="font-semibold mt-0.5 {% if s.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if s.pnl >= 0 %}+{% endif %}{{ s.pnl|inr }}</div></div>
+        <div class="w-full grid grid-cols-3 gap-2 pt-2 border-t border-[var(--v-hairline)] text-xs tabular-nums">
+          <div>
+            <span class="text-xs text-base-content/45 block">Cost Basis</span>
+            <span class="font-semibold text-base-content/80 mt-0.5 block">{{ s.purchase_value|inr }}</span>
+          </div>
+          <div>
+            <span class="text-xs text-base-content/45 block">Current</span>
+            <span class="font-bold text-base-content mt-0.5 block">{{ s.current_value|inr }}</span>
+          </div>
+          <div class="text-right">
+            <span class="text-xs text-base-content/45 block">P&amp;L ({{ s.pnl_pct }}%)</span>
+            <span class="font-bold mt-0.5 block {% if s.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+              {% if s.pnl >= 0 %}+{% endif %}{{ s.pnl|inr }}
+            </span>
+          </div>
         </div>
       </div>
       {% endfor %}
     </div>
     {% else %}
-    <p class="text-sm opacity-60 py-2">No stock holdings.</p>
+    <div class="v-empty py-8">
+      <p class="v-empty-desc">No stock holdings synced across Zerodha accounts.</p>
+    </div>
     {% endif %}
   </div>
-</div>
+</section>
 
-{# ——— INDEX MUTUAL FUNDS (MERGED) ——— #}
-<div class="card bg-base-200 shadow-sm card-hover animate-up mt-6" style="animation-delay:0.15s">
-  <div class="card-body p-4">
-    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-      <h2 class="card-title text-base">Index Mutual Funds</h2>
-      <span class="badge badge-secondary badge-sm">{{ total_index|inr }}</span>
+{# --- MERGED INDEX MUTUAL FUNDS BLOTTER --- #}
+<section class="v-panel mb-6" aria-label="Consolidated Index Mutual Funds">
+  <div class="v-panel-header">
+    <div class="flex items-center gap-2 min-w-0">
+      <h2 class="v-panel-title">
+        <span class="material-symbols-outlined text-base text-teal-400">stacked_line_chart</span>
+        Consolidated Index Mutual Funds
+      </h2>
+      <span class="v-delta v-delta-neutral text-xs font-semibold tabular-nums">{{ total_index|inr }}</span>
     </div>
+    <span class="text-xs text-base-content/50">Tap row for account split</span>
+  </div>
+  <div class="v-panel-body p-0">
     {% if index_mf %}
-    <div class="hidden md:block overflow-x-auto -mx-2 px-2">
-      <table class="table table-sm" id="indexTable">
-        <thead><tr>
-          <th class="sortable-th cursor-pointer select-none">Fund <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
-          <th class="sortable-th cursor-pointer select-none text-end">Units <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
-          <th class="sortable-th cursor-pointer select-none text-end">Purchased <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
-          <th class="sortable-th cursor-pointer select-none text-end">Current <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
-          <th class="sortable-th cursor-pointer select-none text-end">P&amp;L <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
-          <th class="sortable-th cursor-pointer select-none text-end">P&amp;L % <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
-                  </tr></thead>
+    {# Desktop Table #}
+    <div class="v-panel-table hidden md:block overflow-x-auto">
+      <table class="v-table" id="indexTable">
+        <thead>
+          <tr>
+            <th class="sortable-th cursor-pointer select-none">Fund Name <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Units <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Cost Basis <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Current Value <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Unrealized P&amp;L <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Return % <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+          </tr>
+        </thead>
         <tbody>
-        {% for m in index_mf %}
-        <tr class="hover {% if m.multi %}clickable-row{% endif %}" {% if m.multi %}onclick="showBreakdown('{{ m.name|escapejs }}', 'index', {{ forloop.counter0 }})"{% endif %}>
-          <td class="font-semibold max-w-[280px] overflow-hidden text-ellipsis whitespace-nowrap" title="{{ m.name }}" data-val="{{ m.name }}">
-            {{ m.name }}
-            {% if m.multi %}<span class="material-symbols-outlined text-sm align-middle opacity-60 ml-1">unfold_more</span>{% endif %}
-          </td>
-          <td class="text-end" data-val="{{ m.units }}">{{ m.units|floatformat:3 }}</td>
-          <td class="text-end" data-val="{{ m.purchase_value }}">{{ m.purchase_value|inr }}</td>
-          <td class="text-end font-semibold" data-val="{{ m.current_value }}">{{ m.current_value|inr }}</td>
-          <td class="text-end" data-val="{{ m.pnl }}"><span class="{% if m.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if m.pnl >= 0 %}+{% endif %}{{ m.pnl|inr }}</span></td>
-          <td class="text-end" data-val="{{ m.pnl_pct }}"><span class="{% if m.pnl_pct >= 0 %}text-success{% else %}text-error{% endif %}">{{ m.pnl_pct }}%</span></td>
-          <td class="text-right" onclick="event.stopPropagation();">
-            {% if not m.multi %}
-              <form method="post" action="{% url 'toggle_baby' 'mutualfundholding' m.entries.0.id %}" class="inline m-0">{% csrf_token %}
-                {% if m.entries.0.is_baby %}
-                  <button type="submit" class="btn btn-ghost btn-xs btn-square text-warning" title="Move to Master Portfolio">
-                    <span class="material-symbols-outlined text-base">assignment_return</span>
-                  </button>
-                {% else %}
-                  <button type="submit" class="btn btn-ghost btn-xs btn-square opacity-60 hover:opacity-100" title="Move to Child Portfolio">
-                    <span class="material-symbols-outlined text-base">child_care</span>
-                  </button>
-                {% endif %}
-              </form>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-        <tr class="total-row border-t-2 border-base-300">
-          <td class="font-bold text-primary">Total</td>
-          <td></td>
-          <td class="text-end font-semibold">{{ total_index_purchased|inr }}</td>
-          <td class="text-end font-semibold">{{ total_index|inr }}</td>
-          <td class="text-end"><span class="font-bold {% if total_index_pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if total_index_pnl >= 0 %}+{% endif %}{{ total_index_pnl|inr }}</span></td>
-          <td></td>
-        </tr>
+          {% for m in index_mf %}
+          <tr class="cursor-pointer hover:bg-base-content/4 transition-colors" onclick="showBreakdown('{{ m.name|escapejs }}', 'index_mf', {{ forloop.counter0 }})">
+            <td class="font-bold text-xs text-base-content max-w-sm truncate" title="{{ m.name }}" data-val="{{ m.name }}">
+              <span class="inline-flex items-center gap-1.5">
+                <span class="truncate">{{ m.name }}</span>
+                {% if m.multi %}<span class="v-delta v-delta-neutral text-xs py-0 px-1.5 shrink-0">{{ m.entries|length }} accts</span>{% endif %}
+              </span>
+            </td>
+            <td class="v-num text-xs text-base-content/75" data-val="{{ m.units }}">{{ m.units|floatformat:3 }}</td>
+            <td class="v-num text-xs text-base-content/80" data-val="{{ m.purchase_value }}">₹{{ m.purchase_value|floatformat:2|indian_number }}</td>
+            <td class="v-num text-xs font-bold text-base-content" data-val="{{ m.current_value }}">₹{{ m.current_value|floatformat:2|indian_number }}</td>
+            <td class="v-num text-xs font-bold {% if m.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}" data-val="{{ m.pnl }}">
+              {% if m.pnl >= 0 %}+{% endif %}₹{{ m.pnl|floatformat:2|indian_number }}
+            </td>
+            <td class="v-num text-xs font-semibold {% if m.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}" data-val="{{ m.pnl_pct }}">
+              {% if m.pnl >= 0 %}+{% endif %}{{ m.pnl_pct }}%
+            </td>
+          </tr>
+          {% endfor %}
         </tbody>
+        <tfoot>
+          <tr class="total-row border-t-2 border-[var(--v-hairline)] font-bold">
+            <td class="text-xs text-base-content">Total Index Fund Capital</td>
+            <td></td>
+            <td class="v-num text-xs text-base-content/80">₹{{ total_index_purchased|floatformat:2|indian_number }}</td>
+            <td class="v-num text-xs text-base-content">₹{{ total_index|floatformat:2|indian_number }}</td>
+            <td class="v-num text-xs font-bold {% if total_index_pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+              {% if total_index_pnl >= 0 %}+{% endif %}₹{{ total_index_pnl|floatformat:2|indian_number }}
+            </td>
+            <td></td>
+          </tr>
+        </tfoot>
       </table>
     </div>
-    {# Mobile card view #}
-    <div class="md:hidden space-y-2">
+
+    {# Mobile View #}
+    <div class="md:hidden divide-y divide-[var(--v-hairline)]">
       {% for m in index_mf %}
-      <div class="table-card {% if m.multi %}cursor-pointer active:bg-base-300/50{% endif %}" {% if m.multi %}onclick="showBreakdown('{{ m.name|escapejs }}', 'index', {{ forloop.counter0 }})"{% endif %}>
-        <div class="flex items-center justify-between gap-2">
-          <span class="font-semibold text-sm">{{ m.name }}{% if m.multi %} <span class="material-symbols-outlined text-xs align-middle opacity-50">unfold_more</span>{% endif %}</span>
-          <span class="text-xs opacity-50">{{ m.units|floatformat:3 }} units</span>
+      <div class="v-mobile-row flex-col !items-stretch gap-2 cursor-pointer active:bg-base-content/5" role="button" tabindex="0"
+           onclick="showBreakdown('{{ m.name|escapejs }}', 'index_mf', {{ forloop.counter0 }})"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showBreakdown('{{ m.name|escapejs }}', 'index_mf', {{ forloop.counter0 }});}">
+        <div class="w-full flex items-start justify-between gap-2">
+          <span class="font-bold text-sm text-base-content leading-snug line-clamp-2 flex-1 min-w-0">
+            {{ m.name }}
+            {% if m.multi %}<span class="v-delta v-delta-neutral text-xs py-0 px-1.5 ml-1">{{ m.entries|length }} accts</span>{% endif %}
+          </span>
+          <span class="text-xs text-primary inline-flex items-center gap-0.5 shrink-0 tabular-nums">{{ m.units|floatformat:2 }} u <span class="material-symbols-outlined text-xs">open_in_new</span></span>
         </div>
-        <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
-          <div><span class="opacity-50">Bought</span><div class="font-semibold mt-0.5">{{ m.purchase_value|inr }}</div></div>
-          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5">{{ m.current_value|inr }}</div></div>
-          <div><span class="opacity-50">P&amp;L</span><div class="font-semibold mt-0.5 {% if m.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if m.pnl >= 0 %}+{% endif %}{{ m.pnl|inr }}</div></div>
+        <div class="w-full grid grid-cols-3 gap-2 pt-2 border-t border-[var(--v-hairline)] text-xs tabular-nums">
+          <div>
+            <span class="text-xs text-base-content/45 block">Cost Basis</span>
+            <span class="font-semibold text-base-content/80 mt-0.5 block">{{ m.purchase_value|inr }}</span>
+          </div>
+          <div>
+            <span class="text-xs text-base-content/45 block">Current</span>
+            <span class="font-bold text-base-content mt-0.5 block">{{ m.current_value|inr }}</span>
+          </div>
+          <div class="text-right">
+            <span class="text-xs text-base-content/45 block">P&amp;L ({{ m.pnl_pct }}%)</span>
+            <span class="font-bold mt-0.5 block {% if m.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+              {% if m.pnl >= 0 %}+{% endif %}{{ m.pnl|inr }}
+            </span>
+          </div>
         </div>
       </div>
       {% endfor %}
     </div>
     {% else %}
-    <p class="text-sm opacity-60 py-2">No index funds.</p>
+    <div class="v-empty py-8">
+      <p class="v-empty-desc">No index mutual funds synced.</p>
+    </div>
     {% endif %}
   </div>
-</div>
+</section>
 
-{# ——— OTHER MUTUAL FUNDS (MERGED) ——— #}
-<div class="card bg-base-200 shadow-sm card-hover animate-up mt-6" style="animation-delay:0.2s">
-  <div class="card-body p-4">
-    <div class="flex flex-wrap items-center justify-between gap-2 mb-3">
-      <h2 class="card-title text-base">Other Mutual Funds</h2>
-      <span class="badge badge-secondary badge-sm">{{ total_other|inr }}</span>
+{# --- MERGED OTHER MUTUAL FUNDS BLOTTER --- #}
+<section class="v-panel mb-6" aria-label="Consolidated Active and Other Mutual Funds">
+  <div class="v-panel-header">
+    <div class="flex items-center gap-2 min-w-0">
+      <h2 class="v-panel-title">
+        <span class="material-symbols-outlined text-base text-orange-400">finance_mode</span>
+        Consolidated Active &amp; Other Mutual Funds
+      </h2>
+      <span class="v-delta v-delta-neutral text-xs font-semibold tabular-nums">{{ total_other|inr }}</span>
     </div>
+    <span class="text-xs text-base-content/50">Tap row for account split</span>
+  </div>
+  <div class="v-panel-body p-0">
     {% if other_mf %}
-    <div class="hidden md:block overflow-x-auto -mx-2 px-2">
-      <table class="table table-sm" id="otherTable">
-        <thead><tr>
-          <th class="sortable-th cursor-pointer select-none">Fund <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
-          <th class="sortable-th cursor-pointer select-none text-end">Units <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
-          <th class="sortable-th cursor-pointer select-none text-end">Purchased <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
-          <th class="sortable-th cursor-pointer select-none text-end">Current <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
-          <th class="sortable-th cursor-pointer select-none text-end">P&amp;L <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
-          <th class="sortable-th cursor-pointer select-none text-end">P&amp;L % <span class="material-symbols-outlined sort-icon text-sm align-middle opacity-40">unfold_more</span></th>
-                  </tr></thead>
+    {# Desktop Table #}
+    <div class="v-panel-table hidden md:block overflow-x-auto">
+      <table class="v-table" id="otherTable">
+        <thead>
+          <tr>
+            <th class="sortable-th cursor-pointer select-none">Fund Name <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Units <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Cost Basis <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Current Value <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Unrealized P&amp;L <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Return % <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+          </tr>
+        </thead>
         <tbody>
-        {% for m in other_mf %}
-        <tr class="hover {% if m.multi %}clickable-row{% endif %}" {% if m.multi %}onclick="showBreakdown('{{ m.name|escapejs }}', 'other', {{ forloop.counter0 }})"{% endif %}>
-          <td class="font-semibold max-w-[280px] overflow-hidden text-ellipsis whitespace-nowrap" title="{{ m.name }}" data-val="{{ m.name }}">
-            {{ m.name }}
-            {% if m.multi %}<span class="material-symbols-outlined text-sm align-middle opacity-60 ml-1">unfold_more</span>{% endif %}
-          </td>
-          <td class="text-end" data-val="{{ m.units }}">{{ m.units|floatformat:3 }}</td>
-          <td class="text-end" data-val="{{ m.purchase_value }}">{{ m.purchase_value|inr }}</td>
-          <td class="text-end font-semibold" data-val="{{ m.current_value }}">{{ m.current_value|inr }}</td>
-          <td class="text-end" data-val="{{ m.pnl }}"><span class="{% if m.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if m.pnl >= 0 %}+{% endif %}{{ m.pnl|inr }}</span></td>
-          <td class="text-end" data-val="{{ m.pnl_pct }}"><span class="{% if m.pnl_pct >= 0 %}text-success{% else %}text-error{% endif %}">{{ m.pnl_pct }}%</span></td>
-          <td class="text-right" onclick="event.stopPropagation();">
-            {% if not m.multi %}
-              <form method="post" action="{% url 'toggle_baby' 'mutualfundholding' m.entries.0.id %}" class="inline m-0">{% csrf_token %}
-                {% if m.entries.0.is_baby %}
-                  <button type="submit" class="btn btn-ghost btn-xs btn-square text-warning" title="Move to Master Portfolio">
-                    <span class="material-symbols-outlined text-base">assignment_return</span>
-                  </button>
-                {% else %}
-                  <button type="submit" class="btn btn-ghost btn-xs btn-square opacity-60 hover:opacity-100" title="Move to Child Portfolio">
-                    <span class="material-symbols-outlined text-base">child_care</span>
-                  </button>
-                {% endif %}
-              </form>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-        <tr class="total-row border-t-2 border-base-300">
-          <td class="font-bold text-primary">Total</td>
-          <td></td>
-          <td class="text-end font-semibold">{{ total_other_purchased|inr }}</td>
-          <td class="text-end font-semibold">{{ total_other|inr }}</td>
-          <td class="text-end"><span class="font-bold {% if total_other_pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if total_other_pnl >= 0 %}+{% endif %}{{ total_other_pnl|inr }}</span></td>
-          <td></td>
-        </tr>
+          {% for m in other_mf %}
+          <tr class="cursor-pointer hover:bg-base-content/4 transition-colors" onclick="showBreakdown('{{ m.name|escapejs }}', 'other_mf', {{ forloop.counter0 }})">
+            <td class="font-bold text-xs text-base-content max-w-sm truncate" title="{{ m.name }}" data-val="{{ m.name }}">
+              <span class="inline-flex items-center gap-1.5">
+                <span class="truncate">{{ m.name }}</span>
+                {% if m.multi %}<span class="v-delta v-delta-neutral text-xs py-0 px-1.5 shrink-0">{{ m.entries|length }} accts</span>{% endif %}
+              </span>
+            </td>
+            <td class="v-num text-xs text-base-content/75" data-val="{{ m.units }}">{{ m.units|floatformat:3 }}</td>
+            <td class="v-num text-xs text-base-content/80" data-val="{{ m.purchase_value }}">₹{{ m.purchase_value|floatformat:2|indian_number }}</td>
+            <td class="v-num text-xs font-bold text-base-content" data-val="{{ m.current_value }}">₹{{ m.current_value|floatformat:2|indian_number }}</td>
+            <td class="v-num text-xs font-bold {% if m.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}" data-val="{{ m.pnl }}">
+              {% if m.pnl >= 0 %}+{% endif %}₹{{ m.pnl|floatformat:2|indian_number }}
+            </td>
+            <td class="v-num text-xs font-semibold {% if m.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}" data-val="{{ m.pnl_pct }}">
+              {% if m.pnl >= 0 %}+{% endif %}{{ m.pnl_pct }}%
+            </td>
+          </tr>
+          {% endfor %}
         </tbody>
+        <tfoot>
+          <tr class="total-row border-t-2 border-[var(--v-hairline)] font-bold">
+            <td class="text-xs text-base-content">Total Active Mutual Fund Capital</td>
+            <td></td>
+            <td class="v-num text-xs text-base-content/80">₹{{ total_other_purchased|floatformat:2|indian_number }}</td>
+            <td class="v-num text-xs text-base-content">₹{{ total_other|floatformat:2|indian_number }}</td>
+            <td class="v-num text-xs font-bold {% if total_other_pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+              {% if total_other_pnl >= 0 %}+{% endif %}₹{{ total_other_pnl|floatformat:2|indian_number }}
+            </td>
+            <td></td>
+          </tr>
+        </tfoot>
       </table>
     </div>
-    {# Mobile card view #}
-    <div class="md:hidden space-y-2">
+
+    {# Mobile View #}
+    <div class="md:hidden divide-y divide-[var(--v-hairline)]">
       {% for m in other_mf %}
-      <div class="table-card {% if m.multi %}cursor-pointer active:bg-base-300/50{% endif %}" {% if m.multi %}onclick="showBreakdown('{{ m.name|escapejs }}', 'other', {{ forloop.counter0 }})"{% endif %}>
-        <div class="flex items-center justify-between gap-2">
-          <span class="font-semibold text-sm">{{ m.name }}{% if m.multi %} <span class="material-symbols-outlined text-xs align-middle opacity-50">unfold_more</span>{% endif %}</span>
-          <span class="text-xs opacity-50">{{ m.units|floatformat:3 }} units</span>
+      <div class="v-mobile-row flex-col !items-stretch gap-2 cursor-pointer active:bg-base-content/5" role="button" tabindex="0"
+           onclick="showBreakdown('{{ m.name|escapejs }}', 'other_mf', {{ forloop.counter0 }})"
+           onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();showBreakdown('{{ m.name|escapejs }}', 'other_mf', {{ forloop.counter0 }});}">
+        <div class="w-full flex items-start justify-between gap-2">
+          <span class="font-bold text-sm text-base-content leading-snug line-clamp-2 flex-1 min-w-0">
+            {{ m.name }}
+            {% if m.multi %}<span class="v-delta v-delta-neutral text-xs py-0 px-1.5 ml-1">{{ m.entries|length }} accts</span>{% endif %}
+          </span>
+          <span class="text-xs text-primary inline-flex items-center gap-0.5 shrink-0 tabular-nums">{{ m.units|floatformat:2 }} u <span class="material-symbols-outlined text-xs">open_in_new</span></span>
         </div>
-        <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
-          <div><span class="opacity-50">Bought</span><div class="font-semibold mt-0.5">{{ m.purchase_value|inr }}</div></div>
-          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5">{{ m.current_value|inr }}</div></div>
-          <div><span class="opacity-50">P&amp;L</span><div class="font-semibold mt-0.5 {% if m.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if m.pnl >= 0 %}+{% endif %}{{ m.pnl|inr }}</div></div>
+        <div class="w-full grid grid-cols-3 gap-2 pt-2 border-t border-[var(--v-hairline)] text-xs tabular-nums">
+          <div>
+            <span class="text-xs text-base-content/45 block">Cost Basis</span>
+            <span class="font-semibold text-base-content/80 mt-0.5 block">{{ m.purchase_value|inr }}</span>
+          </div>
+          <div>
+            <span class="text-xs text-base-content/45 block">Current</span>
+            <span class="font-bold text-base-content mt-0.5 block">{{ m.current_value|inr }}</span>
+          </div>
+          <div class="text-right">
+            <span class="text-xs text-base-content/45 block">P&amp;L ({{ m.pnl_pct }}%)</span>
+            <span class="font-bold mt-0.5 block {% if m.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+              {% if m.pnl >= 0 %}+{% endif %}{{ m.pnl|inr }}
+            </span>
+          </div>
         </div>
       </div>
       {% endfor %}
     </div>
     {% else %}
-    <p class="text-sm opacity-60 py-2">No other mutual funds.</p>
+    <div class="v-empty py-8">
+      <p class="v-empty-desc">No active mutual funds synced.</p>
+    </div>
     {% endif %}
   </div>
-</div>
+</section>
 
-{# ——— BREAKDOWN MODAL ——— #}
-<dialog id="breakdownModal" class="modal zerodha-breakdown-modal">
-  <div class="modal-box max-w-[640px] w-full">
-    <form method="dialog">
-      <button class="btn btn-ghost btn-xs btn-square absolute end-2 top-2" aria-label="Close"><span class="material-symbols-outlined text-lg">close</span></button>
-    </form>
-    <h3 class="font-bold text-lg flex items-center gap-2 pe-10" id="breakdownTitle"><span class="material-symbols-outlined text-primary">analytics</span> Breakdown</h3>
-    <div class="overflow-x-auto mt-4 -mx-2 px-2">
-      <table class="table table-sm" id="breakdownTable">
+{# --- MULTI-ACCOUNT BREAKDOWN MODAL --- #}
+<dialog class="modal modal-bottom sm:modal-middle" id="breakdownModal">
+  <div class="modal-box max-w-2xl max-h-[90dvh] overflow-y-auto overscroll-contain">
+    <div class="v-modal-header flex items-center justify-between gap-3 pb-3 mb-4 border-b border-[var(--v-hairline)]">
+      <div class="min-w-0">
+        <h3 class="font-semibold text-base text-base-content truncate" id="breakdownTitle">Holding Breakdown</h3>
+        <p class="text-xs text-base-content/55">Per-account allocation across Zerodha portfolios</p>
+      </div>
+      <button type="button" class="v-icon-btn shrink-0" onclick="closeModal('breakdownModal')" aria-label="Close">
+        <span class="material-symbols-outlined text-lg">close</span>
+      </button>
+    </div>
+
+    <div class="v-table-wrap overflow-x-auto">
+      <table class="v-table v-table-stack" id="breakdownTable">
         <thead id="breakdownHead"></thead>
         <tbody id="breakdownBody"></tbody>
       </table>
     </div>
-    <div class="modal-action">
-      <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('breakdownModal')">Close</button>
+
+    <div class="v-modal-footer modal-action justify-end mt-4 pt-3 border-t border-[var(--v-hairline)]">
+      <button type="button" class="v-btn v-btn-primary" onclick="closeModal('breakdownModal')">Done</button>
     </div>
   </div>
-  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+  <form method="dialog" class="modal-backdrop"><button aria-label="Close modal">close</button></form>
 </dialog>
+
+{% endwith %}
 
 {{ equity_chart_data|json_script:"equity-chart-data" }}
 {{ consolidated_data|json_script:"consolidated-data" }}
+
 {% endblock %}
 
 {% block chart_js %}
@@ -492,69 +591,78 @@
 <script src="{% static 'js/sortable.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function(){
-  initPagination('stocksTable', 20);
-  initPagination('indexTable', 20);
-  initPagination('otherTable', 20);
+  if (document.getElementById('stocksTable')) initPagination('stocksTable', 20);
+  if (document.getElementById('indexTable')) initPagination('indexTable', 20);
+  if (document.getElementById('otherTable')) initPagination('otherTable', 20);
 });
 
+var _consData = {};
+try {
+  _consData = JSON.parse(document.getElementById('consolidated-data').textContent) || {};
+} catch (err) {
+  _consData = {};
+}
 
-
-var _cdata = JSON.parse(document.getElementById('consolidated-data').textContent);
-
-function _fmt(v) {
-  var n = parseFloat(v);
-  return '\u20b9' + Math.abs(Math.round(n)).toLocaleString('en-IN');
+function _fmt(n) {
+  return '₹' + Number(n).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
 }
 
 function _td(text, opts) {
+  opts = opts || {};
   var td = document.createElement('td');
-  if (opts && opts.align) td.style.textAlign = opts.align;
-  if (opts && opts.cls) td.className = opts.cls;
   td.textContent = text;
+  if (opts.align) td.style.textAlign = opts.align;
+  if (opts.cls) td.className = opts.cls;
+  if (opts.label) td.setAttribute('data-label', opts.label);
   return td;
 }
 
 function showBreakdown(name, type, idx) {
-  var item = _cdata[type][idx];
-  if (!item) return;
+  var entries = [];
+  var isStock = type === 'stock';
+  var stockArr = _consData.stock || _consData.stocks || [];
+  var indexArr = _consData.index || _consData.index_mf || [];
+  var otherArr = _consData.other || _consData.other_mf || [];
 
-  var title = document.getElementById('breakdownTitle');
-  while (title.childNodes.length > 1) title.removeChild(title.lastChild);
-  title.appendChild(document.createTextNode(' ' + name));
+  if (isStock && stockArr[idx]) {
+    entries = stockArr[idx].entries || [];
+  } else if (type === 'index_mf' && indexArr[idx]) {
+    entries = indexArr[idx].entries || [];
+  } else if (type === 'other_mf' && otherArr[idx]) {
+    entries = otherArr[idx].entries || [];
+  }
 
-  var isStock = (type === 'stock');
+  document.getElementById('breakdownTitle').textContent = name;
+
   var head = document.getElementById('breakdownHead');
-  head.textContent = '';
-  var hr = document.createElement('tr');
-  ['Account', isStock ? 'Qty' : 'Units', 'Purchased', 'Current', 'P&L', ''].forEach(function(label, i) {
+  head.innerHTML = '';
+  var htr = document.createElement('tr');
+  var qtyLabel = isStock ? 'Quantity' : 'Units';
+  ['Account', qtyLabel, 'Cost Basis', 'Current Value', 'Unrealized P&L', 'Portfolio'].forEach(function(lbl, i) {
     var th = document.createElement('th');
-    th.textContent = label;
-    if (i > 0 && i < 5) th.style.textAlign = 'right';
-    hr.appendChild(th);
+    th.textContent = lbl;
+    if (i > 0) th.className = 'v-num';
+    htr.appendChild(th);
   });
-  head.appendChild(hr);
+  head.appendChild(htr);
 
   var body = document.getElementById('breakdownBody');
-  body.textContent = '';
-  item.entries.forEach(function(e) {
+  body.innerHTML = '';
+  entries.forEach(function(e) {
     var pnl = parseFloat(e.pnl);
-    var cls = pnl >= 0 ? 'td-pos' : 'amount-danger';
-    var sign = pnl >= 0 ? '+' : '-';
+    var cls = pnl >= 0 ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold';
+    var sign = pnl >= 0 ? '+' : '';
     var tr = document.createElement('tr');
-    tr.appendChild(_td(e.account, {cls: 'td-bold'}));
-    tr.appendChild(_td(isStock ? e.quantity : parseFloat(e.units).toFixed(3), {align: 'right'}));
-    tr.appendChild(_td(_fmt(e.purchase_value), {align: 'right'}));
-    tr.appendChild(_td(_fmt(e.current_value), {align: 'right', cls: 'td-bold'}));
-    var pnlTd = document.createElement('td');
-    pnlTd.style.textAlign = 'right';
-    var pnlSpan = document.createElement('span');
-    pnlSpan.className = cls;
-    pnlSpan.textContent = sign + _fmt(e.pnl);
-    pnlTd.appendChild(pnlSpan);
+    tr.appendChild(_td(e.account, {cls: 'v-stack-lead font-bold text-xs text-base-content'}));
+    tr.appendChild(_td(isStock ? e.quantity : parseFloat(e.units).toFixed(3), {align: 'right', cls: 'v-num text-xs font-semibold', label: qtyLabel}));
+    tr.appendChild(_td(_fmt(e.purchase_value), {align: 'right', cls: 'v-num text-xs text-base-content/75', label: 'Cost Basis'}));
+    tr.appendChild(_td(_fmt(e.current_value), {align: 'right', cls: 'v-num text-xs font-bold text-base-content', label: 'Current Value'}));
+
+    var pnlTd = _td(sign + _fmt(e.pnl), {align: 'right', cls: 'v-num text-xs ' + cls, label: 'Unrealized P&L'});
     tr.appendChild(pnlTd);
 
     var actionTd = document.createElement('td');
-    actionTd.style.textAlign = 'right';
+    actionTd.className = 'v-stack-actions text-right';
     var modelName = isStock ? 'stockholding' : 'mutualfundholding';
     var entryId = parseInt(e.id, 10);
     if (!isNaN(entryId) && entryId > 0) {
@@ -569,16 +677,18 @@ function showBreakdown(name, type, idx) {
       toggleForm.appendChild(csrfInput);
       var toggleBtn = document.createElement('button');
       toggleBtn.type = 'submit';
-      toggleBtn.className = "btn btn-ghost btn-xs btn-square";
+      toggleBtn.className = "v-icon-btn";
       var iconSpan = document.createElement('span');
       iconSpan.className = "material-symbols-outlined text-base";
       if (e.is_baby === true || e.is_baby === 'true') {
-        toggleBtn.classList.add("text-warning");
-        toggleBtn.title = "Move to Master Portfolio";
+        toggleBtn.classList.add("text-amber-400");
+        toggleBtn.title = "Return to Master Portfolio";
+        toggleBtn.setAttribute('aria-label', 'Return to Master Portfolio');
         iconSpan.textContent = "assignment_return";
       } else {
-        toggleBtn.classList.add("opacity-60", "hover:opacity-100");
+        toggleBtn.classList.add("text-primary");
         toggleBtn.title = "Move to Child Portfolio";
+        toggleBtn.setAttribute('aria-label', 'Move to Child Portfolio');
         iconSpan.textContent = "child_care";
       }
       toggleBtn.appendChild(iconSpan);

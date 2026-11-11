@@ -8,18 +8,67 @@
 {% block eyebrow %}Bill reminder{% endblock %}
 
 {% block content %}
-<p class="em-muted" style="margin:0 0 6px 0; font-size:13px; color:#64748b;">{{ card }}</p>
-<p class="em-hero em-text num" style="margin:0; font-size:36px; line-height:42px; font-weight:800; color:#0f172a;">{% if statement.total_due %}{{ statement.total_due|inr }}{% else %}Payment due{% endif %}</p>
-<p style="margin:10px 0 0 0; font-size:14px;">
-  <span style="display:inline-block; padding:3px 10px; border-radius:999px; font-weight:700; {% if overdue %}background-color:#fef2f2; color:#b91c1c;{% elif days_left <= 1 %}background-color:#fffbeb; color:#b45309;{% else %}background-color:#eff6ff; color:#1d4ed8;{% endif %}">
-    {% if overdue %}Overdue since {{ statement.due_date|date:"j M" }}{% elif days_left == 0 %}Due today{% else %}Due {{ statement.due_date|date:"D, j M" }} · {{ days_left }} day{{ days_left|pluralize }}{% endif %}
-  </span>
-</p>
-{% if statement.min_due %}<p class="em-muted" style="margin:14px 0 0 0; font-size:13px; color:#64748b;">Minimum due {{ statement.min_due|inr }}. Paying only the minimum attracts interest on the rest.</p>{% endif %}
-{% if statement.added_count %}<p class="em-muted" style="margin:8px 0 0 0; font-size:13px; color:#64748b;">{{ statement.added_count }} charge{{ statement.added_count|pluralize }} on this statement had no email alert — worth a glance before paying.</p>{% endif %}
+
+{# ── Card & Status Banner ── #}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr>
+    <td valign="middle">
+      <p class="em-muted" style="margin:0 0 4px 0; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size:12px; font-weight:700; letter-spacing:0.8px; text-transform:uppercase; color:#64748b;">Credit card statement</p>
+      <p class="em-text" style="margin:0; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size:18px; font-weight:800; color:#0f172a;">{{ card }}</p>
+    </td>
+    <td align="right" valign="middle">
+      <span style="display:inline-block; padding:4px 12px; border-radius:999px; font-size:11px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; {% if overdue %}background-color:#fef2f2; color:#b91c1c; border:1px solid #fecdd3;{% elif days_left <= 1 %}background-color:#fffbeb; color:#b45309; border:1px solid #fde68a;{% else %}background-color:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe;{% endif %}">
+        {% if overdue %}Overdue since {{ statement.due_date|date:"j M" }}{% elif days_left == 0 %}Due today{% else %}Due in {{ days_left }} day{{ days_left|pluralize }}{% endif %}
+      </span>
+    </td>
+  </tr>
+</table>
+
+{# ── Hero Total Due ── #}
+<div style="margin-top:20px;">
+  <p class="em-muted" style="margin:0 0 4px 0; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size:11px; font-weight:700; letter-spacing:0.8px; text-transform:uppercase; color:#64748b;">Total amount due</p>
+  <p class="em-hero em-text num" style="margin:0; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size:42px; line-height:48px; font-weight:800; color:{% if overdue %}#b91c1c{% else %}#0f172a{% endif %}; letter-spacing:-0.03em;">
+    {% if statement.total_due %}{{ statement.total_due|inr }}{% else %}Payment due{% endif %}
+  </p>
+  <p class="em-muted" style="margin:8px 0 0 0; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size:13px; color:#64748b;">
+    Due date: <strong class="em-text" style="color:#0f172a;">{{ statement.due_date|date:"l, j F Y" }}</strong>
+  </p>
+</div>
+
+{# ── Minimum Due & Advisory Details ── #}
+{% if statement.min_due or statement.added_count %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:20px;">
+  <tr>
+    <td class="em-soft em-line" style="background-color:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:16px 18px;">
+      {% if statement.min_due %}
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td>
+            <p class="em-muted" style="margin:0; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size:11px; font-weight:700; letter-spacing:0.8px; text-transform:uppercase; color:#64748b;">Minimum amount due</p>
+            <p class="em-text num" style="margin:3px 0 0 0; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size:16px; font-weight:700; color:#0f172a;">{{ statement.min_due|inr }}</p>
+          </td>
+        </tr>
+      </table>
+      <p class="em-muted" style="margin:8px 0 0 0; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size:12px; line-height:18px; color:#64748b;">
+        Paying only the minimum due attracts high revolving interest on the remaining balance and forfeits interest-free grace periods. We recommend settling in full.
+      </p>
+      {% endif %}
+
+      {% if statement.added_count %}
+      <div style="{% if statement.min_due %}margin-top:14px; padding-top:12px; border-top:1px solid #e2e8f0;{% endif %}">
+        <p class="em-text" style="margin:0; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size:13px; line-height:19px; color:#334155;">
+          <strong>Audit notice:</strong> {{ statement.added_count }} charge{{ statement.added_count|pluralize }} on this statement had no prior email alert &mdash; review your itemized statement to verify every entry before paying.
+        </p>
+      </div>
+      {% endif %}
+    </td>
+  </tr>
+</table>
+{% endif %}
+
 <div style="height:20px; line-height:20px; font-size:0;">&nbsp;</div>
 {% endblock %}
 
 {% block cta_label %}View statement{% endblock %}
-{% block footer_note %}Already paid? Mark it paid in Vault and reminders stop — or they stop automatically once your bank emails a payment confirmation.{% endblock %}
+{% block footer_note %}Already paid? Mark it as paid in Vault and reminders stop immediately &mdash; or reminders dismiss automatically once your bank emails a payment acknowledgment.{% endblock %}
 {% block disclaimer %}{% endblock %}

@@ -1,0 +1,19 @@
+{% load i18n %}
+<div class="absolute flex flex-row items-center justify-between left-0 m-4 right-0 top-0 gap-3">
+    <div id="site-name" class="vault-admin-brand">
+        <a href="{{ site_url|default:'/' }}" class="vault-admin-brand-link">
+            <span class="vault-admin-brand-mark">
+                {% include "includes/vault_icon.html" with size="20" %}
+            </span>
+            <span class="vault-admin-brand-title">{{ site_header|default:_('Vault') }}</span>
+            <span class="vault-admin-brand-badge">Console</span>
+        </a>
+    </div>
+
+    <div class="flex items-center gap-2 ml-auto">
+        <a href="{{ site_url|default:'/' }}" class="vault-admin-return">&larr; {% trans 'Return to Vault' %}</a>
+        {% if not theme %}
+            {% include "unfold/helpers/theme_switch_dropdown.html" %}
+        {% endif %}
+    </div>
+</div>

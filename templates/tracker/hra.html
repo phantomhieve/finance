@@ -1,196 +1,391 @@
 {% extends 'base.html' %}
 {% load humanize indian_format %}
 
-{% block title %}HRA & Rent — Vault{% endblock %}
+{% block title %}HRA &amp; Rent · {{ fy_label }} | Vault{% endblock %}
 
 {% block page_header %}
-<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-  <div>
-    <p class="text-xs font-bold tracking-widest uppercase text-primary">House Rent Allowance</p>
-    <h1 class="text-xl lg:text-2xl font-extrabold">{{ fy_label }}</h1>
-    <p class="text-xs opacity-50">{{ fy_start_date|date:"d M Y" }} → {{ fy_end_date|date:"d M Y" }}</p>
-  </div>
-  <div class="flex flex-wrap items-center gap-2 sm:gap-2 justify-center sm:justify-start w-full sm:w-auto">
-    <div class="fy-tabs" id="fySwitcher">
-      {% for fy in fy_options %}
-      <a href="?fy={{ fy }}" class="fy-tab {% if fy == fy_start %}fy-tab-active{% endif %}">{{ fy }}-{{ fy|add:1 }}</a>
-      {% endfor %}
+<header class="v-page-header">
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
+    <div class="min-w-0">
+      <h1 class="v-title">HRA &amp; Rent</h1>
+      <p class="v-subtitle tabular-nums">{{ fy_label }} · {{ fy_start_date|date:"d M Y" }} → {{ fy_end_date|date:"d M Y" }}</p>
     </div>
-    {% if user.can_edit_hra %}
-    <button class="btn btn-primary btn-sm gap-1" onclick="newHraEntry()">
-      <span class="material-symbols-outlined text-base">add_circle</span><span class="hidden sm:inline">Add Entry</span><span class="sm:hidden">Add</span>
-    </button>
-    {% endif %}
+    <div class="v-toolbar flex flex-wrap items-center gap-2">
+      <div class="fy-tabs" id="fySwitcher" role="navigation" aria-label="Financial year">
+        {% for fy in fy_options %}
+        <a href="?fy={{ fy }}" class="fy-tab !min-h-11 lg:!min-h-8 tabular-nums {% if fy == fy_start %}fy-tab-active{% endif %}">{{ fy }}-{{ fy|add:1 }}</a>
+        {% endfor %}
+      </div>
+      {% if user.can_edit_hra %}
+      <button type="button" class="v-btn v-btn-primary !min-h-11 lg:!min-h-9 text-xs gap-1.5 cursor-pointer" onclick="newHraEntry()">
+        <span class="material-symbols-outlined text-base">add_circle</span><span>Add Entry</span>
+      </button>
+      {% else %}
+      <span class="inline-flex items-center gap-1.5 min-h-9 px-3 rounded-lg bg-base-200/70 border border-base-content/10 text-xs font-medium text-base-content/70">
+        <span class="material-symbols-outlined text-sm">visibility</span>
+        <span>Landlord View</span>
+      </span>
+      {% endif %}
+    </div>
   </div>
-</div>
+</header>
 {% endblock %}
 
 {% block content %}
 
-{# ——— HERO STATS ——— #}
-<div class="card hero-gradient-success shadow-sm animate-up mb-4 card-hover">
-  <div class="card-body p-4 lg:p-6">
-    <div class="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-8">
-      <div>
-        <p class="text-[10px] font-bold uppercase tracking-widest opacity-40">Remaining Balance</p>
-        <p class="text-3xl lg:text-4xl font-extrabold mt-1 {% if remaining_balance >= 0 %}text-success{% else %}text-error{% endif %}">{{ remaining_balance|inr }}</p>
-        <p class="text-xs opacity-30 mt-1">Available in HRA Pool</p>
+{# --- SIGNATURE LEDGER BAND --- #}
+<section class="v-ledger-band mb-5" aria-label="HRA financial position">
+  <div class="v-lead-cell">
+    <div class="flex items-center justify-between gap-2 flex-wrap mb-1.5">
+      <span class="v-lead-label">Remaining Pool · {{ fy_label }}</span>
+      <span class="v-delta {% if remaining_balance >= 0 %}v-delta-pos{% else %}v-delta-neg{% endif %}">
+        <span class="material-symbols-outlined text-xs">{% if remaining_balance >= 0 %}account_balance_wallet{% else %}warning{% endif %}</span>
+        <span>{% if remaining_balance >= 0 %}In Surplus{% else %}Deficit{% endif %}</span>
+      </span>
+    </div>
+
+    <div class="v-lead-figure tabular-nums {% if remaining_balance < 0 %}text-rose-400{% else %}text-base-content{% endif %}">
+      {{ remaining_balance|inr }}
+    </div>
+
+    <p class="v-lead-sub mt-1">Available in HRA pool to claim or disburse against eligible rent receipts.</p>
+
+    {% if total_additions or total_expense %}
+    <div class="v-horizon mt-4 pt-3 border-t border-base-content/10">
+      <div class="v-horizon-bar" id="hraHorizonBar" data-added="{{ total_additions }}" data-spent="{{ total_expense }}">
+        <span class="v-horizon-seg bg-emerald-400" id="hraSegAdded" style="width: 50%;" title="Added: {{ total_additions|inr }}"></span>
+        <span class="v-horizon-seg bg-rose-400" id="hraSegSpent" style="width: 50%;" title="Spent: {{ total_expense|inr }}"></span>
       </div>
-      <div class="flex gap-3">
-        <div class="stat-card stat-card-success">
-          <div class="text-[10px] uppercase tracking-wider opacity-50">Total Added</div>
-          <div class="text-lg font-bold text-success mt-0.5">{{ total_additions|inr }}</div>
-        </div>
-        <div class="stat-card stat-card-error">
-          <div class="text-[10px] uppercase tracking-wider opacity-50">Total Spent</div>
-          <div class="text-lg font-bold text-error mt-0.5">{{ total_expense|inr }}</div>
-        </div>
+      <div class="v-horizon-legend">
+        <span class="v-horizon-item">
+          <span class="v-horizon-dot bg-emerald-400"></span>
+          <span>Added</span>
+          <span class="v-horizon-amount">{{ total_additions|inr_short }}</span>
+        </span>
+        <span class="v-horizon-item">
+          <span class="v-horizon-dot bg-rose-400"></span>
+          <span>Spent</span>
+          <span class="v-horizon-amount">{{ total_expense|inr_short }}</span>
+        </span>
       </div>
+    </div>
+    {% endif %}
+  </div>
+
+  {# 4-cell Semantic Stat Grid (balanced across 2x2 mobile, 4x1 tablet, 2x2 desktop) #}
+  <div class="v-stat-grid">
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Total Added</div>
+      <div class="v-stat-value text-emerald-400 tabular-nums">{{ total_additions|inr }}</div>
+      <div class="v-stat-meta truncate">HRA allowance deposits</div>
+    </div>
+
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Total Spent</div>
+      <div class="v-stat-value text-rose-400 tabular-nums">{{ total_expense|inr }}</div>
+      <div class="v-stat-meta truncate">Rent &amp; claimed expenses</div>
+    </div>
+
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Entries Logged</div>
+      <div class="v-stat-value text-base-content tabular-nums">{{ expenses|length }}</div>
+      <div class="v-stat-meta truncate">Records in {{ fy_label }}</div>
+    </div>
+
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Payment Modes</div>
+      <div class="v-stat-value text-sky-400 tabular-nums">{{ mode_metrics|length }}</div>
+      <div class="v-stat-meta truncate">Settlement channels</div>
     </div>
   </div>
-</div>
+</section>
 
-{# ——— MONTH GRID ——— #}
-<div class="card bg-base-200 shadow-sm animate-up mb-4 card-hover" style="animation-delay:0.1s">
-  <div class="card-body p-4 lg:p-6">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="card-title text-base">Monthly Breakdown</h2>
-      <div class="hidden sm:flex gap-2 text-xs">
-        <span class="badge badge-success badge-sm gap-1">Rent Paid</span>
-        <span class="badge badge-error badge-sm gap-1">Rent Due</span>
-        <span class="badge badge-info badge-sm gap-1">Current</span>
-        <span class="badge badge-ghost badge-sm gap-1">Upcoming</span>
-      </div>
+{# --- 12-MONTH HRA BREAKDOWN MATRIX --- #}
+<section class="v-panel mb-5" aria-label="Monthly HRA breakdown">
+  <div class="v-panel-header flex flex-wrap items-center justify-between gap-2">
+    <div>
+      <h2 class="v-panel-title">Monthly Breakdown</h2>
+      <p class="text-xs text-base-content/55 mt-0.5">Rent disbursement cadence across the fiscal year</p>
     </div>
-    <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-2">
+    <div class="flex flex-wrap items-center gap-1.5 text-xs">
+      <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-500/12 text-emerald-400 border border-emerald-500/25 font-medium">
+        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>Rent Paid
+      </span>
+      <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-rose-500/12 text-rose-400 border border-rose-500/25 font-medium">
+        <span class="w-1.5 h-1.5 rounded-full bg-rose-400"></span>Rent Due
+      </span>
+      <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-sky-500/12 text-sky-400 border border-sky-500/25 font-medium">
+        <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span>Current
+      </span>
+      <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[var(--v-elevated)] text-base-content/65 font-medium">
+        <span class="w-1.5 h-1.5 rounded-full bg-base-content/40"></span>Upcoming
+      </span>
+    </div>
+  </div>
+
+  <div class="v-panel-body">
+    <div class="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-12 gap-px bg-[var(--v-hairline)] border border-[var(--v-hairline)] rounded-xl overflow-hidden">
       {% for m in monthly_data %}
-      <div class="month-card rounded-xl p-2.5 text-center text-xs border {% if m.status == 'rent_paid' %}border-success/30 bg-success/5{% elif m.status == 'rent_due' %}border-error/20 bg-error/5{% elif m.status == 'current' %}border-info/30 bg-info/5{% else %}border-base-300/50 bg-base-300/20{% endif %}">
-        <div class="font-semibold mb-1.5 text-[10px] uppercase tracking-wider {% if m.status == 'rent_paid' %}text-success{% elif m.status == 'rent_due' %}text-error{% elif m.status == 'current' %}text-info{% else %}opacity-60{% endif %}">{{ m.name }}</div>
+      <div class="bg-[var(--v-sheet)] p-2.5 sm:p-3 flex flex-col justify-between min-h-24 transition-colors {% if m.status == 'current' %}ring-1 ring-inset ring-sky-500/40 bg-sky-500/5{% elif m.status == 'rent_due' %}bg-rose-500/5{% endif %}">
+        <div class="flex items-center justify-between gap-1 mb-1.5">
+          <span class="text-xs font-bold {% if m.status == 'rent_paid' %}text-emerald-400{% elif m.status == 'rent_due' %}text-rose-400{% elif m.status == 'current' %}text-sky-400{% else %}text-base-content/60{% endif %}">{{ m.name|slice:":3" }}</span>
+          <span class="w-2 h-2 rounded-full shrink-0 {% if m.status == 'rent_paid' %}bg-emerald-400{% elif m.status == 'rent_due' %}bg-rose-400{% elif m.status == 'current' %}bg-sky-400{% else %}bg-base-content/25{% endif %}" aria-hidden="true"></span>
+        </div>
+
         {% if m.started %}
-        <div class="font-bold text-success text-sm">{{ m.addition|inr }}</div>
-        <div class="text-[10px] opacity-30">Added</div>
-        <div class="text-sm text-error mt-1">-{{ m.expense|inr }}</div>
-        <div class="text-[10px] opacity-30">Spent</div>
+        <div class="space-y-1">
+          <div class="flex items-baseline justify-between gap-1" title="Added: {{ m.addition|inr }}">
+            <span class="text-xs text-base-content/50">In</span>
+            <span class="text-xs font-bold text-emerald-400 tabular-nums truncate">+{{ m.addition|inr_short }}</span>
+          </div>
+          <div class="flex items-baseline justify-between gap-1" title="Spent: {{ m.expense|inr }}">
+            <span class="text-xs text-base-content/50">Out</span>
+            <span class="text-xs font-semibold text-rose-400 tabular-nums truncate">−{{ m.expense|inr_short }}</span>
+          </div>
+        </div>
         {% else %}
-        <div class="text-sm opacity-20 mt-1">—</div>
-        <div class="text-[10px] opacity-20">Future</div>
+        <div class="pt-2">
+          <div class="text-xs text-base-content/35 tabular-nums">—</div>
+          <div class="text-xs text-base-content/40 mt-0.5">Upcoming</div>
+        </div>
         {% endif %}
       </div>
       {% endfor %}
     </div>
   </div>
-</div>
+</section>
 
-{# ——— LOG + SPENDS ——— #}
-<div class="grid grid-cols-1 lg:grid-cols-5 gap-4 animate-up" style="animation-delay:0.2s">
-  <div class="card bg-base-200 shadow-sm lg:col-span-2 order-2 lg:order-1 card-hover">
-    <div class="card-body p-4">
-      <h2 class="card-title text-base mb-2">Spends by Mode</h2>
-      <div class="space-y-2">
+{# --- ASYMMETRIC LOG & SPENDS WORKBENCH --- #}
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+
+  {# Spends by Payment Mode + Pool Reconciliation (4 cols, balanced height) #}
+  <section class="v-panel lg:col-span-4">
+    <div class="v-panel-header">
+      <div>
+        <h2 class="v-panel-title">Spends by Payment Mode</h2>
+        <p class="text-xs text-base-content/55 mt-0.5">Disbursement settlement channels</p>
+      </div>
+    </div>
+    <div class="v-panel-body p-0">
+      {% if mode_metrics %}
+      <div class="divide-y divide-[var(--v-hairline-subtle)]" id="hraModeList" data-total-spent="{{ total_expense }}">
         {% for metric in mode_metrics %}
-        <div class="flex justify-between items-center p-3 bg-base-300/30 rounded-lg text-sm hover:bg-base-300/50 transition-colors">
-          <span class="opacity-60">{{ metric.mode_of_payment }}</span>
-          <span class="font-semibold">{{ metric.total|inr }}</span>
-        </div>
-        {% empty %}
-        <p class="text-sm opacity-40 py-4 text-center">No spends yet.</p>
-        {% endfor %}
-      </div>
-    </div>
-  </div>
-
-  <div class="card bg-base-200 shadow-sm lg:col-span-3 order-1 lg:order-2">
-    <div class="card-body p-4">
-      <h2 class="card-title text-base mb-2">Expense Log</h2>
-
-      {# Desktop table #}
-      <div class="hidden md:block overflow-x-auto">
-        <table class="table table-sm" id="hraTable">
-          <thead><tr><th>Date</th><th>Description</th><th>Mode</th><th>Amount</th>{% if user.can_edit_hra %}<th class="w-10"></th>{% endif %}</tr></thead>
-          <tbody>
-            {% for expense in expenses %}
-            <tr class="hover">
-              <td class="opacity-60 text-sm whitespace-nowrap">{{ expense.date|date:"d M Y" }}</td>
-              <td class="font-semibold text-sm">
-                {{ expense.expense_type }}
-                {% if expense.remarks %}<div class="text-xs opacity-40 mt-0.5">{{ expense.remarks }}</div>{% endif %}
-              </td>
-              <td>
-                <div class="flex flex-col gap-1">
-                  {% if expense.hra_type == 'RENT_PAID' %}<span class="badge badge-success badge-sm">Added</span>
-                  {% elif expense.hra_type == 'EXPENSE' %}<span class="badge badge-error badge-sm">Spent</span>
-                  {% elif expense.hra_type == 'REVERT' %}<span class="badge badge-info badge-sm">Revert</span>
-                  {% else %}<span class="badge badge-ghost badge-sm">{{ expense.hra_type|default:"—" }}</span>{% endif %}
-                  {% if expense.mode_of_payment %}<span class="badge badge-outline badge-sm">{{ expense.mode_of_payment }}</span>{% endif %}
-                </div>
-              </td>
-              <td class="font-semibold whitespace-nowrap">
-                {% if expense.is_revert %}<span class="text-success">+{{ expense.amount|inr }}</span>
-                {% else %}<span class="text-error">−{{ expense.amount|inr }}</span>{% endif %}
-              </td>
-              {% if user.can_edit_hra %}
-              <td>
-                <button class="btn btn-ghost btn-xs btn-square" onclick="editHraEntry({{ expense.id }}, '{{ expense.date|date:'Y-m-d' }}', '{{ expense.hra_type }}', '{{ expense.amount }}', '{{ expense.mode_of_payment|escapejs }}', '{{ expense.expense_type|escapejs }}', '{{ expense.remarks|escapejs }}')">
-                  <span class="material-symbols-outlined text-base">edit</span>
-                </button>
-              </td>
-              {% endif %}
-            </tr>
-            {% empty %}
-            <tr><td colspan="{% if user.can_edit_hra %}5{% else %}4{% endif %}" class="text-center opacity-50 py-8">No records found.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-
-      {# Mobile card view #}
-      <div class="md:hidden space-y-2" id="hraCards">
-        {% for expense in expenses %}
-        <div class="table-card flex items-center justify-between gap-3">
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2">
-              <span class="font-semibold text-sm whitespace-nowrap">
-                {% if expense.is_revert %}<span class="text-success">+{{ expense.amount|inr }}</span>
-                {% else %}<span class="text-error">−{{ expense.amount|inr }}</span>{% endif %}
-              </span>
-              {% if expense.hra_type == 'RENT_PAID' %}<span class="badge badge-success badge-xs">Added</span>
-              {% elif expense.hra_type == 'EXPENSE' %}<span class="badge badge-error badge-xs">Spent</span>
-              {% elif expense.hra_type == 'REVERT' %}<span class="badge badge-info badge-xs">Revert</span>{% endif %}
+        <div class="px-4 py-3" data-mode-amount="{{ metric.total }}">
+          <div class="flex items-center justify-between gap-2 text-xs">
+            <span class="font-semibold text-base-content truncate">{{ metric.mode_of_payment|default:"Unspecified" }}</span>
+            <div class="flex items-center gap-2 shrink-0">
+              <span class="text-xs text-base-content/55 tabular-nums hra-mode-pct"></span>
+              <span class="font-bold text-sm text-base-content tabular-nums">{{ metric.total|inr }}</span>
             </div>
-            <div class="text-xs opacity-50 mt-0.5 truncate">{{ expense.date|date:"d M Y" }} · {{ expense.expense_type }}</div>
-            {% if expense.mode_of_payment %}<div class="text-[10px] opacity-30 mt-0.5">{{ expense.mode_of_payment }}</div>{% endif %}
           </div>
-          {% if user.can_edit_hra %}
-          <button class="btn btn-ghost btn-xs btn-square shrink-0" onclick="editHraEntry({{ expense.id }}, '{{ expense.date|date:'Y-m-d' }}', '{{ expense.hra_type }}', '{{ expense.amount }}', '{{ expense.mode_of_payment|escapejs }}', '{{ expense.expense_type|escapejs }}', '{{ expense.remarks|escapejs }}')">
-            <span class="material-symbols-outlined text-base">edit</span>
-          </button>
-          {% endif %}
+          <div class="mt-2 h-1.5 w-full rounded-full bg-[var(--v-elevated)] overflow-hidden">
+            <div class="h-full rounded-full bg-rose-400/80 hra-mode-bar transition-all" style="width: 0%;"></div>
+          </div>
         </div>
-        {% empty %}
-        <p class="text-center opacity-50 py-8 text-sm">No records found.</p>
         {% endfor %}
       </div>
+      {% else %}
+      <div class="v-empty py-10 px-4">
+        <div class="v-empty-icon">
+          <span class="material-symbols-outlined text-xl">payments</span>
+        </div>
+        <p class="v-empty-title">No payment modes recorded</p>
+        <p class="v-empty-body">Disbursements grouped by settlement mode will appear here.</p>
+      </div>
+      {% endif %}
+
+      {# Flush HRA Pool Reconciliation Ledger (balances 2-column height) #}
+      <div class="border-t border-[var(--v-hairline)] bg-[var(--v-elevated)]/30">
+        <div class="px-4 py-2.5 border-b border-[var(--v-hairline-subtle)] flex items-center justify-between">
+          <span class="text-xs font-bold text-base-content/75">Pool Reconciliation</span>
+          <span class="text-xs text-base-content/50 tabular-nums">{{ fy_label }}</span>
+        </div>
+        <dl class="divide-y divide-[var(--v-hairline-subtle)] text-xs">
+          <div class="px-4 py-2.5 flex items-center justify-between gap-2">
+            <dt class="text-base-content/65">Allowance Credited</dt>
+            <dd class="font-bold text-emerald-400 tabular-nums">+{{ total_additions|inr }}</dd>
+          </div>
+          <div class="px-4 py-2.5 flex items-center justify-between gap-2">
+            <dt class="text-base-content/65">Rent &amp; Claims Disbursed</dt>
+            <dd class="font-bold text-rose-400 tabular-nums">−{{ total_expense|inr }}</dd>
+          </div>
+          <div class="px-4 py-3 flex items-center justify-between gap-2 bg-[var(--v-sheet)]">
+            <dt class="font-bold text-base-content">Net Pool Balance</dt>
+            <dd class="font-extrabold text-sm tabular-nums {% if remaining_balance >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+              {% if remaining_balance >= 0 %}+{% endif %}{{ remaining_balance|inr }}
+            </dd>
+          </div>
+        </dl>
+      </div>
     </div>
-  </div>
+  </section>
+
+  {# Expense Log (8 cols) #}
+  <section class="v-panel lg:col-span-8">
+    <div class="v-panel-header flex flex-wrap items-center justify-between gap-2">
+      <div class="flex items-center gap-2">
+        <h2 class="v-panel-title">Expense Log</h2>
+        {% if expenses %}
+        <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-base-200/80 border border-base-content/10 text-base-content/70 tabular-nums">{{ expenses|length }} entries</span>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if expenses %}
+    <div class="px-4 py-2.5 border-b border-[var(--v-hairline)] flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-base-200/20">
+      <div class="v-pill-rail flex items-center gap-1.5 overflow-x-auto pr-4" role="tablist" aria-label="Filter HRA entries">
+        <button type="button" class="filter-pill hra-type-pill is-active !min-h-11 lg:!min-h-8 text-xs shrink-0 cursor-pointer" onclick="filterHraRows('ALL', this)">All</button>
+        <button type="button" class="filter-pill hra-type-pill !min-h-11 lg:!min-h-8 text-xs shrink-0 cursor-pointer" onclick="filterHraRows('RENT_PAID', this)">Added</button>
+        <button type="button" class="filter-pill hra-type-pill !min-h-11 lg:!min-h-8 text-xs shrink-0 cursor-pointer" onclick="filterHraRows('EXPENSE', this)">Spent</button>
+        <button type="button" class="filter-pill hra-type-pill !min-h-11 lg:!min-h-8 text-xs shrink-0 cursor-pointer" onclick="filterHraRows('REVERT', this)">Revert</button>
+      </div>
+      <div class="relative w-full sm:w-56 shrink-0">
+        <span class="material-symbols-outlined text-base text-base-content/50 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none z-10">search</span>
+        <input type="search" id="hraSearchInput" class="v-input !h-11 lg:!h-9 !pl-9 !pr-3 text-base sm:text-xs w-full" placeholder="Search description or mode…" oninput="filterHraRows(null, null)" aria-label="Search HRA entries">
+      </div>
+    </div>
+
+    {# Desktop Table #}
+    <div class="v-panel-table v-table-wrap hidden md:block overflow-x-auto">
+      <table class="v-table w-full text-xs" id="hraTable">
+        <thead>
+          <tr>
+            <th class="py-2.5 pl-4 text-left">Date</th>
+            <th class="py-2.5 text-left">Description</th>
+            <th class="py-2.5 text-left">Mode</th>
+            <th class="py-2.5 pr-4 text-right v-num">Amount</th>
+            {% if user.can_edit_hra %}<th class="py-2.5 pr-3 text-right w-12"><span class="sr-only">Actions</span></th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for expense in expenses %}
+          <tr class="hra-desk-row border-b border-[var(--v-hairline-subtle)] hover:bg-[var(--v-hover)] transition-colors"
+              data-type="{{ expense.hra_type }}"
+              data-search="{{ expense.expense_type|lower }} {{ expense.remarks|default:''|lower }} {{ expense.mode_of_payment|default:''|lower }} {{ expense.date|date:'d M Y'|lower }}">
+            <td class="py-3 pl-4 text-base-content/70 whitespace-nowrap tabular-nums">{{ expense.date|date:"d M Y" }}</td>
+            <td class="py-3 font-semibold text-xs text-base-content">
+              {{ expense.expense_type }}
+              {% if expense.remarks %}<div class="text-xs text-base-content/55 font-normal mt-0.5">{{ expense.remarks }}</div>{% endif %}
+            </td>
+            <td class="py-3">
+              <div class="flex flex-wrap items-center gap-1.5">
+                {% if expense.hra_type == 'RENT_PAID' %}<span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-emerald-500/12 text-emerald-400 border border-emerald-500/25">Added</span>
+                {% elif expense.hra_type == 'EXPENSE' %}<span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-rose-500/12 text-rose-400 border border-rose-500/25">Spent</span>
+                {% elif expense.hra_type == 'REVERT' %}<span class="text-xs font-semibold px-2 py-0.5 rounded-md bg-sky-500/12 text-sky-400 border border-sky-500/25">Revert</span>
+                {% else %}<span class="text-xs font-medium px-2 py-0.5 rounded-md bg-base-content/10 text-base-content/70">{{ expense.hra_type|default:"—" }}</span>{% endif %}
+                {% if expense.mode_of_payment %}<span class="text-xs text-base-content/65 font-medium">{{ expense.mode_of_payment }}</span>{% endif %}
+              </div>
+            </td>
+            <td class="py-3 pr-4 font-bold whitespace-nowrap text-right v-num tabular-nums">
+              {% if expense.is_revert %}<span class="text-emerald-400">+{{ expense.amount|inr }}</span>
+              {% else %}<span class="text-rose-400">−{{ expense.amount|inr }}</span>{% endif %}
+            </td>
+            {% if user.can_edit_hra %}
+            <td class="py-2 pr-3 text-right">
+              <button type="button" class="v-icon-btn v-btn v-btn-ghost !min-h-11 !min-w-11 lg:!min-h-9 lg:!min-w-9 cursor-pointer"
+                onclick="editHraEntry({{ expense.id }}, '{{ expense.date|date:'Y-m-d' }}', '{{ expense.hra_type }}', '{{ expense.amount }}', '{{ expense.mode_of_payment|escapejs }}', '{{ expense.expense_type|escapejs }}', '{{ expense.remarks|escapejs }}')"
+                aria-label="Edit {{ expense.expense_type }}">
+                <span class="material-symbols-outlined text-base">edit</span>
+              </button>
+            </td>
+            {% endif %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {# Mobile Ledger Row View (flush .v-mobile-row — zero nested cards) #}
+    <div class="md:hidden" id="hraCards">
+      {% for expense in expenses %}
+      <div class="v-mobile-row hra-mob-row flex items-center justify-between gap-3 px-4 py-3 hover:bg-[var(--v-hover)] transition-colors"
+           data-type="{{ expense.hra_type }}"
+           data-search="{{ expense.expense_type|lower }} {{ expense.remarks|default:''|lower }} {{ expense.mode_of_payment|default:''|lower }} {{ expense.date|date:'d M Y'|lower }}">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center justify-between gap-2">
+            <span class="font-semibold text-sm text-base-content truncate">{{ expense.expense_type }}</span>
+            <span class="font-bold text-sm tabular-nums whitespace-nowrap shrink-0">
+              {% if expense.is_revert %}<span class="text-emerald-400">+{{ expense.amount|inr }}</span>
+              {% else %}<span class="text-rose-400">−{{ expense.amount|inr }}</span>{% endif %}
+            </span>
+          </div>
+          <div class="flex flex-wrap items-center gap-1.5 mt-1 text-xs text-base-content/60">
+            <span class="tabular-nums">{{ expense.date|date:"d M Y" }}</span>
+            {% if expense.hra_type == 'RENT_PAID' %}<span class="font-semibold px-1.5 py-0.5 rounded bg-emerald-500/12 text-emerald-400">Added</span>
+            {% elif expense.hra_type == 'EXPENSE' %}<span class="font-semibold px-1.5 py-0.5 rounded bg-rose-500/12 text-rose-400">Spent</span>
+            {% elif expense.hra_type == 'REVERT' %}<span class="font-semibold px-1.5 py-0.5 rounded bg-sky-500/12 text-sky-400">Revert</span>{% endif %}
+            {% if expense.mode_of_payment %}<span>· {{ expense.mode_of_payment }}</span>{% endif %}
+          </div>
+          {% if expense.remarks %}<div class="text-xs text-base-content/50 mt-0.5 truncate">{{ expense.remarks }}</div>{% endif %}
+        </div>
+        {% if user.can_edit_hra %}
+        <button type="button" class="v-icon-btn v-btn v-btn-ghost !min-h-11 !min-w-11 shrink-0 cursor-pointer"
+          onclick="editHraEntry({{ expense.id }}, '{{ expense.date|date:'Y-m-d' }}', '{{ expense.hra_type }}', '{{ expense.amount }}', '{{ expense.mode_of_payment|escapejs }}', '{{ expense.expense_type|escapejs }}', '{{ expense.remarks|escapejs }}')"
+          aria-label="Edit {{ expense.expense_type }}">
+          <span class="material-symbols-outlined text-base">edit</span>
+        </button>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+
+    <div id="hraFilterEmpty" class="hidden flex-col items-center justify-center py-10 px-4 text-center gap-2">
+      <span class="material-symbols-outlined text-2xl text-base-content/40">filter_alt_off</span>
+      <p class="text-xs font-semibold text-base-content/75">No HRA entries match your filter</p>
+    </div>
+
+    {% else %}
+    <div class="v-empty py-12 px-4">
+      <div class="v-empty-icon">
+        <span class="material-symbols-outlined text-xl">receipt_long</span>
+      </div>
+      <p class="v-empty-title">No HRA entries logged in {{ fy_label }}</p>
+      <p class="v-empty-body">Record HRA allowance credits and monthly rent disbursements to track your pool balance.</p>
+      {% if user.can_edit_hra %}
+      <button type="button" class="v-btn v-btn-primary !min-h-11 lg:!min-h-9 text-xs gap-1.5 mt-3 cursor-pointer" onclick="newHraEntry()">
+        <span class="material-symbols-outlined text-base">add_circle</span><span>Add First Entry</span>
+      </button>
+      {% endif %}
+    </div>
+    {% endif %}
+  </section>
+
 </div>
 
 {% if user.can_edit_hra %}
-{# ——— ADD/EDIT MODAL ——— #}
-<dialog class="modal" id="addTxnModal">
-  <div class="modal-box">
-    <h3 class="font-bold text-lg flex items-center gap-2" id="hraModalTitle">
-      <span class="material-symbols-outlined text-primary">add_circle</span>Add HRA Entry
-    </h3>
-    <form id="addHraForm" method="post" action="{% url 'add_hra_entry' %}">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
-      <div class="grid grid-cols-2 gap-4 mt-4">
-        <div class="form-field"><label class="label text-xs font-semibold">Date</label>{{ txn_form.date }}</div>
-        <div class="form-field"><label class="label text-xs font-semibold">Entry Type</label>{{ txn_form.type }}</div>
-      </div>
-      <div class="grid grid-cols-2 gap-4 mt-3">
-        <div class="form-field"><label class="label text-xs font-semibold">Amount (₹)</label>{{ txn_form.amount }}</div>
+{# --- ADD/EDIT MODAL --- #}
+<dialog class="modal modal-bottom sm:modal-middle" id="addTxnModal">
+  <div class="modal-box max-w-md rounded-t-2xl sm:rounded-2xl bg-base-100 border border-[var(--v-hairline)] p-5">
+    <div class="v-modal-header flex items-center justify-between gap-2 pb-3 border-b border-[var(--v-hairline)]">
+      <h3 class="font-bold text-base flex items-center gap-2 truncate" id="hraModalTitle">
+        <span class="material-symbols-outlined text-primary">add_circle</span>Add HRA Entry
+      </h3>
+      <button type="button" class="v-icon-btn btn btn-ghost btn-sm btn-circle !min-h-11 !min-w-11 lg:!min-h-9 lg:!min-w-9 text-base-content/60 hover:text-base-content cursor-pointer" onclick="closeModal('addTxnModal')" aria-label="Close">
+        <span class="material-symbols-outlined text-lg">close</span>
+      </button>
+    </div>
+
+    <form id="addHraForm" method="post" action="{% url 'add_hra_entry' %}">
+      {% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
         <div class="form-field">
-          <label class="label text-xs font-semibold">Mode of Payment</label>
-          <select id="mode_select" class="select select-bordered select-sm w-full" onchange="handleModeChange()">
+          <label class="block text-xs font-semibold text-base-content/75 mb-1" for="id_date">Date</label>
+          {{ txn_form.date }}
+        </div>
+        <div class="form-field">
+          <label class="block text-xs font-semibold text-base-content/75 mb-1" for="id_type">Entry Type</label>
+          {{ txn_form.type }}
+        </div>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+        <div class="form-field">
+          <label class="block text-xs font-semibold text-base-content/75 mb-1" for="id_amount">Amount (₹)</label>
+          {{ txn_form.amount }}
+        </div>
+        <div class="form-field">
+          <label class="block text-xs font-semibold text-base-content/75 mb-1" for="mode_select">Mode of Payment</label>
+          <select id="mode_select" class="v-input min-h-11 text-base sm:text-sm" onchange="handleModeChange()">
             <option value="UPI">UPI</option>
             <option value="Credit Card">Credit Card</option>
             <option value="Net Banking">Net Banking</option>
@@ -202,26 +397,77 @@
                 <option value="{{ metric.mode_of_payment }}">{{ metric.mode_of_payment }}</option>
               {% endif %}
             {% endfor %}
-            <option value="_NEW_">+ Add New...</option>
+            <option value="_NEW_">+ Add New…</option>
           </select>
-          <input type="text" id="id_mode_of_payment" name="mode_of_payment" class="input input-bordered input-sm w-full mt-2 hidden" placeholder="Custom mode">
+          <input type="text" id="id_mode_of_payment" name="mode_of_payment" class="v-input min-h-11 text-base sm:text-sm mt-2 hidden" placeholder="Custom payment mode">
         </div>
       </div>
-      <div class="form-field mt-3"><label class="label text-xs font-semibold">Description / Title</label>{{ txn_form.expense_type }}</div>
-      <div class="form-field mt-3"><label class="label text-xs font-semibold">Remarks (Optional)</label>{{ txn_form.remarks }}</div>
-      <div class="modal-action">
-        <button type="button" id="hraDeleteBtn" class="btn btn-error btn-sm mr-auto" style="display:none" onclick="confirmDelete('deleteHraForm')">
-          <span class="material-symbols-outlined text-base">delete</span>Delete
+      <div class="mt-3 form-field">
+        <label class="block text-xs font-semibold text-base-content/75 mb-1" for="id_expense_type">Description / Title</label>
+        {{ txn_form.expense_type }}
+      </div>
+      <div class="mt-3 form-field">
+        <label class="block text-xs font-semibold text-base-content/75 mb-1" for="id_remarks">Remarks <span class="font-normal text-base-content/45">optional</span></label>
+        {{ txn_form.remarks }}
+      </div>
+      <div class="v-modal-footer modal-action mt-5 pt-3 border-t border-base-content/10 flex items-center justify-between gap-2">
+        <button type="button" id="hraDeleteBtn" class="v-btn v-btn-ghost !min-h-11 lg:!min-h-9 text-xs text-rose-400 px-3 cursor-pointer" style="display:none" onclick="confirmDelete('deleteHraForm')">
+          <span class="material-symbols-outlined text-sm">delete</span>Delete
         </button>
-        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('addTxnModal')">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm">Save Entry</button>
+        <div class="flex items-center gap-2 ml-auto">
+          <button type="button" class="v-btn v-btn-ghost !min-h-11 lg:!min-h-9 text-xs px-3.5 cursor-pointer" onclick="closeModal('addTxnModal')">Cancel</button>
+          <button type="submit" class="v-btn v-btn-primary !min-h-11 lg:!min-h-9 text-xs px-4 gap-1 cursor-pointer">
+            <span class="material-symbols-outlined text-sm">save</span>Save Entry
+          </button>
+        </div>
       </div>
     </form>
     <form id="deleteHraForm" method="post" action="" style="display:none">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form>
   </div>
   <form method="dialog" class="modal-backdrop"><button>close</button></form>
 </dialog>
+
+<script>
+(function() {
+  var amtEl = document.getElementById('id_amount');
+  if (amtEl) {
+    amtEl.setAttribute('inputmode', 'decimal');
+    amtEl.classList.add('v-input', 'tabular-nums');
+  }
+})();
+</script>
 {% endif %}
+
+<script>
+(function() {
+  var bar = document.getElementById('hraHorizonBar');
+  if (bar) {
+    var added = Math.max(0, parseFloat(bar.getAttribute('data-added')) || 0);
+    var spent = Math.max(0, parseFloat(bar.getAttribute('data-spent')) || 0);
+    var sum = added + spent;
+    if (sum > 0) {
+      var addPct = Math.round((added / sum) * 1000) / 10;
+      var segA = document.getElementById('hraSegAdded');
+      var segS = document.getElementById('hraSegSpent');
+      if (segA) segA.style.width = addPct + '%';
+      if (segS) segS.style.width = Math.max(0, 100 - addPct) + '%';
+    }
+  }
+
+  var modeList = document.getElementById('hraModeList');
+  if (modeList) {
+    var totalSpent = Math.max(0, parseFloat(modeList.getAttribute('data-total-spent')) || 0);
+    modeList.querySelectorAll('[data-mode-amount]').forEach(function(row) {
+      var val = Math.max(0, parseFloat(row.getAttribute('data-mode-amount')) || 0);
+      var pct = totalSpent > 0 ? Math.min(100, Math.round((val / totalSpent) * 100)) : 0;
+      var barEl = row.querySelector('.hra-mode-bar');
+      var pctEl = row.querySelector('.hra-mode-pct');
+      if (barEl) barEl.style.width = pct + '%';
+      if (pctEl && totalSpent > 0) pctEl.textContent = pct + '%';
+    });
+  }
+})();
+</script>
 
 {% endblock %}
 
@@ -276,6 +522,47 @@ function editHraEntry(id, date, type, amount, mode, desc, remarks) {
   openModal('addTxnModal');
 }
 {% endif %}
+
+var _activeHraType = 'ALL';
+function filterHraRows(type, btnEl) {
+  if (type) {
+    _activeHraType = type;
+    document.querySelectorAll('.hra-type-pill').forEach(function(b) {
+      b.classList.toggle('is-active', b === btnEl);
+    });
+  }
+  var q = ((document.getElementById('hraSearchInput') || {}).value || '').trim().toLowerCase();
+  var isFiltering = _activeHraType !== 'ALL' || q.length > 0;
+  var pager = document.getElementById('hraTable_pager');
+
+  if (!isFiltering) {
+    document.querySelectorAll('.hra-desk-row, .hra-mob-row').forEach(function(el) { el.style.display = ''; });
+    var emptyReset = document.getElementById('hraFilterEmpty');
+    if (emptyReset) { emptyReset.classList.add('hidden'); emptyReset.classList.remove('flex'); }
+    if (pager) pager.remove();
+    initPagination('hraTable', window.innerWidth <= 640 ? 7 : 15);
+    return;
+  }
+
+  if (pager) pager.style.display = 'none';
+  var visible = 0;
+  document.querySelectorAll('.hra-desk-row').forEach(function(el) {
+    var ok = (_activeHraType === 'ALL' || el.getAttribute('data-type') === _activeHraType) &&
+             (!q || (el.getAttribute('data-search') || '').indexOf(q) !== -1);
+    el.style.display = ok ? '' : 'none';
+    if (ok) visible++;
+  });
+  document.querySelectorAll('.hra-mob-row').forEach(function(el) {
+    var ok = (_activeHraType === 'ALL' || el.getAttribute('data-type') === _activeHraType) &&
+             (!q || (el.getAttribute('data-search') || '').indexOf(q) !== -1);
+    el.style.display = ok ? '' : 'none';
+  });
+  var emptyEl = document.getElementById('hraFilterEmpty');
+  if (emptyEl) {
+    emptyEl.classList.toggle('hidden', visible > 0);
+    emptyEl.classList.toggle('flex', visible === 0);
+  }
+}
 
 document.addEventListener('DOMContentLoaded', function() {
   initPagination('hraTable', window.innerWidth <= 640 ? 7 : 15);

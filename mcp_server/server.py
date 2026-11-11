@@ -56,7 +56,7 @@ from tracker.models import (  # noqa: E402
     MonthlySavingsComment,
 )
 from portfolio.models import (  # noqa: E402
-    ZerodhaAccount, EPFEntry, PFEntry, NPSEntry, FixedDeposit, CashPosition,
+    StockHolding, MutualFundHolding, EPFEntry, PFEntry, NPSEntry, FixedDeposit, CashPosition,
     BondHolding, CryptoHolding, CommodityHolding,
     CommodityPrice, MonthlySnapshot,
     FinancialGoal as PortfolioGoal, USStockHolding,
@@ -110,18 +110,46 @@ def _to_json(data) -> str:
 
 
 def _get_group():
-    """Return the first AccountGroup (single-tenant app)."""
-    return AccountGroup.objects.first()
+    """Return the active OAuth user's AccountGroup, or the first AccountGroup in stdio mode."""
+    from mcp_server.middleware import current_mcp_user
+    ctx_user = current_mcp_user.get()
+    if ctx_user is not None:
+        return ctx_user.group
+    return AccountGroup.objects.order_by('pk').first()
 
 
 def _get_primary_user():
-    """Return the primary user for write operations."""
-    return User.objects.filter(user_type='PRIMARY').first()
+    """Return the primary user for the served household group (never cross-household)."""
+    from mcp_server.middleware import current_mcp_user
+    ctx_user = current_mcp_user.get()
+    if ctx_user is not None:
+        return ctx_user if getattr(ctx_user, 'is_primary', False) else None
+    group = _get_group()
+    if not group:
+        return None
+    return User.objects.filter(user_type='PRIMARY', group=group).order_by('pk').first()
 
 
-def _parse_date(date_str: str) -> datetime.date:
-    """Parse a date string in YYYY-MM-DD format."""
-    return datetime.date.fromisoformat(date_str)
+def _group_qs(model, group):
+    """Fail-closed queryset helper: empty queryset when no household group exists."""
+    return model.objects.filter(group=group) if group else model.objects.none()
+
+
+def _group_get(model, pk, group):
+    """Fail-closed single-object lookup: raises model.DoesNotExist when group is None."""
+    if not group:
+        raise model.DoesNotExist
+    return model.objects.get(pk=pk, group=group)
+
+
+def _parse_date(date_str: str, default: datetime.date | None = None) -> datetime.date:
+    """Parse a date string in YYYY-MM-DD format safely."""
+    if not date_str:
+        return default or datetime.date.today()
+    try:
+        return datetime.date.fromisoformat(str(date_str).strip())
+    except (ValueError, TypeError):
+        return default or datetime.date.today()
 
 
 def _parse_decimal(value) -> Decimal:
@@ -239,20 +267,20 @@ def portfolio_summary() -> str:
 def portfolio_stocks() -> str:
     """All stock holdings across all Zerodha accounts."""
     group = _get_group()
-    accounts = ZerodhaAccount.objects.filter(group=group) if group else ZerodhaAccount.objects.all()
-    result = []
-    for acct in accounts:
-        for h in acct.stock_holdings.all():
-            result.append({
-                'account': acct.name,
-                'symbol': h.symbol,
-                'quantity': h.quantity,
-                'purchase_value': str(h.purchase_value),
-                'current_value': str(h.current_value),
-                'pnl': str(h.pnl),
-                'pnl_pct': str(h.pnl_pct),
-                'is_baby': h.is_baby,
-            })
+    holdings = (
+        StockHolding.objects.select_related('account').filter(account__group=group)
+        if group else StockHolding.objects.none()
+    )
+    result = [{
+        'account': h.account.name,
+        'symbol': h.symbol,
+        'quantity': h.quantity,
+        'purchase_value': str(h.purchase_value),
+        'current_value': str(h.current_value),
+        'pnl': str(h.pnl),
+        'pnl_pct': str(h.pnl_pct),
+        'is_baby': h.is_baby,
+    } for h in holdings]
     return _to_json(result)
 
 
@@ -260,21 +288,21 @@ def portfolio_stocks() -> str:
 def portfolio_mutual_funds() -> str:
     """All mutual fund holdings (index + other) across all Zerodha accounts."""
     group = _get_group()
-    accounts = ZerodhaAccount.objects.filter(group=group) if group else ZerodhaAccount.objects.all()
-    result = []
-    for acct in accounts:
-        for h in acct.mf_holdings.all():
-            result.append({
-                'account': acct.name,
-                'fund_name': h.fund_name,
-                'fund_type': h.fund_type,
-                'units': str(h.units),
-                'purchase_value': str(h.purchase_value),
-                'current_value': str(h.current_value),
-                'pnl': str(h.pnl),
-                'pnl_pct': str(h.pnl_pct),
-                'is_baby': h.is_baby,
-            })
+    holdings = (
+        MutualFundHolding.objects.select_related('account').filter(account__group=group)
+        if group else MutualFundHolding.objects.none()
+    )
+    result = [{
+        'account': h.account.name,
+        'fund_name': h.fund_name,
+        'fund_type': h.fund_type,
+        'units': str(h.units),
+        'purchase_value': str(h.purchase_value),
+        'current_value': str(h.current_value),
+        'pnl': str(h.pnl),
+        'pnl_pct': str(h.pnl_pct),
+        'is_baby': h.is_baby,
+    } for h in holdings]
     return _to_json(result)
 
 
@@ -282,7 +310,7 @@ def portfolio_mutual_funds() -> str:
 def portfolio_epf() -> str:
     """EPF entries and running balance."""
     group = _get_group()
-    qs = EPFEntry.objects.filter(group=group) if group else EPFEntry.objects.all()
+    qs = _group_qs(EPFEntry, group)
     entries = [_model_to_dict(e) for e in qs[:50]]
     total_contrib = qs.filter(entry_type='CONTRIBUTION').aggregate(t=Sum('amount'))['t'] or _ZERO
     total_interest = qs.filter(entry_type='INTEREST').aggregate(t=Sum('amount'))['t'] or _ZERO
@@ -299,7 +327,7 @@ def portfolio_pf() -> str:
     """PF (Provident Fund / PPF) entries and per-member running balances."""
     group = _get_group()
     pf = _fetch_pf_summary(group=group, is_baby=False)
-    qs = PFEntry.objects.filter(group=group) if group else PFEntry.objects.all()
+    qs = _group_qs(PFEntry, group)
     entries = [_model_to_dict(e) for e in qs[:100]]
     return _to_json({
         'total_contribution': str(pf['pf_total_contrib']),
@@ -323,7 +351,7 @@ def portfolio_pf() -> str:
 def portfolio_nps() -> str:
     """NPS entries and current balance."""
     group = _get_group()
-    qs = NPSEntry.objects.filter(group=group) if group else NPSEntry.objects.all()
+    qs = _group_qs(NPSEntry, group)
     latest = qs.order_by('-date', '-created_at').first()
     entries = [_model_to_dict(e) for e in qs[:50]]
     return _to_json({
@@ -338,7 +366,7 @@ def portfolio_nps() -> str:
 def portfolio_fixed_deposits() -> str:
     """All fixed deposits (active and inactive)."""
     group = _get_group()
-    qs = FixedDeposit.objects.filter(group=group) if group else FixedDeposit.objects.all()
+    qs = _group_qs(FixedDeposit, group)
     result = []
     for fd in qs:
         d = _model_to_dict(fd)
@@ -354,7 +382,7 @@ def portfolio_fixed_deposits() -> str:
 def portfolio_cash() -> str:
     """Cash positions."""
     group = _get_group()
-    qs = CashPosition.objects.filter(group=group) if group else CashPosition.objects.all()
+    qs = _group_qs(CashPosition, group)
     return _to_json([_model_to_dict(c) for c in qs])
 
 
@@ -362,7 +390,7 @@ def portfolio_cash() -> str:
 def portfolio_bonds() -> str:
     """Bond holdings."""
     group = _get_group()
-    qs = BondHolding.objects.filter(group=group) if group else BondHolding.objects.all()
+    qs = _group_qs(BondHolding, group)
     return _to_json([_model_to_dict(b) for b in qs])
 
 
@@ -370,7 +398,7 @@ def portfolio_bonds() -> str:
 def portfolio_crypto() -> str:
     """Crypto holdings."""
     group = _get_group()
-    qs = CryptoHolding.objects.filter(group=group) if group else CryptoHolding.objects.all()
+    qs = _group_qs(CryptoHolding, group)
     result = []
     for c in qs:
         d = _model_to_dict(c)
@@ -383,7 +411,7 @@ def portfolio_crypto() -> str:
 def portfolio_commodities() -> str:
     """Commodity (gold/silver) holdings with current market prices."""
     group = _get_group()
-    qs = CommodityHolding.objects.filter(group=group) if group else CommodityHolding.objects.all()
+    qs = _group_qs(CommodityHolding, group)
     prices = {p.commodity_type: str(p.rate_per_gram) for p in CommodityPrice.objects.all()}
     result = []
     for h in qs:
@@ -399,7 +427,7 @@ def portfolio_commodities() -> str:
 def portfolio_us_stocks() -> str:
     """US stock (RSU) holdings."""
     group = _get_group()
-    qs = USStockHolding.objects.filter(group=group) if group else USStockHolding.objects.all()
+    qs = _group_qs(USStockHolding, group)
     result = []
     for h in qs:
         d = _model_to_dict(h)
@@ -415,7 +443,7 @@ def portfolio_us_stocks() -> str:
 def portfolio_real_estate() -> str:
     """Real estate property investments (land, plots, apartments, commercial)."""
     group = _get_group()
-    qs = RealEstateHolding.objects.filter(group=group) if group else RealEstateHolding.objects.all()
+    qs = _group_qs(RealEstateHolding, group)
     result = []
     for h in qs:
         d = _model_to_dict(h)
@@ -439,7 +467,7 @@ def portfolio_real_estate() -> str:
 def portfolio_goals() -> str:
     """Portfolio financial goals and progress."""
     group = _get_group()
-    qs = PortfolioGoal.objects.filter(group=group) if group else PortfolioGoal.objects.all()
+    qs = _group_qs(PortfolioGoal, group)
     return _to_json([_model_to_dict(g) for g in qs])
 
 
@@ -447,7 +475,7 @@ def portfolio_goals() -> str:
 def portfolio_snapshots() -> str:
     """Monthly portfolio snapshots (growth data). Returns last 24 months."""
     group = _get_group()
-    qs = MonthlySnapshot.objects.filter(group=group) if group else MonthlySnapshot.objects.all()
+    qs = _group_qs(MonthlySnapshot, group)
     result = []
     for s in qs[:24]:
         d = _model_to_dict(s)
@@ -527,11 +555,11 @@ def tracker_goals() -> str:
 
 @mcp.resource("vault://tracker/notes")
 def tracker_notes() -> str:
-    """Personal notes (last 100)."""
+    """Personal notes for the primary user (last 100)."""
     user = _get_primary_user()
     if not user:
         return _to_json({'error': 'No primary user found.'})
-    qs = Note.objects.filter(user__group=user.group)[:100]
+    qs = Note.objects.filter(user=user)[:100]
     return _to_json([_model_to_dict(n) for n in qs])
 
 
@@ -539,8 +567,7 @@ def tracker_notes() -> str:
 def jewellery_items() -> str:
     """All jewellery items with estimated values."""
     group = _get_group()
-    qs = JewelleryItem.objects.filter(group=group) if group else JewelleryItem.objects.all()
-    qs = list(qs)
+    qs = list(_group_qs(JewelleryItem, group))
     JewelleryItem.attach_rates(qs)
     result = []
     for item in qs:
@@ -556,9 +583,11 @@ def mcp_audit_log() -> str:
     """Recent MCP audit log entries (last 50)."""
     from .audit import _entry_belongs_to_group
     group = _get_group()
+    if group is None:
+        return _to_json([])
     result = []
     for e in MCPAuditLog.objects.all()[:150]:
-        if group is not None and not _entry_belongs_to_group(e, group):
+        if not _entry_belongs_to_group(e, group):
             continue
         result.append({
             'id': e.id,
@@ -597,25 +626,24 @@ def get_portfolio_stocks(symbol: str = "", account_name: str = "") -> str:
         account_name: Optional Zerodha account name filter
     """
     group = _get_group()
-    accounts = ZerodhaAccount.objects.filter(group=group) if group else ZerodhaAccount.objects.all()
+    qs = (
+        StockHolding.objects.select_related('account').filter(account__group=group)
+        if group else StockHolding.objects.none()
+    )
     if account_name:
-        accounts = accounts.filter(name__icontains=account_name)
-    result = []
-    for acct in accounts:
-        holdings = acct.stock_holdings.all()
-        if symbol:
-            holdings = holdings.filter(symbol__icontains=symbol)
-        for h in holdings:
-            result.append({
-                'account': acct.name,
-                'symbol': h.symbol,
-                'quantity': h.quantity,
-                'purchase_value': str(h.purchase_value),
-                'current_value': str(h.current_value),
-                'pnl': str(h.pnl),
-                'pnl_pct': str(h.pnl_pct),
-                'is_baby': h.is_baby,
-            })
+        qs = qs.filter(account__name__icontains=account_name)
+    if symbol:
+        qs = qs.filter(symbol__icontains=symbol)
+    result = [{
+        'account': h.account.name,
+        'symbol': h.symbol,
+        'quantity': h.quantity,
+        'purchase_value': str(h.purchase_value),
+        'current_value': str(h.current_value),
+        'pnl': str(h.pnl),
+        'pnl_pct': str(h.pnl_pct),
+        'is_baby': h.is_baby,
+    } for h in qs]
     return _to_json(result)
 
 
@@ -628,26 +656,25 @@ def get_portfolio_mutual_funds(fund_name: str = "", account_name: str = "") -> s
         account_name: Optional account name filter
     """
     group = _get_group()
-    accounts = ZerodhaAccount.objects.filter(group=group) if group else ZerodhaAccount.objects.all()
+    qs = (
+        MutualFundHolding.objects.select_related('account').filter(account__group=group)
+        if group else MutualFundHolding.objects.none()
+    )
     if account_name:
-        accounts = accounts.filter(name__icontains=account_name)
-    result = []
-    for acct in accounts:
-        holdings = acct.mf_holdings.all()
-        if fund_name:
-            holdings = holdings.filter(fund_name__icontains=fund_name)
-        for h in holdings:
-            result.append({
-                'account': acct.name,
-                'fund_name': h.fund_name,
-                'fund_type': h.fund_type,
-                'units': str(h.units),
-                'purchase_value': str(h.purchase_value),
-                'current_value': str(h.current_value),
-                'pnl': str(h.pnl),
-                'pnl_pct': str(h.pnl_pct),
-                'is_baby': h.is_baby,
-            })
+        qs = qs.filter(account__name__icontains=account_name)
+    if fund_name:
+        qs = qs.filter(fund_name__icontains=fund_name)
+    result = [{
+        'account': h.account.name,
+        'fund_name': h.fund_name,
+        'fund_type': h.fund_type,
+        'units': str(h.units),
+        'purchase_value': str(h.purchase_value),
+        'current_value': str(h.current_value),
+        'pnl': str(h.pnl),
+        'pnl_pct': str(h.pnl_pct),
+        'is_baby': h.is_baby,
+    } for h in qs]
     return _to_json(result)
 
 
@@ -666,7 +693,7 @@ def get_pf_details(account_name: str = "") -> str:
     """
     group = _get_group()
     pf = _fetch_pf_summary(group=group, is_baby=False)
-    qs = PFEntry.objects.filter(group=group) if group else PFEntry.objects.all()
+    qs = _group_qs(PFEntry, group)
     if account_name:
         qs = qs.filter(account_name__icontains=account_name.strip())
     entries = [_model_to_dict(e) for e in qs[:100]]
@@ -703,7 +730,7 @@ def get_fixed_deposits(is_active_only: bool = True) -> str:
         is_active_only: Whether to return only active FDs (default: True)
     """
     group = _get_group()
-    qs = FixedDeposit.objects.filter(group=group) if group else FixedDeposit.objects.all()
+    qs = _group_qs(FixedDeposit, group)
     if is_active_only:
         qs = qs.filter(is_active=True)
     result = []
@@ -762,7 +789,7 @@ def get_real_estate_detail(holding_id: int) -> str:
     """
     group = _get_group()
     try:
-        h = RealEstateHolding.objects.get(pk=holding_id, group=group) if group else RealEstateHolding.objects.get(pk=holding_id)
+        h = _group_get(RealEstateHolding, holding_id, group)
     except RealEstateHolding.DoesNotExist:
         return f"Error: RealEstateHolding #{holding_id} not found."
 
@@ -792,7 +819,7 @@ def get_real_estate_llm_prompt(holding_id: int) -> str:
     """
     group = _get_group()
     try:
-        h = RealEstateHolding.objects.get(pk=holding_id, group=group) if group else RealEstateHolding.objects.get(pk=holding_id)
+        h = _group_get(RealEstateHolding, holding_id, group)
     except RealEstateHolding.DoesNotExist:
         return f"Error: RealEstateHolding #{holding_id} not found."
 
@@ -814,7 +841,7 @@ def get_portfolio_snapshots(limit: int = 12) -> str:
     """
     limit = min(max(1, limit), 60)
     group = _get_group()
-    qs = MonthlySnapshot.objects.filter(group=group) if group else MonthlySnapshot.objects.all()
+    qs = _group_qs(MonthlySnapshot, group)
     result = []
     for s in qs[:limit]:
         d = _model_to_dict(s)
@@ -834,8 +861,7 @@ def get_ai_insights(limit: int = 1) -> str:
     """
     limit = min(max(1, limit), 10)
     group = _get_group()
-    qs = PortfolioInsight.objects.filter(group=group) if group else PortfolioInsight.objects.all()
-    qs = qs.order_by('-generated_at')[:limit]
+    qs = _group_qs(PortfolioInsight, group).order_by('-generated_at')[:limit]
     result = []
     for insight in qs:
         entry = {
@@ -871,7 +897,7 @@ def get_ai_insight_status() -> str:
     else:
         cooldown_days = InsightGenerationSettings.get_solo().cooldown_days
 
-    qs = PortfolioInsight.objects.filter(group=group) if group else PortfolioInsight.objects.all()
+    qs = _group_qs(PortfolioInsight, group)
     latest = qs.order_by('-generated_at').first()
 
     if not latest:
@@ -939,21 +965,23 @@ def trigger_ai_insights(force: bool = False) -> str:
     from django.conf import settings as _settings
 
     group = _get_group()
+    if not group:
+        return _to_json({'status': 'error', 'message': 'No household group configured.'})
+    try:
+        if not group.config.has_feature('ai_insights'):
+            return _to_json({'status': 'error', 'message': 'AI insights feature is disabled for this household.'})
+    except Exception:
+        pass
 
     # ── Cooldown check (per-household) ──
     if not force:
         is_debug = _settings.DEBUG
-        cooldown_days = 30
-        if group:
-            try:
-                cooldown_days = group.config.ai_cooldown_days
-            except Exception:
-                cooldown_days = InsightGenerationSettings.get_solo().cooldown_days
-        else:
+        try:
+            cooldown_days = group.config.ai_cooldown_days
+        except Exception:
             cooldown_days = InsightGenerationSettings.get_solo().cooldown_days
 
-        latest = PortfolioInsight.objects.filter(group=group).order_by('-generated_at').first() if group \
-            else PortfolioInsight.objects.order_by('-generated_at').first()
+        latest = PortfolioInsight.objects.filter(group=group).order_by('-generated_at').first()
 
         if latest and not is_debug:
             cooldown_td = datetime.timedelta(days=cooldown_days)
@@ -994,10 +1022,11 @@ def trigger_ai_insights(force: bool = False) -> str:
             'insights': result.insights_dict,
         })
     except Exception as e:
+        from pftracker.ai_gateway import scrub_diagnostics
         logger.exception('AI insight generation failed via MCP')
         return _to_json({
             'status': 'error',
-            'message': f'AI insight generation failed: {str(e)}',
+            'message': f'AI insight generation failed: {scrub_diagnostics(str(e))[:200]}',
         })
 
 
@@ -1092,7 +1121,7 @@ def get_notes(
     user = _get_primary_user()
     if not user:
         return _to_json({'error': 'No primary user found.'})
-    qs = Note.objects.filter(user__group=user.group)
+    qs = Note.objects.filter(user=user)
     if section:
         qs = qs.filter(section__icontains=section)
     if pending_only:
@@ -1114,7 +1143,7 @@ def get_jewellery_items(
         location: Optional filter ('BANK_LOCKER', 'HOME_SAFE')
     """
     group = _get_group()
-    qs = JewelleryItem.objects.filter(group=group) if group else JewelleryItem.objects.all()
+    qs = _group_qs(JewelleryItem, group)
     if category:
         qs = qs.filter(category=category.upper())
     if metal_type:
@@ -1205,8 +1234,10 @@ def update_transaction(
         remarks: Updated remarks (optional)
     """
     user = _get_primary_user()
+    if not user:
+        return "Error: No primary user found."
     try:
-        txn = Transaction.objects.get(pk=txn_id, user=user) if user else Transaction.objects.get(pk=txn_id)
+        txn = Transaction.objects.get(pk=txn_id, user__group=user.group)
     except Transaction.DoesNotExist:
         return f"Error: Transaction #{txn_id} not found."
 
@@ -1288,8 +1319,10 @@ def update_hra_entry(
         remarks: Updated remarks (optional)
     """
     user = _get_primary_user()
+    if not user:
+        return "Error: No primary user found."
     try:
-        entry = HRAExpense.objects.get(pk=entry_id, user=user) if user else HRAExpense.objects.get(pk=entry_id)
+        entry = HRAExpense.objects.get(pk=entry_id, user__group=user.group)
     except HRAExpense.DoesNotExist:
         return f"Error: HRA expense #{entry_id} not found."
 
@@ -1373,9 +1406,11 @@ def update_note(
         amount: New amount (leave empty to keep current)
         is_done: Mark as done (for todo-type notes)
     """
-    group = _get_group()
+    user = _get_primary_user()
+    if not user:
+        return "Error: No primary user found."
     try:
-        note = Note.objects.get(pk=note_id, user__group=group) if group else Note.objects.get(pk=note_id)
+        note = Note.objects.get(pk=note_id, user=user)
     except Note.DoesNotExist:
         return f"Error: Note #{note_id} not found."
 
@@ -1413,6 +1448,8 @@ def add_epf_entry(
         remarks: Optional remarks
     """
     group = _get_group()
+    if not group:
+        return "Error: No household group configured."
     if entry_type.upper() not in ('CONTRIBUTION', 'INTEREST'):
         return "Error: entry_type must be CONTRIBUTION or INTEREST"
 
@@ -1447,7 +1484,7 @@ def update_epf_entry(
     """
     group = _get_group()
     try:
-        entry = EPFEntry.objects.get(pk=entry_id, group=group) if group else EPFEntry.objects.get(pk=entry_id)
+        entry = _group_get(EPFEntry, entry_id, group)
     except EPFEntry.DoesNotExist:
         return f"Error: EPF entry #{entry_id} not found."
 
@@ -1494,6 +1531,8 @@ def add_pf_entry(
         is_baby: Track in Child portfolio (default: False)
     """
     group = _get_group()
+    if not group:
+        return "Error: No household group configured."
     clean_member = (account_name or "").strip()
     if not clean_member:
         return "Error: account_name is required (e.g. 'Atul', 'Kanika')"
@@ -1604,7 +1643,7 @@ def update_pf_entry(
     """
     group = _get_group()
     try:
-        entry = PFEntry.objects.get(pk=entry_id, group=group) if group else PFEntry.objects.get(pk=entry_id)
+        entry = _group_get(PFEntry, entry_id, group)
     except PFEntry.DoesNotExist:
         return f"Error: PF entry #{entry_id} not found."
 
@@ -1664,6 +1703,8 @@ def add_nps_entry(
         remarks: Optional remarks
     """
     group = _get_group()
+    if not group:
+        return "Error: No household group configured."
     entry = NPSEntry(
         group=group,
         date=_parse_date(date),
@@ -1698,7 +1739,7 @@ def update_nps_entry(
     """
     group = _get_group()
     try:
-        entry = NPSEntry.objects.get(pk=entry_id, group=group) if group else NPSEntry.objects.get(pk=entry_id)
+        entry = _group_get(NPSEntry, entry_id, group)
     except NPSEntry.DoesNotExist:
         return f"Error: NPS entry #{entry_id} not found."
 
@@ -1745,6 +1786,8 @@ def add_fixed_deposit(
         remarks: Optional remarks
     """
     group = _get_group()
+    if not group:
+        return "Error: No household group configured."
     valid_comp = ['SIMPLE', 'MONTHLY', 'QUARTERLY', 'ANNUAL']
     if compounding.upper() not in valid_comp:
         return f"Error: compounding must be one of {valid_comp}"
@@ -1785,7 +1828,7 @@ def update_fixed_deposit(
     """
     group = _get_group()
     try:
-        fd = FixedDeposit.objects.get(pk=fd_id, group=group) if group else FixedDeposit.objects.get(pk=fd_id)
+        fd = _group_get(FixedDeposit, fd_id, group)
     except FixedDeposit.DoesNotExist:
         return f"Error: FD #{fd_id} not found."
 
@@ -1814,6 +1857,8 @@ def add_cash_position(
         is_baby: Track in Child portfolio (default: false)
     """
     group = _get_group()
+    if not group:
+        return "Error: No household group configured."
     pos = CashPosition(
         group=group,
         name=name,
@@ -1843,7 +1888,7 @@ def update_cash_position(
     """
     group = _get_group()
     try:
-        pos = CashPosition.objects.get(pk=position_id, group=group) if group else CashPosition.objects.get(pk=position_id)
+        pos = _group_get(CashPosition, position_id, group)
     except CashPosition.DoesNotExist:
         return f"Error: Cash position #{position_id} not found."
 
@@ -1875,6 +1920,8 @@ def add_bond_holding(
         is_baby: Track in Child portfolio (default: false)
     """
     group = _get_group()
+    if not group:
+        return "Error: No household group configured."
     bond = BondHolding(
         group=group,
         account_name=account_name,
@@ -1902,7 +1949,7 @@ def update_bond_holding(
     """
     group = _get_group()
     try:
-        bond = BondHolding.objects.get(pk=bond_id, group=group) if group else BondHolding.objects.get(pk=bond_id)
+        bond = _group_get(BondHolding, bond_id, group)
     except BondHolding.DoesNotExist:
         return f"Error: Bond #{bond_id} not found."
 
@@ -1934,6 +1981,8 @@ def add_crypto_holding(
         is_baby: Track in Child portfolio (default: false)
     """
     group = _get_group()
+    if not group:
+        return "Error: No household group configured."
     crypto = CryptoHolding(
         group=group,
         name=name,
@@ -1964,7 +2013,7 @@ def update_crypto_holding(
     """
     group = _get_group()
     try:
-        crypto = CryptoHolding.objects.get(pk=crypto_id, group=group) if group else CryptoHolding.objects.get(pk=crypto_id)
+        crypto = _group_get(CryptoHolding, crypto_id, group)
     except CryptoHolding.DoesNotExist:
         return f"Error: Crypto #{crypto_id} not found."
 
@@ -2000,6 +2049,8 @@ def add_commodity_holding(
         is_baby: Track in Child portfolio (default: false)
     """
     group = _get_group()
+    if not group:
+        return "Error: No household group configured."
     if commodity_type.upper() not in ('GOLD', 'SILVER'):
         return "Error: commodity_type must be GOLD or SILVER"
 
@@ -2041,7 +2092,7 @@ def update_commodity_holding(
     """
     group = _get_group()
     try:
-        holding = CommodityHolding.objects.get(pk=holding_id, group=group) if group else CommodityHolding.objects.get(pk=holding_id)
+        holding = _group_get(CommodityHolding, holding_id, group)
     except CommodityHolding.DoesNotExist:
         return f"Error: Commodity holding #{holding_id} not found."
 
@@ -2093,6 +2144,8 @@ def add_us_stock(
     if not re.fullmatch(r'[A-Z0-9.\-]{1,15}', clean_sym):
         return "Error: Invalid stock ticker symbol."
     group = _get_group()
+    if not group:
+        return "Error: No household group configured."
 
     holding = USStockHolding(
         group=group,
@@ -2141,7 +2194,7 @@ def update_us_stock(
     import re
     group = _get_group()
     try:
-        holding = USStockHolding.objects.get(pk=holding_id, group=group) if group else USStockHolding.objects.get(pk=holding_id)
+        holding = _group_get(USStockHolding, holding_id, group)
     except USStockHolding.DoesNotExist:
         return f"Error: US stock holding #{holding_id} not found."
 
@@ -2224,6 +2277,8 @@ def add_real_estate_holding(
         remarks: Notes, builder info, tenant details (optional)
     """
     group = _get_group()
+    if not group:
+        return "Error: No household group configured."
     if google_maps_url:
         from django.core.exceptions import ValidationError
         from django.core.validators import URLValidator
@@ -2307,7 +2362,7 @@ def update_real_estate_holding(
     """
     group = _get_group()
     try:
-        holding = RealEstateHolding.objects.get(pk=holding_id, group=group) if group else RealEstateHolding.objects.get(pk=holding_id)
+        holding = _group_get(RealEstateHolding, holding_id, group)
     except RealEstateHolding.DoesNotExist:
         return f"Error: RealEstateHolding #{holding_id} not found."
 
@@ -2376,7 +2431,7 @@ def update_real_estate_valuation(
     """
     group = _get_group()
     try:
-        holding = RealEstateHolding.objects.get(pk=holding_id, group=group) if group else RealEstateHolding.objects.get(pk=holding_id)
+        holding = _group_get(RealEstateHolding, holding_id, group)
     except RealEstateHolding.DoesNotExist:
         return f"Error: RealEstateHolding #{holding_id} not found."
 
@@ -2420,6 +2475,8 @@ def add_portfolio_goal(
     if financial_year and financial_year != PortfolioGoal.LONG_TERM and fy_start_from_label(financial_year) is None:
         return "Error: financial_year must look like 'FY 2026-27' or 'Long Term'."
     group = _get_group()
+    if not group:
+        return "Error: No household group configured."
     goal = PortfolioGoal(
         group=group,
         label=label,
@@ -2455,7 +2512,7 @@ def update_portfolio_goal(
     """
     group = _get_group()
     try:
-        goal = PortfolioGoal.objects.get(pk=goal_id, group=group) if group else PortfolioGoal.objects.get(pk=goal_id)
+        goal = _group_get(PortfolioGoal, goal_id, group)
     except PortfolioGoal.DoesNotExist:
         return f"Error: PortfolioGoal #{goal_id} not found."
 
@@ -2515,6 +2572,8 @@ def add_jewellery_item(
         notes: Optional notes
     """
     group = _get_group()
+    if not group:
+        return "Error: No household group configured."
     valid_cats = ['CHAIN', 'LOCKET', 'NECKLACE', 'RING', 'BANGLE',
                   'BRACELET', 'EARRINGS', 'COIN', 'OTHER']
     if category.upper() not in valid_cats:
@@ -2568,7 +2627,7 @@ def update_jewellery_item(
     """
     group = _get_group()
     try:
-        item = JewelleryItem.objects.get(pk=item_id, group=group) if group else JewelleryItem.objects.get(pk=item_id)
+        item = _group_get(JewelleryItem, item_id, group)
     except JewelleryItem.DoesNotExist:
         return f"Error: Jewellery item #{item_id} not found."
 
@@ -2634,8 +2693,15 @@ def delete_record(
         return f"Error: Cannot resolve model '{model_name}': {exc}"
 
     group = _get_group()
+    if not group:
+        return "Error: No household group configured."
     field_names = {f.name for f in Model._meta.get_fields()}
-    if 'group' in field_names:
+    if model_name == 'tracker.Note':
+        user = _get_primary_user()
+        if not user:
+            return "Error: No primary user found."
+        scope = {'user': user}
+    elif 'group' in field_names:
         scope = {'group': group}
     elif 'user' in field_names:
         scope = {'user__group': group}
@@ -2664,12 +2730,15 @@ def revert_mcp_change(audit_log_id: int) -> str:
     Args:
         audit_log_id: ID of the MCPAuditLog entry to revert
     """
+    group = _get_group()
+    if not group:
+        return "Error: No household group configured."
     try:
         entry = MCPAuditLog.objects.get(pk=audit_log_id)
     except MCPAuditLog.DoesNotExist:
         return f"Error: Audit log entry #{audit_log_id} not found."
 
-    result = revert_entry(entry, group=_get_group())
+    result = revert_entry(entry, group=group)
     return _to_json({'status': 'reverted', 'detail': result})
 
 
@@ -2689,6 +2758,8 @@ def list_mcp_audit_log(
     from .audit import _entry_belongs_to_group
     limit = min(max(1, limit), 100)
     group = _get_group()
+    if group is None:
+        return _to_json({'count': 0, 'entries': []})
     qs = MCPAuditLog.objects.all()
     if action:
         qs = qs.filter(action=action.upper())
@@ -2696,7 +2767,7 @@ def list_mcp_audit_log(
         qs = qs.filter(model_name=model_name)
     entries = []
     for e in qs[:limit * 3]:
-        if group is not None and not _entry_belongs_to_group(e, group):
+        if not _entry_belongs_to_group(e, group):
             continue
         entries.append({
             'id': e.id,
@@ -2726,6 +2797,8 @@ def do_refresh_commodity_prices() -> str:
 def do_refresh_us_stock_prices() -> str:
     """Trigger a refresh of US stock (RSU) prices and USD/INR rate."""
     group = _get_group()
+    if not group:
+        return _to_json({'status': 'failed', 'detail': 'No household group configured.'})
     result = _refresh_us_stock_prices(group=group)
     if result:
         return _to_json({'status': 'refreshed', 'detail': result})

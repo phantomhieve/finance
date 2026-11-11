@@ -1,36 +1,67 @@
-document.addEventListener('click', function(e) {
-  var th = e.target.closest('.sortable-th');
-  if (!th) return;
-  var table = th.closest('table');
-  var tbody = table.querySelector('tbody');
-  var colIdx = Array.from(th.parentNode.children).indexOf(th);
-  var totalRow = tbody.querySelector('.total-row');
-  var rows = Array.from(tbody.querySelectorAll('tr:not(.total-row)'));
-  var asc = th.dataset.sortDir !== 'asc';
+(function() {
+  function enhanceSortableHeaders() {
+    document.querySelectorAll('.sortable-th').forEach(function(th) {
+      if (!th.hasAttribute('tabindex')) th.setAttribute('tabindex', '0');
+      if (!th.hasAttribute('aria-sort')) th.setAttribute('aria-sort', 'none');
+    });
+  }
 
-  table.querySelectorAll('.sortable-th').forEach(function(h) {
-    h.removeAttribute('data-sort-dir');
-    var ic = h.querySelector('.sort-icon');
-    if (ic) ic.textContent = 'unfold_more';
-  });
-  th.dataset.sortDir = asc ? 'asc' : 'desc';
-  var icon = th.querySelector('.sort-icon');
-  if (icon) icon.textContent = asc ? 'arrow_upward' : 'arrow_downward';
+  function sortByHeader(th) {
+    var table = th.closest('table');
+    if (!table) return;
+    var tbody = table.querySelector('tbody');
+    if (!tbody) return;
+    var colIdx = Array.from(th.parentNode.children).indexOf(th);
+    var totalRow = tbody.querySelector('.total-row');
+    var rows = Array.from(tbody.querySelectorAll('tr:not(.total-row)'));
+    var asc = th.dataset.sortDir !== 'asc';
 
-  rows.sort(function(a, b) {
-    var ac = a.children[colIdx], bc = b.children[colIdx];
-    if (!ac || !bc) return 0;
-    var av = ac.dataset.val, bv = bc.dataset.val;
-    if (av !== undefined && bv !== undefined) {
-      var an = parseFloat(av), bn = parseFloat(bv);
-      if (!isNaN(an) && !isNaN(bn)) return asc ? an - bn : bn - an;
-    }
-    var at = ac.textContent.trim(), bt = bc.textContent.trim();
-    return asc ? at.localeCompare(bt) : bt.localeCompare(at);
+    table.querySelectorAll('.sortable-th').forEach(function(h) {
+      h.removeAttribute('data-sort-dir');
+      h.setAttribute('aria-sort', 'none');
+      var ic = h.querySelector('.sort-icon');
+      if (ic) ic.textContent = 'unfold_more';
+    });
+
+    th.dataset.sortDir = asc ? 'asc' : 'desc';
+    th.setAttribute('aria-sort', asc ? 'ascending' : 'descending');
+    var icon = th.querySelector('.sort-icon');
+    if (icon) icon.textContent = asc ? 'arrow_upward' : 'arrow_downward';
+
+    rows.sort(function(a, b) {
+      var ac = a.children[colIdx], bc = b.children[colIdx];
+      if (!ac || !bc) return 0;
+      var av = ac.dataset.val, bv = bc.dataset.val;
+      if (av !== undefined && bv !== undefined) {
+        var an = parseFloat(av), bn = parseFloat(bv);
+        if (!isNaN(an) && !isNaN(bn)) return asc ? an - bn : bn - an;
+      }
+      var at = ac.textContent.trim(), bt = bc.textContent.trim();
+      return asc ? at.localeCompare(bt) : bt.localeCompare(at);
+    });
+
+    rows.forEach(function(r) {
+      if (totalRow) tbody.insertBefore(r, totalRow);
+      else tbody.appendChild(r);
+    });
+  }
+
+  document.addEventListener('click', function(e) {
+    var th = e.target.closest('.sortable-th');
+    if (th) sortByHeader(th);
   });
 
-  rows.forEach(function(r) {
-    if (totalRow) tbody.insertBefore(r, totalRow);
-    else tbody.appendChild(r);
+  document.addEventListener('keydown', function(e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    var th = e.target.closest('.sortable-th');
+    if (!th) return;
+    e.preventDefault();
+    sortByHeader(th);
   });
-});
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', enhanceSortableHeaders);
+  } else {
+    enhanceSortableHeaders();
+  }
+})();

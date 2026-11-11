@@ -2,116 +2,213 @@
 {% load indian_format %}
 {% load static %}
 
-{% block title %}Crypto — Portfolio — Vault{% endblock %}
+{% block title %}Crypto Holdings | Portfolio | Vault{% endblock %}
 
 {% block page_header %}
-<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+<div class="v-page-header">
   <div>
-    <p class="text-xs font-bold tracking-widest uppercase text-primary">Portfolio</p>
-    <h1 class="text-xl lg:text-2xl font-extrabold">Crypto Holdings</h1>
-    <p class="text-xs opacity-50">All cryptocurrency holdings</p>
+    <h1 class="v-title flex items-center gap-2">
+      <span class="material-symbols-outlined text-violet-400 text-2xl">currency_bitcoin</span>
+      Cryptocurrency &amp; Digital Assets
+    </h1>
+    <p class="v-subtitle">Digital currency positions, hardware wallet tokens, and unrealized fiat P&amp;L</p>
   </div>
-  <div class="flex flex-wrap items-center gap-2">
-    <button type="button" class="btn btn-primary btn-sm gap-1" onclick="openAddModal()"><span class="material-symbols-outlined text-base">add</span>Add</button>
-    <a href="{% url 'portfolio_tracker' %}" class="btn btn-ghost btn-sm gap-1"><span class="material-symbols-outlined text-base">arrow_back</span>Portfolio</a>
+  <div class="v-toolbar">
+    <button type="button" class="v-btn v-btn-primary" onclick="openAddModal()">
+      <span class="material-symbols-outlined text-sm">add</span>Add Asset
+    </button>
+    <a href="{% url 'portfolio_tracker' %}#alternates" class="v-btn v-btn-secondary">
+      <span class="material-symbols-outlined text-sm">arrow_back</span>Portfolio
+    </a>
   </div>
 </div>
 {% endblock %}
 
 {% block content %}
-<div class="card hero-gradient-portfolio shadow-sm card-hover animate-up mb-4">
-  <div class="card-body p-4 lg:p-6">
-    <div class="flex flex-wrap items-center gap-8">
-      <div>
-        <p class="text-[10px] font-bold uppercase tracking-widest opacity-40">Total Current Value</p>
-        <p class="text-3xl lg:text-4xl font-extrabold mt-1">{{ total_current|inr }}</p>
-        <div class="mt-2">
-          <span class="badge {% if total_pnl >= 0 %}badge-success{% else %}badge-error{% endif %} badge-sm gap-1">
-            {% if total_pnl >= 0 %}+{% endif %}{{ total_pnl|inr }} total P&amp;L
-          </span>
-        </div>
+
+{# --- SIGNATURE LEDGER SUMMARY BAND --- #}
+<section class="v-ledger-band" aria-label="Crypto Valuation Summary">
+  <div class="v-lead-cell">
+    <div>
+      <div class="v-lead-label">
+        <span>Total Crypto Valuation</span>
+        <span class="v-delta v-delta-neutral text-xs py-0 px-2 font-semibold">Digital Custody</span>
       </div>
-      <div class="flex flex-wrap gap-4">
-        <div class="stat-card">
-          <div class="text-[10px] uppercase tracking-wider opacity-50">Total Invested</div>
-          <div class="text-base font-bold mt-0.5">{{ total_invested|inr }}</div>
-        </div>
-        <div class="stat-card stat-card-success">
-          <div class="text-[10px] uppercase tracking-wider opacity-50">Total P&amp;L</div>
-          <div class="text-base font-bold mt-0.5 font-semibold {% if total_pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if total_pnl >= 0 %}+{% endif %}{{ total_pnl|inr }}</div>
-        </div>
+      <div class="v-lead-figure-row">
+        <span class="v-lead-figure tabular-nums">{{ total_current|inr }}</span>
+        <span class="v-delta {% if total_pnl >= 0 %}v-delta-pos{% else %}v-delta-neg{% endif %} text-xs font-bold tabular-nums">
+          <span class="material-symbols-outlined text-xs">{% if total_pnl >= 0 %}trending_up{% else %}trending_down{% endif %}</span>
+          {% if total_pnl >= 0 %}+{% endif %}{{ total_pnl|inr }}{% if total_invested > 0 %} ({% if total_pnl >= 0 %}+{% endif %}{% widthratio total_pnl total_invested 100 %}%){% endif %}
+        </span>
+      </div>
+      <div class="v-lead-sub">
+        Cost Basis: <strong class="text-base-content/85 tabular-nums">{{ total_invested|inr }}</strong>
+        &middot;
+        <span class="tabular-nums">{{ holdings|length }} tokens recorded</span>
       </div>
     </div>
-  </div>
-</div>
 
-<div class="card bg-base-200 shadow-sm card-hover animate-up mb-4" style="animation-delay:0.1s">
-  <div class="card-body p-4">
-    <h2 class="card-title text-base mb-3">All Crypto Holdings</h2>
+    {% if total_current > 0 and holdings %}
+    <div class="v-horizon">
+      <div class="v-horizon-bar" role="img" aria-label="Crypto asset allocation">
+        {% for c in holdings|slice:":4" %}
+        <div class="v-horizon-seg" style="width: {% widthratio c.current_value total_current 100 %}%; background: {% cycle '#8b5cf6' '#6366f1' '#0ea5e9' '#94a3b8' %};" title="{{ c.name }}: {{ c.current_value|inr }}"></div>
+        {% endfor %}
+      </div>
+      <div class="v-horizon-legend">
+        {% for c in holdings|slice:":3" %}
+        <span class="v-horizon-item">
+          <span class="v-horizon-dot" style="background: {% cycle '#8b5cf6' '#6366f1' '#0ea5e9' %};"></span>
+          {{ c.name|truncatechars:14 }} <strong>{% widthratio c.current_value total_current 100 %}%</strong>
+        </span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="v-stat-grid">
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Invested Cost Basis</div>
+      <div class="v-stat-value text-base-content tabular-nums">{{ total_invested|inr }}</div>
+      <div class="v-stat-sub">INR fiat principal</div>
+    </div>
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Current Valuation</div>
+      <div class="v-stat-value text-base-content tabular-nums">{{ total_current|inr }}</div>
+      <div class="v-stat-sub">Mark-to-market</div>
+    </div>
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Unrealized P&amp;L</div>
+      <div class="v-stat-value tabular-nums {% if total_pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+        {% if total_pnl >= 0 %}+{% endif %}{{ total_pnl|inr }}
+      </div>
+      <div class="v-stat-sub">Market valuation delta</div>
+    </div>
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Active Positions</div>
+      <div class="v-stat-value text-base-content tabular-nums">{{ holdings|length }}</div>
+      <div class="v-stat-sub">Tracked digital coins</div>
+    </div>
+  </div>
+</section>
+
+{# --- CRYPTO BLOTTER --- #}
+<section class="v-panel mb-6" aria-label="All Crypto Positions">
+  <div class="v-panel-header">
+    <div class="flex items-center gap-2 min-w-0">
+      <h2 class="v-panel-title">
+        <span class="material-symbols-outlined text-base text-violet-400">toll</span>
+        All Crypto Positions
+      </h2>
+      <span class="v-delta v-delta-neutral text-xs font-semibold tabular-nums">{{ holdings|length }} Assets</span>
+    </div>
+    <button type="button" class="v-btn v-btn-secondary v-btn-sm" onclick="openAddModal()">
+      <span class="material-symbols-outlined text-sm">add</span>Add Asset
+    </button>
+  </div>
+  <div class="v-panel-body p-0">
     {% if holdings %}
-    {# Desktop table #}
-    <div class="hidden md:block overflow-x-auto">
-      <table class="table table-sm" id="cryptoTable">
+    {# Desktop Table #}
+    <div class="v-panel-table hidden md:block overflow-x-auto">
+      <table class="v-table" id="cryptoTable">
         <thead>
           <tr>
-            <th class="sortable-th">Name <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
-            <th class="sortable-th text-right">Invested <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
-            <th class="sortable-th text-right">Current <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
-            <th class="sortable-th text-right">P&amp;L <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
-            <th>Remarks</th>
-            <th class="w-10"></th>
+            <th class="sortable-th cursor-pointer select-none">Token / Asset <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Invested Principal <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Current Value <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Unrealized P&amp;L <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th>Custody / Remarks</th>
+            <th class="text-right w-16">Action</th>
           </tr>
         </thead>
         <tbody>
           {% for c in holdings %}
-          <tr class="hover">
-            <td class="font-semibold">{{ c.name }}</td>
-            <td class="text-right" data-val="{{ c.amount_invested }}">{{ c.amount_invested|inr }}</td>
-            <td class="text-right font-semibold" data-val="{{ c.current_value }}">{{ c.current_value|inr }}</td>
-            <td class="text-right font-semibold" data-val="{{ c.pnl }}"><span class="{% if c.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if c.pnl >= 0 %}+{% endif %}{{ c.pnl|inr }}</span></td>
-            <td class="opacity-60 text-sm">{{ c.remarks|default:"—" }}</td>
+          <tr>
+            <td class="font-bold text-xs text-base-content">{{ c.name }}</td>
+            <td class="v-num text-xs text-base-content/75" data-val="{{ c.amount_invested }}">{{ c.amount_invested|inr }}</td>
+            <td class="v-num text-xs font-bold text-base-content" data-val="{{ c.current_value }}">{{ c.current_value|inr }}</td>
+            <td class="v-num text-xs font-bold {% if c.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}" data-val="{{ c.pnl }}">
+              {% if c.pnl >= 0 %}+{% endif %}{{ c.pnl|inr }}
+            </td>
+            <td class="text-xs text-base-content/60 max-w-xs truncate">{{ c.remarks|default:"—" }}</td>
             <td class="text-right">
-              <button type="button" class="btn btn-ghost btn-xs btn-square" data-edit-crypto data-id="{{ c.id }}" data-name="{{ c.name }}" data-invested="{{ c.amount_invested }}" data-current="{{ c.current_value }}" data-remarks="{{ c.remarks|default:'' }}"><span class="material-symbols-outlined text-base">edit</span></button>
+              <button type="button" class="v-icon-btn" data-edit-crypto
+                      data-id="{{ c.id }}" data-name="{{ c.name }}"
+                      data-invested="{{ c.amount_invested }}" data-current="{{ c.current_value }}"
+                      data-remarks="{{ c.remarks|default:'' }}"
+                      aria-label="Edit {{ c.name }}">
+                <span class="material-symbols-outlined text-sm">edit</span>
+              </button>
             </td>
           </tr>
           {% endfor %}
-          <tr class="total-row border-t-2 border-base-300">
-            <td class="font-bold text-primary">Total</td>
-            <td class="text-right font-bold text-primary" data-val="{{ total_invested }}">{{ total_invested|inr }}</td>
-            <td class="text-right font-bold text-primary" data-val="{{ total_current }}">{{ total_current|inr }}</td>
-            <td class="text-right font-bold {% if total_pnl >= 0 %}text-success{% else %}text-error{% endif %}" data-val="{{ total_pnl }}">{% if total_pnl >= 0 %}+{% endif %}{{ total_pnl|inr }}</td>
+          <tr class="total-row border-t-2 border-[var(--v-hairline)] font-bold">
+            <td class="text-xs text-base-content">Total Crypto Assets</td>
+            <td class="v-num text-xs text-base-content" data-val="{{ total_invested }}">{{ total_invested|inr }}</td>
+            <td class="v-num text-xs text-base-content" data-val="{{ total_current }}">{{ total_current|inr }}</td>
+            <td class="v-num text-xs font-bold {% if total_pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}" data-val="{{ total_pnl }}">
+              {% if total_pnl >= 0 %}+{% endif %}{{ total_pnl|inr }}
+            </td>
             <td colspan="2"></td>
           </tr>
         </tbody>
       </table>
     </div>
-    {# Mobile card view #}
-    <div class="md:hidden space-y-2">
+
+    {# Mobile View #}
+    <div class="md:hidden divide-y divide-[var(--v-hairline)]">
       {% for c in holdings %}
-      <div class="table-card">
-        <div class="flex items-start justify-between gap-2">
-          <div class="font-semibold text-sm">{{ c.name }}</div>
-          <button type="button" class="btn btn-ghost btn-xs btn-square shrink-0" data-edit-crypto data-id="{{ c.id }}" data-name="{{ c.name }}" data-invested="{{ c.amount_invested }}" data-current="{{ c.current_value }}" data-remarks="{{ c.remarks|default:'' }}"><span class="material-symbols-outlined text-base">edit</span></button>
+      <div class="v-mobile-row flex-col !items-stretch gap-2">
+        <div class="w-full flex items-center justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <div class="font-bold text-sm text-base-content truncate">{{ c.name }}</div>
+            {% if c.remarks %}<div class="text-xs text-base-content/50 truncate mt-0.5">{{ c.remarks }}</div>{% endif %}
+          </div>
+          <button type="button" class="v-icon-btn shrink-0" data-edit-crypto
+                  data-id="{{ c.id }}" data-name="{{ c.name }}"
+                  data-invested="{{ c.amount_invested }}" data-current="{{ c.current_value }}"
+                  data-remarks="{{ c.remarks|default:'' }}"
+                  aria-label="Edit {{ c.name }}">
+            <span class="material-symbols-outlined text-base">edit</span>
+          </button>
         </div>
-        <div class="grid grid-cols-3 gap-2 mt-2 text-xs">
-          <div><span class="opacity-50">Invested</span><div class="font-semibold mt-0.5">{{ c.amount_invested|inr }}</div></div>
-          <div><span class="opacity-50">Current</span><div class="font-semibold mt-0.5">{{ c.current_value|inr }}</div></div>
-          <div><span class="opacity-50">P&L</span><div class="font-semibold mt-0.5 {% if c.pnl >= 0 %}text-success{% else %}text-error{% endif %}">{% if c.pnl >= 0 %}+{% endif %}{{ c.pnl|inr }}</div></div>
+        <div class="w-full grid grid-cols-3 gap-2 text-xs pt-2 border-t border-[var(--v-hairline)] tabular-nums">
+          <div>
+            <div class="text-xs text-base-content/45">Invested</div>
+            <div class="font-semibold text-base-content/80 mt-0.5">{{ c.amount_invested|inr }}</div>
+          </div>
+          <div>
+            <div class="text-xs text-base-content/45">Current</div>
+            <div class="font-bold text-base-content mt-0.5">{{ c.current_value|inr }}</div>
+          </div>
+          <div class="text-right">
+            <div class="text-xs text-base-content/45">P&amp;L</div>
+            <div class="font-bold mt-0.5 {% if c.pnl >= 0 %}text-emerald-400{% else %}text-rose-400{% endif %}">
+              {% if c.pnl >= 0 %}+{% endif %}{{ c.pnl|inr }}
+            </div>
+          </div>
         </div>
       </div>
       {% endfor %}
-      <div class="flex items-center justify-between px-1 pt-2 border-t border-base-300 text-sm">
-        <span class="font-bold text-primary">Total</span>
-        <span class="font-bold">{{ total_invested|inr }} → <span class="text-primary">{{ total_current|inr }}</span></span>
-      </div>
     </div>
     {% else %}
-    <p class="text-sm opacity-40">No crypto holdings.</p>
+    <div class="v-empty py-10">
+      <div class="v-empty-icon text-violet-400">
+        <span class="material-symbols-outlined text-3xl">currency_bitcoin</span>
+      </div>
+      <h3 class="v-empty-title">No Crypto Holdings Recorded</h3>
+      <p class="v-empty-desc">Track BTC, ETH, and cold storage hardware token valuations in Indian Rupees.</p>
+      <button type="button" class="v-btn v-btn-primary" onclick="openAddModal()">
+        <span class="material-symbols-outlined text-sm">add</span>Add First Asset
+      </button>
+    </div>
     {% endif %}
   </div>
-</div>
+</section>
 
 {% include 'portfolio/_crypto_form_modal.html' with form_obj=form %}
+
 {% endblock %}
 
 {% block extra_js %}
@@ -119,26 +216,50 @@
 <script>
 function openAddModal() {
   var form = document.getElementById('cryptoForm');
+  if (!form) return;
   form.action = "{% url 'add_crypto' %}";
   form.reset();
-  document.getElementById('cryptoDeleteBtn').style.display = 'none';
-  document.getElementById('cryptoModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span>Add Crypto Holding';
+  var delBtn = document.getElementById('cryptoDeleteBtn');
+  if (delBtn) {
+    delBtn.classList.add('hidden');
+    delBtn.style.display = 'none';
+  }
+  var titleEl = document.getElementById('cryptoModalTitle');
+  if (titleEl) {
+    titleEl.innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span> Add Crypto Asset';
+  }
   openModal('addCryptoModal');
 }
+
 document.addEventListener('click', function(e) {
   var btn = e.target.closest('[data-edit-crypto]');
   if (!btn) return;
   var form = document.getElementById('cryptoForm');
-  form.action = "{% url 'edit_crypto' pk=0 %}".replace('/0/', '/' + btn.dataset.id + '/');
-  document.getElementById('deleteCryptoForm').action = "{% url 'delete_crypto' pk=0 %}".replace('/0/', '/' + btn.dataset.id + '/');
-  document.getElementById('cryptoDeleteBtn').style.display = 'inline-flex';
-  document.getElementById('cryptoModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">edit</span>Edit Crypto';
-  form.querySelector('[name=name]').value = btn.dataset.name;
-  form.querySelector('[name=amount_invested]').value = btn.dataset.invested;
-  form.querySelector('[name=current_value]').value = btn.dataset.current;
-  form.querySelector('[name=remarks]').value = btn.dataset.remarks;
+  if (!form) return;
+  var id = btn.dataset.id;
+  form.action = "{% url 'edit_crypto' pk=0 %}".replace('/0/', '/' + id + '/');
+  var delForm = document.getElementById('deleteCryptoForm');
+  if (delForm) delForm.action = "{% url 'delete_crypto' pk=0 %}".replace('/0/', '/' + id + '/');
+  var delBtn = document.getElementById('cryptoDeleteBtn');
+  if (delBtn) {
+    delBtn.classList.remove('hidden');
+    delBtn.style.display = 'inline-flex';
+  }
+  var titleEl = document.getElementById('cryptoModalTitle');
+  if (titleEl) {
+    titleEl.innerHTML = '<span class="material-symbols-outlined text-primary">edit</span> Edit Crypto Asset';
+  }
+
+  form.querySelector('[name=name]').value = btn.dataset.name || '';
+  form.querySelector('[name=amount_invested]').value = btn.dataset.invested || '';
+  form.querySelector('[name=current_value]').value = btn.dataset.current || '';
+  form.querySelector('[name=remarks]').value = btn.dataset.remarks || '';
+
   openModal('addCryptoModal');
 });
-document.addEventListener('DOMContentLoaded', function() { initPagination('cryptoTable', 15); });
+
+document.addEventListener('DOMContentLoaded', function() {
+  initPagination('cryptoTable', 20);
+});
 </script>
 {% endblock %}

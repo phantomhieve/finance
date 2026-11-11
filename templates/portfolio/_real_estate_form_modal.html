@@ -1,11 +1,11 @@
 <dialog class="modal modal-bottom sm:modal-middle" id="{{ modal_id|default:'addRealEstateModal' }}">
-  <div class="modal-box max-w-2xl bg-base-100 border border-base-content/10 shadow-2xl">
-    <div class="flex items-start justify-between gap-2 mb-4 pb-3 border-b border-base-content/10">
-      <h3 id="{{ title_id|default:'realEstateModalTitle' }}" class="font-bold text-lg flex items-center gap-2">
-        <span class="material-symbols-outlined text-primary">domain</span> Add Real Estate Property
+  <div class="modal-box max-w-2xl max-h-[90dvh] overflow-y-auto overscroll-contain">
+    <div class="v-modal-header flex items-center justify-between gap-3 pb-3 mb-4 border-b border-[var(--v-hairline)]">
+      <h3 id="{{ title_id|default:'realEstateModalTitle' }}" class="font-semibold text-base text-base-content flex items-center gap-2">
+        <span class="material-symbols-outlined text-primary text-xl">domain</span> Add Real Estate Property
       </h3>
-      <button type="button" class="btn btn-ghost btn-xs btn-square" onclick="closeModal('{{ modal_id|default:'addRealEstateModal' }}')" aria-label="Close">
-        <span class="material-symbols-outlined">close</span>
+      <button type="button" class="v-icon-btn" onclick="closeModal('{{ modal_id|default:'addRealEstateModal' }}')" aria-label="Close">
+        <span class="material-symbols-outlined text-lg">close</span>
       </button>
     </div>
 
@@ -13,139 +13,157 @@
       <input type="hidden" name="next" value="{{ request.get_full_path }}">
       {% if is_baby %}<input type="hidden" name="is_baby" value="true">{% endif %}
 
-      <div class="space-y-4 max-h-[70vh] overflow-y-auto pf-scroll-box pr-1">
+      <div class="space-y-5">
         {# Property Identity #}
         <div>
-          <h4 class="text-xs font-bold uppercase tracking-wider text-primary mb-2 flex items-center gap-1">
-            <span class="material-symbols-outlined text-sm">home</span> Property Identity
-          </h4>
+          <p class="text-xs font-semibold text-base-content/75 mb-2.5 flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-sm text-base-content/55">home</span> Property Identity &amp; Ownership
+          </p>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div class="form-field sm:col-span-3">
-              <label class="label text-xs font-semibold">Property Name / Title</label>
+            <label class="form-field v-field sm:col-span-3">
+              <span class="v-label">Property Name / Title</span>
               {{ form_obj.name }}
-            </div>
-            <div class="form-field sm:col-span-2">
-              <label class="label text-xs font-semibold">Property Type</label>
+            </label>
+            <label class="form-field v-field">
+              <span class="v-label">Property Type</span>
               {{ form_obj.property_type }}
-            </div>
-            <div class="form-field">
-              <label class="label text-xs font-semibold">Current Status</label>
+            </label>
+            <label class="form-field v-field">
+              <span class="v-label">Current Status</span>
               {{ form_obj.status }}
-            </div>
+            </label>
+            <label class="form-field v-field">
+              <span class="v-label">Acquisition Mode</span>
+              {{ form_obj.acquisition_type }}
+            </label>
           </div>
+
+          <details class="v-disclosure mt-2.5">
+            <summary class="text-xs py-2 px-3">Inheritance or Gift Provenance <span class="text-base-content/40 font-normal ml-1">(optional)</span></summary>
+            <div class="v-disclosure-body grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              <label class="form-field v-field">
+                <span class="v-label">Original Owner</span>
+                {{ form_obj.original_owner }}
+              </label>
+              <label class="form-field v-field">
+                <span class="v-label">Year Inherited / Gifted</span>
+                {{ form_obj.inherited_year }}
+              </label>
+            </div>
+          </details>
         </div>
 
         {# Land & Measurements #}
-        <div class="pt-2 border-t border-base-content/10">
-          <h4 class="text-xs font-bold uppercase tracking-wider text-primary mb-2 flex items-center gap-1">
-            <span class="material-symbols-outlined text-sm">square_foot</span> Dimensions &amp; Measurement
-          </h4>
+        <div class="pt-3 border-t border-[var(--v-hairline)]">
+          <p class="text-xs font-semibold text-base-content/75 mb-2.5 flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-sm text-base-content/55">square_foot</span> Dimensions &amp; Measurement
+          </p>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div class="form-field">
-              <label class="label text-xs font-semibold">Area / Size</label>
+            <label class="form-field v-field">
+              <span class="v-label">Area / Size</span>
               {{ form_obj.area_value }}
-            </div>
-            <div class="form-field">
-              <label class="label text-xs font-semibold">Unit of Measurement</label>
+            </label>
+            <label class="form-field v-field">
+              <span class="v-label">Unit of Measurement</span>
               {{ form_obj.area_unit }}
-            </div>
+            </label>
           </div>
         </div>
 
         {# Location Details #}
-        <div class="pt-2 border-t border-base-content/10">
-          <h4 class="text-xs font-bold uppercase tracking-wider text-primary mb-2 flex items-center gap-1">
-            <span class="material-symbols-outlined text-sm">location_on</span> Location &amp; Micro-Market
-          </h4>
+        <div class="pt-3 border-t border-[var(--v-hairline)]">
+          <p class="text-xs font-semibold text-base-content/75 mb-2.5 flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-sm text-base-content/55">location_on</span> Location &amp; Micro-Market
+          </p>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div class="form-field sm:col-span-2">
-              <label class="label text-xs font-semibold">Locality / Sector</label>
+            <label class="form-field v-field sm:col-span-2">
+              <span class="v-label">Locality / Sector</span>
               {{ form_obj.locality }}
-            </div>
-            <div class="form-field">
-              <label class="label text-xs font-semibold">City</label>
+            </label>
+            <label class="form-field v-field">
+              <span class="v-label">City</span>
               {{ form_obj.city }}
-            </div>
-            <div class="form-field">
-              <label class="label text-xs font-semibold">State</label>
+            </label>
+            <label class="form-field v-field">
+              <span class="v-label">State</span>
               {{ form_obj.state }}
-            </div>
-            <div class="form-field">
-              <label class="label text-xs font-semibold">PIN Code <span class="opacity-40 font-normal">optional</span></label>
+            </label>
+            <label class="form-field v-field">
+              <span class="v-label">PIN Code <span class="text-base-content/40 font-normal normal-case tracking-normal">optional</span></span>
               {{ form_obj.pincode }}
-            </div>
-            <div class="form-field">
-              <label class="label text-xs font-semibold">Khasra / Legal Doc # <span class="opacity-40 font-normal">optional</span></label>
+            </label>
+            <label class="form-field v-field">
+              <span class="v-label">Khasra / Registry # <span class="text-base-content/40 font-normal normal-case tracking-normal">optional</span></span>
               {{ form_obj.khasra_khata_number }}
-            </div>
-            <div class="form-field sm:col-span-2">
-              <label class="label text-xs font-semibold">Landmark / Proximity <span class="opacity-40 font-normal">e.g. Near Airport link</span></label>
+            </label>
+            <label class="form-field v-field sm:col-span-2">
+              <span class="v-label">Landmark / Proximity <span class="text-base-content/40 font-normal normal-case tracking-normal">optional</span></span>
               {{ form_obj.landmark }}
-            </div>
-            <div class="form-field">
-              <label class="label text-xs font-semibold">Micro-Market Tag <span class="opacity-40 font-normal">e.g. Expressway</span></label>
+            </label>
+            <label class="form-field v-field">
+              <span class="v-label">Micro-Market Tag</span>
               {{ form_obj.micro_market_tag }}
-            </div>
-            <div class="form-field sm:col-span-3">
-              <label class="label text-xs font-semibold">Google Maps Pin URL <span class="opacity-40 font-normal">optional link</span></label>
+            </label>
+            <label class="form-field v-field sm:col-span-3">
+              <span class="v-label">Google Maps Pin URL <span class="text-base-content/40 font-normal normal-case tracking-normal">optional</span></span>
               {{ form_obj.google_maps_url }}
-            </div>
+            </label>
           </div>
         </div>
 
         {# Financials & Valuation #}
-        <div class="pt-2 border-t border-base-content/10">
-          <h4 class="text-xs font-bold uppercase tracking-wider text-primary mb-2 flex items-center gap-1">
-            <span class="material-symbols-outlined text-sm">currency_rupee</span> Financials &amp; Valuation
-          </h4>
+        <div class="pt-3 border-t border-[var(--v-hairline)]">
+          <p class="text-xs font-semibold text-base-content/75 mb-2.5 flex items-center gap-1.5">
+            <span class="material-symbols-outlined text-sm text-base-content/55">currency_rupee</span> Cost Basis &amp; Valuation
+          </p>
           <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div class="form-field">
-              <label class="label text-xs font-semibold">Purchase Date</label>
+            <label class="form-field v-field">
+              <span class="v-label">Purchase Date</span>
               {{ form_obj.purchase_date }}
-            </div>
-            <div class="form-field">
-              <label class="label text-xs font-semibold">Purchase Price (₹)</label>
+            </label>
+            <label class="form-field v-field">
+              <span class="v-label">Purchase Price (₹)</span>
               {{ form_obj.purchase_price }}
-            </div>
-            <div class="form-field">
-              <label class="label text-xs font-semibold">Stamp Duty / Registry (₹)</label>
+            </label>
+            <label class="form-field v-field">
+              <span class="v-label">Stamp Duty / Registry (₹)</span>
               {{ form_obj.stamp_duty_charges }}
-            </div>
-            <div class="form-field">
-              <label class="label text-xs font-semibold">Current Valuation (₹)</label>
+            </label>
+            <label class="form-field v-field">
+              <span class="v-label">Current Valuation (₹)</span>
               {{ form_obj.current_valuation }}
-            </div>
-            <div class="form-field">
-              <label class="label text-xs font-semibold">Valuation Date <span class="opacity-40 font-normal">optional</span></label>
+            </label>
+            <label class="form-field v-field">
+              <span class="v-label">Valuation Date <span class="text-base-content/40 font-normal normal-case tracking-normal">optional</span></span>
               {{ form_obj.last_valuation_date }}
-            </div>
-            <div class="form-field">
-              <label class="label text-xs font-semibold">Monthly Rent (₹) <span class="opacity-40 font-normal">if rented</span></label>
+            </label>
+            <label class="form-field v-field">
+              <span class="v-label">Monthly Rent (₹) <span class="text-base-content/40 font-normal normal-case tracking-normal">if rented</span></span>
               {{ form_obj.monthly_rental_income }}
-            </div>
+            </label>
           </div>
         </div>
 
         {# Remarks #}
-        <div class="pt-2 border-t border-base-content/10">
-          <div class="form-field">
-            <label class="label text-xs font-semibold">Remarks &amp; Registry Notes <span class="opacity-40 font-normal">optional</span></label>
+        <div class="pt-3 border-t border-[var(--v-hairline)]">
+          <label class="form-field v-field">
+            <span class="v-label">Remarks &amp; Appraisal Notes <span class="text-base-content/40 font-normal normal-case tracking-normal">optional</span></span>
             {{ form_obj.remarks }}
-          </div>
+          </label>
         </div>
       </div>
 
-      <div class="modal-action flex-wrap gap-2 mt-6 pt-3 border-t border-base-content/10">
-        <button type="button" id="{{ delete_btn_id|default:'realEstateDeleteBtn' }}" class="btn btn-error btn-sm gap-1 mr-auto hidden" onclick="confirmDelete('{{ delete_form_id|default:'deleteRealEstateForm' }}')">
+      <div class="v-modal-footer modal-action flex-wrap items-center gap-2 mt-6 pt-3 border-t border-[var(--v-hairline)]">
+        <button type="button" id="{{ delete_btn_id|default:'realEstateDeleteBtn' }}" class="v-btn v-btn-danger mr-auto hidden" onclick="confirmDelete('{{ delete_form_id|default:'deleteRealEstateForm' }}')">
           <span class="material-symbols-outlined text-base">delete</span>Delete
         </button>
-        <button type="button" class="btn btn-ghost btn-sm" onclick="closeModal('{{ modal_id|default:'addRealEstateModal' }}')">Cancel</button>
-        <button type="submit" class="btn btn-primary btn-sm gap-1">
+        <button type="button" class="v-btn v-btn-ghost" onclick="closeModal('{{ modal_id|default:'addRealEstateModal' }}')">Cancel</button>
+        <button type="submit" class="v-btn v-btn-primary">
           <span class="material-symbols-outlined text-base">save</span>Save Property
         </button>
       </div>
     </form>
     <form id="{{ delete_form_id|default:'deleteRealEstateForm' }}" method="post" action="" class="hidden">{% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}"></form>
   </div>
-  <form method="dialog" class="modal-backdrop"><button>close</button></form>
+  <form method="dialog" class="modal-backdrop"><button aria-label="Close modal">close</button></form>
 </dialog>

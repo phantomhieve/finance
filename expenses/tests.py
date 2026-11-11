@@ -1065,6 +1065,53 @@ class ExpensesAITests(SimpleTestCase):
         self.assertEqual(kwargs.get('model'), 'gemini-3.8-flash')
         self.assertEqual(kwargs.get('thinking_level'), 'HIGH')
 
+    @mock.patch('expenses.ai.runner.gateway.generate_structured')
+    @mock.patch('expenses.ai.runner.ai_available', return_value=True)
+    def test_categorise_deduplicates_merchants_and_heals_casing(self, mock_avail, mock_gen):
+        from .ai import CategoryBatch, CategoryChoice, categorise
+
+        # 50 items across only 2 canonical merchants -> should require ONLY 1 gateway call (not 2 batches of 40+10)
+        items = [
+            {'id': i, 'merchant': 'Swiggy   Instamart', 'amount': 300.0 + i, 'direction': 'DEBIT', 'channel': 'UPI'}
+            for i in range(1, 31)
+        ] + [
+            {'id': i, 'merchant': 'UBER INDIA', 'amount': 250.0, 'direction': 'DEBIT', 'channel': 'CARD'}
+            for i in range(31, 51)
+        ]
+        mock_gen.return_value = CategoryBatch(
+            results=[
+                CategoryChoice(id=1, category='groceries ', confidence=0.94),  # case/space mismatch healed
+                CategoryChoice(id=31, category='Transport', confidence=0.91),
+            ]
+        )
+        out = categorise(items, ['Groceries', 'Transport'], [])
+        self.assertEqual(mock_gen.call_count, 1)
+        self.assertEqual(len(out), 50)
+        for i in range(1, 31):
+            self.assertEqual(out[i], ('Groceries', 0.94))
+        for i in range(31, 51):
+            self.assertEqual(out[i], ('Transport', 0.91))
+
+    @mock.patch('expenses.ai.runner.chunk_statement_text', return_value=['CHUNK_ONE', 'CHUNK_TWO', 'CHUNK_THREE'])
+    @mock.patch('expenses.ai.runner.gateway.generate_structured')
+    @mock.patch('expenses.ai.runner.ai_available', return_value=True)
+    def test_extract_statement_lines_parallel_preserves_chunk_order(self, mock_avail, mock_gen, mock_chunks):
+        import time as _time
+        from .ai.runner import extract_statement_lines
+        from .ai.schemas import ExtractedLine, ExtractedLines
+
+        def fake_extract(schema, prompt, **kwargs):
+            if "CHUNK_ONE" in prompt:
+                _time.sleep(0.05)  # Slowest chunk finishes last, must still appear 1st!
+                return ExtractedLines(lines=[ExtractedLine(date="2026-03-01", description="First", amount=100.0, is_credit=False)])
+            if "CHUNK_TWO" in prompt:
+                raise RuntimeError("Transient chunk 2 parse error")
+            return ExtractedLines(lines=[ExtractedLine(date="2026-03-03", description="Third", amount=300.0, is_credit=False)])
+
+        mock_gen.side_effect = fake_extract
+        lines = extract_statement_lines("raw statement text")
+        self.assertEqual([ln.description for ln in lines], ["First", "Third"])
+
 
 class BrandKnowledgeTests(TestCase):
     def setUp(self):
@@ -1719,3 +1766,243 @@ class SessionLifetimeTests(SimpleTestCase):
         from django.conf import settings
         self.assertEqual(settings.SESSION_COOKIE_AGE, 30 * 24 * 3600)
         self.assertFalse(settings.SESSION_EXPIRE_AT_BROWSER_CLOSE)
+
+
+class StatementPaymentReconciliationAndOptimizationsTests(ExpenseTestCase):
+    def test_auto_track_statement_payments_and_twin_debit_healing(self):
+        from expenses.statements import auto_track_statement_payments, upcoming_dues
+        from expenses.models import CardStatement, PaymentSource, ExpenseCategory, Expense
+
+        card = PaymentSource.objects.create(
+            group=self.group, institution="ICICI", nickname="Amazon Pay ICICI", kind="CREDIT_CARD", last4="5678"
+        )
+        cc_cat = ExpenseCategory.objects.get(group=self.group, name="Credit Card Payment")
+        transfer_cat = ExpenseCategory.objects.get(group=self.group, name="Transfers")
+
+        due_date = datetime.date.today() + datetime.timedelta(days=10)
+        st = CardStatement.objects.create(
+            group=self.group,
+            payment_source=card,
+            statement_date=datetime.date.today() - datetime.timedelta(days=15),
+            due_date=due_date,
+            total_due=Decimal('12500.00'),
+            is_paid=False,
+        )
+
+        # 1. Card credit (payment receipt on credit card)
+        credit_txn = Expense.objects.create(
+            group=self.group,
+            payment_source=card,
+            direction='CREDIT',
+            amount=Decimal('12500.00'),
+            txn_date=datetime.date.today(),
+            category=transfer_cat,
+        )
+
+        # 2. Bank debit (twin payment from savings account)
+        bank_source = PaymentSource.objects.create(group=self.group, institution="HDFC", nickname="HDFC Savings", kind="BANK_ACCOUNT", last4="9988")
+        debit_txn = Expense.objects.create(
+            group=self.group,
+            payment_source=bank_source,
+            direction='DEBIT',
+            amount=Decimal('12500.00'),
+            txn_date=datetime.date.today(),
+            category=transfer_cat,
+        )
+
+        # Run reconciliation
+        auto_track_statement_payments(self.group)
+
+        st.refresh_from_db()
+        self.assertTrue(st.is_paid)
+        self.assertEqual(st.paid_amount, Decimal('12500.00'))
+
+        # Check that categories were healed to 'Credit Card Payment'
+        credit_txn.refresh_from_db()
+        debit_txn.refresh_from_db()
+        self.assertEqual(credit_txn.category, cc_cat)
+        self.assertEqual(debit_txn.category, cc_cat)
+
+        # Check upcoming_dues computation
+        dues = upcoming_dues(self.group, today=datetime.date.today())
+        # Since statement is fully paid, it should not be in unpaid dues
+        self.assertNotIn(st.pk, [d.pk for d in dues])
+
+    def test_upcoming_dues_partial_payment(self):
+        from expenses.statements import upcoming_dues
+        from expenses.models import CardStatement, PaymentSource
+
+        card = PaymentSource.objects.create(
+            group=self.group, institution="Axis", nickname="Axis Atlas", kind="CREDIT_CARD", last4="1122"
+        )
+        due_date = datetime.date.today() + datetime.timedelta(days=5)
+        st = CardStatement.objects.create(
+            group=self.group,
+            payment_source=card,
+            due_date=due_date,
+            total_due=Decimal('50000.00'),
+            paid_amount=Decimal('20000.00'),
+            is_paid=False,
+        )
+
+        dues = upcoming_dues(self.group, today=datetime.date.today())
+        due_item = next((d for d in dues if d.pk == st.pk), None)
+        self.assertIsNotNone(due_item)
+        self.assertEqual(due_item.remaining_due, Decimal('30000.00'))
+        self.assertTrue(due_item.is_partial)
+
+
+class ExpensesSecurityHardeningTests(TestCase):
+    def setUp(self):
+        from django.core.cache import cache
+        from .categories import ensure_default_categories
+        cache.clear()
+        self.group = AccountGroup.objects.create(name="ExpSecGroup")
+        self.group.config.feature_expenses = True
+        self.group.config.save()
+        ensure_default_categories(self.group)
+        self.primary = User.objects.create_user(
+            username="exp_primary", password="pw", user_type="PRIMARY", group=self.group
+        )
+        self.spouse = User.objects.create_user(
+            username="exp_spouse", password="pw", user_type="ACCOUNT_HOLDER", group=self.group
+        )
+
+    def tearDown(self):
+        from django.core.cache import cache
+        cache.clear()
+
+    def test_crypto_fails_closed_in_prod_when_secret_key_is_weak(self):
+        with mock.patch.dict('os.environ', {'EXPENSES_ENCRYPTION_KEY': ''}, clear=False):
+            with override_settings(DEBUG=False, SECRET_KEY='django-insecure-short'):
+                with self.assertRaises(RuntimeError):
+                    crypto._fernet()
+            with override_settings(DEBUG=False, SECRET_KEY='short'):
+                with self.assertRaises(RuntimeError):
+                    crypto._fernet()
+
+    def test_spouse_investment_isolation_across_analytics_emi_and_tenure(self):
+        from .emi import emi_projection
+        inv_cat = ExpenseCategory.objects.get(group=self.group, name='Investments')
+        shop_cat = ExpenseCategory.objects.get(group=self.group, name='Shopping')
+
+        # Previous month investment + shopping
+        Expense.objects.create(
+            group=self.group, amount=Decimal('500000.00'), direction='DEBIT',
+            txn_date=datetime.date(2026, 9, 15), merchant='Zerodha SIP', category=inv_cat,
+        )
+        Expense.objects.create(
+            group=self.group, amount=Decimal('5000.00'), direction='DEBIT',
+            txn_date=datetime.date(2026, 9, 15), merchant='Amazon', category=shop_cat,
+        )
+        # Current month investment EMI + shopping
+        inv_emi = Expense.objects.create(
+            group=self.group, amount=Decimal('25000.00'), direction='DEBIT',
+            txn_date=datetime.date(2026, 10, 5), merchant='Investment Loan EMI',
+            category=inv_cat, is_emi=True, emi_reference='INVEMI01',
+            emi_installment_num=1, emi_total_installments=12,
+        )
+        Expense.objects.create(
+            group=self.group, amount=Decimal('4000.00'), direction='DEBIT',
+            txn_date=datetime.date(2026, 10, 5), merchant='Flipkart', category=shop_cat,
+        )
+
+        summary_hidden = month_summary(
+            self.group, 2026, 10, today=datetime.date(2026, 10, 31), hide_investments=True
+        )
+        self.assertEqual(summary_hidden['prev_total'], Decimal('5000.00'))
+        self.assertEqual(summary_hidden['total'], Decimal('4000.00'))
+
+        trend_hidden = monthly_trend(
+            self.group, 2026, 10, n=2, today=datetime.date(2026, 10, 31), hide_investments=True
+        )
+        totals_by_month = {row['month']: row['total'] for row in trend_hidden['months']}
+        self.assertEqual(totals_by_month.get(9), Decimal('5000.00'))
+        self.assertEqual(totals_by_month.get(10), Decimal('4000.00'))
+
+        from .emi import emi_schedules
+        sched_hidden = emi_schedules(self.group, today=datetime.date(2026, 10, 15), hide_investments=True)
+        self.assertEqual(sched_hidden, [])
+        proj_hidden = emi_projection(
+            self.group,
+            datetime.date(2026, 10, 1),
+            datetime.date(2026, 12, 31),
+            today=datetime.date(2026, 10, 15),
+            hide_investments=True,
+        )
+        self.assertEqual(proj_hidden['items'], [])
+
+        # Spouse cannot mutate EMI tenure on an Investments EMI (returns 404)
+        self.client.force_login(self.spouse)
+        resp = self.client.post(reverse('expense_set_emi_tenure'), {
+            'ref': 'INVEMI01',
+            'expense_id': str(inv_emi.pk),
+            'total_installments': '6',
+            'installment_num': '2',
+        })
+        self.assertEqual(resp.status_code, 404)
+        inv_emi.refresh_from_db()
+        self.assertEqual(inv_emi.emi_total_installments, 12)
+
+    def test_statement_unlock_rate_limiting_and_password_preservation(self):
+        card = PaymentSource.objects.create(
+            group=self.group, kind='CREDIT_CARD', institution='HDFC', last4='7788'
+        )
+        card.statement_password = 'GoodCardPass1!'
+        card.save()
+        st = CardStatement.objects.create(
+            group=self.group, payment_source=card, status='NEEDS_PASSWORD',
+            pdf_blob=crypto.encrypt_bytes(b'%PDF-1.4 encrypted dummy'),
+        )
+
+        self.client.force_login(self.primary)
+        # 5 wrong attempts must NOT overwrite card.statement_password and must lock out on 6th attempt
+        with mock.patch('expenses.views.read_pdf', return_value=(None, True)):
+            for _ in range(5):
+                self.client.post(reverse('expenses_statement_unlock', args=[st.pk]), {
+                    'password': 'WrongGuess!',
+                    'save_password': '1',
+                })
+
+        card.refresh_from_db()
+        self.assertEqual(card.statement_password, 'GoodCardPass1!')
+
+        # 6th attempt is rate-limited before read_pdf is even called
+        with mock.patch('expenses.views.read_pdf') as mocked_read:
+            resp = self.client.post(reverse('expenses_statement_unlock', args=[st.pk]), {
+                'password': 'GoodCardPass1!',
+            })
+            self.assertEqual(resp.status_code, 302)
+            mocked_read.assert_not_called()
+
+    def test_gmail_oauth_callback_rejects_expired_and_cross_user_state(self):
+        import time as _time
+        self.client.force_login(self.primary)
+
+        # 1. Expired state (> 600s old)
+        session = self.client.session
+        session['expenses_gmail_oauth_state'] = {
+            'state': 'valid-token-123',
+            'uid': self.primary.pk,
+            'ts': _time.time() - 700,
+        }
+        session.save()
+        with mock.patch('expenses.views.gmail.exchange_code') as exchange:
+            resp = self.client.get(reverse('expenses_gmail_callback'), {'state': 'valid-token-123', 'code': 'abc'})
+            self.assertEqual(resp.status_code, 302)
+            exchange.assert_not_called()
+
+        # 2. Cross-user state (initiated by another user_id)
+        session = self.client.session
+        session['expenses_gmail_oauth_state'] = {
+            'state': 'valid-token-456',
+            'uid': self.spouse.pk,
+            'ts': _time.time(),
+        }
+        session.save()
+        with mock.patch('expenses.views.gmail.exchange_code') as exchange:
+            resp = self.client.get(reverse('expenses_gmail_callback'), {'state': 'valid-token-456', 'code': 'abc'})
+            self.assertEqual(resp.status_code, 302)
+            exchange.assert_not_called()
+
+

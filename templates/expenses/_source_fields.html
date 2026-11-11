@@ -1,44 +1,59 @@
 <label class="flex flex-col gap-1 sm:col-span-2">
-  <span class="text-[11px] font-bold uppercase tracking-wider opacity-60">Nickname</span>
-  <input type="text" name="nickname" maxlength="60" value="{{ s.nickname|default:'' }}" placeholder="e.g. Regalia Gold, Salary Account" class="input input-bordered input-sm w-full bg-base-100">
+  <span class="text-xs font-semibold text-base-content/75">Source Nickname</span>
+  <input type="text" name="nickname" maxlength="60" value="{{ s.nickname|default:'' }}" placeholder="e.g. Regalia Gold, Salary Account" class="v-input input input-bordered w-full min-h-11 lg:min-h-9 bg-base-100 rounded-lg text-base sm:text-sm">
 </label>
+
 <label class="flex flex-col gap-1">
-  <span class="text-[11px] font-bold uppercase tracking-wider opacity-60">Type</span>
-  <select name="kind" class="select select-bordered select-sm w-full bg-base-100">
+  <span class="text-xs font-semibold text-base-content/75">Account Type</span>
+  <select name="kind" class="v-input select select-bordered w-full min-h-11 lg:min-h-9 bg-base-100 rounded-lg text-base sm:text-xs">
     {% for value, label in kind_choices %}<option value="{{ value }}" {% if s.kind == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
   </select>
 </label>
+
 <label class="flex flex-col gap-1">
-  <span class="text-[11px] font-bold uppercase tracking-wider opacity-60">Bank / Issuer</span>
-  <input type="text" name="institution" maxlength="40" value="{{ s.institution|default:'' }}" placeholder="e.g. HDFC Bank, Axis Bank" class="input input-bordered input-sm w-full bg-base-100">
+  <span class="text-xs font-semibold text-base-content/75">Bank / Issuer</span>
+  <input type="text" name="institution" maxlength="40" value="{{ s.institution|default:'' }}" placeholder="e.g. HDFC Bank, Axis Bank" class="v-input input input-bordered w-full min-h-11 lg:min-h-9 bg-base-100 rounded-lg text-base sm:text-sm">
 </label>
+
 <label class="flex flex-col gap-1">
-  <span class="text-[11px] font-bold uppercase tracking-wider opacity-60">Last 4 digits</span>
-  <input type="text" name="last4" inputmode="numeric" maxlength="4" pattern="\d{4}" value="{{ s.last4|default:'' }}" placeholder="e.g. 4689" class="input input-bordered input-sm w-full font-mono tabular-nums bg-base-100">
+  <span class="text-xs font-semibold text-base-content/75">Last 4 Digits</span>
+  <input type="text" name="last4" inputmode="numeric" maxlength="4" pattern="\d{4}" value="{{ s.last4|default:'' }}" placeholder="e.g. 4689" class="v-input input input-bordered w-full min-h-11 lg:min-h-9 font-mono tabular-nums bg-base-100 rounded-lg text-base sm:text-sm">
 </label>
+
 <label class="flex flex-col gap-1">
-  <span class="text-[11px] font-bold uppercase tracking-wider opacity-60">Owner</span>
-  <select name="owner" class="select select-bordered select-sm w-full bg-base-100">
+  <span class="text-xs font-semibold text-base-content/75">Account Holder</span>
+  <select name="owner" class="v-input select select-bordered w-full min-h-11 lg:min-h-9 bg-base-100 rounded-lg text-base sm:text-xs">
     <option value="">Shared / Household</option>
     {% for m in members %}<option value="{{ m.pk }}" {% if s.owner_id == m.pk %}selected{% endif %}>{{ m.first_name|default:m.username }}</option>{% endfor %}
   </select>
 </label>
-<div class="flex flex-col gap-1 sm:col-span-2">
-  <div class="flex items-center justify-between">
-    <span class="text-[11px] font-bold uppercase tracking-wider opacity-60">Statement PDF Password</span>
+
+<div class="flex flex-col gap-1 sm:col-span-2 pt-1">
+  <div class="flex items-center justify-between gap-2">
+    <label for="stmtPwd_{{ s.pk|default:'new' }}" class="text-xs font-semibold text-base-content/75">Statement PDF Password</label>
     {% if s.statement_password_enc %}
-    <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400">
+    <span class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400">
       <span class="material-symbols-outlined text-xs">verified_user</span>Encrypted &amp; saved
     </span>
     {% endif %}
   </div>
-  <input type="password" name="statement_password" autocomplete="new-password" maxlength="64"
-         placeholder="{% if s.statement_password_enc %}Saved — leave blank to keep current password{% else %}e.g. ATUL0101 or last 4 digits{% endif %}"
-         class="input input-bordered input-sm w-full bg-base-100">
-  <span class="text-[11px] opacity-45 leading-relaxed">Stored encrypted with AES-GCM. Usually first 4 letters of your name + DDMM of birth, or card digits — check your bank's statement email.</span>
+  <div class="relative w-full">
+    <input type="password" id="stmtPwd_{{ s.pk|default:'new' }}" name="statement_password" autocomplete="new-password" maxlength="64"
+           aria-label="Statement PDF Password"
+           placeholder="{% if s.statement_password_enc %}Saved — leave blank to keep current password{% else %}e.g. ATUL0101 or last 4 digits{% endif %}"
+           class="v-input input input-bordered w-full min-h-11 lg:min-h-9 !pr-12 bg-base-100 rounded-lg text-base sm:text-sm">
+    <button type="button"
+            class="v-icon-btn absolute right-1 inset-y-0 my-auto !min-h-9 !min-w-9 flex items-center justify-center rounded-lg text-base-content/55 hover:text-base-content z-10 cursor-pointer"
+            aria-label="Toggle password visibility"
+            onclick="var i=this.previousElementSibling;i.type=i.type==='password'?'text':'password';this.querySelector('span').textContent=i.type==='password'?'visibility':'visibility_off'">
+      <span class="material-symbols-outlined text-base">visibility</span>
+    </button>
+  </div>
+  <span class="text-xs opacity-55 leading-relaxed mt-0.5">Stored encrypted with AES-GCM. Usually first 4 letters of your name + DDMM of birth, or card digits — check your bank's statement email.</span>
 </div>
+
 {% if s.statement_password_enc %}
-<label class="flex items-center gap-2 sm:col-span-2 cursor-pointer py-0.5">
-  <input type="checkbox" name="clear_password" class="checkbox checkbox-xs checkbox-error"><span class="text-xs opacity-75">Forget saved PDF password</span>
+<label class="flex items-center gap-2.5 sm:col-span-2 cursor-pointer min-h-11 py-1">
+  <input type="checkbox" name="clear_password" class="checkbox checkbox-sm checkbox-error rounded"><span class="text-xs text-error/85 font-medium">Forget saved PDF password</span>
 </label>
 {% endif %}

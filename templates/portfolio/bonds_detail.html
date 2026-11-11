@@ -2,98 +2,183 @@
 {% load indian_format %}
 {% load static %}
 
-{% block title %}Bonds — Portfolio — Vault{% endblock %}
+{% block title %}Bonds | Portfolio | Vault{% endblock %}
 
 {% block page_header %}
-<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+<div class="v-page-header">
   <div>
-    <p class="text-xs font-bold tracking-widest uppercase text-primary">Portfolio</p>
-    <h1 class="text-xl lg:text-2xl font-extrabold">Bonds</h1>
-    <p class="text-xs opacity-50">All bond holdings</p>
+    <h1 class="v-title flex items-center gap-2">
+      <span class="material-symbols-outlined text-teal-400 text-2xl">toll</span>
+      Sovereign &amp; Corporate Bonds
+    </h1>
+    <p class="v-subtitle">Government securities, RBI floating rate bonds, and corporate debt instruments</p>
   </div>
-  <div class="flex flex-wrap items-center gap-2">
-    <button type="button" class="btn btn-primary btn-sm gap-1" onclick="openAddModal()"><span class="material-symbols-outlined text-base">add</span>Add</button>
-    <a href="{% url 'portfolio_tracker' %}" class="btn btn-ghost btn-sm gap-1"><span class="material-symbols-outlined text-base">arrow_back</span>Portfolio</a>
+  <div class="v-toolbar">
+    <button type="button" class="v-btn v-btn-primary" onclick="openAddModal()">
+      <span class="material-symbols-outlined text-sm">add</span>Add Bond
+    </button>
+    <a href="{% url 'portfolio_tracker' %}#debt" class="v-btn v-btn-secondary">
+      <span class="material-symbols-outlined text-sm">arrow_back</span>Portfolio
+    </a>
   </div>
 </div>
 {% endblock %}
 
 {% block content %}
-<div class="card hero-gradient-portfolio shadow-sm card-hover animate-up mb-4">
-  <div class="card-body p-4 lg:p-6">
-    <div class="flex flex-wrap items-center gap-6">
-      <div class="stat-card stat-card-primary">
-        <div class="text-[10px] uppercase tracking-wider opacity-50">Total Bonds</div>
-        <div class="text-base font-bold mt-0.5 font-semibold">{{ total|inr }}</div>
+
+{# --- SIGNATURE LEDGER SUMMARY BAND --- #}
+<section class="v-ledger-band" aria-label="Bonds Summary">
+  <div class="v-lead-cell">
+    <div>
+      <div class="v-lead-label">
+        <span>Total Bond Corpus</span>
+        <span class="v-delta v-delta-pos text-xs py-0 px-2 font-semibold">Fixed Yield</span>
       </div>
-      <div class="stat-card">
-        <div class="text-[10px] uppercase tracking-wider opacity-50">Holdings</div>
-        <div class="text-base font-bold mt-0.5">{{ bonds|length }}</div>
+      <div class="v-lead-figure-row">
+        <span class="v-lead-figure tabular-nums">{{ total|inr }}</span>
+      </div>
+      <div class="v-lead-sub">
+        Portfolio holding across <strong class="text-base-content/85 tabular-nums">{{ bonds|length }} bond series</strong>
       </div>
     </div>
-  </div>
-</div>
 
-<div class="card bg-base-200 shadow-sm card-hover animate-up mb-4" style="animation-delay:0.1s">
-  <div class="card-body p-4">
-    <h2 class="card-title text-base mb-3">All Bond Holdings</h2>
+    {% if total > 0 and bonds %}
+    <div class="v-horizon">
+      <div class="v-horizon-bar" role="img" aria-label="Bond series distribution">
+        {% for b in bonds|slice:":4" %}
+        <div class="v-horizon-seg" style="width: {% widthratio b.amount total 100 %}%; background: {% cycle '#14b8a6' '#10b981' '#0ea5e9' '#94a3b8' %};" title="{{ b.account_name }}: {{ b.amount|inr }}"></div>
+        {% endfor %}
+      </div>
+      <div class="v-horizon-legend">
+        {% for b in bonds|slice:":3" %}
+        <span class="v-horizon-item">
+          <span class="v-horizon-dot" style="background: {% cycle '#14b8a6' '#10b981' '#0ea5e9' %};"></span>
+          {{ b.account_name|truncatechars:18 }} <strong>{% widthratio b.amount total 100 %}%</strong>
+        </span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="v-stat-grid">
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Total Bond Corpus</div>
+      <div class="v-stat-value text-base-content tabular-nums">{{ total|inr }}</div>
+      <div class="v-stat-sub">Sovereign &amp; corporate</div>
+    </div>
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Largest Tranche</div>
+      <div class="v-stat-value text-base-content tabular-nums">{% if bonds %}{{ bonds.0.amount|inr }}{% else %}₹0{% endif %}</div>
+      <div class="v-stat-sub truncate">{% if bonds %}{{ bonds.0.account_name }}{% else %}No series{% endif %}</div>
+    </div>
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Active Tranches</div>
+      <div class="v-stat-value text-base-content tabular-nums">{{ bonds|length }}</div>
+      <div class="v-stat-sub">Series instruments</div>
+    </div>
+    <div class="v-stat-cell">
+      <div class="v-stat-label">Asset Class</div>
+      <div class="v-stat-value text-teal-400">Fixed Debt</div>
+      <div class="v-stat-sub">Capital preservation</div>
+    </div>
+  </div>
+</section>
+
+{# --- BONDS BLOTTER --- #}
+<section class="v-panel mb-6" aria-label="All Bond Holdings">
+  <div class="v-panel-header">
+    <div class="flex items-center gap-2 min-w-0">
+      <h2 class="v-panel-title">
+        <span class="material-symbols-outlined text-base text-teal-400">receipt</span>
+        All Bond Holdings
+      </h2>
+      <span class="v-delta v-delta-neutral text-xs font-semibold tabular-nums">{{ bonds|length }} Holdings</span>
+    </div>
+    <button type="button" class="v-btn v-btn-secondary v-btn-sm" onclick="openAddModal()">
+      <span class="material-symbols-outlined text-sm">add</span>Add Bond
+    </button>
+  </div>
+  <div class="v-panel-body p-0">
     {% if bonds %}
-    {# Desktop table #}
-    <div class="hidden md:block overflow-x-auto">
-      <table class="table table-sm" id="bondsTable">
+    {# Desktop Table #}
+    <div class="v-panel-table hidden md:block overflow-x-auto">
+      <table class="v-table" id="bondsTable">
         <thead>
           <tr>
-            <th class="sortable-th">Account <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
-            <th class="sortable-th text-right">Amount <span class="material-symbols-outlined sort-icon text-base opacity-50 align-middle">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none">Account / Series <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="sortable-th cursor-pointer select-none v-num">Holding Amount <span class="material-symbols-outlined sort-icon text-xs align-middle opacity-40">unfold_more</span></th>
+            <th class="v-num">Share</th>
             <th>Remarks</th>
-            <th class="w-10"></th>
+            <th class="text-right w-16">Action</th>
           </tr>
         </thead>
         <tbody>
           {% for b in bonds %}
-          <tr class="hover">
-            <td class="font-semibold">{{ b.account_name }}</td>
-            <td class="text-right font-semibold" data-val="{{ b.amount }}">{{ b.amount|inr }}</td>
-            <td class="opacity-60 text-sm">{{ b.remarks|default:"—" }}</td>
+          <tr>
+            <td class="font-bold text-xs text-base-content">{{ b.account_name }}</td>
+            <td class="v-num text-xs font-bold text-base-content" data-val="{{ b.amount }}">{{ b.amount|inr }}</td>
+            <td class="v-num text-xs text-base-content/60">{% if total > 0 %}{% widthratio b.amount total 100 %}%{% else %}0%{% endif %}</td>
+            <td class="text-xs text-base-content/60 max-w-xs truncate">{{ b.remarks|default:"—" }}</td>
             <td class="text-right">
-              <button type="button" class="btn btn-ghost btn-xs btn-square" data-edit-bond data-id="{{ b.id }}" data-account="{{ b.account_name }}" data-amount="{{ b.amount }}" data-remarks="{{ b.remarks|default:'' }}"><span class="material-symbols-outlined text-base">edit</span></button>
+              <button type="button" class="v-icon-btn" data-edit-bond
+                      data-id="{{ b.id }}" data-account="{{ b.account_name }}"
+                      data-amount="{{ b.amount }}" data-remarks="{{ b.remarks|default:'' }}"
+                      aria-label="Edit {{ b.account_name }}">
+                <span class="material-symbols-outlined text-sm">edit</span>
+              </button>
             </td>
           </tr>
           {% endfor %}
-          <tr class="total-row border-t-2 border-base-300">
-            <td class="font-bold text-primary">Total</td>
-            <td class="text-right font-bold text-primary" data-val="{{ total }}">{{ total|inr }}</td>
+          <tr class="total-row border-t-2 border-[var(--v-hairline)] font-bold">
+            <td class="text-xs text-base-content">Total Bonds Value</td>
+            <td class="v-num text-xs text-base-content" data-val="{{ total }}">{{ total|inr }}</td>
+            <td class="v-num text-xs text-base-content/60">100%</td>
             <td colspan="2"></td>
           </tr>
         </tbody>
       </table>
     </div>
-    {# Mobile card view #}
-    <div class="md:hidden space-y-2">
+
+    {# Mobile View #}
+    <div class="md:hidden divide-y divide-[var(--v-hairline)]">
       {% for b in bonds %}
-      <div class="table-card flex items-center justify-between gap-3">
-        <div class="flex-1 min-w-0">
-          <div class="font-semibold text-sm">{{ b.account_name }}</div>
-          <div class="text-xs opacity-50 mt-0.5 truncate">{{ b.remarks|default:"—" }}</div>
+      <div class="v-mobile-row gap-3">
+        <div class="min-w-0 flex-1">
+          <div class="font-bold text-sm text-base-content truncate">{{ b.account_name }}</div>
+          <div class="text-xs text-base-content/55 mt-0.5 truncate">
+            {% if total > 0 %}<span class="tabular-nums">{% widthratio b.amount total 100 %}% share</span>{% endif %}{% if b.remarks %} &middot; {{ b.remarks }}{% endif %}
+          </div>
         </div>
-        <div class="flex items-center gap-2 shrink-0">
-          <span class="font-bold text-sm">{{ b.amount|inr }}</span>
-          <button type="button" class="btn btn-ghost btn-xs btn-square" data-edit-bond data-id="{{ b.id }}" data-account="{{ b.account_name }}" data-amount="{{ b.amount }}" data-remarks="{{ b.remarks|default:'' }}"><span class="material-symbols-outlined text-base">edit</span></button>
+        <div class="flex items-center gap-1.5 shrink-0">
+          <span class="font-bold text-sm text-base-content tabular-nums">{{ b.amount|inr }}</span>
+          <button type="button" class="v-icon-btn" data-edit-bond
+                  data-id="{{ b.id }}" data-account="{{ b.account_name }}"
+                  data-amount="{{ b.amount }}" data-remarks="{{ b.remarks|default:'' }}"
+                  aria-label="Edit {{ b.account_name }}">
+            <span class="material-symbols-outlined text-base">edit</span>
+          </button>
         </div>
       </div>
       {% endfor %}
-      <div class="flex items-center justify-between px-1 pt-2 border-t border-base-300 text-sm">
-        <span class="font-bold text-primary">Total</span>
-        <span class="font-bold text-primary">{{ total|inr }}</span>
-      </div>
     </div>
     {% else %}
-    <p class="text-sm opacity-40">No bond holdings.</p>
+    <div class="v-empty py-10">
+      <div class="v-empty-icon text-teal-400">
+        <span class="material-symbols-outlined text-3xl">toll</span>
+      </div>
+      <h3 class="v-empty-title">No Bond Holdings Recorded</h3>
+      <p class="v-empty-desc">Track RBI floating rate savings bonds, sovereign gold bonds (SGB), and corporate NCDs.</p>
+      <button type="button" class="v-btn v-btn-primary" onclick="openAddModal()">
+        <span class="material-symbols-outlined text-sm">add</span>Add First Bond
+      </button>
+    </div>
     {% endif %}
   </div>
-</div>
+</section>
 
 {% include 'portfolio/_bond_form_modal.html' with form_obj=form %}
+
 {% endblock %}
 
 {% block extra_js %}
@@ -101,25 +186,49 @@
 <script>
 function openAddModal() {
   var form = document.getElementById('bondForm');
+  if (!form) return;
   form.action = "{% url 'add_bond' %}";
   form.reset();
-  document.getElementById('bondDeleteBtn').style.display = 'none';
-  document.getElementById('bondModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span>Add Bond Holding';
+  var delBtn = document.getElementById('bondDeleteBtn');
+  if (delBtn) {
+    delBtn.classList.add('hidden');
+    delBtn.style.display = 'none';
+  }
+  var titleEl = document.getElementById('bondModalTitle');
+  if (titleEl) {
+    titleEl.innerHTML = '<span class="material-symbols-outlined text-primary">add_circle</span> Add Bond Holding';
+  }
   openModal('addBondModal');
 }
+
 document.addEventListener('click', function(e) {
   var btn = e.target.closest('[data-edit-bond]');
   if (!btn) return;
   var form = document.getElementById('bondForm');
-  form.action = "{% url 'edit_bond' pk=0 %}".replace('/0/', '/' + btn.dataset.id + '/');
-  document.getElementById('deleteBondForm').action = "{% url 'delete_bond' pk=0 %}".replace('/0/', '/' + btn.dataset.id + '/');
-  document.getElementById('bondDeleteBtn').style.display = 'inline-flex';
-  document.getElementById('bondModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">edit</span>Edit Bond';
-  form.querySelector('[name=account_name]').value = btn.dataset.account;
-  form.querySelector('[name=amount]').value = btn.dataset.amount;
-  form.querySelector('[name=remarks]').value = btn.dataset.remarks;
+  if (!form) return;
+  var id = btn.dataset.id;
+  form.action = "{% url 'edit_bond' pk=0 %}".replace('/0/', '/' + id + '/');
+  var delForm = document.getElementById('deleteBondForm');
+  if (delForm) delForm.action = "{% url 'delete_bond' pk=0 %}".replace('/0/', '/' + id + '/');
+  var delBtn = document.getElementById('bondDeleteBtn');
+  if (delBtn) {
+    delBtn.classList.remove('hidden');
+    delBtn.style.display = 'inline-flex';
+  }
+  var titleEl = document.getElementById('bondModalTitle');
+  if (titleEl) {
+    titleEl.innerHTML = '<span class="material-symbols-outlined text-primary">edit</span> Edit Bond Holding';
+  }
+
+  form.querySelector('[name=account_name]').value = btn.dataset.account || '';
+  form.querySelector('[name=amount]').value = btn.dataset.amount || '';
+  form.querySelector('[name=remarks]').value = btn.dataset.remarks || '';
+
   openModal('addBondModal');
 });
-document.addEventListener('DOMContentLoaded', function() { initPagination('bondsTable', 15); });
+
+document.addEventListener('DOMContentLoaded', function() {
+  initPagination('bondsTable', 20);
+});
 </script>
 {% endblock %}

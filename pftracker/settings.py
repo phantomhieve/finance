@@ -9,22 +9,34 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Dev-only fallback; production must set DJANGO_SECRET_KEY in .env
 _default_key = 'django-insecure-dev-only-change-me'
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', _default_key)
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', _default_key).strip()
 
 DEBUG = os.environ.get('DJANGO_DEBUG', 'False').lower() in ('true', '1', 'yes')
 
-if not DEBUG and SECRET_KEY == _default_key:
+if not DEBUG and (
+    not SECRET_KEY
+    or SECRET_KEY == _default_key
+    or SECRET_KEY.startswith('django-insecure-')
+    or len(SECRET_KEY) < 32
+):
     raise RuntimeError(
-        'DJANGO_SECRET_KEY must be set in production. '
+        'DJANGO_SECRET_KEY must be set to a strong secret (>= 32 chars) in production. '
         'Generate one with: python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"'
     )
 
-ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = [
+    h.strip()
+    for h in os.environ.get('DJANGO_ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+    if h.strip()
+]
+if not DEBUG and (not ALLOWED_HOSTS or '*' in ALLOWED_HOSTS):
+    raise RuntimeError('DJANGO_ALLOWED_HOSTS must list explicit hostnames in production (no wildcard "*").')
 
-CSRF_TRUSTED_ORIGINS = os.environ.get(
-    'DJANGO_CSRF_TRUSTED_ORIGINS',
-    'http://localhost:8000',
-).split(',')
+CSRF_TRUSTED_ORIGINS = [
+    o.strip()
+    for o in os.environ.get('DJANGO_CSRF_TRUSTED_ORIGINS', 'http://localhost:8000').split(',')
+    if o.strip()
+]
 
 INSTALLED_APPS = [
     'unfold',
@@ -224,6 +236,21 @@ elif 'postgres' in _db_engine:
     DATABASES['default']['OPTIONS'].setdefault('keepalives_interval', 10)
     DATABASES['default']['OPTIONS'].setdefault('keepalives_count', 5)
 
+# Caching — in-memory cache for development/test, configurable via DJANGO_CACHE_BACKEND
+CACHES = {
+    'default': {
+        'BACKEND': os.environ.get(
+            'DJANGO_CACHE_BACKEND',
+            'django.core.cache.backends.locmem.LocMemCache'
+        ),
+        'LOCATION': 'vault-cache',
+        'TIMEOUT': 300,
+        'OPTIONS': {
+            'MAX_ENTRIES': 2000,
+        },
+    }
+}
+
 
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
@@ -310,6 +337,7 @@ SECURE_CSP = {
     "font-src": [CSP.SELF, "https://fonts.gstatic.com"],
     "connect-src": [CSP.SELF, "https://accounts.google.com"],
     "img-src": [CSP.SELF, "data:", "blob:", "https://*.googleusercontent.com"],
+    "object-src": [CSP.NONE],
     "frame-ancestors": [CSP.NONE],
     "base-uri": [CSP.SELF],
 }
@@ -336,6 +364,8 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin-allow-popups'
+DATA_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024  # 5 MB max in-memory POST/JSON payload
+DATA_UPLOAD_MAX_NUMBER_FIELDS = 1000
 
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'
@@ -353,8 +383,9 @@ EXPENSES_UNLOCK_TTL = int(os.environ.get('EXPENSES_UNLOCK_TTL_SECONDS', str(4 * 
 if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-    # Cloudflare Tunnel terminates TLS — do NOT redirect internally or it loops
-    SECURE_SSL_REDIRECT = False
+    # Cloudflare Tunnel terminates TLS — do NOT redirect internally by default or it loops;
+    # set DJANGO_SECURE_SSL_REDIRECT=true when terminating TLS without a tunnel loop.
+    SECURE_SSL_REDIRECT = os.environ.get('DJANGO_SECURE_SSL_REDIRECT', 'False').lower() in ('true', '1', 'yes')
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_HSTS_SECONDS = 31_536_000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
@@ -420,9 +451,10 @@ OAUTH2_PROVIDER = {
 }
 
 # CORS Configuration for MCP & OAuth
-# Allow CORS for discovery endpoints, MCP API, and OAuth token endpoints
-CORS_URLS_REGEX = r'^/(\.well-known/.*|mcp/.*|o/.*)$'
+# Allow CORS for discovery endpoints, MCP API, and OAuth token/registration endpoints (never /o/authorize/)
+CORS_URLS_REGEX = r'^/(\.well-known/.*|mcp/.*|o/(?:token|register|revoke_token|introspect)/?)$'
 CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = False
 CORS_ALLOW_HEADERS = (
     'accept',
     'accept-encoding',
@@ -468,7 +500,7 @@ SHAKTI_RETRY_DELAY = int(os.environ.get('SHAKTI_RETRY_DELAY', '3'))
 
 GEMINI_API_KEYS = os.environ.get('GEMINI_API_KEYS', '')
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
-GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-4-argon')
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-4-carbon')
 EXPENSES_GEMINI_MODEL = os.environ.get('EXPENSES_GEMINI_MODEL', 'gemini-3.8-flash')
 GEMINI_THINKING_LEVEL = os.environ.get('GEMINI_THINKING_LEVEL', '')
 GEMINI_THINKING_BUDGET = os.environ.get('GEMINI_THINKING_BUDGET', None)
@@ -476,5 +508,8 @@ GEMINI_THINKING_BUDGET = os.environ.get('GEMINI_THINKING_BUDGET', None)
 # Multi-Stage DAG Engine for Portfolio Insights
 ENABLE_PORTFOLIO_DAG = os.environ.get('ENABLE_PORTFOLIO_DAG', 'true').lower() in ('true', '1', 'yes')
 PORTFOLIO_DAG_CONCURRENCY = os.environ.get('PORTFOLIO_DAG_CONCURRENCY', 'true').lower() in ('true', '1', 'yes')
+PORTFOLIO_DAG_STAGE_TIMEOUT = float(os.environ.get('PORTFOLIO_DAG_STAGE_TIMEOUT', '90.0'))
+PORTFOLIO_DAG_STAGE_CACHE = os.environ.get('PORTFOLIO_DAG_STAGE_CACHE', 'false').lower() in ('true', '1', 'yes')
+PORTFOLIO_DAG_STAGE_CACHE_TTL = int(os.environ.get('PORTFOLIO_DAG_STAGE_CACHE_TTL', '600'))
 
 

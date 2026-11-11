@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import time
 from typing import Any, TypeVar
 
 from pydantic import BaseModel
 
 from pftracker.ai_gateway import TaskProfile, TaskType, ai_config, gateway
+from pftracker.concurrency import DjangoSafeThreadPoolExecutor
 
 from .prompts import (
     ANOMALY_SYSTEM,
@@ -40,6 +42,7 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)
 MAX_BATCH = 40
 MATCH_BATCH = 20
+_WS_RE = re.compile(r"\s+")
 
 
 def ai_available(task: TaskProfile | TaskType = TaskType.FAST) -> bool:
@@ -60,8 +63,7 @@ def _generate(
     model: str | None = None,
     **kwargs: Any,
 ) -> T:
-    """Execute structured generation with task-level tier routing and model override."""
-    model_override = model or os.environ.get("EXPENSES_GEMINI_MODEL")
+    """Execute structured generation with task-level tier routing and optional model override."""
     start_t = time.monotonic()
     preferred_node = "gemini-cloud" if gateway.node_registry.get("gemini-cloud") else None
 
@@ -71,7 +73,7 @@ def _generate(
         system=system,
         task=task,
         preferred_node_id=preferred_node,
-        model=model_override,
+        model=model,
         temperature=temperature,
         max_tokens=max_tokens,
         **kwargs,
@@ -86,12 +88,23 @@ def _generate(
     return result
 
 
+def _canonical_categorise_key(item: dict[str, Any]) -> tuple[str, str, str]:
+    """Build canonical (merchant_norm, direction, channel) key to deduplicate batch items."""
+    raw_merchant = str(item.get("merchant") or item.get("raw") or "").strip().lower()
+    merchant_norm = _WS_RE.sub(" ", raw_merchant)
+    if not merchant_norm:
+        return ("__id__", str(item.get("id")), "")
+    direction = str(item.get("direction") or "DEBIT").strip().upper()
+    channel = str(item.get("channel") or "").strip().upper()
+    return (merchant_norm, direction, channel)
+
+
 def categorise(
     items: list[dict[str, Any]],
     category_names: list[str],
     examples: list[tuple[str, str]],
 ) -> dict[int, tuple[str, float]]:
-    """Batch-categorise transactions using past decisions as few-shot examples.
+    """Batch-categorise transactions using canonical merchant deduplication and few-shot examples.
 
     Args:
         items: List of transaction dicts [{'id', 'merchant', 'raw', 'amount', 'direction', 'channel'}].
@@ -105,10 +118,27 @@ def categorise(
         return {}
 
     allowed = set(category_names)
+    allowed_ci = {c.strip().lower(): c for c in category_names if isinstance(c, str) and c.strip()}
+
+    # Deduplicate identical (merchant_norm, direction, channel) rows before chunking
+    representatives: list[dict[str, Any]] = []
+    rep_id_to_member_ids: dict[int, list[int]] = {}
+    key_to_rep_id: dict[tuple[str, str, str], int] = {}
+
+    for item in items:
+        item_id = int(item["id"])
+        ckey = _canonical_categorise_key(item)
+        if ckey in key_to_rep_id:
+            rep_id_to_member_ids[key_to_rep_id[ckey]].append(item_id)
+        else:
+            key_to_rep_id[ckey] = item_id
+            rep_id_to_member_ids[item_id] = [item_id]
+            representatives.append(item)
+
     out: dict[int, tuple[str, float]] = {}
 
-    for start in range(0, len(items), MAX_BATCH):
-        chunk = items[start:start + MAX_BATCH]
+    for start in range(0, len(representatives), MAX_BATCH):
+        chunk = representatives[start:start + MAX_BATCH]
         prompt = build_categorise_prompt(chunk, allowed, examples)
         try:
             parsed = _generate(
@@ -122,9 +152,11 @@ def categorise(
             continue
 
         for r in parsed.results:
-            if r.category in allowed:
+            resolved_cat = r.category if r.category in allowed else allowed_ci.get((r.category or "").strip().lower())
+            if resolved_cat:
                 confidence = max(0.0, min(1.0, float(r.confidence)))
-                out[r.id] = (r.category, confidence)
+                for member_id in rep_id_to_member_ids.get(r.id, [r.id]):
+                    out[member_id] = (resolved_cat, confidence)
 
     return out
 
@@ -149,27 +181,51 @@ def extract_transaction(subject: str, body: str) -> ExtractedTxn | None:
     return result if result.is_transaction and result.amount else None
 
 
+def _extract_single_statement_chunk(chunk: str) -> list[Any]:
+    result = _generate(
+        prompt=build_statement_prompt(chunk),
+        schema=ExtractedLines,
+        system=STATEMENT_SYSTEM,
+        task=TaskProfile.STATEMENT_PARSING,
+    )
+    return list(result.lines)
+
+
 def extract_statement_lines(text: str) -> list[Any]:
     """AI line-item extraction for statement PDFs the regex engine cannot (fully) parse.
 
-    Long statements are processed in line-aligned chunks so later pages are not dropped.
+    Long statements are split on line boundaries and processed concurrently (up to 3 workers)
+    while strictly preserving original page/chunk order.
     """
     if not ai_available(TaskProfile.STATEMENT_PARSING) or not text:
         return []
 
-    out: list[Any] = []
-    for chunk in chunk_statement_text(text):
+    chunks = chunk_statement_text(text)
+    if not chunks:
+        return []
+
+    if len(chunks) == 1:
         try:
-            result = _generate(
-                prompt=build_statement_prompt(chunk),
-                schema=ExtractedLines,
-                system=STATEMENT_SYSTEM,
-                task=TaskProfile.STATEMENT_PARSING,
-            )
+            return _extract_single_statement_chunk(chunks[0])
         except Exception as exc:
             logger.warning("AI statement extraction failed: %s", exc)
-            continue
-        out.extend(result.lines)
+            return []
+
+    ordered_results: list[list[Any]] = [[] for _ in chunks]
+    with DjangoSafeThreadPoolExecutor(max_workers=min(3, len(chunks))) as executor:
+        futures = [
+            (idx, executor.submit(_extract_single_statement_chunk, chunk))
+            for idx, chunk in enumerate(chunks)
+        ]
+        for idx, fut in futures:
+            try:
+                ordered_results[idx] = fut.result()
+            except Exception as exc:
+                logger.warning("AI statement extraction failed on chunk %d/%d: %s", idx + 1, len(chunks), exc)
+
+    out: list[Any] = []
+    for lines in ordered_results:
+        out.extend(lines)
     return out
 
 
@@ -278,4 +334,3 @@ def detect_anomalies(
             continue
 
     return out
-

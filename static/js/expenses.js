@@ -9,6 +9,7 @@ var Expenses = (function () {
   var data = readJson('expense-data') || {};
   var current = null;
   var addUrl = (document.getElementById('expenseForm') || {}).action;
+  var _reducedMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   function $(id) { return document.getElementById(id); }
 
@@ -108,7 +109,7 @@ var Expenses = (function () {
       toggle('expMeta', true);
       toggle('expDeleteBtn', true, 'inline-flex');
     } else {
-      form.action = '/expenses/add/';
+      form.action = addUrl || '/expenses/add/';
       setText('expModalTitle', 'Add expense');
       $('expDate').value = new Date().toLocaleDateString('en-CA');
       var self = document.querySelector('#expMember option[data-self]');
@@ -140,15 +141,21 @@ var Expenses = (function () {
   /* ── Charts ─────────────────────────────────────────────────────── */
 
   var ORANGE = '#fb923c';
+  var _paceChartInstance = null;
+  var _trendChartInstance = null;
+  var _paceChartArgs = null;
+  var _trendChartArgs = null;
 
   function palette() {
     var dark = document.documentElement.getAttribute('data-theme') !== 'winter';
     return {
-      grid: dark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)',
-      tick: 'rgba(128,128,128,0.6)',
-      muted: dark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.28)',
-      soft: dark ? 'rgba(148,163,184,0.22)' : 'rgba(100,116,139,0.22)',
-      label: dark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.65)',
+      dark: dark,
+      grid: dark ? 'rgba(226, 232, 240, 0.06)' : 'rgba(15, 23, 42, 0.07)',
+      tick: dark ? '#94a3b8' : '#475569',
+      muted: dark ? 'rgba(226, 232, 240, 0.30)' : 'rgba(15, 23, 42, 0.30)',
+      soft: dark ? 'rgba(148, 163, 184, 0.24)' : 'rgba(100, 116, 139, 0.24)',
+      label: dark ? '#cbd5e1' : '#334155',
+      pointBorder: dark ? '#0b0f17' : '#ffffff',
     };
   }
 
@@ -159,12 +166,12 @@ var Expenses = (function () {
       var meta = chart.getDatasetMeta(0);
       var ctx = chart.ctx;
       ctx.save();
-      ctx.font = '600 10px ui-sans-serif, system-ui, sans-serif';
+      ctx.font = '600 10px Inter, ui-sans-serif, system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.fillStyle = palette().label;
       meta.data.forEach(function (bar, i) {
         var v = chart.data.datasets[0].data[i];
-        if (v) ctx.fillText(inrShort(v), bar.x, bar.y - 5);
+        if (v) ctx.fillText(inrShort(v), bar.x, Math.max(12, bar.y - 5));
       });
       ctx.restore();
     },
@@ -182,14 +189,16 @@ var Expenses = (function () {
   }
 
   var tooltip = {
-    backgroundColor: 'oklch(0.2 0 0 / 0.95)',
-    borderColor: 'rgba(128,128,128,0.15)',
+    backgroundColor: 'rgba(17, 23, 34, 0.95)',
+    borderColor: 'rgba(226, 232, 240, 0.16)',
     borderWidth: 1,
-    titleColor: '#ddd',
-    bodyColor: '#aaa',
+    titleColor: '#f8fafc',
+    bodyColor: '#cbd5e1',
     padding: 10,
     cornerRadius: 8,
     displayColors: false,
+    titleFont: { family: "'Inter', system-ui, sans-serif", size: 12, weight: '600' },
+    bodyFont: { family: "'Inter', system-ui, sans-serif", size: 12 },
   };
 
   function cumulative(values, upto) {
@@ -203,6 +212,8 @@ var Expenses = (function () {
 
   // This month's running total against last month's, so a big day-1 rent payment doesn't hide the rest.
   function paceChart(canvas, d) {
+    _paceChartArgs = [canvas, d];
+    if (_paceChartInstance) _paceChartInstance.destroy();
     var c = palette();
     var days = Math.max(d.daily.length, d.prev_daily.length);
     var labels = [];
@@ -210,7 +221,7 @@ var Expenses = (function () {
     var current = cumulative(d.daily, d.upto);
     var previous = cumulative(d.prev_daily);
     var last = d.upto - 1;
-    new Chart(canvas, {
+    _paceChartInstance = new Chart(canvas, {
       type: 'line',
       data: {
         labels: labels,
@@ -221,13 +232,13 @@ var Expenses = (function () {
               var area = ctx.chart.chartArea;
               if (!area) return 'transparent';
               var g = ctx.chart.ctx.createLinearGradient(0, area.top, 0, area.bottom);
-              g.addColorStop(0, 'rgba(251,146,60,0.28)');
+              g.addColorStop(0, 'rgba(251,146,60,0.26)');
               g.addColorStop(1, 'rgba(251,146,60,0)');
               return g;
             },
             fill: true,
             pointRadius: function (ctx) { return ctx.dataIndex === last ? 4 : 0; },
-            pointBackgroundColor: ORANGE, pointBorderColor: '#0a0a14', pointBorderWidth: 2, pointHoverRadius: 4,
+            pointBackgroundColor: ORANGE, pointBorderColor: c.pointBorder, pointBorderWidth: 2, pointHoverRadius: 5,
           },
           {
             label: d.prev_label, data: previous, borderColor: c.muted, borderWidth: 1.5, borderDash: [4, 4],
@@ -236,9 +247,10 @@ var Expenses = (function () {
         ],
       },
       options: {
-        responsive: true, maintainAspectRatio: false, animation: { duration: 700 },
+        responsive: true, maintainAspectRatio: false,
+        animation: _reducedMotion ? false : { duration: 600 },
         interaction: { mode: 'index', intersect: false },
-        layout: { padding: { top: 6, right: 4 } },
+        layout: { padding: { top: 8, right: 6, left: 4, bottom: 2 } },
         plugins: {
           legend: { display: false },
           tooltip: Object.assign({}, tooltip, {
@@ -252,7 +264,7 @@ var Expenses = (function () {
         scales: {
           x: {
             grid: { display: false }, border: { display: false },
-            ticks: { color: c.tick, font: { size: 9 }, maxRotation: 0, autoSkip: false,
+            ticks: { color: c.tick, font: { family: "'Inter', system-ui, sans-serif", size: 9.5 }, maxRotation: 0, autoSkip: false,
                      callback: function (v, i) { var n = i + 1; return n === 1 || n % 7 === 0 || n === days ? n : ''; } },
           },
           y: { display: false, beginAtZero: true },
@@ -262,6 +274,8 @@ var Expenses = (function () {
   }
 
   function trendChart(canvas, d) {
+    _trendChartArgs = [canvas, d];
+    if (_trendChartInstance) _trendChartInstance.destroy();
     var c = palette();
     var datasets = [{
       type: 'bar', data: d.values, borderRadius: 6, borderSkipped: false, maxBarThickness: 34,
@@ -273,16 +287,21 @@ var Expenses = (function () {
         borderWidth: 1.5, borderDash: [4, 4], pointRadius: 0, pointHoverRadius: 0,
       });
     }
-    new Chart(canvas, {
+    _trendChartInstance = new Chart(canvas, {
       data: { labels: d.labels, datasets: datasets },
       plugins: [barValues],
       options: {
-        responsive: true, maintainAspectRatio: false, animation: { duration: 600 },
-        layout: { padding: { top: 16 } },
+        responsive: true, maintainAspectRatio: false,
+        animation: _reducedMotion ? false : { duration: 550 },
+        layout: { padding: { top: 20, right: 6, left: 6, bottom: 2 } },
         onClick: function (_, els) {
           if (els.length) window.location.search = '?m=' + d.params[els[0].index];
         },
-        onHover: function (evt, els) { evt.native.target.style.cursor = els.length ? 'pointer' : 'default'; },
+        onHover: function (evt, els) {
+          if (evt && evt.native && evt.native.target) {
+            evt.native.target.style.cursor = els.length ? 'pointer' : 'default';
+          }
+        },
         plugins: {
           legend: { display: false },
           tooltip: Object.assign({}, tooltip, {
@@ -294,15 +313,15 @@ var Expenses = (function () {
           }),
         },
         scales: {
-          x: { grid: { display: false }, border: { display: false }, ticks: { color: c.tick, font: { size: 10 } } },
+          x: { grid: { display: false }, border: { display: false }, ticks: { color: c.tick, font: { family: "'Inter', system-ui, sans-serif", size: 10 }, maxRotation: 0 } },
           y: { display: false, beginAtZero: true },
         },
       },
     });
   }
 
-  // Vault's chart palette: category hues sit too close together (food vs fuel) to tell apart when stacked.
-  var STACK_COLORS = ['#648cfa', '#a78bfa', '#34d399', '#fbbf24', '#f87171'];
+  // Vault's chart palette: distinct hues when stacked.
+  var STACK_COLORS = ['#6366f1', '#8b5cf6', '#10b981', '#eab308', '#f43f5e'];
   var _yearChartInstance = null;
   var _yearChartData = null;
   var _yearChartCanvas = null;
@@ -340,7 +359,7 @@ var Expenses = (function () {
           }
         });
         if (sum > 0 && barX != null && topY < Infinity) {
-          ctx.fillText(inrShort(sum), barX, Math.max(10, topY - 5));
+          ctx.fillText(inrShort(sum), barX, Math.max(12, topY - 5));
         }
       });
       ctx.restore();
@@ -358,7 +377,7 @@ var Expenses = (function () {
         stack: 'spend',
         backgroundColor: d.totals.map(function (v, i) {
           if (d.partial && d.partial[i]) return 'rgba(251, 146, 60, 0.65)';
-          if (peak > 0 && v === peak) return '#f87171';
+          if (peak > 0 && v === peak) return '#f43f5e';
           return ORANGE;
         }),
         hoverBackgroundColor: ORANGE,
@@ -393,13 +412,15 @@ var Expenses = (function () {
     if (_yearChartInstance) {
       _yearChartInstance.destroy();
     }
+    var isNarrow = window.innerWidth < 640;
     var datasets = buildYearDatasets(d, _yearChartMode, c);
     _yearChartInstance = new Chart(canvas, {
       data: { labels: d.labels, datasets: datasets },
       plugins: [yearTopValues],
       options: {
-        responsive: true, maintainAspectRatio: false, animation: { duration: 650 },
-        layout: { padding: { top: 18 } },
+        responsive: true, maintainAspectRatio: false,
+        animation: _reducedMotion ? false : { duration: 550 },
+        layout: { padding: { top: 24, left: 6, right: 6, bottom: 6 } },
         interaction: { mode: 'index', intersect: false },
         onClick: function (_, els) {
           if (els.length && d && d.params) {
@@ -418,7 +439,7 @@ var Expenses = (function () {
           legend: {
             display: _yearChartMode === 'stacked',
             position: 'bottom',
-            labels: { color: c.tick, usePointStyle: true, pointStyle: 'circle', boxWidth: 7, boxHeight: 7, padding: 12, font: { size: 11 },
+            labels: { color: c.label, usePointStyle: true, pointStyle: 'circle', boxWidth: 7, boxHeight: 7, padding: 12, font: { family: "'Inter', system-ui, sans-serif", size: 11 },
                       filter: function (item) { return item.text !== 'Monthly average'; } },
           },
           tooltip: Object.assign({}, tooltip, {
@@ -441,10 +462,10 @@ var Expenses = (function () {
         },
         scales: {
           x: { stacked: true, grid: { display: false }, border: { display: false },
-               ticks: { color: c.tick, font: { size: 10, weight: '600' }, maxRotation: 0, autoSkip: false } },
+               ticks: { color: c.tick, font: { family: "'Inter', system-ui, sans-serif", size: isNarrow ? 9.5 : 10, weight: '600' }, maxRotation: isNarrow ? 35 : 0, autoSkip: false } },
           y: {
             stacked: true, beginAtZero: true, grid: { color: c.grid }, border: { display: false },
-            ticks: { color: c.tick, font: { size: 10 }, maxTicksLimit: 5, callback: inrShort },
+            ticks: { color: c.tick, font: { family: "'Inter', system-ui, sans-serif", size: 10 }, maxTicksLimit: 5, callback: inrShort },
           },
         },
       },
@@ -461,9 +482,11 @@ var Expenses = (function () {
       var isStacked = _yearChartMode === 'stacked';
       btnStacked.classList.toggle('bg-primary', isStacked);
       btnStacked.classList.toggle('text-primary-content', isStacked);
+      btnStacked.classList.toggle('is-active', isStacked);
       btnStacked.classList.toggle('opacity-60', !isStacked);
       btnTotal.classList.toggle('bg-primary', !isStacked);
       btnTotal.classList.toggle('text-primary-content', !isStacked);
+      btnTotal.classList.toggle('is-active', !isStacked);
       btnTotal.classList.toggle('opacity-60', isStacked);
     }
   }
@@ -494,10 +517,10 @@ var Expenses = (function () {
       if (!isNaN(num) && num > 0) {
         var pending = Math.max(0, tot - num);
         noteEl.textContent = pending === 0 ? '✓ Final installment' : (pending + ' installment' + (pending === 1 ? '' : 's') + ' pending');
-        noteEl.className = 'text-[11px] font-semibold ' + (pending === 0 ? 'text-emerald-400' : 'text-purple-300');
+        noteEl.className = 'text-[11px] font-semibold tabular-nums ' + (pending === 0 ? 'text-emerald-400' : 'text-indigo-300');
       } else {
         noteEl.textContent = tot + ' total installments';
-        noteEl.className = 'text-[11px] font-semibold text-purple-300';
+        noteEl.className = 'text-[11px] font-semibold tabular-nums text-indigo-300';
       }
     } else {
       noteEl.textContent = '';
@@ -523,14 +546,14 @@ var Expenses = (function () {
       var trend = readJson('expense-trend-chart');
       if (trend && $('trendChart')) trendChart($('trendChart'), trend);
       var year = readJson('expense-year-chart');
-      if (year && $('yearChart')) {
-        yearChart($('yearChart'), year);
-        if (typeof MutationObserver !== 'undefined') {
-          new MutationObserver(function () {
-            if (_yearChartCanvas && _yearChartData) yearChart(_yearChartCanvas, _yearChartData);
-          }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-        }
+      if (year && $('yearChart')) yearChart($('yearChart'), year);
+
+      function reRenderExpenseCharts() {
+        if (_paceChartArgs) paceChart(_paceChartArgs[0], _paceChartArgs[1]);
+        if (_trendChartArgs) trendChart(_trendChartArgs[0], _trendChartArgs[1]);
+        if (_yearChartCanvas && _yearChartData) yearChart(_yearChartCanvas, _yearChartData);
       }
+      window.addEventListener('vault:themechange', reRenderExpenseCharts);
     }
 
     var params = new URLSearchParams(window.location.search);

@@ -32,6 +32,11 @@ log "=== Backup started ==="
 
 FAILED=0
 for DB in $DATABASES; do
+  if [[ ! "$DB" =~ ^[A-Za-z0-9_-]+$ ]]; then
+    log "ERROR: Invalid database identifier '${DB}'"
+    FAILED=1
+    continue
+  fi
   DUMP_FILE="${TMPDIR}/${DB}.sql"
 
   log "Dumping ${DB}..."

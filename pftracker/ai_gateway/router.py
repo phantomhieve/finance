@@ -25,10 +25,13 @@ class NodeRouter:
         self,
         task: TaskType = TaskType.GENERAL,
         preferred_node_id: str | None = None,
+        cascade_fallback: bool = False,
     ) -> Iterator[tuple[AINode, str]]:
         """Yields (node, active_api_key) candidates ordered by priority and health.
 
         If preferred_node_id is specified and available, attempts that node first.
+        When cascade_fallback is True, continues yielding healthy fallback nodes
+        ordered by priority tier if the preferred node fails or is unavailable.
         Otherwise groups healthy nodes by priority (1 = primary, 2 = secondary, etc.)
         and applies round-robin within each tier before cascading to subsequent tiers.
         """
@@ -36,6 +39,8 @@ class NodeRouter:
         if not all_nodes:
             logger.warning("No AI nodes are currently registered in the NodeRegistry.")
             return
+
+        yielded_node_ids: set[str] = set()
 
         # 1. Handle explicit preferred node
         if preferred_node_id:
@@ -45,20 +50,32 @@ class NodeRouter:
                     if n.provider == preferred_node_id or (preferred_node_id.startswith("gemini") and n.provider == "gemini"):
                         target = n
                         break
-            if target and target.is_active:
-                key, _ = self._circuit_breaker.get_active_key(target)
-                yield target, key
-                return
-            else:
+            if not cascade_fallback:
+                if target and target.is_active:
+                    key, _ = self._circuit_breaker.get_active_key(target)
+                    yield target, key
+                    return
                 logger.warning("Preferred node '%s' not found or inactive. Falling back to pool.", preferred_node_id)
+            else:
+                if target and target.is_active and self._circuit_breaker.is_node_available(target):
+                    key, _ = self._circuit_breaker.get_active_key(target)
+                    yielded_node_ids.add(target.id)
+                    yield target, key
+                elif not target or not target.is_active:
+                    logger.warning("Preferred node '%s' not found or inactive. Falling back to pool.", preferred_node_id)
+                else:
+                    logger.warning("Preferred node '%s' circuit is OPEN. Cascading to fallback pool.", target.id)
 
         # 2. Filter nodes supporting the given task
         eligible = [
             n for n in all_nodes
-            if n.is_active and task in n.supported_tasks and self._circuit_breaker.is_node_available(n)
+            if n.is_active
+            and n.id not in yielded_node_ids
+            and task in n.supported_tasks
+            and self._circuit_breaker.is_node_available(n)
         ]
 
-        if not eligible:
+        if not eligible and not yielded_node_ids:
             # Fall back to any active node even if cooling down if desperate
             logger.warning("No healthy nodes available for task '%s'. Checking all active nodes.", task.value)
             eligible = [n for n in all_nodes if n.is_active and task in n.supported_tasks]
