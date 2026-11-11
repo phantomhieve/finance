@@ -1565,15 +1565,16 @@ class RefundAndEmiTrackingTests(TestCase):
         self.assertEqual(credit.category.name, 'Credit Card Payment')
 
         self.client.force_login(self.user)
-        response = self.client.get(reverse('expenses_home') + '?m=2026-10')
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context['total_dues_amount'], Decimal('141780.00'))
-        self.assertNotContains(response, '>AI Audit</')
-        # Only Leg 1 (DEBIT) is shown in the activity feed; Leg 2 (CREDIT) is collapsed into it
-        feed_items = [e for day in response.context['days'] for e in day['items']]
-        self.assertEqual(len(feed_items), 1)
-        self.assertEqual(feed_items[0].direction, 'DEBIT')
-        self.assertEqual(feed_items[0].paired_source, card2)
+        with mock.patch('expenses.views.timezone.localdate', return_value=datetime.date(2026, 10, 26)):
+            response = self.client.get(reverse('expenses_home') + '?m=2026-10')
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.context['total_dues_amount'], Decimal('141780.00'))
+            self.assertNotContains(response, '>AI Audit</')
+            # Only Leg 1 (DEBIT) is shown in the activity feed; Leg 2 (CREDIT) is collapsed into it
+            feed_items = [e for day in response.context['days'] for e in day['items']]
+            self.assertEqual(len(feed_items), 1)
+            self.assertEqual(feed_items[0].direction, 'DEBIT')
+            self.assertEqual(feed_items[0].paired_source, card2)
 
     def test_spouse_cannot_delete_or_rename_investments_category(self):
         from .categories import ensure_default_categories
