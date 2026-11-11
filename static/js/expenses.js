@@ -340,7 +340,7 @@ var Expenses = (function () {
           }
         });
         if (sum > 0 && barX != null && topY < Infinity) {
-          ctx.fillText(inrShort(sum), barX, Math.max(10, topY - 5));
+          ctx.fillText(inrShort(sum), barX, Math.max(12, topY - 5));
         }
       });
       ctx.restore();
@@ -399,7 +399,7 @@ var Expenses = (function () {
       plugins: [yearTopValues],
       options: {
         responsive: true, maintainAspectRatio: false, animation: { duration: 650 },
-        layout: { padding: { top: 18 } },
+        layout: { padding: { top: 22, left: 10, right: 10, bottom: 6 } },
         interaction: { mode: 'index', intersect: false },
         onClick: function (_, els) {
           if (els.length && d && d.params) {

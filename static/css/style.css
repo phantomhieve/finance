@@ -278,6 +278,8 @@
 .v-horizon {
   margin-top: 0.875rem;
 }
+/* When .v-horizon is applied directly as a bar or wraps .v-horizon-seg */
+.v-horizon:has(> .v-horizon-seg),
 .v-horizon-bar {
   display: flex;
   gap: 2px;
@@ -295,14 +297,16 @@
 .v-horizon-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.625rem 1rem;
+  gap: 0.5rem 1rem;
   margin-top: 0.625rem;
+  padding: 0.125rem 0.25rem;
   font-size: 0.75rem;
 }
 @media (max-width: 480px) {
   .v-horizon-legend {
     gap: 0.375rem 0.75rem;
     font-size: 0.6875rem;
+    padding: 0.125rem 0.125rem;
   }
 }
 .v-horizon-item {
@@ -335,6 +339,15 @@
   border-radius: 12px;
   overflow: hidden;
   margin-bottom: 1rem;
+  height: auto;
+  align-self: start; /* Prevents rigid full-height grid stretching that creates empty black voids */
+}
+.v-panel-fill {
+  height: 100% !important;
+}
+.v-panel-natural {
+  height: auto !important;
+  align-self: start !important;
 }
 .v-panel-header {
   display: flex;
@@ -371,6 +384,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+}
+
+/* Balanced Grid Utilities — prevents huge empty voids when adjacent panels have uneven length */
+.v-grid-align-start {
+  align-items: start !important;
+}
+.v-grid-balanced {
+  display: grid;
+  align-items: start;
 }
 
 /* 2.7 Asymmetric Workbench Layout (.v-workbench) */
@@ -471,6 +493,23 @@
 .v-num {
   text-align: right;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.v-table thead th.v-num,
+.v-table thead th.text-right {
+  text-align: right;
+}
+.v-table thead th.text-center,
+.v-table tbody td.text-center {
+  text-align: center;
+}
+.v-table-tight thead th,
+.v-table-tight tbody td {
+  padding: 0.45rem 0.625rem;
+  font-size: 0.75rem;
+}
+.v-table-nowrap th,
+.v-table-nowrap td {
   white-space: nowrap;
 }
 

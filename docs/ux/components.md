@@ -178,7 +178,7 @@ Use for sub-pages or secondary tabs where a smaller 3 or 4 cell KPI bar is neede
 
 ## 5. Workbench Container (`.v-panel`)
 
-The standard card/panel container. Eliminates nested borders and ensures consistent headers.
+The standard card/panel container. Eliminates nested borders and ensures consistent headers. By default, `.v-panel` has `align-self: start` and natural content height, preventing giant empty black voids when placed in CSS grid columns next to taller elements. Use `.v-panel-fill` only when a panel explicitly must match its row height.
 
 ```html
 <div class="v-panel">
@@ -217,7 +217,7 @@ The standard card/panel container. Eliminates nested borders and ensures consist
 
 ## 6. Asymmetric Workbench Grid (`.v-workbench`)
 
-Organizes complex screens into a 2-column layout on desktop (`7fr 5fr`, `.v-workbench-8-4` for `8fr 4fr`, or `.v-workbench-equal` for `1fr 1fr`). Columns align to `start` with natural content height, preventing giant empty voids when adjacent panels have uneven length.
+Organizes complex screens into a 2-column layout on desktop (`7fr 5fr`, `.v-workbench-8-4` for `8fr 4fr`, or `.v-workbench-equal` for `1fr 1fr`). Columns align to `start` with natural content height, preventing giant empty voids when adjacent panels have uneven length. For custom grid layouts (`grid grid-cols-1 lg:grid-cols-12`), add `.v-grid-align-start` (or `items-start`) to prevent empty black holes.
 
 ```html
 <div class="v-workbench">

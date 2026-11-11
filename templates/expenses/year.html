@@ -85,10 +85,10 @@
       {% endif %}
     </div>
 
-    {# Top Category Horizon Distribution Bar #}
+    {# Top Category Horizon Distribution Bar with Protective Padding #}
     {% if summary.categories %}
     <div class="mt-4 pt-3 border-t border-base-content/10">
-      <div class="flex items-center justify-between text-[11px] mb-1.5">
+      <div class="flex items-center justify-between text-[11px] mb-1.5 px-0.5">
         <span class="opacity-55 font-medium">Category distribution</span>
         <span class="opacity-80 font-bold tabular-nums">Top: {{ summary.categories.0.name }} ({{ summary.categories.0.pct }}%)</span>
       </div>
@@ -97,12 +97,12 @@
         <div class="v-horizon-seg" style="width: {{ c.pct }}%; background-color: hsl({{ c.hue }}, 75%, 55%);" title="{{ c.name }}: {{ c.total|inr }} ({{ c.pct }}%)"></div>
         {% endfor %}
       </div>
-      <div class="v-horizon-legend mt-2 flex flex-wrap gap-x-3 gap-y-1">
+      <div class="v-horizon-legend mt-2.5 px-1 flex flex-wrap gap-x-4 gap-y-1.5">
         {% for c in summary.categories|slice:":4" %}
-        <span class="inline-flex items-center gap-1.5 text-[11px] opacity-70">
-          <span class="w-2 h-2 rounded-full shrink-0" style="background-color: hsl({{ c.hue }}, 75%, 55%);"></span>
-          <span class="truncate max-w-[90px]">{{ c.name }}</span>
-          <strong class="tabular-nums font-semibold">{{ c.pct }}%</strong>
+        <span class="v-horizon-item inline-flex items-center gap-1.5 text-[11px] opacity-80">
+          <span class="v-horizon-dot" style="background-color: hsl({{ c.hue }}, 75%, 55%);"></span>
+          <span class="whitespace-nowrap">{{ c.name }}</span>
+          <strong class="v-horizon-pct font-semibold text-base-content">{{ c.pct }}%</strong>
         </span>
         {% endfor %}
       </div>
@@ -240,11 +240,11 @@
   <button type="button" class="flex-1 py-1.5 px-3 rounded-lg text-center transition-all opacity-60 hover:opacity-100 cursor-pointer whitespace-nowrap flex items-center justify-center gap-1.5" id="yrTabCategoriesBtn" onclick="switchYearMobileTab('categories')">
     <span class="material-symbols-outlined text-sm">donut_small</span>Categories
   </button>
-  <button type="button" class="flex-1 py-1.5 px-3 rounded-lg text-center transition-all opacity-60 hover:opacity-100 cursor-pointer whitespace-nowrap flex items-center justify-center gap-1.5" id="yrTabSubsBtn" onclick="switchYearMobileTab('subs')">
-    <span class="material-symbols-outlined text-sm">subscriptions</span>Subscriptions
-  </button>
   <button type="button" class="flex-1 py-1.5 px-3 rounded-lg text-center transition-all opacity-60 hover:opacity-100 cursor-pointer whitespace-nowrap flex items-center justify-center gap-1.5" id="yrTabMerchantsBtn" onclick="switchYearMobileTab('merchants')">
     <span class="material-symbols-outlined text-sm">storefront</span>Merchants
+  </button>
+  <button type="button" class="flex-1 py-1.5 px-3 rounded-lg text-center transition-all opacity-60 hover:opacity-100 cursor-pointer whitespace-nowrap flex items-center justify-center gap-1.5" id="yrTabSubsBtn" onclick="switchYearMobileTab('subs')">
+    <span class="material-symbols-outlined text-sm">subscriptions</span>Subs
   </button>
 </div>
 
@@ -269,20 +269,19 @@
       </button>
     </div>
   </div>
-  <div class="v-panel-body">
-    <div class="w-full" style="height:260px">
+  <div class="v-panel-body pt-2 pb-4 px-3 sm:px-5">
+    <div class="w-full relative" style="height:280px; min-height:280px">
       <canvas id="yearChart" data-month-url="{% url 'expenses_home' %}" aria-label="Monthly spend by category"></canvas>
     </div>
   </div>
 </section>
 
-{# --- MAIN ASYMMETRIC TWO-COLUMN WORKBENCH --- #}
-<div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+{# --- ROW 1: CATEGORY BREAKDOWN (7 cols) + MONTH-BY-MONTH CADENCE (5 cols) --- #}
+{# Perfectly balanced ~500px height pairing that eliminates vertical dead space #}
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start mb-5">
 
-  {# --- LEFT COLUMN (7 cols): Category Breakdown & Payment Instruments --- #}
-  <div id="yrSectionCategories" class="lg:col-span-7 hidden lg:flex flex-col gap-5">
-    
-    {# By Category Panel #}
+  {# --- LEFT: By Category Panel (7 cols) --- #}
+  <div id="yrSectionCategories" class="lg:col-span-7 hidden lg:block">
     <section class="v-panel">
       <div class="v-panel-header flex items-center justify-between gap-2">
         <div class="flex items-center gap-2">
@@ -351,63 +350,11 @@
         {% endif %}
       </div>
     </section>
-
-    {# Payment Sources & Household Split #}
-    {% if summary.sources %}
-    <section id="yrSectionSources" class="v-panel">
-      <div class="v-panel-header flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <span class="material-symbols-outlined text-base opacity-60">credit_card</span>
-          <h2 class="v-panel-title">Cards &amp; Payment Instruments</h2>
-        </div>
-        <span class="text-[11px] opacity-45 tabular-nums">{{ summary.sources|length }} source{{ summary.sources|length|pluralize }}</span>
-      </div>
-
-      <div class="v-panel-body">
-        <div class="flex flex-col gap-2">
-          {% for s in summary.sources %}
-          <div class="p-2.5 rounded-xl bg-base-300/30 border border-base-content/10 flex items-center gap-3">
-            <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-              <span class="material-symbols-outlined text-base">{{ s.icon }}</span>
-            </div>
-            <div class="flex-1 min-w-0">
-              <div class="flex items-baseline justify-between gap-2">
-                <span class="text-xs sm:text-sm font-semibold truncate">{{ s.name }}</span>
-                <span class="text-xs sm:text-sm font-bold tabular-nums shrink-0">{{ s.total|inr }}</span>
-              </div>
-              <div class="flex items-center gap-2 mt-1">
-                <div class="exp-bar flex-1" style="--h:220"><span style="width:{{ s.bar }}%"></span></div>
-                <span class="text-[10px] opacity-50 tabular-nums shrink-0">{{ s.count }} txn{{ s.count|pluralize }} · {{ s.pct }}%</span>
-              </div>
-            </div>
-          </div>
-          {% endfor %}
-        </div>
-
-        {% if summary.members|length > 1 %}
-        <div class="mt-4 pt-4 border-t border-base-content/10">
-          <div class="text-[10px] font-bold uppercase tracking-wider opacity-50 mb-2.5">Household Member Split</div>
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {% for mem in summary.members %}
-            <div class="p-2.5 rounded-xl bg-base-300/30 border border-base-content/10">
-              <div class="text-[11px] opacity-60 truncate">{{ mem.name }}</div>
-              <div class="text-sm font-bold tabular-nums mt-0.5">{{ mem.total|inr_short }}</div>
-              <div class="text-[10px] opacity-45 tabular-nums">{{ mem.pct }}% · {{ mem.count }} txns</div>
-            </div>
-            {% endfor %}
-          </div>
-        </div>
-        {% endif %}
-      </div>
-    </section>
-    {% endif %}
   </div>
 
-  {# --- RIGHT COLUMN (5 cols): Months Breakdown & Top Merchants --- #}
-  <div class="lg:col-span-5 flex flex-col gap-5">
-
-    {# Month-by-Month Interactive Navigation #}
-    <section id="yrSectionMonths" class="v-panel">
+  {# --- RIGHT: Month-by-Month Interactive Navigation (5 cols) --- #}
+  <div id="yrSectionMonths" class="lg:col-span-5 hidden lg:block">
+    <section class="v-panel">
       <div class="v-panel-header flex items-center justify-between">
         <div class="flex items-center gap-2">
           <span class="material-symbols-outlined text-base opacity-60">calendar_month</span>
@@ -475,10 +422,19 @@
         {% endif %}
       </div>
     </section>
+  </div>
 
-    {# Top Merchants Panel #}
-    {% if summary.merchants %}
-    <section id="yrSectionMerchants" class="v-panel hidden lg:flex flex-col">
+</div>
+
+{# --- ROW 2: TOP MERCHANTS (6 cols) + PAYMENT INSTRUMENTS & HOUSEHOLD (6 cols) --- #}
+{# Perfectly balanced ~400px height pairing that eliminates vertical dead space #}
+{% if summary.merchants or summary.sources %}
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start mb-5">
+
+  {# --- LEFT: Top Merchants Panel (6 cols) --- #}
+  {% if summary.merchants %}
+  <div id="yrSectionMerchants" class="{% if summary.sources %}lg:col-span-6{% else %}lg:col-span-12{% endif %} hidden lg:block">
+    <section class="v-panel">
       <div class="v-panel-header flex items-center justify-between">
         <div class="flex items-center gap-2">
           <span class="material-symbols-outlined text-base opacity-60">storefront</span>
@@ -510,13 +466,66 @@
         </div>
       </div>
     </section>
-    {% endif %}
-
   </div>
-</div>
+  {% endif %}
 
-{# --- SECTION 4: RECURRING SUBSCRIPTIONS & CADENCE MATRIX --- #}
-<section id="yrSectionSubscriptions" class="v-panel mt-6 hidden lg:flex flex-col border-violet-500/20">
+  {# --- RIGHT: Payment Sources & Household Split (6 cols) --- #}
+  {% if summary.sources %}
+  <div id="yrSectionSources" class="{% if summary.merchants %}lg:col-span-6{% else %}lg:col-span-12{% endif %} hidden lg:block">
+    <section class="v-panel">
+      <div class="v-panel-header flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined text-base opacity-60">credit_card</span>
+          <h2 class="v-panel-title">Cards &amp; Payment Instruments</h2>
+        </div>
+        <span class="text-[11px] opacity-45 tabular-nums">{{ summary.sources|length }} source{{ summary.sources|length|pluralize }}</span>
+      </div>
+
+      <div class="v-panel-body">
+        <div class="flex flex-col gap-2">
+          {% for s in summary.sources %}
+          <div class="p-2.5 rounded-xl bg-base-300/30 border border-base-content/10 flex items-center gap-3">
+            <div class="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+              <span class="material-symbols-outlined text-base">{{ s.icon }}</span>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-baseline justify-between gap-2">
+                <span class="text-xs sm:text-sm font-semibold truncate">{{ s.name }}</span>
+                <span class="text-xs sm:text-sm font-bold tabular-nums shrink-0">{{ s.total|inr }}</span>
+              </div>
+              <div class="flex items-center gap-2 mt-1">
+                <div class="exp-bar flex-1" style="--h:220"><span style="width:{{ s.bar }}%"></span></div>
+                <span class="text-[10px] opacity-50 tabular-nums shrink-0">{{ s.count }} txn{{ s.count|pluralize }} · {{ s.pct }}%</span>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+
+        {% if summary.members|length > 1 %}
+        <div class="mt-4 pt-4 border-t border-base-content/10">
+          <div class="text-[10px] font-bold uppercase tracking-wider opacity-50 mb-2.5">Household Member Split</div>
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {% for mem in summary.members %}
+            <div class="p-2.5 rounded-xl bg-base-300/30 border border-base-content/10">
+              <div class="text-[11px] opacity-60 truncate">{{ mem.name }}</div>
+              <div class="text-sm font-bold tabular-nums mt-0.5">{{ mem.total|inr_short }}</div>
+              <div class="text-[10px] opacity-45 tabular-nums">{{ mem.pct }}% · {{ mem.count }} txns</div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </section>
+  </div>
+  {% endif %}
+
+</div>
+{% endif %}
+
+{# --- ROW 3: RECURRING SUBSCRIPTIONS & CADENCE MATRIX (Full Width) --- #}
+<section id="yrSectionSubscriptions" class="v-panel mb-5 hidden lg:block border-violet-500/20">
   <div class="v-panel-header flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4">
     <div class="flex items-center gap-3">
       <span class="jw-type-avatar" style="--h:280;width:2.5rem;height:2.5rem;border-radius:.75rem">
@@ -800,19 +809,20 @@ function switchYearMobileTab(tab) {
     months: document.getElementById('yrSectionMonths'),
     categories: document.getElementById('yrSectionCategories'),
     merchants: document.getElementById('yrSectionMerchants'),
+    sources: document.getElementById('yrSectionSources'),
     subs: document.getElementById('yrSectionSubscriptions')
   };
   var buttons = {
     overview: document.getElementById('yrTabOverviewBtn'),
     categories: document.getElementById('yrTabCategoriesBtn'),
-    subs: document.getElementById('yrTabSubsBtn'),
-    merchants: document.getElementById('yrTabMerchantsBtn')
+    merchants: document.getElementById('yrTabMerchantsBtn'),
+    subs: document.getElementById('yrTabSubsBtn')
   };
   var showMap = {
     overview: ['chart', 'months'],
     categories: ['categories'],
-    subs: ['subs'],
-    merchants: ['merchants']
+    merchants: ['merchants', 'sources'],
+    subs: ['subs']
   };
   var visibleKeys = showMap[tab] || ['chart', 'months'];
   Object.keys(sections).forEach(function (k) {
@@ -820,7 +830,7 @@ function switchYearMobileTab(tab) {
     if (!el) return;
     var show = visibleKeys.indexOf(k) !== -1;
     el.classList.toggle('hidden', !show);
-    el.classList.toggle('flex', show);
+    el.classList.toggle('block', show);
   });
   Object.keys(buttons).forEach(function (k) {
     var btn = buttons[k];
@@ -846,7 +856,8 @@ function jumpToYearSection(tab) {
     overview: 'yrSectionChart',
     categories: 'yrSectionCategories',
     subs: 'yrSectionSubscriptions',
-    merchants: 'yrSectionMerchants'
+    merchants: 'yrSectionMerchants',
+    sources: 'yrSectionSources'
   };
   var targetEl = document.getElementById(targetMap[tab] || 'yrSectionSubscriptions');
   if (targetEl) {
