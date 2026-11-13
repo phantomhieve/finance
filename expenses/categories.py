@@ -5,10 +5,11 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from django.db import transaction
+from django.utils import timezone
 
 from . import ai
 from .analytics import INVESTMENT_CATEGORY
-from .knowledge import record_ai_brand
+from .knowledge import record_ai_brand, record_user_brand
 from .models import Expense, ExpenseCategory, MerchantRule
 from .parsing import brand_category
 
@@ -114,24 +115,62 @@ def categorise_expense(expense: Expense, cats: dict[str, ExpenseCategory] | None
         expense.category_confidence = 0.7
 
 
-def ai_categorise_pending(group: AccountGroup, limit: int = 200) -> int:
-    """Ask Gemini to categorise uncategorised rows; cache confident answers as AI rules."""
-    pending = list(
-        Expense.objects.filter(group=group, is_deleted=False, category__isnull=True, category_source='NONE')
-        .order_by('-txn_date')[:limit]
+def _user_examples(group: AccountGroup, limit: int = 40) -> list[list[str]]:
+    """Collect recent user-confirmed merchant → category examples for few-shot AI categorization."""
+    examples: list[list[str]] = []
+    seen_keys: set[str] = set()
+
+    rules = (
+        MerchantRule.objects.filter(group=group, source='USER')
+        .select_related('category')
+        .order_by('-updated_at')[:limit]
     )
-    if not pending or not ai.ai_available():
+    for r in rules:
+        key = r.merchant_key or (r.merchant_label or '').strip().upper()
+        if not key or key in seen_keys:
+            continue
+        seen_keys.add(key)
+        examples.append([r.merchant_label or r.merchant_key, r.category.name])
+
+    if len(examples) < limit:
+        manual_rows = (
+            Expense.objects.filter(
+                group=group,
+                is_deleted=False,
+                category_source='USER',
+                category__isnull=False,
+            )
+            .exclude(merchant='')
+            .select_related('category')
+            .order_by('-updated_at')[:limit * 2]
+        )
+        for e in manual_rows:
+            key = e.merchant_key or e.merchant.strip().upper()
+            if not key or key in seen_keys:
+                continue
+            seen_keys.add(key)
+            examples.append([e.merchant, e.category.name])
+            if len(examples) >= limit:
+                break
+
+    return examples
+
+
+def categorise_expenses_with_ai(group: AccountGroup, pending: list[Expense]) -> int:
+    """Categorise truly uncategorised expenses via AI; never overwrite manual/existing categories."""
+    eligible = [
+        e for e in pending
+        if not e.is_deleted and e.category_id is None and e.category_source == 'NONE'
+    ]
+    if not eligible or not ai.ai_available():
         return 0
 
     cats = categories_by_name(group)
-    examples = list(
-        MerchantRule.objects.filter(group=group, source='USER').select_related('category')
-        .order_by('-updated_at').values_list('merchant_label', 'category__name')[:40]
-    )
+    examples = _user_examples(group)
     by_key: dict[str, list[Expense]] = {}
     items: list[dict[str, Any]] = []
 
-    for e in pending:
+    for e in eligible:
         bucket_key = e.merchant_key or f'#{e.pk}'
         if bucket_key in by_key:
             by_key[bucket_key].append(e)
@@ -146,7 +185,7 @@ def ai_categorise_pending(group: AccountGroup, limit: int = 200) -> int:
             'channel': e.channel,
         })
 
-    answers = ai.categorise(items, list(cats), [list(x) for x in examples])
+    answers = ai.categorise(items, list(cats), examples)
     updated = 0
     for item in items:
         answer = answers.get(item['id'])
@@ -155,27 +194,60 @@ def ai_categorise_pending(group: AccountGroup, limit: int = 200) -> int:
         name, confidence = answer
         if name not in cats:
             continue
-        lead = next(e for e in pending if e.pk == item['id'])
+        lead = next(e for e in eligible if e.pk == item['id'])
         group_rows = by_key[lead.merchant_key or f'#{lead.pk}']
+        target_cat = cats[name]
         for e in group_rows:
-            e.category = cats[name]
-            e.category_source = 'AI'
-            e.category_confidence = confidence
-            e.save(update_fields=['category', 'category_source', 'category_confidence', 'updated_at'])
-            updated += 1
+            changed = Expense.objects.filter(
+                pk=e.pk,
+                is_deleted=False,
+                category__isnull=True,
+                category_source='NONE',
+            ).update(
+                category=target_cat,
+                category_source='AI',
+                category_confidence=confidence,
+                updated_at=timezone.now(),
+            )
+            if changed:
+                e.category = target_cat
+                e.category_source = 'AI'
+                e.category_confidence = confidence
+                updated += 1
+
         if lead.merchant_key and confidence >= 0.6:
-            MerchantRule.objects.get_or_create(
-                group=group,
-                merchant_key=lead.merchant_key,
-                defaults={'category': cats[name], 'source': 'AI', 'merchant_label': lead.merchant},
+            has_conflicting_user_choice = (
+                Expense.objects.filter(
+                    group=group,
+                    is_deleted=False,
+                    merchant_key=lead.merchant_key,
+                    category_source='USER',
+                )
+                .exclude(category=target_cat)
+                .exists()
             )
-            record_ai_brand(
-                merchant_key=lead.merchant_key,
-                display_name=lead.merchant or lead.merchant_raw,
-                category_name=name,
-                confidence=confidence,
-            )
+            if not has_conflicting_user_choice:
+                MerchantRule.objects.get_or_create(
+                    group=group,
+                    merchant_key=lead.merchant_key,
+                    defaults={'category': target_cat, 'source': 'AI', 'merchant_label': lead.merchant},
+                )
+                record_ai_brand(
+                    merchant_key=lead.merchant_key,
+                    display_name=lead.merchant or lead.merchant_raw,
+                    category_name=name,
+                    confidence=confidence,
+                )
     return updated
+
+
+def ai_categorise_pending(group: AccountGroup, limit: int = 200) -> int:
+    """Ask Gemini to categorise uncategorised rows; cache confident answers as AI rules."""
+    pending = list(
+        Expense.objects.filter(group=group, is_deleted=False, category__isnull=True, category_source='NONE')
+        .order_by('-txn_date')[:limit]
+    )
+    return categorise_expenses_with_ai(group, pending)
 
 
 @transaction.atomic
@@ -191,7 +263,18 @@ def learn_category(expense: Expense, category: ExpenseCategory, user: User, appl
     expense.category_source = 'USER'
     expense.category_confidence = 1.0
     expense.save(update_fields=['category', 'category_source', 'category_confidence', 'updated_at'])
-    if not expense.merchant_key or not apply_to_similar:
+    if not expense.merchant_key:
+        return 0
+
+    if not apply_to_similar:
+        stale_ai_rules = MerchantRule.objects.filter(
+            group=expense.group,
+            merchant_key=expense.merchant_key,
+            source='AI',
+        ).exclude(category=category)
+        if hides_investments:
+            stale_ai_rules = stale_ai_rules.exclude(category__name=INVESTMENT_CATEGORY)
+        stale_ai_rules.delete()
         return 0
 
     existing_rule = MerchantRule.objects.filter(
@@ -200,11 +283,10 @@ def learn_category(expense: Expense, category: ExpenseCategory, user: User, appl
     if hides_investments and existing_rule and existing_rule.category.name == INVESTMENT_CATEGORY:
         return 0
 
-    record_ai_brand(
+    record_user_brand(
         merchant_key=expense.merchant_key,
         display_name=expense.merchant or expense.merchant_key,
         category_name=category.name,
-        confidence=1.0,
     )
     MerchantRule.objects.update_or_create(
         group=expense.group,

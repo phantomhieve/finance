@@ -2006,3 +2006,263 @@ class ExpensesSecurityHardeningTests(TestCase):
             exchange.assert_not_called()
 
 
+class EmiFalsePositiveTests(ExpenseTestCase):
+    def test_email_upsell_footers_do_not_trigger_emi(self):
+        from .parsing import parse_emi_details
+
+        hdfc_promo = (
+            'alerts@hdfcbank.net',
+            'Alert : Update on your HDFC Bank Credit Card',
+            'Dear Customer, Thank you for using your HDFC Bank Credit Card ending 8066 for Rs 1,249.00 at '
+            'AMAZON PAY INDIA on 04-10-2026 14:20:00. Convert this transaction into SmartEMI at attractive interest rates. '
+            'Click https://hdfcbk.io/smartemi to know more. T&C apply.',
+        )
+        p1 = parse_transaction(*hdfc_promo, RECEIVED)
+        self.assertIsNotNone(p1)
+        self.assertFalse(p1.is_emi)
+        self.assertEqual(p1.emi_component, '')
+        e1 = self.email_expense(hdfc_promo, message_id='emi_promo_1')
+        self.assertFalse(e1.is_emi)
+        self.assertNotEqual(e1.category.name if e1.category else '', 'EMI & Loans')
+
+        sbi_promo = (
+            'onlinesbicard@sbicard.com',
+            'Transaction Alert for SBI Card',
+            'Rs. 4,500.00 spent on SBI Credit Card XX4321 at MYNTRA on 05-10-26. '
+            'Convert your purchase into Flexipay in 3 easy steps! Avail attractive interest rate.',
+        )
+        p2 = parse_transaction(*sbi_promo, RECEIVED)
+        self.assertIsNotNone(p2)
+        self.assertFalse(p2.is_emi)
+
+        no_cost_promo = (
+            'credit_cards@icicibank.com',
+            'Transaction alert for ICICI Credit Card',
+            'Your ICICI Bank Credit Card XX1111 has been used for Rs 2,500.00 at FLIPKART on 06-10-26. '
+            'Eligible for No Cost EMI on select cards.',
+        )
+        p3 = parse_transaction(*no_cost_promo, RECEIVED)
+        self.assertIsNotNone(p3)
+        self.assertFalse(p3.is_emi)
+
+        # Single-line promotional or non-EMI strings
+        self.assertFalse(parse_emi_details('Eligible for SmartEMI offer')['is_emi'])
+
+    def test_fee_gst_credit_and_date_lookalikes_do_not_trigger_emi(self):
+        from .models import CardStatement, StatementLine
+        from .parsing import parse_emi_details
+        from .statements import reconcile
+
+        for desc in (
+            'EMI PROCESSING FEE',
+            'SMARTEMI PROCESSING FEE',
+            'IGST ON EMI INTEREST',
+            'SMARTEMI FORECLOSURE FEE',
+            'EMI 15/10/2026',
+            'EMI 10/2026',
+            'EMI 1 OF 1',
+            'EMI 5/9999',
+        ):
+            info = parse_emi_details(desc)
+            self.assertFalse(info['is_emi'], desc)
+
+        # Credit reversal / conversion credit must never be tagged EMI
+        self.assertFalse(parse_emi_details('OFFUS EMI CONVERSION CREDIT', direction='CREDIT')['is_emi'])
+
+        # Fees mentioning EMI should resolve to Fees & Charges, not EMI & Loans
+        self.assertEqual(brand_category('EMIPROCESSINGFEE', 'EMI PROCESSING FEE'), 'Fees & Charges')
+        # Mutual fund / NACH SIP and generic NACH should not force EMI & Loans
+        self.assertEqual(brand_category('NACHMUTUALFUNDSIP', 'NACH-MUTUAL FUND SIP'), 'Investments')
+        self.assertIsNone(brand_category('NACHTATAPOWER', 'NACH-TATA POWER'))
+
+        card = PaymentSource.objects.create(group=self.group, kind='CREDIT_CARD', institution='HDFC', last4='9090')
+        st = CardStatement.objects.create(
+            group=self.group, payment_source=card, status='PARSED', statement_date=datetime.date(2026, 10, 20),
+        )
+        StatementLine.objects.create(
+            statement=st, txn_date=datetime.date(2026, 10, 10),
+            description='SMARTEMI PROCESSING FEE', amount=Decimal('299.00'), is_credit=False,
+        )
+        StatementLine.objects.create(
+            statement=st, txn_date=datetime.date(2026, 10, 11),
+            description='OFFUS EMI CONVERSION CREDIT', amount=Decimal('15000.00'), is_credit=True,
+        )
+        reconcile(st)
+        fee_exp = Expense.objects.get(group=self.group, amount=Decimal('299.00'))
+        self.assertFalse(fee_exp.is_emi)
+        self.assertEqual(fee_exp.category.name, 'Fees & Charges')
+        credit_exp = Expense.objects.get(group=self.group, amount=Decimal('15000.00'))
+        self.assertFalse(credit_exp.is_emi)
+
+    def test_true_emi_formats_still_detected(self):
+        from .parsing import parse_emi_details
+
+        p = parse_emi_details('OFFUS EMI,PRIN NB:03,XXXXXXXXXX9861')
+        self.assertEqual((p['is_emi'], p['component'], p['installment_num'], p['reference']), (True, 'PRINCIPAL', 3, '9861'))
+
+        i = parse_emi_details('OFFUS EMI,INT NBR:03,XXXXXXXXXX9861')
+        self.assertEqual((i['is_emi'], i['component'], i['installment_num'], i['reference']), (True, 'INTEREST', 3, '9861'))
+
+        inst = parse_emi_details('BAJAJ FINANCE EMI 04/12')
+        self.assertEqual((inst['is_emi'], inst['component'], inst['installment_num'], inst['total_installments']), (True, 'PRINCIPAL', 4, 12))
+
+        purch = parse_emi_details('EMI VIJAY SALES INDIA PRI')
+        self.assertEqual((purch['is_emi'], purch['component']), (True, 'PURCHASE'))
+
+        loan_email = (
+            'alerts@hdfcbank.net',
+            'Loan EMI Debit Alert',
+            'Your Loan EMI of Rs. 18,500.00 towards Loan A/c XX9861 has been debited on 05-10-2026.',
+        )
+        pe = parse_transaction(*loan_email, RECEIVED)
+        self.assertIsNotNone(pe)
+        self.assertTrue(pe.is_emi)
+        self.assertEqual(pe.emi_component, 'PRINCIPAL')
+        self.assertEqual(pe.emi_reference, '9861')
+
+
+class ManualCategoryPriorityTests(ExpenseTestCase):
+    def _run_ai_categorize_day(self, return_cat='Shopping', confidence=0.95):
+        with (
+            mock.patch('expenses.ai.ai_available', return_value=True),
+            mock.patch('expenses.ai.categorise', side_effect=lambda items, cats, examples: {
+                it['id']: (return_cat, confidence) for it in items
+            }) as mocked_cat,
+        ):
+            call_command('ai_categorize_day', all_pending=True, stdout=mock.MagicMock())
+            return mocked_cat
+
+    def test_manual_expense_via_view_not_overridden_by_ai(self):
+        from .categories import ai_categorise_pending
+
+        self.client.force_login(self.user)
+        resp = self.client.post(reverse('expense_add'), {
+            'amount': '850.00',
+            'direction': 'DEBIT',
+            'txn_date': '2026-10-12',
+            'merchant': 'Local Corner Kirana',
+            'category': self.cats['Groceries'].pk,
+        })
+        self.assertEqual(resp.status_code, 302)
+        exp = Expense.objects.get(merchant='Local Corner Kirana')
+        self.assertEqual(exp.category_source, 'USER')
+
+        with (
+            mock.patch('expenses.ai.ai_available', return_value=True),
+            mock.patch('expenses.ai.categorise', return_value={exp.pk: ('Shopping', 0.99)}),
+        ):
+            ai_categorise_pending(self.group)
+        self._run_ai_categorize_day(return_cat='Shopping')
+
+        exp.refresh_from_db()
+        self.assertEqual(exp.category, self.cats['Groceries'])
+        self.assertEqual(exp.category_source, 'USER')
+
+    def test_manual_edit_clears_stale_ai_rule_and_blocks_cron_override(self):
+        from .categories import _user_examples, categorise_expense
+
+        merchant_name = 'Urban Bistro Cafe'
+        _, key = normalize_merchant(merchant_name)
+        MerchantRule.objects.create(
+            group=self.group, merchant_key=key, merchant_label=merchant_name,
+            category=self.cats['Shopping'], source='AI',
+        )
+        exp = Expense.objects.create(
+            group=self.group, amount=Decimal('650.00'), direction='DEBIT',
+            txn_date=datetime.date(2026, 10, 14), merchant=merchant_name, merchant_key=key,
+            source='EMAIL', category=self.cats['Shopping'], category_source='AI',
+        )
+
+        self.client.force_login(self.user)
+        resp = self.client.post(reverse('expense_edit', args=[exp.pk]), {
+            'amount': '650.00',
+            'direction': 'DEBIT',
+            'txn_date': '2026-10-14',
+            'merchant': merchant_name,
+            'category': self.cats['Food & Dining'].pk,
+        })
+        self.assertEqual(resp.status_code, 302)
+        exp.refresh_from_db()
+        self.assertEqual(exp.category, self.cats['Food & Dining'])
+        self.assertEqual(exp.category_source, 'USER')
+        # Contradicted AI rule must be removed even when remember=False
+        self.assertFalse(MerchantRule.objects.filter(group=self.group, merchant_key=key, source='AI').exists())
+        # Few-shot examples include the user's manual decision
+        examples = _user_examples(self.group)
+        self.assertIn([merchant_name, 'Food & Dining'], examples)
+
+        # Create an uncategorized expense to verify cron still processes pending rows, while skipping manual one
+        pending = Expense.objects.create(
+            group=self.group, amount=Decimal('320.00'), direction='DEBIT',
+            txn_date=datetime.date(2026, 10, 14), merchant='Mystery Vendor', merchant_key='MYSTERYVENDOR',
+            source='EMAIL', category=None, category_source='NONE',
+        )
+        self._run_ai_categorize_day(return_cat='Shopping')
+
+        exp.refresh_from_db()
+        pending.refresh_from_db()
+        self.assertEqual(exp.category, self.cats['Food & Dining'])
+        self.assertEqual(exp.category_source, 'USER')
+        self.assertEqual(pending.category, self.cats['Shopping'])
+        self.assertEqual(pending.category_source, 'AI')
+
+        # Future transaction from same merchant does not apply the deleted stale AI rule
+        future_exp = Expense(
+            group=self.group, amount=Decimal('400.00'), direction='DEBIT',
+            txn_date=datetime.date(2026, 10, 15), merchant=merchant_name, merchant_key=key, source='EMAIL',
+        )
+        categorise_expense(future_exp, self.cats)
+        self.assertNotEqual(future_exp.category, self.cats['Shopping'])
+
+    def test_admin_save_marks_category_user_and_cron_skips_cleared_and_existing_categories(self):
+        from django.contrib.admin.sites import AdminSite
+        from django.test import RequestFactory
+        from .admin import ExpenseAdmin
+
+        exp_admin = ExpenseAdmin(Expense, AdminSite())
+        factory = RequestFactory()
+        req = factory.post('/vault-manage/expenses/expense/')
+        req.user = self.user
+
+        # 1. Admin edit marks category_source = 'USER'
+        admin_exp = Expense.objects.create(
+            group=self.group, amount=Decimal('900.00'), direction='DEBIT',
+            txn_date=datetime.date(2026, 10, 14), merchant='Admin Edited Store', merchant_key='ADMINEDITEDSTORE',
+            source='EMAIL', category=self.cats['Shopping'], category_source='NONE',
+        )
+        admin_exp.category = self.cats['Health']
+        form_mock = mock.MagicMock(changed_data=['category'])
+        exp_admin.save_model(req, admin_exp, form_mock, change=True)
+        admin_exp.refresh_from_db()
+        self.assertEqual(admin_exp.category_source, 'USER')
+
+        # 2. Existing KEYWORD category and NONE category (already categorized) and user-cleared category
+        kw_exp = self.add('1500', 'Swiggy Instamart', datetime.date(2026, 10, 14), 'Groceries', category_source='KEYWORD')
+        legacy_exp = self.add('1200', 'Legacy Store', datetime.date(2026, 10, 14), 'Health', category_source='NONE')
+
+        # Explicitly clear category via UI -> stays Uncategorised with category_source='USER'
+        to_clear = self.add('500', 'Ambiguous Store', datetime.date(2026, 10, 14), 'Shopping', category_source='AI')
+        self.client.force_login(self.user)
+        self.client.post(reverse('expense_edit', args=[to_clear.pk]), {
+            'amount': '500.00',
+            'direction': 'DEBIT',
+            'txn_date': '2026-10-14',
+            'merchant': 'Ambiguous Store',
+            'category': '',
+        })
+        to_clear.refresh_from_db()
+        self.assertIsNone(to_clear.category)
+        self.assertEqual(to_clear.category_source, 'USER')
+
+        self._run_ai_categorize_day(return_cat='Transport')
+
+        for item, expected_cat, expected_src in (
+            (admin_exp, self.cats['Health'], 'USER'),
+            (kw_exp, self.cats['Groceries'], 'KEYWORD'),
+            (legacy_exp, self.cats['Health'], 'NONE'),
+            (to_clear, None, 'USER'),
+        ):
+            item.refresh_from_db()
+            self.assertEqual(item.category, expected_cat)
+            self.assertEqual(item.category_source, expected_src)
+
