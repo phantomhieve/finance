@@ -582,35 +582,81 @@ def _token_hit(token: str, key: str, words: set[str]) -> bool:
     return token in key
 
 
+_EMI_FEE_OR_CREDIT_RE = re.compile(
+    r'\b(?:processing\s+fee|proc\.?\s*fee|conv(?:enience)?\s+fee|igst|cgst|sgst|ugst|gst\b'
+    r'|foreclosure|pre[-\s]?closure|cancellation\s+fee|late\s+(?:payment\s+)?fee|penalty'
+    r'|finance\s+charge|conversion\s+credit|amortization|cashback|subvention|reversal|refund)\b',
+    re.I,
+)
+_EMI_PROMO_SEGMENT_RE = re.compile(
+    r'(?:\b(?:convert(?:\s+this|\s+your|\s+purchases?|\s+into|\s+to)?|eligible\s+for|avail\b|opt\s+for'
+    r'|turn\s+your|split\s+your|book\s+(?:your\s+)?flexipay|apply\s+for|know\s+more|click\s+here'
+    r'|t&c|terms\s+and\s+conditions|attractive\s+interest|easy\s+(?:monthly\s+)?(?:emi|installments?|instalments?)'
+    r'|sms\s+[a-z0-9]+\s+to)\b|https?://)',
+    re.I,
+)
+_EMAIL_EMI_DEBIT_RE = re.compile(
+    r'\b(?:loan\s+emi|emi\s+amount|emi\s+of\s+(?:rs\.?|inr|₹)'
+    r'|emi\s+(?:has\s+been\s+|is\s+)?debited|towards\s+(?:your\s+)?(?:loan\s+)?emi'
+    r'|(?:monthly\s+)?(?:emi|installment|instalment)\s+(?:has\s+been\s+|is\s+)?(?:debited|billed))\b',
+    re.I,
+)
+
+
+def _match_keyword_rule(merchant_key: str, text: str = '') -> tuple[str, str, str] | None:
+    from .knowledge import get_keyword_rules
+
+    words = _words(text)
+    raw_text = text or ''
+    is_fee_like = bool(_EMI_FEE_OR_CREDIT_RE.search(raw_text))
+    has_loan_word = bool(re.search(r'\b(?:EMI|LOAN)\b', raw_text, re.I))
+    nach_item: tuple[str, str, str] | None = None
+
+    for item in get_keyword_rules():
+        kw = item[0]
+        if not _token_hit(kw, merchant_key, words):
+            continue
+        if kw in ('EMI', 'LOAN', 'NACH') and is_fee_like:
+            continue
+        if kw == 'NACH':
+            if has_loan_word and nach_item is None:
+                nach_item = item
+            continue
+        return item
+    return nach_item
+
+
 def brand_category(merchant_key: str, text: str = '') -> str | None:
     """Resolve category name from BrandKnowledge or KeywordKnowledge in database."""
-    from .knowledge import get_keyword_rules, lookup_brand
+    from .knowledge import lookup_brand
 
     match = lookup_brand(merchant_key)
     if match:
         return match[1]
-    words = _words(text)
-    for item in get_keyword_rules():
-        if _token_hit(item[0], merchant_key, words):
-            return item[1]
-    return None
+    kw_match = _match_keyword_rule(merchant_key, text)
+    return kw_match[1] if kw_match else None
 
 
 def brand_icon(merchant_key: str, text: str = '') -> str | None:
     """Return specific Material Symbols icon for a known merchant brand or keyword."""
-    from .knowledge import get_keyword_rules, lookup_brand
+    from .knowledge import lookup_brand
 
     match = lookup_brand(merchant_key)
     if match and len(match) > 2:
         return match[2]
-    words = _words(text)
-    for item in get_keyword_rules():
-        if len(item) > 2 and _token_hit(item[0], merchant_key, words):
-            return item[2]
+    kw_match = _match_keyword_rule(merchant_key, text)
+    if kw_match and len(kw_match) > 2:
+        return kw_match[2]
     return None
 
 
-def parse_emi_details(raw: str | None) -> dict[str, Any]:
+def parse_emi_details(
+    raw: str | None,
+    *,
+    is_email: bool = False,
+    merchant_raw: str = '',
+    direction: str = 'DEBIT',
+) -> dict[str, Any]:
     """Parse EMI components from bank statement line or email alert text.
 
     Returns dict with keys:
@@ -621,67 +667,134 @@ def parse_emi_details(raw: str | None) -> dict[str, Any]:
       reference: str
       merchant: str
     """
-    if not raw:
-        return {'is_emi': False, 'component': '', 'installment_num': None, 'total_installments': None, 'reference': '', 'merchant': ''}
-
-    s = raw.strip()
-    # 1. HDFC / Indian statement installment patterns:
-    # OFFUS EMI,PRIN NB:03,XXXXXXXXXX9861 or EMI,PRIN NB:03
-    prin_match = re.search(r'\b(?:OFFUS\s+)?EMI\s*,\s*PRIN\s+NB:(\d+)\s*,\s*([A-Za-z0-9]+)', s, re.I)
-    if prin_match:
-        ref = prin_match.group(2)[-4:]
-        num = int(prin_match.group(1))
+    def _empty() -> dict[str, Any]:
         return {
-            'is_emi': True,
-            'component': 'PRINCIPAL',
-            'installment_num': num,
-            'total_installments': None,
-            'reference': ref,
-            'merchant': f'Loan ••{ref} (Principal #{num})',
-        }
-
-    # 2. OFFUS EMI,INT NBR:03,XXXXXXXXXX9861 or EMI,INT NBR:03
-    int_match = re.search(r'\b(?:OFFUS\s+)?EMI\s*,\s*INT\s+NBR:(\d+)\s*,\s*([A-Za-z0-9]+)', s, re.I)
-    if int_match:
-        ref = int_match.group(2)[-4:]
-        num = int(int_match.group(1))
-        return {
-            'is_emi': True,
-            'component': 'INTEREST',
-            'installment_num': num,
-            'total_installments': None,
-            'reference': ref,
-            'merchant': f'Loan ••{ref} (Interest #{num})',
-        }
-
-    # 3. Standard installment pattern: EMI (MONTH|INSTALMENT|INSTALLMENT)? (\d+)\s*(?:OF|/)\s*(\d+)
-    inst_match = re.search(r'\b(?:EMI|INSTALLMENT|INSTALMENT)\s*(?:MONTH)?\s*(\d+)\s*(?:OF|/)\s*(\d+)', s, re.I)
-    if inst_match:
-        cur, tot = int(inst_match.group(1)), int(inst_match.group(2))
-        return {
-            'is_emi': True,
-            'component': 'PRINCIPAL',
-            'installment_num': cur,
-            'total_installments': tot,
-            'reference': '',
-            'merchant': f'EMI Installment ({cur}/{tot})',
-        }
-
-    # 4. Merchant purchase on EMI: EMI <Merchant> or <Merchant> EMI or SMARTEMI or FLEXIPAY
-    if re.search(r'^(?:EMI\s+|OFFUS\s+EMI\s+|SMARTEMI\s+|FLEXIPAY\s+)', s, re.I) or re.search(r'\b(?:NO\s+COST\s+EMI|SMARTEMI|FLEXIPAY)\b', s, re.I):
-        clean_m = re.sub(r'^(?:EMI|OFFUS\s+EMI|SMARTEMI|FLEXIPAY)\s+', '', s, flags=re.I).strip()
-        clean_m = re.sub(r'^(?:UPI-)', '', clean_m, flags=re.I).strip()
-        disp, _ = normalize_merchant(clean_m)
-        return {
-            'is_emi': True,
-            'component': 'PURCHASE',
+            'is_emi': False,
+            'component': '',
             'installment_num': None,
             'total_installments': None,
             'reference': '',
-            'merchant': f'{disp or clean_m} (EMI)',
+            'merchant': '',
         }
 
-    return {'is_emi': False, 'component': '', 'installment_num': None, 'total_installments': None, 'reference': '', 'merchant': ''}
+    if not raw or (direction or 'DEBIT').upper() != 'DEBIT':
+        return _empty()
+
+    s = raw.strip()
+    if is_email:
+        segments = re.split(r'[\r\n]+|(?<=[.!?;])\s+', s)
+        kept = [seg for seg in segments if seg and not _EMI_PROMO_SEGMENT_RE.search(seg)]
+        target = '\n'.join(kept).strip()
+        if not target:
+            return _empty()
+    else:
+        if _EMI_PROMO_SEGMENT_RE.search(s) or _EMI_FEE_OR_CREDIT_RE.search(s):
+            return _empty()
+        target = s
+
+    # 1. HDFC / Indian statement installment patterns:
+    # OFFUS EMI,PRIN NB:03,XXXXXXXXXX9861 or EMI,PRIN NB:03
+    prin_match = re.search(r'\b(?:OFFUS\s+)?EMI\s*,\s*PRIN\s+NB:(\d+)\s*,\s*([A-Za-z0-9]+)', target, re.I)
+    if prin_match:
+        ref = prin_match.group(2)[-4:]
+        num = int(prin_match.group(1))
+        if 1 <= num <= 360:
+            return {
+                'is_emi': True,
+                'component': 'PRINCIPAL',
+                'installment_num': num,
+                'total_installments': None,
+                'reference': ref,
+                'merchant': f'Loan ••{ref} (Principal #{num})',
+            }
+
+    # 2. OFFUS EMI,INT NBR:03,XXXXXXXXXX9861 or EMI,INT NBR:03
+    int_match = re.search(r'\b(?:OFFUS\s+)?EMI\s*,\s*INT\s+NBR:(\d+)\s*,\s*([A-Za-z0-9]+)', target, re.I)
+    if int_match:
+        ref = int_match.group(2)[-4:]
+        num = int(int_match.group(1))
+        if 1 <= num <= 360:
+            return {
+                'is_emi': True,
+                'component': 'INTEREST',
+                'installment_num': num,
+                'total_installments': None,
+                'reference': ref,
+                'merchant': f'Loan ••{ref} (Interest #{num})',
+            }
+
+    # 3. Standard installment pattern: EMI (MONTH|NO.|#)? <cur> (OF|/) <tot>
+    if not _EMI_FEE_OR_CREDIT_RE.search(target):
+        inst_match = re.search(
+            r'\b(?:EMI|INSTALLMENT|INSTALMENT)(?:\s+(?:MONTH|NO\.?)|\s*#)?\s*(\d{1,3})\s*(OF|/)\s*(\d{1,3})\b(?![/-]\d)',
+            target,
+            re.I,
+        )
+        if inst_match:
+            cur, tot = int(inst_match.group(1)), int(inst_match.group(3))
+            if 1 <= cur <= tot <= 360 and tot >= 2:
+                return {
+                    'is_emi': True,
+                    'component': 'PRINCIPAL',
+                    'installment_num': cur,
+                    'total_installments': tot,
+                    'reference': '',
+                    'merchant': f'EMI Installment ({cur}/{tot})',
+                }
+            return _empty()
+
+    # 4. Merchant purchase on EMI (statement line) or explicit EMI debit (email alert)
+    if not is_email:
+        if (
+            re.search(r'^(?:EMI\s+|OFFUS\s+EMI\s+|MERCHANT\s+EMI\s+|SMARTEMI\s+|FLEXIPAY\s+)', target, re.I)
+            or re.search(r'\b(?:MERCHANT\s+EMI|OFFUS\s+EMI|NO\s+COST\s+EMI|SMARTEMI|FLEXIPAY)\b', target, re.I)
+        ):
+            clean_m = re.sub(r'^(?:EMI|OFFUS\s+EMI|MERCHANT\s+EMI|SMARTEMI|FLEXIPAY)\s+', '', target, flags=re.I).strip()
+            clean_m = re.sub(r'^(?:UPI-)', '', clean_m, flags=re.I).strip()
+            alpha_m = re.sub(r'\b(?:of|no|month|inst|instalment|installment)\b', '', clean_m, flags=re.I)
+            if len(re.sub(r'[^A-Za-z]', '', alpha_m)) >= 2:
+                disp, _ = normalize_merchant(clean_m)
+                return {
+                    'is_emi': True,
+                    'component': 'PURCHASE',
+                    'installment_num': None,
+                    'total_installments': None,
+                    'reference': '',
+                    'merchant': f'{disp or clean_m} (EMI)',
+                }
+    else:
+        m_raw = (merchant_raw or '').strip()
+        if (
+            m_raw
+            and not _EMI_PROMO_SEGMENT_RE.search(m_raw)
+            and not _EMI_FEE_OR_CREDIT_RE.search(m_raw)
+            and re.search(r'^(?:EMI|OFFUS\s+EMI|SMARTEMI|FLEXIPAY)\s+\S', m_raw, re.I)
+        ):
+            clean_m = re.sub(r'^(?:EMI|OFFUS\s+EMI|SMARTEMI|FLEXIPAY)\s+', '', m_raw, flags=re.I).strip()
+            clean_m = re.sub(r'^(?:UPI-)', '', clean_m, flags=re.I).strip()
+            if len(re.sub(r'[^A-Za-z]', '', clean_m)) >= 2:
+                disp, _ = normalize_merchant(clean_m)
+                return {
+                    'is_emi': True,
+                    'component': 'PURCHASE',
+                    'installment_num': None,
+                    'total_installments': None,
+                    'reference': '',
+                    'merchant': f'{disp or clean_m} (EMI)',
+                }
+        if _EMAIL_EMI_DEBIT_RE.search(target) and not _EMI_FEE_OR_CREDIT_RE.search(target):
+            m_ref = re.search(r'\bloan\s*(?:a/c|account|no\.?|#)?\s*[:\-]?\s*[xX*•.]*(\d{4,})\b', target, re.I)
+            ref = m_ref.group(1)[-4:] if m_ref else ''
+            return {
+                'is_emi': True,
+                'component': 'PRINCIPAL',
+                'installment_num': None,
+                'total_installments': None,
+                'reference': ref,
+                'merchant': f'Loan ••{ref} EMI' if ref else '',
+            }
+
+    return _empty()
 
 
 # ---------------------------------------------------------------------------
@@ -774,14 +887,20 @@ def parse_transaction(
     display, key = normalize_merchant(merchant_text)
 
     # 3. Instrument, channel & details
+    direction = _direction(full)
     instrument = parse_instrument(full)
-    emi = parse_emi_details(full)
+    emi = parse_emi_details(
+        full,
+        is_email=True,
+        merchant_raw=merchant_raw or merchant_text,
+        direction=direction,
+    )
     if emi['is_emi'] and emi['merchant'] and not display:
         display = emi['merchant']
 
     return ParsedTransaction(
         amount=amount,
-        direction=_direction(full),
+        direction=direction,
         txn_date=parse_date(text, received_date) or received_date or datetime.date.today(),
         txn_time=parse_time(text),
         merchant=display,

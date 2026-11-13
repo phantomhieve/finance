@@ -439,7 +439,7 @@ def _add_line(statement, line, cats, method='', confidence=None, reason=''):
 
     card = statement.payment_source
     direction = 'CREDIT' if line.is_credit else 'DEBIT'
-    emi = parse_emi_details(line.description)
+    emi = parse_emi_details(line.description, direction=direction)
     display, key = normalize_merchant(line.description)
     merchant = emi['merchant'] if (emi['is_emi'] and emi['merchant']) else (display or line.description)
     parsed = ParsedTransaction(
@@ -862,13 +862,13 @@ def auto_track_statement_payments(group, since_days=60):
             if not c.merchant or c.merchant in ('Unknown merchant', 'Unknown'):
                 c.merchant = 'Credit Card Bill Payment'
                 updates_c.append('merchant')
-            if c.category and c.category.name == 'Transfers' and cc_payment_cat:
+            if c.category and c.category.name == 'Transfers' and c.category_source != 'USER' and cc_payment_cat:
                 c.category = cc_payment_cat
                 updates_c.append('category')
             if updates_c:
                 c.save(update_fields=updates_c)
 
-            # Heal twin debit if filed under Transfers or uncategorised
+            # Heal twin debit if filed under Transfers or uncategorised (never override USER choice)
             twin_debit = (
                 Expense.objects.filter(
                     group=group,
@@ -878,6 +878,7 @@ def auto_track_statement_payments(group, since_days=60):
                     txn_date__lte=c.txn_date + datetime.timedelta(days=4),
                     is_deleted=False,
                 )
+                .exclude(category_source='USER')
                 .filter(Q(category__name='Transfers') | Q(category__isnull=True))
                 .select_related('category')
                 .first()

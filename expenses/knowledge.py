@@ -167,8 +167,9 @@ def record_ai_brand(
     category_name: str,
     icon: str | None = None,
     confidence: float = 1.0,
+    source: str = 'AI',
 ) -> BrandKnowledge | None:
-    """Expand the database knowledge base when AI categorizes a new merchant with high confidence."""
+    """Expand the database knowledge base when AI categorizes a merchant or a user teaches a mapping."""
     if not merchant_key or not category_name:
         return None
 
@@ -182,6 +183,8 @@ def record_ai_brand(
     clean_display = (display_name or clean_key).strip()
     if clean_display.isupper() or clean_display.islower():
         clean_display = clean_display.title()
+    clean_source = 'USER' if source == 'USER' else 'AI'
+    clean_confidence = 1.0 if clean_source == 'USER' else max(0.0, min(1.0, float(confidence)))
 
     try:
         obj, created = BrandKnowledge.objects.get_or_create(
@@ -190,13 +193,24 @@ def record_ai_brand(
                 'display_name': clean_display[:120],
                 'category_name': category_name[:60],
                 'icon': target_icon[:40],
-                'source': 'AI',
-                'confidence': max(0.0, min(1.0, float(confidence))),
+                'source': clean_source,
+                'confidence': clean_confidence,
                 'hits': 1,
             },
         )
         if not created:
-            BrandKnowledge.objects.filter(pk=obj.pk).update(hits=obj.hits + 1)
+            if clean_source == 'USER' and obj.source != 'SEED':
+                obj.display_name = clean_display[:120]
+                obj.category_name = category_name[:60]
+                obj.icon = target_icon[:40]
+                obj.source = 'USER'
+                obj.confidence = 1.0
+                obj.hits = obj.hits + 1
+                obj.save(update_fields=[
+                    'display_name', 'category_name', 'icon', 'source', 'confidence', 'hits', 'updated_at',
+                ])
+            else:
+                BrandKnowledge.objects.filter(pk=obj.pk).update(hits=obj.hits + 1)
 
         # Update in-memory caches dynamically
         _BRAND_CACHE[clean_key] = (obj.display_name, obj.category_name, obj.icon)
@@ -208,6 +222,23 @@ def record_ai_brand(
     except Exception as exc:
         logger.warning("Could not record AI-discovered brand knowledge for %s: %s", clean_key, exc)
         return None
+
+
+def record_user_brand(
+    merchant_key: str,
+    display_name: str,
+    category_name: str,
+    icon: str | None = None,
+) -> BrandKnowledge | None:
+    """Persist a user-confirmed merchant brand mapping without overriding global SEED entries."""
+    return record_ai_brand(
+        merchant_key=merchant_key,
+        display_name=display_name,
+        category_name=category_name,
+        icon=icon,
+        confidence=1.0,
+        source='USER',
+    )
 
 
 class _CategoryDefaultIconsProxy(dict):

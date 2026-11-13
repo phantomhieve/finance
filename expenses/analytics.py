@@ -232,7 +232,7 @@ def month_summary(
     refund_count = month_all.filter(all_refunds_q()).count()
 
     # Credit card EMI metrics
-    emi_qs = month_all.filter(is_emi=True)
+    emi_qs = month_all.filter(is_emi=True, direction='DEBIT')
     ongoing_by_loan = defaultdict(lambda: {
         'ref': '', 'num': None, 'total_installments': None, 'pending_installments': None,
         'principal': ZERO, 'interest': ZERO, 'total': ZERO, 'payment_source': None,

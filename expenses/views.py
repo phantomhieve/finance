@@ -347,14 +347,19 @@ def _save_expense(request, form, previous_category=None, creating=False):
         Expense.objects.filter(
             group=obj.group, is_emi=True, emi_reference=obj.emi_reference
         ).exclude(pk=obj.pk).update(emi_total_installments=obj.emi_total_installments)
-    if new_category and (creating or new_category.pk != previous_category):
+    if new_category and (creating or new_category.pk != previous_category or remember):
         learned = learn_category(obj, new_category, request.user, apply_to_similar=remember)
         if learned:
             messages.info(request, f'Learned: {obj.merchant} → {new_category.name} (re-filed {learned} past '
                                    f'transaction{"s" if learned != 1 else ""}).')
+    elif new_category and obj.category_source == 'NONE':
+        obj.category_source = 'USER'
+        obj.category_confidence = 1.0
+        obj.save(update_fields=['category_source', 'category_confidence', 'updated_at'])
     elif not new_category and not creating and previous_category:
         obj.category_source = 'USER'
-        obj.save(update_fields=['category_source'])
+        obj.category_confidence = None
+        obj.save(update_fields=['category_source', 'category_confidence', 'updated_at'])
     apply_flags(obj)
     return obj
 

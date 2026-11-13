@@ -91,11 +91,17 @@ def build_expense(
         refunded_amount=parsed.refunded_amount,
         refund_date=parsed.refund_date,
     )
+    cats = cats or categories_by_name(group)
     categorise_expense(expense, cats)
-    if expense.is_emi and (not expense.category or expense.category.kind != 'SPEND'):
-        if cats and 'EMI & Loans' in cats:
-            expense.category = cats['EMI & Loans']
-            expense.category_source = 'RULE'
+    if (
+        expense.is_emi
+        and expense.direction == 'DEBIT'
+        and not expense.category
+        and expense.emi_component != 'PURCHASE'
+        and 'EMI & Loans' in cats
+    ):
+        expense.category = cats['EMI & Loans']
+        expense.category_source = 'KEYWORD'
     expense.save()
     return expense, True
 

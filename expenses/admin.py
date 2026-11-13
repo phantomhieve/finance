@@ -62,6 +62,17 @@ class ExpenseAdmin(ModelAdmin):
     readonly_fields = ('gmail_account', 'gmail_message_id', 'email_subject', 'dedupe_key', 'merchant_key',
                        'created_by', 'created_at', 'updated_at')
 
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.created_by = obj.created_by or request.user
+            if obj.category_id and 'category_source' not in form.changed_data:
+                obj.category_source = 'USER'
+                obj.category_confidence = 1.0
+        elif 'category' in form.changed_data and 'category_source' not in form.changed_data:
+            obj.category_source = 'USER'
+            obj.category_confidence = 1.0 if obj.category_id else None
+        super().save_model(request, obj, form, change)
+
 
 @admin.register(MerchantRule)
 class MerchantRuleAdmin(ModelAdmin):
