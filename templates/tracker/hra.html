@@ -33,6 +33,15 @@
 
 {% block content %}
 
+{# --- DEPRECATION NOTICE BANNER --- #}
+<div role="status" aria-live="polite" class="mb-5 p-3.5 sm:px-4 rounded-xl border flex items-start sm:items-center gap-3 animate-up" style="background: var(--v-caution-tint); border-color: color-mix(in oklch, var(--v-caution) 30%, transparent);">
+  <span class="material-symbols-outlined text-xl shrink-0 mt-0.5 sm:mt-0" style="color: var(--v-caution);" aria-hidden="true">warning</span>
+  <div class="text-xs sm:text-sm leading-relaxed text-base-content/90">
+    <strong class="font-semibold" style="color: var(--v-caution);">Deprecation Notice:</strong>
+    This HRA &amp; Rent page will be discarded shortly. HRA entries no longer affect Monthly Savings.
+  </div>
+</div>
+
 {# --- SIGNATURE LEDGER BAND --- #}
 <section class="v-ledger-band mb-5" aria-label="HRA financial position">
   <div class="v-lead-cell">

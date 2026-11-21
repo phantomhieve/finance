@@ -33,6 +33,7 @@ DEFAULT_MONTHLY_GOAL: float = 3_500_000.0 / 12.0  # ≈ 291,666.67
 
 MIN_FY_YEAR: int = 2000
 MAX_FY_YEAR: int = 2099
+LEGACY_HRA_CUTOFF_FY: int = 2026  # FY 2026-27 onwards decouples Transfers & HRA from Monthly Savings
 
 
 def group_user_filter(user: Any) -> Q:
@@ -153,7 +154,7 @@ def apply_carry_forward(user: Any, fy_start_date: datetime.date, base_monthly: f
 
 
 def hra_spent(user: Any, fy_start_date: datetime.date, fy_end_date: datetime.date) -> float:
-    """Total HRA expenses for the FY across the group."""
+    """Total HRA expenses for the FY across the group (applied to Monthly Savings only in legacy FYs < LEGACY_HRA_CUTOFF_FY)."""
     spent = HRAExpense.objects.filter(
         group_user_filter(user),
         hra_type='EXPENSE',
@@ -164,7 +165,11 @@ def hra_spent(user: Any, fy_start_date: datetime.date, fy_end_date: datetime.dat
 
 
 def aggregate_transactions(queryset: QuerySet[Transaction]) -> tuple[float, float, float, float]:
-    """Return (net_savings, transfers, income, expense) totals from a transaction queryset."""
+    """Return (net_savings, transfers, income, expense) totals from a transaction queryset.
+
+    Note: ``transfers`` is only folded into Monthly Savings goal achievement for legacy FYs
+    (``fy_start < LEGACY_HRA_CUTOFF_FY``).
+    """
     agg = queryset.aggregate(
         savings_pos=Sum(Case(When(type='SAVINGS', then='amount'), default=Value(0), output_field=DecimalField())),
         expense=Sum(Case(When(type='EXPENSE', then='amount'), default=Value(0), output_field=DecimalField())),

@@ -2,6 +2,9 @@ from django import forms
 from .models import Transaction, GoalIncrement, FinancialGoal, HRAExpense, MonthlyGoalAdjustment, Note, MonthlySavingsComment
 
 ENTRY_TYPE_CHOICES = Transaction.TRANSACTION_TYPE_CHOICES
+ACTIVE_ENTRY_TYPE_CHOICES = tuple(
+    choice for choice in ENTRY_TYPE_CHOICES if choice[0] != 'TRANSFER'
+)
 
 HRA_ENTRY_TYPE_CHOICES = HRAExpense.HRA_TYPE_CHOICES
 
@@ -10,9 +13,14 @@ class TransactionForm(forms.ModelForm):
     """Form for adding a monthly savings transaction."""
 
     type = forms.ChoiceField(
-        choices=ENTRY_TYPE_CHOICES,
+        choices=ACTIVE_ENTRY_TYPE_CHOICES,
         widget=forms.Select(attrs={'class': 'form-select'})
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.pk and self.instance.type == 'TRANSFER':
+            self.fields['type'].choices = ENTRY_TYPE_CHOICES
 
     class Meta:
         model = Transaction
