@@ -28,6 +28,7 @@ from .forms import (
 from .services import (
     MONTH_ORDER,
     MONTH_TO_NUM,
+    LEGACY_HRA_CUTOFF_FY,
     fy_date_range,
     get_month_date,
     resolve_per_month_goals,
@@ -158,9 +159,15 @@ def dashboard(request):
     total_goal = sum(per_month_goals.values())
 
     total_savings, total_transfers, total_income, total_expense = aggregate_transactions(transactions)
-    hra_spent = get_hra_spent(request.user, fc['fy_start_date'], fc['fy_end_date'])
+    use_legacy_hra = fy_start < LEGACY_HRA_CUTOFF_FY
+    if use_legacy_hra:
+        hra_spent = get_hra_spent(request.user, fc['fy_start_date'], fc['fy_end_date'])
+        hra_balance = total_transfers - hra_spent
+        goal_achieved = total_savings + total_income + hra_balance
+    else:
+        hra_balance = None
+        goal_achieved = total_savings + total_income
 
-    goal_achieved = total_savings + total_income + (total_transfers - hra_spent)
     goal_remaining = total_goal - goal_achieved
     goal_pct = max(0, min(100, int((goal_achieved / total_goal) * 100))) if total_goal else 0
 
@@ -202,7 +209,8 @@ def dashboard(request):
         'goal_surplus': max(0.0, -goal_remaining),
         'goal_pct': goal_pct,
         'pace': pace,
-        'hra_balance': total_transfers - hra_spent,
+        'use_legacy_hra': use_legacy_hra,
+        'hra_balance': hra_balance,
         'monthly_data': monthly_data,
         'transactions': fy_transactions,
         'txn_form': txn_form,

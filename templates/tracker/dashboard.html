@@ -102,6 +102,7 @@
       <div class="v-stat-sub truncate">Bonuses &amp; secondary inflows</div>
     </div>
 
+    {% if use_legacy_hra %}
     <div class="v-stat-cell">
       <div class="v-stat-label">Transfers</div>
       <div class="v-stat-value text-sky-400 tabular-nums">{{ total_transfers|inr }}</div>
@@ -118,6 +119,7 @@
       </div>
       <div class="v-stat-sub truncate">Rent &amp; allowance pool</div>
     </a>
+    {% endif %}
   </div>
 </section>
 
@@ -260,7 +262,9 @@
       <button type="button" class="filter-pill !min-h-11 lg:!min-h-8 is-active txn-type-pill cursor-pointer" data-type="ALL" onclick="filterSavingsTxns('ALL', this)">All</button>
       <button type="button" class="filter-pill !min-h-11 lg:!min-h-8 txn-type-pill cursor-pointer" data-type="SAVINGS" onclick="filterSavingsTxns('SAVINGS', this)">Savings</button>
       <button type="button" class="filter-pill !min-h-11 lg:!min-h-8 txn-type-pill cursor-pointer" data-type="EXTRA_INCOME" onclick="filterSavingsTxns('EXTRA_INCOME', this)">Income</button>
+      {% if use_legacy_hra or total_transfers %}
       <button type="button" class="filter-pill !min-h-11 lg:!min-h-8 txn-type-pill cursor-pointer" data-type="TRANSFER" onclick="filterSavingsTxns('TRANSFER', this)">Transfer</button>
+      {% endif %}
       <button type="button" class="filter-pill !min-h-11 lg:!min-h-8 txn-type-pill cursor-pointer" data-type="EXPENSE" onclick="filterSavingsTxns('EXPENSE', this)">Expense</button>
     </div>
 
@@ -675,8 +679,23 @@ function editAdjustment(id, date, amount, reason) {
   if (r) r.value = reason;
 }
 
+function _syncLegacyTransferOption(allowLegacy) {
+  var typeSel = document.getElementById('id_type');
+  if (!typeSel) return;
+  var existingLegacy = typeSel.querySelector('option[data-legacy-transfer="1"]');
+  if (existingLegacy) existingLegacy.remove();
+  if (allowLegacy && !typeSel.querySelector('option[value="TRANSFER"]')) {
+    var opt = document.createElement('option');
+    opt.value = 'TRANSFER';
+    opt.textContent = 'Transfer (Legacy)';
+    opt.setAttribute('data-legacy-transfer', '1');
+    typeSel.appendChild(opt);
+  }
+}
+
 function newTransaction() {
   var form = document.getElementById('addTxnForm');
+  _syncLegacyTransferOption(false);
   form.action = "{% url 'add_transaction' %}";
   form.reset();
   document.getElementById('txnDeleteBtn').style.display = 'none';
@@ -691,6 +710,7 @@ function editTransaction(id, date, type, amount, remarks) {
   delForm.action = "{% url 'delete_transaction' pk=0 %}".replace('/0/', '/' + id + '/');
   document.getElementById('txnDeleteBtn').style.display = 'inline-flex';
   document.getElementById('txnModalTitle').innerHTML = '<span class="material-symbols-outlined text-primary">edit</span> Edit Entry';
+  _syncLegacyTransferOption(type === 'TRANSFER');
   document.getElementById('id_date').value = date;
   document.getElementById('id_type').value = type;
   document.getElementById('id_amount').value = parseFloat(amount);

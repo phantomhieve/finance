@@ -391,3 +391,100 @@ class TrackerSecurityHardeningTests(TestCase):
         self.assertFalse(MonthlySavingsComment.objects.filter(user=self.owner).exists())
 
 
+class LegacyHRADecouplingTests(TestCase):
+    def setUp(self):
+        self.group = AccountGroup.objects.create(name="DecoupleHome")
+        self.owner = User.objects.create_user(
+            username="dec_owner", password="x", user_type="PRIMARY", group=self.group
+        )
+        self.landlord = User.objects.create_user(
+            username="dec_landlord", password="x", user_type="LANDLORD", group=self.group
+        )
+
+    def test_current_fy_2026_excludes_transfers_and_hra_from_savings_and_ui(self):
+        from tracker.models import HRAExpense
+
+        d26 = datetime.date(2026, 5, 10)
+        Transaction.objects.create(user=self.owner, date=d26, amount=Decimal('50000'), type='SAVINGS')
+        Transaction.objects.create(user=self.owner, date=d26, amount=Decimal('10000'), type='EXTRA_INCOME')
+        Transaction.objects.create(user=self.owner, date=d26, amount=Decimal('5000'), type='EXPENSE')
+        Transaction.objects.create(user=self.owner, date=d26, amount=Decimal('20000'), type='TRANSFER')
+        HRAExpense.objects.create(
+            user=self.owner, date=d26, amount=Decimal('15000'),
+            expense_type='Rent', hra_type='EXPENSE', mode_of_payment='UPI',
+        )
+
+        self.client.force_login(self.owner)
+        resp = self.client.get('/?fy=2026')
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.context['goal_achieved'], 55000.0)
+        self.assertIsNone(resp.context['hra_balance'])
+        self.assertFalse(resp.context['use_legacy_hra'])
+
+        html = resp.content.decode()
+        self.assertNotIn('HRA Balance', html)
+        self.assertNotIn('<div class="v-stat-label">Transfers</div>', html)
+
+    def test_new_transactions_reject_transfer_while_legacy_transfer_edits_succeed(self):
+        self.client.force_login(self.owner)
+
+        resp = self.client.post('/transactions/add/', {
+            'date': '2026-06-01',
+            'amount': '12000',
+            'type': 'TRANSFER',
+            'remarks': 'Should not be allowed',
+        })
+        self.assertEqual(resp.status_code, 302)
+        self.assertFalse(Transaction.objects.filter(user=self.owner, type='TRANSFER').exists())
+
+        legacy_txn = Transaction.objects.create(
+            user=self.owner,
+            date=datetime.date(2026, 4, 15),
+            amount=Decimal('20000'),
+            type='TRANSFER',
+            remarks='Old transfer',
+        )
+        edit_resp = self.client.post(f'/transactions/edit/{legacy_txn.pk}/', {
+            'date': '2026-04-15',
+            'amount': '20000',
+            'type': 'TRANSFER',
+            'remarks': 'Old transfer updated',
+        })
+        self.assertEqual(edit_resp.status_code, 302)
+        legacy_txn.refresh_from_db()
+        self.assertEqual(legacy_txn.type, 'TRANSFER')
+        self.assertEqual(legacy_txn.remarks, 'Old transfer updated')
+
+    def test_previous_fy_2025_preserves_legacy_hra_and_transfers_calculation(self):
+        from tracker.models import HRAExpense
+
+        d25 = datetime.date(2025, 5, 10)
+        Transaction.objects.create(user=self.owner, date=d25, amount=Decimal('50000'), type='SAVINGS')
+        Transaction.objects.create(user=self.owner, date=d25, amount=Decimal('10000'), type='EXTRA_INCOME')
+        Transaction.objects.create(user=self.owner, date=d25, amount=Decimal('5000'), type='EXPENSE')
+        Transaction.objects.create(user=self.owner, date=d25, amount=Decimal('20000'), type='TRANSFER')
+        HRAExpense.objects.create(
+            user=self.owner, date=d25, amount=Decimal('15000'),
+            expense_type='Rent', hra_type='EXPENSE', mode_of_payment='UPI',
+        )
+
+        self.client.force_login(self.owner)
+        resp = self.client.get('/?fy=2025')
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.context['use_legacy_hra'])
+        self.assertEqual(resp.context['hra_balance'], 5000.0)
+        self.assertEqual(resp.context['goal_achieved'], 60000.0)
+
+        html = resp.content.decode()
+        self.assertIn('HRA Balance', html)
+        self.assertIn('<div class="v-stat-label">Transfers</div>', html)
+
+    def test_hra_page_renders_deprecation_banner_for_primary_and_landlord(self):
+        for u in (self.owner, self.landlord):
+            self.client.force_login(u)
+            resp = self.client.get('/hra/')
+            self.assertEqual(resp.status_code, 200)
+            self.assertContains(resp, 'will be discarded shortly')
+
+
+

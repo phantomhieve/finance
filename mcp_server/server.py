@@ -1173,12 +1173,12 @@ def add_transaction(
     category_name: str = "",
     remarks: str = "",
 ) -> str:
-    """Add a savings/expense/transfer/income transaction.
+    """Add a savings/expense/income transaction.
 
     Args:
         date: Transaction date in YYYY-MM-DD format
         amount: Transaction amount (positive number)
-        type: One of SAVINGS, EXPENSE, TRANSFER, EXTRA_INCOME
+        type: One of SAVINGS, EXPENSE, EXTRA_INCOME
         category_name: Category name (must exist). Leave empty if none.
         remarks: Optional remarks
     """
@@ -1186,7 +1186,7 @@ def add_transaction(
     if not user:
         return "Error: No primary user found."
 
-    valid_types = ['SAVINGS', 'TRANSFER', 'EXTRA_INCOME', 'EXPENSE']
+    valid_types = ['SAVINGS', 'EXTRA_INCOME', 'EXPENSE']
     if type.upper() not in valid_types:
         return f"Error: type must be one of {valid_types}"
 
@@ -1223,13 +1223,13 @@ def update_transaction(
     category_name: str = None,
     remarks: str = None,
 ) -> str:
-    """Update an existing savings/expense/transfer/income transaction.
+    """Update an existing savings/expense/income transaction.
 
     Args:
         txn_id: ID of the transaction to update
         amount: New transaction amount (optional)
         date: New date in YYYY-MM-DD format (optional)
-        type: SAVINGS, EXPENSE, TRANSFER, or EXTRA_INCOME (optional)
+        type: SAVINGS, EXPENSE, or EXTRA_INCOME (optional)
         category_name: Category name (optional)
         remarks: Updated remarks (optional)
     """
@@ -1247,7 +1247,9 @@ def update_transaction(
     if date is not None and date != "":
         txn.date = _parse_date(date)
     if type is not None and type != "":
-        valid_types = ['SAVINGS', 'TRANSFER', 'EXTRA_INCOME', 'EXPENSE']
+        valid_types = ['SAVINGS', 'EXTRA_INCOME', 'EXPENSE']
+        if txn.type == 'TRANSFER':
+            valid_types.append('TRANSFER')
         if type.upper() not in valid_types:
             return f"Error: type must be one of {valid_types}"
         txn.type = type.upper()
